@@ -21,7 +21,7 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <artifactId>sedona-parent</artifactId>
-        <groupId>org.apache.sedona</groupId>
+        <groupId>com.wherobots</groupId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
     <artifactId>sedona-spark-shaded-${spark.compat.version}_${scala.compat.version}</artifactId>
@@ -39,7 +39,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.apache.sedona</groupId>
+            <groupId>com.wherobots</groupId>
             <artifactId>sedona-common</artifactId>
             <version>${project.version}</version>
             <exclusions>
@@ -50,17 +50,17 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>org.apache.sedona</groupId>
+            <groupId>com.wherobots</groupId>
             <artifactId>sedona-core-${spark.compat.version}_${scala.compat.version}</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.sedona</groupId>
+            <groupId>com.wherobots</groupId>
             <artifactId>sedona-sql-${spark.compat.version}_${scala.compat.version}</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.sedona</groupId>
+            <groupId>com.wherobots</groupId>
             <artifactId>sedona-python-adapter-${spark.compat.version}_${scala.compat.version}</artifactId>
             <version>${project.version}</version>
         </dependency>

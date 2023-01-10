@@ -25,7 +25,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setup(
-    name='apache-sedona',
+    name='wherobots-sedona',
     version=version,
     description='Apache Sedona is a cluster computing system for processing large-scale spatial data',
     url='https://sedona.apache.org',

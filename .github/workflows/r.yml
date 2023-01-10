@@ -100,8 +100,8 @@ jobs:
           _R_CHECK_FORCE_SUGGESTS_: false
           WARNINGS_ARE_ERRORS: 1
         run: |
-          R CMD check --no-build-vignettes --no-manual --no-tests apache.sedona*.tar.gz
-          rm -f apache.sedona*.tar.gz
+          R CMD check --no-build-vignettes --no-manual --no-tests wherobots.sedona*.tar.gz
+          rm -f wherobots.sedona*.tar.gz
       - name: Install apache.sedona from source
         run: Rscript -e 'install.packages("./R/", repos = NULL, type = "source")'
       - name: Run tests

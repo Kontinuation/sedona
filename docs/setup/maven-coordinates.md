@@ -18,12 +18,12 @@ The optional GeoTools library is required only if you want to use CRS transforma
 	
 		```xml
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-python-adapter-3.0_2.12</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-viz-3.0_2.12</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
@@ -39,12 +39,12 @@ The optional GeoTools library is required only if you want to use CRS transforma
 	
 		```xml
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-python-adapter-3.0_2.13</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-viz-3.0_2.13</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
@@ -63,12 +63,12 @@ The optional GeoTools library is required only if you want to use CRS transforma
 	
 		```xml
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-python-adapter-3.0_2.12</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-flink_2.12</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
@@ -137,17 +137,17 @@ Under BSD 3-clause (compatible with Apache 2.0 license)
 	
 		```xml
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-core-3.0_2.12</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-sql-3.0_2.12</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-viz-3.0_2.12</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
@@ -156,17 +156,17 @@ Under BSD 3-clause (compatible with Apache 2.0 license)
 	
 		```xml
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-core-3.0_2.13</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-sql-3.0_2.13</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-viz-3.0_2.13</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
@@ -180,17 +180,17 @@ Under BSD 3-clause (compatible with Apache 2.0 license)
 	
 		```xml
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-core-3.0_2.12</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-sql-3.0_2.12</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
 		<dependency>
-		  <groupId>org.apache.sedona</groupId>
+		  <groupId>com.wherobots</groupId>
 		  <artifactId>sedona-flink-3.0_2.12</artifactId>
 		  <version>{{ sedona.current_version }}</version>
 		</dependency>
