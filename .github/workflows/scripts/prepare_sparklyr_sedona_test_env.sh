@@ -26,7 +26,7 @@ sedona_jar_files () {
         -Dexpression=project.artifactId \
         -q \
         -DforceStdout \
-        -f "${subdir}"/target/resolved-pom.xml
+        -f "${subdir}"/pom.xml
     )"
     local artifact_version="$(
       mvn \
@@ -34,7 +34,7 @@ sedona_jar_files () {
         -Dexpression=project.version \
         -q \
         -DforceStdout \
-        -f "${subdir}"/target/resolved-pom.xml
+        -f "${subdir}"/pom.xml
     )"
     echo "$(pwd)/${subdir}/target/${artifact_id}-${artifact_version}.jar"
   done
