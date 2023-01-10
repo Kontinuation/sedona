@@ -274,7 +274,7 @@ class TestAdapter(TestBase):
         assert spatial_rdd.approximateTotalCount == 121960
         assert spatial_rdd.boundaryEnvelope == Envelope(-179.147236, 179.475569, -14.548699, 71.35513400000001)
 
-    @pytest.mark.skipif(is_greater_or_equal_version(version, "1.0.0"), reason="Deprecated in Sedona")
+    @pytest.mark.skipif(is_greater_or_equal_version(version, "0.9.9"), reason="Deprecated in Sedona")
     def test_to_spatial_rdd_df_geom_column_id(self):
         df = self.spark.read.\
             format("csv").\

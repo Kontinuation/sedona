@@ -35,7 +35,7 @@ geo_json_with_invalid_geom_with_feature_property = os.path.join(tests_resource, 
 class TestGeoJsonReader(TestBase):
 
     def test_read_to_geometry_rdd(self):
-        if is_greater_or_equal_version(SedonaMeta.version, "1.0.0"):
+        if is_greater_or_equal_version(SedonaMeta.version, "0.9.9"):
             geo_json_rdd = GeoJsonReader.readToGeometryRDD(
                 self.sc,
                 geo_json_geom_with_feature_property
@@ -51,7 +51,7 @@ class TestGeoJsonReader(TestBase):
             assert geo_json_rdd.rawSpatialRDD.count() == 10
 
     def test_read_to_valid_geometry_rdd(self):
-        if is_greater_or_equal_version(SedonaMeta.version, "1.0.0"):
+        if is_greater_or_equal_version(SedonaMeta.version, "0.9.9"):
             geo_json_rdd = GeoJsonReader.readToGeometryRDD(
                 self.sc,
                 geo_json_geom_with_feature_property,
@@ -86,7 +86,7 @@ class TestGeoJsonReader(TestBase):
             assert geo_json_rdd.rawSpatialRDD.count() == 3
 
     def test_read_to_include_id_rdd(self):
-        if is_greater_or_equal_version(SedonaMeta.version, "1.0.0"):
+        if is_greater_or_equal_version(SedonaMeta.version, "0.9.9"):
             geo_json_rdd = GeoJsonReader.readToGeometryRDD(
                 self.sc,
                 geo_json_contains_id,
@@ -107,7 +107,7 @@ class TestGeoJsonReader(TestBase):
                 assert geo_json_rdd.fieldNames.__len__() == 3
 
     def test_read_to_geometry_rdd_invalid_syntax(self):
-        if is_greater_or_equal_version(SedonaMeta.version, "1.0.0"):
+        if is_greater_or_equal_version(SedonaMeta.version, "0.9.9"):
             geojson_rdd = GeoJsonReader.readToGeometryRDD(
                 self.sc,
                 geo_json_with_invalid_geom_with_feature_property,
