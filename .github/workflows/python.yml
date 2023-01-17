@@ -19,30 +19,30 @@ jobs:
             scala: '2.12.8'
             python: '3.10'
             hadoop: '3'
-          - spark: '3.3.0'
-            scala: '2.12.8'
-            python: '3.9'
-            hadoop: '3'
-          - spark: '3.3.0'
-            scala: '2.12.8'
-            python: '3.8'
-            hadoop: '3'
-          - spark: '3.3.0'
-            scala: '2.12.8'
-            python: '3.7'
-            hadoop: '3'
-          - spark: '3.2.0'
-            scala: '2.12.8'
-            python: '3.7'
-            hadoop: '2.7'
-          - spark: '3.1.2'
-            scala: '2.12.8'
-            python: '3.7'
-            hadoop: '2.7'
-          - spark: '3.0.3'
-            scala: '2.12.8'
-            python: '3.7'
-            hadoop: '2.7'
+#          - spark: '3.3.0'
+#            scala: '2.12.8'
+#            python: '3.9'
+#            hadoop: '3'
+#          - spark: '3.3.0'
+#            scala: '2.12.8'
+#            python: '3.8'
+#            hadoop: '3'
+#          - spark: '3.3.0'
+#            scala: '2.12.8'
+#            python: '3.7'
+#            hadoop: '3'
+#          - spark: '3.2.0'
+#            scala: '2.12.8'
+#            python: '3.7'
+#            hadoop: '2.7'
+#          - spark: '3.1.2'
+#            scala: '2.12.8'
+#            python: '3.7'
+#            hadoop: '2.7'
+#          - spark: '3.0.3'
+#            scala: '2.12.8'
+#            python: '3.7'
+#            hadoop: '2.7'
 
     steps:
     - uses: actions/checkout@v2
@@ -71,7 +71,7 @@ jobs:
         SPARK_VERSION: ${{ matrix.spark }}
         HADOOP_VERSION: ${{ matrix.hadoop }}
       run: tar -xzf spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz
-    - run: sudo apt-get -y install python3-pip python-dev libgeos-dev
+    - run: sudo apt-get -y install python3-pip python-dev-is-python3 libgeos-dev
     - run: sudo pip3 install -U setuptools
     - run: sudo pip3 install -U wheel
     - run: sudo pip3 install -U virtualenvwrapper

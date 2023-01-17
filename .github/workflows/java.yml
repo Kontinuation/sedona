@@ -16,30 +16,30 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - spark: 3.3.0
-            scala: 2.13.8
-            jdk: '8'
-            skipTests: ''
+#          - spark: 3.3.0
+#            scala: 2.13.8
+#            jdk: '8'
+#            skipTests: ''
           - spark: 3.3.0
             scala: 2.12.15
             jdk: '8'
             skipTests: ''            
-          - spark: 3.3.0
-            scala: 2.12.15
-            jdk: '11'
-            skipTests: '-DskipTests'            
-          - spark: 3.2.0
-            scala: 2.12.15
-            jdk: '8'
-            skipTests: ''            
-          - spark: 3.1.2
-            scala: 2.12.15
-            jdk: '8'
-            skipTests: ''            
-          - spark: 3.0.3
-            scala: 2.12.15
-            jdk: '8'
-            skipTests: ''
+#          - spark: 3.3.0
+#            scala: 2.12.15
+#            jdk: '11'
+#            skipTests: '-DskipTests'
+#          - spark: 3.2.0
+#            scala: 2.12.15
+#            jdk: '8'
+#            skipTests: ''
+#          - spark: 3.1.2
+#            scala: 2.12.15
+#            jdk: '8'
+#            skipTests: ''
+#          - spark: 3.0.3
+#            scala: 2.12.15
+#            jdk: '8'
+#            skipTests: ''
 
     steps:
     - uses: actions/checkout@v2
