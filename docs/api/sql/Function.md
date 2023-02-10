@@ -1128,7 +1128,7 @@ Result:
 
 ## ST_SetSRID
 
-Introduction: Sets the spatial refence system identifier (SRID) of the geometry.
+Introduction: Sets the spatial reference system identifier (SRID) of the geometry.
 
 Format: `ST_SetSRID (A:geometry, srid: Integer)`
 
@@ -1179,7 +1179,7 @@ Output: `MULTILINESTRING ((0 0, 0.5 0.5), (0.5 0.5, 1 1), (1 1, 1.5 1.5, 2 2))`
 
 ## ST_SRID
 
-Introduction: Return the spatial refence system identifier (SRID) of the geometry.
+Introduction: Return the spatial reference system identifier (SRID) of the geometry.
 
 Format: `ST_SRID (A:geometry)`
 
