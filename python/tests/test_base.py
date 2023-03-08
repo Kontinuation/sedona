@@ -14,9 +14,8 @@
 #  KIND, either express or implied.  See the License for the
 #  specific language governing permissions and limitations
 #  under the License.
-
+import pytest
 from pyspark.sql import SparkSession
-
 from sedona.register import SedonaRegistrator
 from sedona.utils import KryoSerializer, SedonaKryoRegistrator
 from sedona.utils.decorators import classproperty
@@ -30,10 +29,9 @@ class TestBase:
             spark = SparkSession. \
                 builder. \
                 config("spark.serializer", KryoSerializer.getName).\
-                config("spark.kryo.registrator", SedonaKryoRegistrator.getName) .\
+                config("spark.kryo.registrator", SedonaKryoRegistrator.getName) . \
                 master("local[*]").\
                 getOrCreate()
-
             SedonaRegistrator.registerAll(spark)
 
             setattr(self, "__spark", spark)

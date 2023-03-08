@@ -18,11 +18,12 @@
  */
 package org.apache.sedona.sql.utils
 
+import com.wherobots.sedona.sql.monitoring.ListenerRegistrator
 import org.apache.sedona.sql.UDF.UdfRegistrator
 import org.apache.sedona.sql.UDT.UdtRegistrator
 import org.apache.spark.sql.sedona_sql.optimization.SpatialFilterPushDownForGeoParquet
-import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
+import org.apache.spark.sql.{SQLContext, SparkSession}
 
 object SedonaSQLRegistrator {
   def registerAll(sqlContext: SQLContext): Unit = {
@@ -38,9 +39,11 @@ object SedonaSQLRegistrator {
     }
     UdtRegistrator.registerAll()
     UdfRegistrator.registerAll(sparkSession)
+    ListenerRegistrator.registerAll(sparkSession)
   }
 
   def dropAll(sparkSession: SparkSession): Unit = {
     UdfRegistrator.dropAll(sparkSession)
+    ListenerRegistrator.unregisterAll(sparkSession)
   }
 }
