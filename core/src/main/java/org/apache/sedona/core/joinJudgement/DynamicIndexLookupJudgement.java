@@ -36,8 +36,6 @@ import org.locationtech.jts.index.SpatialIndex;
 import org.locationtech.jts.index.quadtree.Quadtree;
 import org.locationtech.jts.index.strtree.STRtree;
 
-import javax.annotation.Nullable;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -93,8 +91,6 @@ public class DynamicIndexLookupJudgement<T extends Geometry, U extends Geometry>
             return Collections.emptyIterator();
         }
 
-        initPartition();
-
         final boolean buildLeft = (joinBuildSide == JoinBuildSide.LEFT);
 
         final Iterator<? extends Geometry> buildShapes;
@@ -118,6 +114,7 @@ public class DynamicIndexLookupJudgement<T extends Geometry, U extends Geometry>
             private int nextIndex = 0;
 
             private int shapeCnt = 0;
+            private JoinResultCandidateRefiner.Refiner refiner = createRefiner(!buildLeft);
 
             @Override
             public boolean hasNext()
@@ -166,22 +163,9 @@ public class DynamicIndexLookupJudgement<T extends Geometry, U extends Geometry>
                     streamCount.add(1);
                     final Geometry streamShape = streamShapes.next();
                     final List candidates = spatialIndex.query(streamShape.getEnvelopeInternal());
-                    for (Object candidate : candidates) {
-                        candidateCount.add(1);
-                        final Geometry buildShape = (Geometry) candidate;
-                        if (buildLeft) {
-                            if (match(buildShape, streamShape)) {
-                                batch.add(Pair.of((U) buildShape, (T) streamShape));
-                                resultCount.add(1);
-                            }
-                        }
-                        else {
-                            if (match(streamShape, buildShape)) {
-                                batch.add(Pair.of((U) streamShape, (T) buildShape));
-                                resultCount.add(1);
-                            }
-                        }
-                    }
+                    candidateCount.add(candidates.size());
+                    refiner.refine(streamShape, candidates, batch);
+                    resultCount.add(batch.size());
                     logMilestone(shapeCnt, 100 * 1000, "Streaming shapes");
                     if (!batch.isEmpty()) {
                         return true;

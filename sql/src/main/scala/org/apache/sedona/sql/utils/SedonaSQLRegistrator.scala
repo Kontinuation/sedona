@@ -21,7 +21,8 @@ package org.apache.sedona.sql.utils
 import com.wherobots.sedona.sql.monitoring.ListenerRegistrator
 import org.apache.sedona.sql.UDF.UdfRegistrator
 import org.apache.sedona.sql.UDT.UdtRegistrator
-import org.apache.spark.sql.sedona_sql.optimization.SpatialFilterPushDownForGeoParquet
+import org.apache.spark.sql.sedona_sql.optimization.{SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
+import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
 import org.apache.spark.sql.{SQLContext, SparkSession}
 
@@ -33,6 +34,9 @@ object SedonaSQLRegistrator {
   def registerAll(sparkSession: SparkSession): Unit = {
     if (!sparkSession.experimental.extraStrategies.exists(_.isInstanceOf[JoinQueryDetector])) {
       sparkSession.experimental.extraStrategies ++= Seq(new JoinQueryDetector(sparkSession))
+    }
+    if (!sparkSession.experimental.extraOptimizations.exists(_.isInstanceOf[UsePreparedPredicate])) {
+      sparkSession.experimental.extraOptimizations ++= Seq(new UsePreparedPredicate)
     }
     if (!sparkSession.experimental.extraOptimizations.exists(_.isInstanceOf[SpatialFilterPushDownForGeoParquet])) {
       sparkSession.experimental.extraOptimizations ++= Seq(new SpatialFilterPushDownForGeoParquet(sparkSession))

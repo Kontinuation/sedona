@@ -22,6 +22,7 @@ package org.apache.sedona.core.rangeJudgement;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.prep.PreparedGeometry;
 
 import java.io.Serializable;
 
@@ -59,6 +60,11 @@ public class JudgementBase<U extends Geometry>
     public boolean match(Geometry spatialObject, Geometry queryWindow)
     {
         return evaluator.eval(spatialObject, queryWindow);
+    }
+
+    public boolean match(Geometry spatialObject, PreparedGeometry preparedQueryWindow)
+    {
+        return evaluator.eval(spatialObject, preparedQueryWindow);
     }
 
     public static SpatialPredicate resolveSpatialPredicate(boolean considerBoundaryIntersection, boolean leftCoveredByRight)

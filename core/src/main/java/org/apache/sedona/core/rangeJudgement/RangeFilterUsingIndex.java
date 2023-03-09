@@ -22,6 +22,8 @@ package org.apache.sedona.core.rangeJudgement;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.prep.PreparedGeometry;
+import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
 import org.locationtech.jts.index.SpatialIndex;
 
 import java.util.ArrayList;
@@ -63,8 +65,15 @@ public class RangeFilterUsingIndex<U extends Geometry, T extends Geometry>
         SpatialIndex treeIndex = treeIndexes.next();
         List<T> results = new ArrayList<T>();
         List<T> tempResults = treeIndex.query(this.queryGeometry.getEnvelopeInternal());
+        if (tempResults.isEmpty()) {
+            return results.iterator();
+        }
+
+        // refine the search results
+        PreparedGeometryFactory factory = new PreparedGeometryFactory();
+        PreparedGeometry preparedQueryGeometry = factory.create(this.queryGeometry);
         for (T tempResult : tempResults) {
-            if (match(tempResult, queryGeometry)) {
+            if (match(tempResult, preparedQueryGeometry)) {
                 results.add(tempResult);
             }
         }

@@ -22,6 +22,8 @@ package org.apache.sedona.core.rangeJudgement;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.spark.api.java.function.Function;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.prep.PreparedGeometry;
+import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
 
 // TODO: Auto-generated Javadoc
 
@@ -29,6 +31,7 @@ public class RangeFilter<U extends Geometry, T extends Geometry>
         extends JudgementBase
         implements Function<T, Boolean>
 {
+    private transient PreparedGeometry preparedQueryGeometry;
 
     public RangeFilter(U queryWindow, SpatialPredicate spatialPredicate)
     {
@@ -46,6 +49,10 @@ public class RangeFilter<U extends Geometry, T extends Geometry>
     public Boolean call(T geometry)
             throws Exception
     {
-        return match(geometry, queryGeometry);
+        if (preparedQueryGeometry == null) {
+            PreparedGeometryFactory factory = new PreparedGeometryFactory();
+            preparedQueryGeometry = factory.create(this.queryGeometry);
+        }
+        return match(geometry, preparedQueryGeometry);
     }
 }

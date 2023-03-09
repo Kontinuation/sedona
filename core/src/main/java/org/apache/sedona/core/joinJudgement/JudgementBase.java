@@ -20,8 +20,6 @@
 package org.apache.sedona.core.joinJudgement;
 
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
-import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators;
-import org.locationtech.jts.geom.Geometry;
 
 import java.io.Serializable;
 
@@ -36,7 +34,6 @@ abstract class JudgementBase
 {
 
     private final SpatialPredicate spatialPredicate;
-    private transient SpatialPredicateEvaluators.SpatialPredicateEvaluator evaluator;
 
     /**
      * @param spatialPredicate spatial predicate as join condition
@@ -46,20 +43,8 @@ abstract class JudgementBase
         this.spatialPredicate = spatialPredicate;
     }
 
-    /**
-     * Looks up the extent of the current partition. If found, `match` method will
-     * activate the logic to avoid emitting duplicate join results from multiple partitions.
-     * <p>
-     * Must be called before processing a partition. Must be called from the
-     * same instance that will be used to process the partition.
-     */
-    protected void initPartition()
+    protected JoinResultCandidateRefiner.Refiner createRefiner(boolean isStream)
     {
-        evaluator = SpatialPredicateEvaluators.create(spatialPredicate);
-    }
-
-    public boolean match(Geometry left, Geometry right)
-    {
-        return evaluator.eval(left, right);
+        return JoinResultCandidateRefiner.create(isStream, spatialPredicate);
     }
 }

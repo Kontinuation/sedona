@@ -22,43 +22,17 @@ package org.apache.spark.sql.sedona_sql.optimization
 import org.apache.sedona.common.geometryObjects.Circle
 import org.apache.sedona.core.spatialOperator.SpatialPredicate
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.And
-import org.apache.spark.sql.catalyst.expressions.Expression
-import org.apache.spark.sql.catalyst.expressions.LessThan
-import org.apache.spark.sql.catalyst.expressions.LessThanOrEqual
-import org.apache.spark.sql.catalyst.expressions.Literal
-import org.apache.spark.sql.catalyst.expressions.Not
-import org.apache.spark.sql.catalyst.expressions.Or
-import org.apache.spark.sql.catalyst.expressions.SubqueryExpression
-import org.apache.spark.sql.catalyst.plans.logical.Filter
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.expressions.{And, Expression, LessThan, LessThanOrEqual, Literal, Not, Or, SubqueryExpression}
+import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.connector.catalog.CatalogV2Implicits.parseColumnPath
-import org.apache.spark.sql.execution.datasources.DataSourceStrategy
-import org.apache.spark.sql.execution.datasources.HadoopFsRelation
-import org.apache.spark.sql.execution.datasources.LogicalRelation
-import org.apache.spark.sql.execution.datasources.PushableColumn
-import org.apache.spark.sql.execution.datasources.PushableColumnBase
-import org.apache.spark.sql.execution.datasources.parquet.GeoParquetFileFormat
-import org.apache.spark.sql.execution.datasources.parquet.GeoParquetSpatialFilter
-import org.apache.spark.sql.execution.datasources.parquet.GeoParquetSpatialFilter.AndFilter
-import org.apache.spark.sql.execution.datasources.parquet.GeoParquetSpatialFilter.LeafFilter
-import org.apache.spark.sql.execution.datasources.parquet.GeoParquetSpatialFilter.OrFilter
+import org.apache.spark.sql.execution.datasources._
+import org.apache.spark.sql.execution.datasources.parquet.{GeoParquetFileFormat, GeoParquetSpatialFilter}
+import org.apache.spark.sql.execution.datasources.parquet.GeoParquetSpatialFilter.{AndFilter, LeafFilter, OrFilter}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
-import org.apache.spark.sql.sedona_sql.expressions.ST_Contains
-import org.apache.spark.sql.sedona_sql.expressions.ST_CoveredBy
-import org.apache.spark.sql.sedona_sql.expressions.ST_Covers
-import org.apache.spark.sql.sedona_sql.expressions.ST_Crosses
-import org.apache.spark.sql.sedona_sql.expressions.ST_Distance
-import org.apache.spark.sql.sedona_sql.expressions.ST_Equals
-import org.apache.spark.sql.sedona_sql.expressions.ST_Intersects
-import org.apache.spark.sql.sedona_sql.expressions.ST_OrderingEquals
-import org.apache.spark.sql.sedona_sql.expressions.ST_Overlaps
-import org.apache.spark.sql.sedona_sql.expressions.ST_Touches
-import org.apache.spark.sql.sedona_sql.expressions.ST_Within
+import org.apache.spark.sql.sedona_sql.expressions._
 import org.apache.spark.sql.types.DoubleType
-import org.locationtech.jts.geom.Geometry
-import org.locationtech.jts.geom.Point
+import org.locationtech.jts.geom.{Geometry, Point}
 
 class SpatialFilterPushDownForGeoParquet(sparkSession: SparkSession) extends Rule[LogicalPlan] {
 
@@ -109,31 +83,24 @@ class SpatialFilterPushDownForGeoParquet(sparkSession: SparkSession) extends Rul
 
       case Not(_) => None
 
-      case ST_Contains(Seq(pushableColumn(name), Literal(v, _))) =>
+      case ST_PreparedContains(pushableColumn(name), Literal(v, _)) =>
         Some(LeafFilter(unquote(name), SpatialPredicate.COVERS, GeometryUDT.deserialize(v)))
-      case ST_Contains(Seq(Literal(v, _), pushableColumn(name))) =>
+      case ST_PreparedCovers(pushableColumn(name), Literal(v, _)) =>
+        Some(LeafFilter(unquote(name), SpatialPredicate.COVERS, GeometryUDT.deserialize(v)))
+      case ST_PreparedWithin(pushableColumn(name), Literal(v, _)) =>
+        Some(LeafFilter(unquote(name), SpatialPredicate.INTERSECTS, GeometryUDT.deserialize(v)))
+      case ST_PreparedCoveredBy(pushableColumn(name), Literal(v, _)) =>
         Some(LeafFilter(unquote(name), SpatialPredicate.INTERSECTS, GeometryUDT.deserialize(v)))
 
-      case ST_Covers(Seq(pushableColumn(name), Literal(v, _))) =>
-        Some(LeafFilter(unquote(name), SpatialPredicate.COVERS, GeometryUDT.deserialize(v)))
-      case ST_Covers(Seq(Literal(v, _), pushableColumn(name))) =>
-        Some(LeafFilter(unquote(name), SpatialPredicate.INTERSECTS, GeometryUDT.deserialize(v)))
-
-      case ST_Within(Seq(pushableColumn(name), Literal(v, _))) =>
-        Some(LeafFilter(unquote(name), SpatialPredicate.INTERSECTS, GeometryUDT.deserialize(v)))
-      case ST_Within(Seq(Literal(v, _), pushableColumn(name))) =>
-        Some(LeafFilter(unquote(name), SpatialPredicate.COVERS, GeometryUDT.deserialize(v)))
-
-      case ST_CoveredBy(Seq(pushableColumn(name), Literal(v, _))) =>
-        Some(LeafFilter(unquote(name), SpatialPredicate.INTERSECTS, GeometryUDT.deserialize(v)))
-      case ST_CoveredBy(Seq(Literal(v, _), pushableColumn(name))) =>
-        Some(LeafFilter(unquote(name), SpatialPredicate.COVERS, GeometryUDT.deserialize(v)))
-
-      case ST_Equals(_) | ST_OrderingEquals(_) =>
+      case _: ST_PreparedEquals |
+           _: ST_PreparedOrderingEquals =>
         for ((name, value) <- resolveNameAndLiteral(predicate.children, pushableColumn))
           yield LeafFilter(unquote(name), SpatialPredicate.COVERS, GeometryUDT.deserialize(value))
 
-      case ST_Intersects(_) | ST_Crosses(_) | ST_Overlaps(_) | ST_Touches(_) =>
+      case _: ST_PreparedIntersects |
+           _: ST_PreparedCrosses |
+           _: ST_PreparedOverlaps |
+           _: ST_PreparedTouches =>
         for ((name, value) <- resolveNameAndLiteral(predicate.children, pushableColumn))
           yield LeafFilter(unquote(name), SpatialPredicate.INTERSECTS, GeometryUDT.deserialize(value))
 

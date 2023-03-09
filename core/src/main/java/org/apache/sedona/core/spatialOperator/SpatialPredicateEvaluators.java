@@ -28,13 +28,16 @@ public class SpatialPredicateEvaluators {
     private SpatialPredicateEvaluators() {}
 
     /**
-     * SpatialPredicateEvaluator for evaluating spatial predicates, it also works as a trait which will
-     * be mixed into {@link org.apache.sedona.core.joinJudgement.JoinConditionMatcher}.
+     * SpatialPredicateEvaluator for evaluating spatial predicates.
      */
     public interface SpatialPredicateEvaluator extends Serializable {
         boolean eval(Geometry left, Geometry right);
 
         boolean eval(PreparedGeometry left, Geometry right);
+
+        default boolean eval(Geometry left, PreparedGeometry right) {
+            return eval(left, right.getGeometry());
+        }
     }
 
     public interface ContainsEvaluator extends SpatialPredicateEvaluator {
@@ -55,6 +58,10 @@ public class SpatialPredicateEvaluators {
         default boolean eval(PreparedGeometry left, Geometry right) {
             return left.intersects(right);
         }
+
+        default boolean eval(Geometry left, PreparedGeometry right) {
+            return right.intersects(left);
+        }
     }
 
     public interface WithinEvaluator extends SpatialPredicateEvaluator {
@@ -66,6 +73,9 @@ public class SpatialPredicateEvaluators {
             return left.within(right);
         }
 
+        default boolean eval(Geometry left, PreparedGeometry right) {
+            return right.contains(left);
+        }
     }
 
     public interface CoversEvaluator extends SpatialPredicateEvaluator {
@@ -85,6 +95,10 @@ public class SpatialPredicateEvaluators {
 
         default boolean eval(PreparedGeometry left, Geometry right) {
             return left.coveredBy(right);
+        }
+
+        default boolean eval(Geometry left, PreparedGeometry right) {
+            return right.covers(left);
         }
     }
 

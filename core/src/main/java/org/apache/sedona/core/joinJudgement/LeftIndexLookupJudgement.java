@@ -25,8 +25,6 @@ import org.apache.spark.api.java.function.FlatMapFunction2;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.index.SpatialIndex;
 
-import javax.annotation.Nullable;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -55,18 +53,14 @@ public class LeftIndexLookupJudgement<T extends Geometry, U extends Geometry>
             return result.iterator();
         }
 
-        initPartition();
+        JoinResultCandidateRefiner.Refiner refiner = createRefiner(false);
 
         SpatialIndex treeIndex = indexIterator.next();
         while (streamShapes.hasNext()) {
             U streamShape = streamShapes.next();
             List<Geometry> candidates = treeIndex.query(streamShape.getEnvelopeInternal());
-            for (Geometry candidate : candidates) {
-                // Refine phase. Use the real polygon (instead of its MBR) to recheck the spatial relation.
-                if (match(candidate, streamShape)) {
-                    result.add(Pair.of((T) candidate, streamShape));
-                }
-            }
+            // Refine phase. Use the real polygon (instead of its MBR) to recheck the spatial relation.
+            refiner.refine(streamShape, candidates, result);
         }
         return result.iterator();
     }

@@ -26,8 +26,6 @@ import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.spark.api.java.function.FlatMapFunction2;
 import org.locationtech.jts.geom.Geometry;
 
-import javax.annotation.Nullable;
-
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -56,7 +54,7 @@ public class NestedLoopJudgement<T extends Geometry, U extends Geometry>
             return Collections.emptyIterator();
         }
 
-        initPartition();
+        JoinResultCandidateRefiner.Refiner refiner = createRefiner(true);
 
         List<Pair<U, T>> result = new ArrayList<>();
         List<T> queryObjects = new ArrayList<>();
@@ -65,13 +63,7 @@ public class NestedLoopJudgement<T extends Geometry, U extends Geometry>
         }
         while (iteratorWindow.hasNext()) {
             U window = iteratorWindow.next();
-            for (int i = 0; i < queryObjects.size(); i++) {
-                T object = queryObjects.get(i);
-                //log.warn("Check "+window.toText()+" with "+object.toText());
-                if (match(window, object)) {
-                    result.add(Pair.of(window, object));
-                }
-            }
+            refiner.refine(window, (List<Geometry>) queryObjects, result);
         }
         return result.iterator();
     }
