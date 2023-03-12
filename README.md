@@ -1,5 +1,20 @@
 # Sedona enterprise
 
+## Set up env
+
+Sedona enterprise requires the following envs:
+
+* `WHEROBOTS_USERID`: any value is allowed
+* `WHEROBOTS_AWS_ACCESSKEY`: [See here](https://github.com/wherobots/sedona-enterprise/settings/variables/actions)
+* `WHEROBOTS_AWS_SECRETKEY`: [See here](https://github.com/wherobots/sedona-enterprise/settings/variables/actions)
+* `WHEROBOTS_AWS_S3BUCKET`: test-wherobots-user-logs/s3-log-tester
+* `WHEROBOTS_AWS_REGION`: us-west-2
+* `WHEROBOTS_PRODUCT`: optional. Any value is allowed.
+
+The corresponding IAM username is `s3-log-tester`. It only has putObject and pubMetric permission to `test-wherobots-user-logs/s3-log-tester` S3 bucekt prefix and CloudWatch namespace, respectively. 
+
+You can use `setup_wherobots_env.sh` in the main folder to set these env. But make sure you put the correct values inside.
+
 ## Compile
 
 ```
@@ -19,13 +34,5 @@ Scala 2.13
 ```
 mvn clean deploy -DskipTests -Dscala=2.13
 ```
-
-
-## Wherobots Enterprise release schedule
-
-| version | Release date | Sedona enterprise version | Sedona open-source version | GeoLake version |  Lampy version  | GeoTorchAI version |
-|:-------:|:------------:|:-------------------------:|:--------------------------:|:---------------:|:---------------:|:------------------:|
-|  1.0.0  |      TBD     |      1.0.0 (03/2023)      |       1.4.0 (03/2023)      | 1.0.0 (03/2023) | 1.0.0 (03/2023) |   1.0.0 (03/2023)  |
-|         |              |                           |                            |                 |                 |                    |
 
 
