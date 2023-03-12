@@ -94,6 +94,8 @@ object InferrableType {
     new InferrableType[Boolean] {}
   implicit val intInstance: InferrableType[Int] =
     new InferrableType[Int] {}
+  implicit val longInstance: InferrableType[Long] =
+    new InferrableType[Long] {}
   implicit val stringInstance: InferrableType[String] =
     new InferrableType[String] {}
   implicit val binaryInstance: InferrableType[Array[Byte]] =
@@ -149,6 +151,8 @@ object InferredTypes {
       DoubleType
     } else if (typeOf[T] =:= typeOf[Int]) {
       IntegerType
+    } else if (typeOf[T] =:= typeOf[Long]) {
+      LongType
     } else if (typeOf[T] =:= typeOf[String]) {
       StringType
     } else if (typeOf[T] =:= typeOf[Array[Byte]]) {

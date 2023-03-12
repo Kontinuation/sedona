@@ -6,3 +6,5 @@
 /build/
 /dist/
 /sedona/utils/*.so
+Pipfile.lock
+/wherobots_sedona.egg-info/

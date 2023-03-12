@@ -497,4 +497,34 @@ public class Functions {
             return org.apache.sedona.common.Functions.s2CellIDs(geom, level);
         }
     }
+
+    public static class ST_H3CellIDs extends ScalarFunction {
+        @DataTypeHint(value = "ARRAY<BIGINT>")
+        public Long[] eval(@DataTypeHint(value = "RAW", bridgedTo = org.locationtech.jts.geom.Geometry.class) Object o,
+                           @DataTypeHint("INT") Integer level,
+                           @DataTypeHint("Boolean") Boolean fullCover
+        ) {
+            Geometry geom = (Geometry) o;
+            return org.apache.sedona.common.Functions.h3CellIDs(geom, level, fullCover);
+        }
+    }
+
+    public static class ST_H3CellDistance extends ScalarFunction {
+        @DataTypeHint(value = "BIGINT")
+        public Long eval(@DataTypeHint("BIGINT") Long cell1,
+                         @DataTypeHint("BIGINT") Long cell2
+        ) {
+            return org.apache.sedona.common.Functions.h3CellDistance(cell1, cell2);
+        }
+    }
+
+    public static class ST_H3KRing extends ScalarFunction {
+        @DataTypeHint(value = "ARRAY<BIGINT>")
+        public Long[] eval(@DataTypeHint("BIGINT") Long cell,
+                           @DataTypeHint("INTEGER") Integer k,
+                           @DataTypeHint("Boolean") Boolean exactRing
+        ) {
+            return org.apache.sedona.common.Functions.h3KRing(cell, k, exactRing);
+        }
+    }
 }

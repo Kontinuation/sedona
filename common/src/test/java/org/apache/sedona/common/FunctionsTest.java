@@ -14,14 +14,12 @@
 package org.apache.sedona.common;
 
 import com.google.common.geometry.S2CellId;
-import org.apache.sedona.common.utils.GeomUtils;
+import org.apache.sedona.common.utils.H3Utils;
 import org.apache.sedona.common.utils.S2Utils;
 import org.junit.Test;
 import org.locationtech.jts.geom.*;
 
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertEquals;
@@ -388,5 +386,116 @@ public class FunctionsTest {
         HashSet<Integer> expects = new HashSet<>();
         expects.add(10);
         assertEquals(expects, levels);
+    }
+
+    /**
+     * Test H3CellIds: pass in all the types of geometry, test if the function cover
+     */
+    @Test
+    public void h3CellIDs() {
+        Geometry[] combinedGeoms = new Geometry[] {
+                GEOMETRY_FACTORY.createPoint(new Coordinate(0.1, 0.1)),
+                GEOMETRY_FACTORY.createPoint(new Coordinate(0.2, 0.1)),
+                GEOMETRY_FACTORY.createLineString(coordArray(0.1, 0.1, 0.2, 0.1, 0.3, 0.4, 0.5, 0.9)),
+                GEOMETRY_FACTORY.createLineString(coordArray(0.5, 0.1, 0.1, 0.5, 0.3, 0.1)),
+                GEOMETRY_FACTORY.createPolygon(coordArray(0.1, 0.1, 0.5, 0.1, 0.1, 0.6, 0.1, 0.1)),
+                GEOMETRY_FACTORY.createPolygon(coordArray(0.2, 0.1, 0.6, 0.3, 0.7, 0.6, 0.2, 0.5, 0.2, 0.1))
+        };
+        // The test geometries, cover all 7 geometry types targeted
+        Geometry[] targets = new Geometry[] {
+                GEOMETRY_FACTORY.createPoint(new Coordinate(1, 2)),
+                GEOMETRY_FACTORY.createPolygon(
+                        GEOMETRY_FACTORY.createLinearRing(coordArray(0.1, 0.1, 0.5, 0.1, 1.0, 0.3, 1.0, 1.0, 0.1, 1.0, 0.1, 0.1)),
+                        new LinearRing[] {
+                                GEOMETRY_FACTORY.createLinearRing(coordArray(0.2, 0.2, 0.5, 0.2, 0.6, 0.7, 0.2, 0.6, 0.2, 0.2))
+                        }
+                ),
+                GEOMETRY_FACTORY.createLineString(coordArray(0.2, 0.2, 0.3, 0.4, 0.4, 0.6)),
+                GEOMETRY_FACTORY.createGeometryCollection(
+                        new Geometry[] {
+                                GEOMETRY_FACTORY.createMultiPoint(new Point[] {(Point) combinedGeoms[0], (Point) combinedGeoms[1]}),
+                                GEOMETRY_FACTORY.createMultiLineString(new LineString[] {(LineString) combinedGeoms[2], (LineString) combinedGeoms[3]}),
+                                GEOMETRY_FACTORY.createMultiPolygon(new Polygon[] {(Polygon) combinedGeoms[4], (Polygon) combinedGeoms[5]})
+                        }
+                )
+        };
+        int resolution = 7;
+        // the expected results
+        List<Set<Long> > expects = new ArrayList<>();
+        expects.add(new HashSet<>(Collections.singletonList(H3Utils.coordinateToCell(targets[0].getCoordinate(), resolution))));
+        expects.add(new HashSet<>(H3Utils.polygonToCells((Polygon) targets[1], resolution, true)));
+        expects.add(new HashSet<>(H3Utils.lineStringToCells((LineString) targets[2], resolution, true)));
+        // for GeometryCollection, generate separately for the underlying geoms
+        Set<Long> geomCollectExpect = new HashSet<>();
+        geomCollectExpect.add(H3Utils.coordinateToCell(combinedGeoms[0].getCoordinate(), resolution));
+        geomCollectExpect.add(H3Utils.coordinateToCell(combinedGeoms[1].getCoordinate(), resolution));
+        geomCollectExpect.addAll(H3Utils.lineStringToCells((LineString) combinedGeoms[2], resolution, true));
+        geomCollectExpect.addAll(H3Utils.lineStringToCells((LineString) combinedGeoms[3], resolution, true));
+        geomCollectExpect.addAll(H3Utils.polygonToCells((Polygon) combinedGeoms[4], resolution, true));
+        geomCollectExpect.addAll(H3Utils.polygonToCells((Polygon) combinedGeoms[5], resolution, true));
+        expects.add(geomCollectExpect);
+        // do asserts
+        for (int i = 0;i < targets.length; i++){
+            assert expects.get(0).equals(new HashSet<>(Arrays.asList(Functions.h3CellIDs(targets[0], resolution, true))));
+        }
+    }
+
+    /**
+     * Test H3CellDistance
+     */
+    @Test
+    public void h3CellDistance() {
+        LineString pentagonLine = GEOMETRY_FACTORY.createLineString(coordArray(58.174758948493505, 10.427371502467615, 58.1388817207103, 10.469490838693966));
+        // normal line
+        LineString line = GEOMETRY_FACTORY.createLineString(coordArray(-4.414062499999996, 19.790494005157534,5.781250000000004, 13.734595619093557));
+        long pentagonDist = Functions.h3CellDistance(
+                H3Utils.coordinateToCell(pentagonLine.getCoordinateN(0), 11),
+                H3Utils.coordinateToCell(pentagonLine.getCoordinateN(1), 11)
+        );
+        long lineDist = Functions.h3CellDistance(
+                H3Utils.coordinateToCell(line.getCoordinateN(0), 10),
+                H3Utils.coordinateToCell(line.getCoordinateN(1), 10)
+        );
+        assertEquals(
+                H3Utils.approxPathCells(
+                        pentagonLine.getCoordinateN(0),
+                        pentagonLine.getCoordinateN(1),
+                        11,
+                        true
+                ).size() - 1,
+                pentagonDist
+        );
+
+        assertEquals(
+                H3Utils.h3.gridDistance(
+                        H3Utils.coordinateToCell(line.getCoordinateN(0), 10),
+                        H3Utils.coordinateToCell(line.getCoordinateN(1), 10)
+                ),
+                lineDist
+        );
+    }
+
+    /**
+     * Test h3kRing
+     */
+    @Test
+    public void h3KRing() {
+        Point[] points = new Point[] {
+                // pentagon
+                GEOMETRY_FACTORY.createPoint(new Coordinate(10.53619907546767, 64.70000012793487)),
+                // 7th neighbor of pentagon
+                GEOMETRY_FACTORY.createPoint(new Coordinate(10.536630883471666, 64.69944253201858)),
+                // normal point
+                GEOMETRY_FACTORY.createPoint(new Coordinate(-166.093005914,61.61964122848931)),
+        };
+        for (Point point : points) {
+            long cell = H3Utils.coordinateToCell(point.getCoordinate(), 12);
+            Set<Long> allNeighbors = new HashSet<>(Arrays.asList(Functions.h3KRing(cell, 10, false)));
+            Set<Long> kthNeighbors = new HashSet<>(Arrays.asList(Functions.h3KRing(cell, 10, true)));
+            assert allNeighbors.containsAll(kthNeighbors);
+            kthNeighbors.addAll(Arrays.asList(Functions.h3KRing(cell, 9, false)));
+            assert allNeighbors.equals(kthNeighbors);
+        }
+
     }
 }

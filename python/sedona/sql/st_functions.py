@@ -55,6 +55,9 @@ __all__ = [
     "ST_GeoHash",
     "ST_GeometryN",
     "ST_GeometryType",
+    "ST_H3CellDistance",
+    "ST_H3CellIDs",
+    "ST_H3KRing",
     "ST_InteriorRingN",
     "ST_Intersection",
     "ST_IsClosed",
@@ -527,6 +530,52 @@ def ST_GeometryType(geometry: ColumnOrName) -> Column:
 
 
 @validate_argument_types
+def ST_H3CellDistance(cell1: Union[ColumnOrName, int], cell2: Union[ColumnOrName, int]) -> Column:
+    """Cover Geometry with H3 Cells and return a List of Long type cell IDs
+    :param cell: start cell
+    :type cell: long
+    :param k: end cell
+    :type k: int
+    :return: distance between cells
+    :rtype: Long
+    """
+    args = (cell1, cell2)
+    return _call_st_function("ST_H3CellDistance", args)
+
+
+@validate_argument_types
+def ST_H3CellIDs(geometry: ColumnOrName, level: Union[ColumnOrName, int], full_cover: Union[ColumnOrName, bool]) -> Column:
+    """Cover Geometry with H3 Cells and return a List of Long type cell IDs
+    :param geometry: Geometry column to generate cell IDs
+    :type geometry: ColumnOrName
+    :param level: value between 1 and 15, controls the size of the cells used for coverage. With a bigger level, the cells will be smaller, the coverage will be more accurate, but the result size will be exponentially increasing.
+    :type level: int
+    :param full_cover: ColumnOrName
+    :type full_cover: int
+    :return: List of cellIDs
+    :rtype: List[long]
+    """
+    args = (geometry, level, full_cover)
+    return _call_st_function("ST_H3CellIDs", args)
+
+
+@validate_argument_types
+def ST_H3KRing(cell: Union[ColumnOrName, int], k: Union[ColumnOrName, int], exact_ring: Union[ColumnOrName, bool]) -> Column:
+    """Cover Geometry with H3 Cells and return a List of Long type cell IDs
+    :param cell: original cell
+    :type cell: long
+    :param k: the k number of rings spread from the original cell
+    :type k: int
+    :param exact_ring: if exactDistance is true, it will only return the cells on the exact kth ring, else will return all 0 - kth neighbors
+    :type exact_ring: bool
+    :return: List of cellIDs
+    :rtype: List[long]
+    """
+    args = (cell, k, exact_ring)
+    return _call_st_function("ST_H3KRing", args)
+
+
+@validate_argument_types
 def ST_InteriorRingN(polygon: ColumnOrName, n: Union[ColumnOrName, int]) -> Column:
     """Return the index n (0-th based) interior ring of a polygon geometry column.
 
@@ -877,6 +926,7 @@ def ST_Reverse(geometry: ColumnOrName) -> Column:
     :rtype: Column
     """
     return _call_st_function("ST_Reverse", geometry)
+
 
 @validate_argument_types
 def ST_S2CellIDs(geometry: ColumnOrName, level: Union[ColumnOrName, int]) -> Column:

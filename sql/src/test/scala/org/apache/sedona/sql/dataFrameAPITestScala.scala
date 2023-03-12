@@ -20,7 +20,7 @@ package org.apache.sedona.sql
 
 import scala.collection.mutable.WrappedArray
 import org.apache.commons.codec.binary.Hex
-import org.apache.spark.sql.functions.{col, lit}
+import org.apache.spark.sql.functions.{col, element_at, lit}
 import org.locationtech.jts.geom.Geometry
 import org.apache.spark.sql.sedona_sql.expressions.st_constructors._
 import org.apache.spark.sql.sedona_sql.expressions.st_functions._
@@ -903,6 +903,37 @@ class dataFrameAPITestScala extends TestBaseScala {
       val actualResult = df.take(1)(0).getAs[mutable.WrappedArray[Long]](0).toSet
       val mbrResult = dfMRB.take(1)(0).getAs[mutable.WrappedArray[Long]](0).toSet
       assert (actualResult.subsetOf(mbrResult))
+    }
+
+    it("Passed ST_H3CellIDs") {
+      val baseDF = sparkSession.sql("SELECT ST_GeomFromWKT('Polygon ((0 0, 1 2, 2 2, 3 2, 5 0, 4 0, 3 1, 2 1, 1 0, 0 0))') as geom")
+      val df = baseDF.select(ST_H3CellIDs("geom", 6, true))
+      val dfMRB = baseDF.select(ST_H3CellIDs(ST_Envelope(col("geom")), lit(6), lit(true)))
+      val actualResult = df.take(1)(0).getAs[mutable.WrappedArray[Long]](0).toSet
+      val mbrResult = dfMRB.take(1)(0).getAs[mutable.WrappedArray[Long]](0).toSet
+      assert(actualResult.subsetOf(mbrResult))
+    }
+
+    it("Passed ST_H3CellDistance") {
+      val distance = sparkSession.sql("SELECT ST_Point(1.0, 2.0) lp, ST_Point(1.23, 1.59) rp")
+        .withColumn("lc", element_at(ST_H3CellIDs("lp", 8, true), 1))
+        .withColumn("rc", element_at(ST_H3CellIDs("rp", 8, true), 1))
+        .select(ST_H3CellDistance(col("lc"), col("rc")))
+        .collectAsList().get(0).get(0)
+      assert(78 == distance)
+    }
+
+    it("Passed ST_H3KRing") {
+      val neighborsAll = sparkSession.sql("SELECT ST_Point(1.0, 2.0) geom")
+        .withColumn("cell", element_at(ST_H3CellIDs("geom", 8, true), 1))
+        .select(ST_H3KRing(col("cell"), 3, false))
+        .collectAsList().get(0).get(0).asInstanceOf[mutable.WrappedArray[Long]]
+      val neighborsExactRing = sparkSession.sql("SELECT ST_Point(1.0, 2.0) geom")
+        .withColumn("cell", element_at(ST_H3CellIDs("geom", 8, true), 1))
+        .select(ST_H3KRing(col("cell"), 3, true))
+        .collectAsList().get(0).get(0).asInstanceOf[mutable.WrappedArray[Long]]
+      assert(neighborsExactRing.toSet.subsetOf(neighborsAll.toSet))
+
     }
   }
 }

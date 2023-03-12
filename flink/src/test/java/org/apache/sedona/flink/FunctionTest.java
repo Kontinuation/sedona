@@ -28,6 +28,7 @@ import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -613,5 +614,52 @@ public class FunctionTest extends TestBase{
         // after filter by ST_Intersects, only id =2 point
         assertEquals(1, count(joinCleanedTable));
         assertEquals(2, first(joinCleanedTable).getField(1));
+    }
+
+    @Test
+    public void testH3CellIDs() {
+        String initExplodeQuery = "SELECT id, geom, cell_tbl.cell from (VALUES %s) as raw_tbl(id, geom, cells) CROSS JOIN UNNEST(raw_tbl.cells) AS cell_tbl (cell)";
+        // left is a polygon
+        tableEnv.createTemporaryView(
+                "lefts_h3",
+                tableEnv.sqlQuery(String.format(initExplodeQuery, "(1, ST_GeomFromWKT('POLYGON ((0 0, 0.2 0, 0.2 0.2, 0 0.2, 0 0))'), ST_H3CellIDs(ST_GeomFromWKT('POLYGON ((0 0, 0.2 0, 0.2 0.2, 0 0.2, 0 0))'), 8, true))"))
+        );
+        // points for test
+        String points = String.join(", ", new String[] {
+                "(2, ST_GeomFromWKT('POINT (0.1 0.1)'), ST_H3CellIDs(ST_GeomFromWKT('POINT (0.1 0.1)'), 8, true))", // points within polygon
+                "(3, ST_GeomFromWKT('POINT (0.25 0.1)'), ST_H3CellIDs(ST_GeomFromWKT('POINT (0.25 0.1)'), 8, true))", // points outside of polygon
+                "(4, ST_GeomFromWKT('POINT (0.2005 0.1)'), ST_H3CellIDs(ST_GeomFromWKT('POINT (0.2005 0.1)'), 8, true))" // points outside of polygon, but very close to border
+        });
+        tableEnv.createTemporaryView(
+                "rights_h3",
+                tableEnv.sqlQuery(String.format(initExplodeQuery, points))
+        );
+        Table joinTable = tableEnv.sqlQuery("select lefts_h3.id, rights_h3.id from lefts_h3 join rights_h3 on lefts_h3.cell = rights_h3.cell group by (lefts_h3.id, rights_h3.id)");
+        assertEquals(2, count(joinTable));
+        ;
+        assert take(joinTable, 2).stream().map(
+                r -> Objects.requireNonNull(r.getField(1)).toString()
+        ).collect(Collectors.toSet()).containsAll(Arrays.asList("2", "4"));
+        // This is due to under level = 10, point id = 4 fall into same cell as the boarder of polygon id = 1
+        // join and filter by st_intersects to exclude the wrong join
+        Table joinCleanedTable = tableEnv.sqlQuery("select lefts_h3.id, rights_h3.id from lefts_h3 join rights_h3 on lefts_h3.cell = rights_h3.cell where ST_Intersects(lefts_h3.geom, rights_h3.geom) is true group by (lefts_h3.id, rights_h3.id)");
+        // after filter by ST_Intersects, only id =2 point
+        assertEquals(1, count(joinCleanedTable));
+        assertEquals(2, first(joinCleanedTable).getField(1));
+    }
+
+    @Test
+    public void testH3CellDistance() {
+        Table pointTable = tableEnv.sqlQuery("select ST_H3CellDistance(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'), 8, true)[1], ST_H3CellIDs(ST_GeomFromWKT('POINT(1.23 1.59)'), 8, true)[1])");
+        long exact = Long.parseLong(Objects.requireNonNull(first(pointTable).getField(0)).toString());
+        assertEquals(exact, 78);
+    }
+
+    @Test
+    public void testH3KRing() {
+        Table pointTable = tableEnv.sqlQuery("select ST_H3KRing(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'), 8, true)[1], 3, false), ST_H3KRing(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'), 8, true)[1], 3, true)");
+        List<Long> full = Arrays.asList((Long[]) Objects.requireNonNull(first(pointTable).getField(0)));
+        List<Long> exactRing = Arrays.asList((Long[]) Objects.requireNonNull(first(pointTable).getField(0)));
+        assert full.containsAll(exactRing);
     }
 }

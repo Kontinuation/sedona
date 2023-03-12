@@ -1074,3 +1074,31 @@ class TestPredicateJoin(TestBase):
         # test null case
         cell_ids = self.spark.sql("select ST_S2CellIDs(null, 6)").take(1)[0][0]
         assert cell_ids is None
+
+    def test_st_h3_cell_ids(self):
+        test_cases = [
+            "'POLYGON((-1 0, 1 0, 0 0, 0 1, -1 0))'",
+            "'LINESTRING(0 0, 1 2, 2 4, 3 6)'",
+            "'POINT(1 2)'"
+        ]
+        for input_geom in test_cases:
+            cell_ids = self.spark.sql("select ST_H3CellIDs(ST_GeomFromText({}), 6, true)".format(input_geom)).take(1)[0][0]
+            assert isinstance(cell_ids, list)
+            assert isinstance(cell_ids[0], int)
+        # test null case
+        cell_ids = self.spark.sql("select ST_H3CellIDs(null, 6, true)").take(1)[0][0]
+        assert cell_ids is None
+
+    def test_st_h3_cell_distance(self):
+        df = self.spark.sql("select ST_H3CellDistance(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'), 8, true)[0], ST_H3CellIDs(ST_GeomFromWKT('POINT(1.23 1.59)'), 8, true)[0])")
+        assert df.take(1)[0][0] == 78
+
+    def test_st_h3_kring(self):
+        df = self.spark.sql("""
+        SELECT 
+            ST_H3KRing(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'), 8, true)[0], 1, true) exactRings,
+            ST_H3KRing(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'), 8, true)[0], 1, false) allRings,
+            ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'), 8, true) original_cells
+        """)
+        exact_rings, all_rings, original_cells = df.take(1)[0]
+        assert set(exact_rings + original_cells) == set(all_rings)

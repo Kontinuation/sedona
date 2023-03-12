@@ -1063,3 +1063,27 @@ case class ST_S2CellIDs(inputExpressions: Seq[Expression])
     copy(inputExpressions = newChildren)
   }
 }
+
+case class ST_H3CellIDs(inputExpressions: Seq[Expression])
+  extends InferredTernaryExpression(Functions.h3CellIDs) with FoldableExpression {
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
+case class ST_H3CellDistance(inputExpressions: Seq[Expression])
+  extends InferredBinaryExpression(Functions.h3CellDistance) with FoldableExpression {
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
+case class ST_H3KRing(inputExpressions: Seq[Expression])
+  extends InferredTernaryExpression(Functions.h3KRing) with FoldableExpression {
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
