@@ -50,7 +50,7 @@ object ListenerRegistrator {
       awsSecretKey = conf.get("wherobots.aws.secretkey")
       awsS3path = conf.get("wherobots.aws.s3bucket")
       awsRegion = conf.get("wherobots.aws.region")
-      product = conf.get("wherobots.environment", "unknown wherobots product")
+      product = conf.get("wherobots.product", "unknown wherobots product")
     }
     catch {
       case e1: NoSuchElementException => {
