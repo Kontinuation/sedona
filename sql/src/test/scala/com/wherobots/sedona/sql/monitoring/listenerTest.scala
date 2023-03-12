@@ -14,12 +14,10 @@
  */
 package com.wherobots.sedona.sql.monitoring
 
-import com.google.gson.{Gson, JsonObject}
 import com.wherobots.sedona.common.monitoring.S3Utils
 import org.apache.sedona.sql.TestBaseScala
 
 class listenerTest extends TestBaseScala {
-  val gson = new Gson()
   val logger = java.util.logging.Logger.getLogger(getClass.getName)
   val userid = sys.env("WHEROBOTS_USERID")
   val awsAccessKey = sys.env("WHEROBOTS_AWS_ACCESSKEY")
@@ -30,9 +28,19 @@ class listenerTest extends TestBaseScala {
   val awsRegion = sys.env("WHEROBOTS_AWS_REGION")
 
   it("Read a single relation") {
-    var df = sparkSession.read.format("csv").option("delimiter", ",").option("header", "false").load(csvPointInputLocation)
-    df = df.selectExpr("ST_Point(cast(_c0 as Decimal(24,20)), cast(_c1 as Decimal(24,20))) as geom")
-    assert(df.count() == 1000)
+    val iterations = 1
+    val startTimeMillis = System.currentTimeMillis()
+    for (i <- 1 to iterations) {
+      var df = sparkSession.read.format("csv").option("delimiter", ",").option("header", "false").load(csvPointInputLocation)
+      df = df.selectExpr("ST_Point(cast(_c0 as Decimal(24,20)), cast(_c1 as Decimal(24,20))) as geom")
+      df = df.filter("ST_Area(geom) >=0")
+      df = df.as("df1").join(df.as("df2")).filter("ST_Distance(df1.geom, df2.geom) <= 0") // Return the points themselves
+      assert(df.count() == 1000)
+    }
+    val endTimeMillis = System.currentTimeMillis()
+    val avgDurationSeconds = (endTimeMillis - startTimeMillis) * 1.0 / (1000 * iterations)
+
+//    println(s"avgDuration ${avgDurationSeconds}")
 
     val s3 = S3Utils.getSyncClient(awsAccessKey, awsSecretKey, awsRegion)
     val logs = S3Utils.listObject(s3, awsBucketName, awsBucketPrefix, logger)

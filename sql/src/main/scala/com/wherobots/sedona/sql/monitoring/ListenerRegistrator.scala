@@ -14,7 +14,7 @@
  */
 package com.wherobots.sedona.sql.monitoring
 
-import com.wherobots.sedona.common.monitoring.S3Utils
+import com.wherobots.sedona.common.monitoring.{CloudWatchUtils, S3Utils}
 import org.apache.spark.sql.{RuntimeConfig, SparkSession}
 
 object ListenerRegistrator {
@@ -70,6 +70,8 @@ object ListenerRegistrator {
     val bucketName = awsS3path.split("/")(0)
     val bucketPrefix = awsS3path.split("/")(1) // Get the log folder name in the bucket
     val s3Client = S3Utils.getAsyncClient(awsAccessKey, awsSecretKey, awsRegion)
-    (new IoListener(userid, bucketName, bucketPrefix, s3Client, product), new SqlListener(userid, bucketName, bucketPrefix, s3Client, product))
+    val cloudwatchClient = CloudWatchUtils.getClient(awsAccessKey, awsSecretKey, awsRegion)
+    (new IoListener(userid, bucketName, bucketPrefix, s3Client, cloudwatchClient, product),
+      new SqlListener(userid, bucketName, bucketPrefix, s3Client, cloudwatchClient, product))
   }
 }

@@ -14,16 +14,18 @@
  */
 package com.wherobots.sedona.sql.monitoring
 
-import com.google.gson.JsonObject
-import com.wherobots.sedona.common.monitoring.S3Utils
+import com.google.gson.{Gson, JsonObject}
+import com.wherobots.sedona.common.monitoring.{CloudWatchUtils, S3Utils}
 import org.apache.spark.scheduler._
+import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
 import software.amazon.awssdk.services.s3.S3AsyncClient
 
 import java.io.{PrintWriter, StringWriter}
+import java.util
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.{Properties, UUID}
 
-class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S3AsyncClient, product:String) extends SparkListener {
+class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S3AsyncClient, cwClient:CloudWatchAsyncClient, product:String) extends SparkListener {
   private val jobsCompleted = new AtomicInteger(0)
   private val stagesCompleted = new AtomicInteger(0)
   private val tasksCompleted = new AtomicInteger(0)
@@ -32,7 +34,7 @@ class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S
   private val recordsWritten = new AtomicLong(0L)
   private val bytesRead = new AtomicLong(0L)
   private val bytesWritten = new AtomicLong(0L)
-
+  private val gson = new Gson()
 
 //  override def onApplicationEnd(applicationEnd: SparkListenerApplicationEnd): Unit = {
 //    log.warn("***************** Aggregate metrics *****************************")
@@ -73,25 +75,47 @@ class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S
 
   def produceLog(jobId:Int, jobEndTime:Long): Unit = {
     // Upload the log after each job
+    val jobsCompleted = this.jobsCompleted.get()
+    val stagesCompleted = this.stagesCompleted.get()
+    val tasksCompleted = this.tasksCompleted.get()
+    val executorRuntime = this.executorRuntime.get()
+    val recordsRead = this.recordsRead.get()
+    val recordsWritten = this.recordsWritten.get()
+    val bytesRead = this.bytesRead.get()
+    val bytesWritten = this.bytesWritten.get()
+
+    val records:util.Map[String, java.lang.Double] = new util.HashMap()
+    records.put("jobsCompleted", jobsCompleted)
+    records.put("stagesCompleted", stagesCompleted)
+    records.put("tasksCompleted", tasksCompleted)
+    records.put("executorRuntime", executorRuntime)
+    records.put("recordsRead", recordsRead)
+    records.put("recordsWritten", recordsWritten)
+    records.put("bytesRead", bytesRead)
+    records.put("bytesWritten", bytesWritten)
+
+    // Upload to CloudWatch
+    CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix + "/" + product, records,
+      "job-stats", "JobMeasure")
+
     // S3 object key is timestamp + UUID to avoid that multiple jobs finish the same time
     val objectKey = bucketPrefix + "/" + jobEndTime + "-" + UUID.randomUUID()
-    // Prepare the log record
     val log = new JsonObject
     log.addProperty("userid", userid)
     log.addProperty("type", "io")
     log.addProperty("timestamp", jobEndTime)
     log.addProperty("product", product)
     log.addProperty("jobId", jobId)
-    log.addProperty("jobsCompleted", jobsCompleted.get())
-    log.addProperty("stagesCompleted", stagesCompleted.get())
-    log.addProperty("tasksCompleted", tasksCompleted.get())
-    log.addProperty("executorRuntime", executorRuntime.get())
-    log.addProperty("recordsRead", recordsRead.get())
-    log.addProperty("recordsWritten", recordsWritten.get())
-    log.addProperty("bytesRead", bytesRead.get())
-    log.addProperty("bytesWritten", bytesWritten.get())
+    log.addProperty("jobsCompleted", jobsCompleted)
+    log.addProperty("stagesCompleted", stagesCompleted)
+    log.addProperty("tasksCompleted", tasksCompleted)
+    log.addProperty("executorRuntime", executorRuntime)
+    log.addProperty("recordsRead", recordsRead)
+    log.addProperty("recordsWritten", recordsWritten)
+    log.addProperty("bytesRead", bytesRead)
+    log.addProperty("bytesWritten", bytesWritten)
+
     S3Utils.putObject(s3client, s3bucket, objectKey, log.toString);
-//    println(log)
   }
   def getPropertyAsString(prop: Properties): String = {
     val writer = new StringWriter()
