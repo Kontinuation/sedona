@@ -45,10 +45,10 @@
         </mailingList>
     </mailingLists>
     <scm>
-        <connection>scm:git:https://github.com/apache/incubator-sedona.git</connection>
-        <developerConnection>scm:git:https://github.com/apache/incubator-sedona.git</developerConnection>
-        <url>https://github.com/apache/incubator-sedona</url>
-        <tag>sedona-1.2.0-incubating-rc2</tag>
+        <connection>scm:git:https://github.com/wherobots/sedona-enterprise.git</connection>
+        <developerConnection>scm:git:https://github.com/wherobots/sedona-enterprise.git</developerConnection>
+        <url>https://github.com/wherobots/sedona-enterprise</url>
+        <tag>sedona-1.0.0</tag>
     </scm>
 
     <properties>
@@ -347,6 +347,12 @@
                 <groupId>com.uber</groupId>
                 <artifactId>h3</artifactId>
                 <version>${uberh3.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.mockito</groupId>
+                <artifactId>mockito-inline</artifactId>
+                <version>4.11.0</version>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

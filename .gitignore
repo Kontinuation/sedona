@@ -18,3 +18,5 @@
 .Rproj.user
 __pycache__
 .DS_Store
+/.bsp
+/.scala-build
