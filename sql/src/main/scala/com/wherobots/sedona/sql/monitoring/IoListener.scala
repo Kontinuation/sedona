@@ -16,16 +16,17 @@ package com.wherobots.sedona.sql.monitoring
 
 import com.google.gson.{Gson, JsonObject}
 import com.wherobots.sedona.common.monitoring.{CloudWatchUtils, S3Utils}
+import org.apache.log4j.Logger
 import org.apache.spark.scheduler._
-import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
-import software.amazon.awssdk.services.s3.S3AsyncClient
+import software.amazon.awssdk.services.cloudwatch.CloudWatchClient
+import software.amazon.awssdk.services.s3.S3Client
 
 import java.io.{PrintWriter, StringWriter}
 import java.util
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.{Properties, UUID}
 
-class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S3AsyncClient, cwClient:CloudWatchAsyncClient, product:String) extends SparkListener {
+class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S3Client, cwClient:CloudWatchClient, product:String) extends SparkListener {
   private val jobsCompleted = new AtomicInteger(0)
   private val stagesCompleted = new AtomicInteger(0)
   private val tasksCompleted = new AtomicInteger(0)
@@ -35,6 +36,7 @@ class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S
   private val bytesRead = new AtomicLong(0L)
   private val bytesWritten = new AtomicLong(0L)
   private val gson = new Gson()
+  private val logger = Logger.getLogger("Wherobots IO Metrics Monitor")
 
 //  override def onApplicationEnd(applicationEnd: SparkListenerApplicationEnd): Unit = {
 //    log.warn("***************** Aggregate metrics *****************************")
@@ -95,8 +97,7 @@ class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S
     records.put("bytesWritten", bytesWritten)
 
     // Upload to CloudWatch
-    CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix + "/" + product, records,
-      "job-stats", "JobMeasure")
+    val responseCW = CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix + "/" + product, records, "job-stats", "JobMeasure")
 
     // S3 object key is timestamp + UUID to avoid that multiple jobs finish the same time
     val objectKey = bucketPrefix + "/" + jobEndTime + "-" + UUID.randomUUID()
@@ -115,7 +116,9 @@ class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S
     log.addProperty("bytesRead", bytesRead)
     log.addProperty("bytesWritten", bytesWritten)
 
-    S3Utils.putObject(s3client, s3bucket, objectKey, log.toString);
+    val responseS3 = S3Utils.putObject(s3client, s3bucket, objectKey, log.toString)
+    logger.info("Query aggregator response: " + responseCW.sdkHttpResponse().statusCode() + " " + responseCW.sdkHttpResponse().isSuccessful)
+    logger.info("Log response: " + responseS3.sdkHttpResponse().statusCode() + " " + responseS3.sdkHttpResponse().isSuccessful)
   }
   def getPropertyAsString(prop: Properties): String = {
     val writer = new StringWriter()

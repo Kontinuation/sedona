@@ -18,6 +18,7 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.core.async.AsyncRequestBody;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3AsyncClient;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -40,7 +41,6 @@ import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 import software.amazon.awssdk.services.s3.model.S3Object;
 
 import java.io.BufferedReader;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
@@ -99,25 +99,26 @@ public class S3Utils
         return b;
     }
 
+    public static PutObjectResponse putObject(S3Client s3, String bucketName, String objectKey, String content) {
+        PutObjectRequest putObjectRequest = PutObjectRequest.builder()
+                .bucket(bucketName).key(objectKey).build();
+        return s3.putObject(putObjectRequest, RequestBody.fromString(content));
+    }
+
     public static boolean putObject(S3AsyncClient s3, String bucketName, String objectKey, String content) {
         PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                 .bucket(bucketName).key(objectKey).build();
         CompletableFuture<PutObjectResponse> result = s3.putObject(putObjectRequest, AsyncRequestBody.fromString(content));
 //        System.out.println("Uploading object " + objectKey + " to bucket " + bucketName);
-//        result.whenComplete((resp, err) -> {
-//            try {
-//                if (resp != null) {
-//                    System.out.println("Object uploaded. Details: " + resp);
-//                } else {
-//                    // Handle error
-//                    err.printStackTrace();
-//                }
-//            } finally {
-//                // Only close the client when you are completely done with it
-////                client.close();
-//            }
-//        });
-//        result.join();
+        result.whenComplete((resp, err) -> {
+            if (resp != null) {
+//                System.out.println("Object uploaded. Details: " + resp);
+            } else {
+                // Handle error
+                err.printStackTrace();
+            }
+        });
+        result.join();
         return true;
     }
 

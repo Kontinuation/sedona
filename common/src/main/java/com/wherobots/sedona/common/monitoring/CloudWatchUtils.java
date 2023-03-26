@@ -18,6 +18,7 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient;
+import software.amazon.awssdk.services.cloudwatch.CloudWatchClient;
 import software.amazon.awssdk.services.cloudwatch.model.CloudWatchException;
 import software.amazon.awssdk.services.cloudwatch.model.Dimension;
 import software.amazon.awssdk.services.cloudwatch.model.MetricDatum;
@@ -33,53 +34,68 @@ import java.util.concurrent.CompletableFuture;
 
 public class CloudWatchUtils
 {
-    public static CloudWatchAsyncClient getClient(String accessKey, String secretKey, String region){
+    public static CloudWatchAsyncClient getAsyncClient(String accessKey, String secretKey, String region){
         CloudWatchAsyncClient client = CloudWatchAsyncClient.builder()
                 .credentialsProvider(getProvider(accessKey, secretKey)).region(Region.of(region)).build();
         return client;
     }
-    public static void putMetric(CloudWatchAsyncClient client, String namespace, Map<String, Double> dataPoints,
+    public static CloudWatchClient getSyncClient(String accessKey, String secretKey, String region){
+        CloudWatchClient client = CloudWatchClient.builder()
+                .credentialsProvider(getProvider(accessKey, secretKey)).region(Region.of(region)).build();
+        return client;
+    }
+    private static PutMetricDataRequest buildMetricRequest(String namespace, Map<String, Double> dataPoints,
             String metricName, String dimensionName) {
         // Set an Instant object.
         Instant instant = Instant.now();
         List<MetricDatum> datums = new ArrayList<>();
+        for (Map.Entry<String, Double> entry : dataPoints.entrySet()) {
+            Dimension dimension = Dimension.builder()
+                    .name(dimensionName)
+                    .value(entry.getKey())
+                    .build();
+            datums.add(MetricDatum.builder()
+                    .metricName(metricName)
+                    .unit(StandardUnit.NONE)
+                    .value(entry.getValue())
+                    .timestamp(instant)
+                    .dimensions(dimension).build());
+        }
+
+        PutMetricDataRequest request = PutMetricDataRequest.builder()
+                .namespace(namespace)
+                .metricData(datums).build();
+        return request;
+    }
+    public static void putMetric(CloudWatchAsyncClient client, String namespace, Map<String, Double> dataPoints,
+            String metricName, String dimensionName) {
+        PutMetricDataRequest request = buildMetricRequest(namespace, dataPoints, metricName, dimensionName);
         try {
-            for (Map.Entry<String, Double> entry : dataPoints.entrySet()) {
-                Dimension dimension = Dimension.builder()
-                        .name(dimensionName)
-                        .value(entry.getKey())
-                        .build();
-                datums.add(MetricDatum.builder()
-                        .metricName(metricName)
-                        .unit(StandardUnit.NONE)
-                        .value(entry.getValue())
-                        .timestamp(instant)
-                        .dimensions(dimension).build());
-            }
-
-            PutMetricDataRequest request = PutMetricDataRequest.builder()
-                    .namespace(namespace)
-                    .metricData(datums).build();
-
             CompletableFuture<PutMetricDataResponse> result = client.putMetricData(request);
-//            result.whenComplete((resp, err) -> {
-//                try {
-//                    if (resp != null) {
-//                        System.out.println("Object uploaded. Details: " + resp);
-//                    } else {
-//                        // Handle error
-//                        err.printStackTrace();
-//                    }
-//                } finally {
-//                    // Only close the client when you are completely done with it
-//                    //                client.close();
-//                }
-//            });
-//            result.join();
+            result.whenComplete((resp, err) -> {
+                if (resp != null) {
+                } else {
+                    // Handle error
+                    err.printStackTrace();
+                }
+            });
+            result.join();
         } catch (CloudWatchException e) {
             System.err.println(e.awsErrorDetails().errorMessage());
             System.exit(1);
         }
+    }
+
+    public static PutMetricDataResponse putMetric(CloudWatchClient client, String namespace, Map<String, Double> dataPoints,
+            String metricName, String dimensionName) {
+        PutMetricDataRequest request = buildMetricRequest(namespace, dataPoints, metricName, dimensionName);
+        try {
+            return client.putMetricData(request);
+        } catch (CloudWatchException e) {
+            System.err.println(e.awsErrorDetails().errorMessage());
+            System.exit(1);
+        }
+        return null;
     }
 
     public static AwsCredentialsProvider getProvider(String accessKey, String secretKey) {

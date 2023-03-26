@@ -16,11 +16,12 @@ package com.wherobots.sedona.sql.monitoring
 
 import com.google.gson.{Gson, JsonObject}
 import com.wherobots.sedona.common.monitoring.{CloudWatchUtils, S3Utils}
+import org.apache.log4j.Logger
 import org.apache.sedona.sql.UDF.Catalog
-import org.apache.spark.sql.execution.{ExtendedMode, QueryExecution}
+import org.apache.spark.sql.execution.QueryExecution
 import org.apache.spark.sql.util.QueryExecutionListener
-import software.amazon.awssdk.services.cloudwatch.CloudWatchAsyncClient
-import software.amazon.awssdk.services.s3.S3AsyncClient
+import software.amazon.awssdk.services.cloudwatch.CloudWatchClient
+import software.amazon.awssdk.services.s3.S3Client
 
 import java.io.{PrintWriter, StringWriter}
 import java.sql.Timestamp
@@ -28,9 +29,10 @@ import java.util
 import java.util.UUID
 import java.util.regex.Pattern
 
-class SqlListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S3AsyncClient, cwClient:CloudWatchAsyncClient, product:String)
+class SqlListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S3Client, cwClient:CloudWatchClient, product:String)
   extends QueryExecutionListener {
   private val gson = new Gson()
+  private val logger = Logger.getLogger("Wherobots SQL Metrics Monitor")
 
   override def onSuccess(funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
     produceLog(qe, null)
@@ -44,7 +46,7 @@ class SqlListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:
     // Upload the log after each sql query
     var planAnalyzed = qe.analyzed.treeString(verbose = false)
     val planPhysical = qe.sparkPlan.treeString(verbose = false)
-    val planAll = qe.explainString(ExtendedMode)
+    val planAll = planAnalyzed + "\n" + planPhysical
 //    println("analyze: " + planAnalyzed)
 //    println("phyiscal: " + planPhysical)
 //    println("all: " + planAll)
@@ -58,11 +60,9 @@ class SqlListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:
     findMatch(planAnalyzed, Seq("(?i)(\\bST_[A-Za-z0-9]+|\\bRS_[A-Za-z0-9]+)"), functionCallMap)
     // Find all internal join algorithms
     findMatch(planPhysical, Seq("(?i)(\\bDistanceJoin|\\bRangeJoin|\\bBroadcastIndexJoin|\\bgeoparquet|\\bgeotiff)"), functionCallMap)
-    CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix + "/" + product, functionCallMap,
-      "function-calls", "FunctionName")
+    val responseCW = CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix + "/" + product, functionCallMap, "function-calls", "FunctionName")
     val timestamp = new Timestamp(System.currentTimeMillis()).getTime.toString
     val objectKey = bucketPrefix + "/" + timestamp + "-" + UUID.randomUUID()
-    val userid = qe.sparkSession.conf.get("wherobots.userid", "dummy@test.com")
     // Prepare the log record
     val log = new JsonObject
     log.addProperty("userid", userid)
@@ -77,8 +77,9 @@ class SqlListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:
       exception.printStackTrace(pw)
       log.addProperty("exceptionStackTrace", sw.toString)
     }
-    S3Utils.putObject(s3client, s3bucket, objectKey, log.toString);
-//    println(log)
+    val responseS3 = S3Utils.putObject(s3client, s3bucket, objectKey, log.toString)
+    logger.info("Query aggregator response: " + responseCW.sdkHttpResponse().statusCode() + " " + responseCW.sdkHttpResponse().isSuccessful)
+    logger.info("Log response: " + responseS3.sdkHttpResponse().statusCode() + " " + responseS3.sdkHttpResponse().isSuccessful)
   }
 
   def findMatch(input:String, patterns:Seq[String], fMap:util.HashMap[String, java.lang.Double]):Unit = {

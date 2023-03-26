@@ -15,9 +15,12 @@
 package com.wherobots.sedona.sql.monitoring
 
 import com.wherobots.sedona.common.monitoring.{CloudWatchUtils, S3Utils}
+import org.apache.log4j.Logger
 import org.apache.spark.sql.{RuntimeConfig, SparkSession}
+import software.amazon.awssdk.services.s3.model.S3Exception
 
 object ListenerRegistrator {
+  val logger = Logger.getLogger(getClass.getName)
 
   def registerAll(sparkSession: SparkSession):Unit = {
     val conf = sparkSession.conf
@@ -53,6 +56,9 @@ object ListenerRegistrator {
       product = conf.get("wherobots.product", "unknown wherobots product")
     }
     catch {
+          // Fetch data from System Environment
+          // Usually these values should be set by Yarn appMasterEnv or K8S driverEnv
+          // Or by the user manually
       case e1: NoSuchElementException => {
         try {
           userid = sys.env("WHEROBOTS_USERID")
@@ -63,14 +69,54 @@ object ListenerRegistrator {
           product = sys.env.getOrElse("WHEROBOTS_PRODUCT", "unknown wherobots product")
         }
         catch {
-          case e2: NoSuchElementException => throw new RuntimeException("Your code is not running in a Wherobots managed environment!")
+              // If the above two methods fail, try to fetch data from Spark RuntimeConfig
+          case e2: NoSuchElementException => {
+            try {
+              userid = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_USERID")
+              awsAccessKey = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_ACCESSKEY")
+              awsSecretKey = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_SECRETKEY")
+              awsS3path = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_S3BUCKET")
+              awsRegion = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_REGION")
+              product = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_PRODUCT", "unknown wherobots product")
+            }
+            catch {
+              case e3: NoSuchElementException => {
+                {
+                  try {
+                    userid = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_USERID")
+                    awsAccessKey = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_ACCESSKEY")
+                    awsSecretKey = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_SECRETKEY")
+                    awsS3path = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_S3BUCKET")
+                    awsRegion = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_REGION")
+                    product = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_PRODUCT", "unknown wherobots product")
+                  }
+                  catch {
+                        // Only if all the above methods fail, throw the exception
+                    case e4: NoSuchElementException => {
+                      throw new RuntimeException("Your code is not running in a Wherobots managed environment!")
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
     val bucketName = awsS3path.split("/")(0)
     val bucketPrefix = awsS3path.split("/")(1) // Get the log folder name in the bucket
-    val s3Client = S3Utils.getAsyncClient(awsAccessKey, awsSecretKey, awsRegion)
-    val cloudwatchClient = CloudWatchUtils.getClient(awsAccessKey, awsSecretKey, awsRegion)
+//    val s3ClientAsync = S3Utils.getAsyncClient(awsAccessKey, awsSecretKey, awsRegion)
+    val s3Client = S3Utils.getSyncClient(awsAccessKey, awsSecretKey, awsRegion)
+    try {
+      S3Utils.putObject(s3Client, bucketName, bucketPrefix + "/_SUCCESS", "")
+      logger.info("Successfully verified your Wherobots audit credential!")
+    }
+    catch {
+      case e: S3Exception => {
+        throw new RuntimeException("Your Wherobots audit credential is not valid!")
+      }
+    }
+    val cloudwatchClient = CloudWatchUtils.getSyncClient(awsAccessKey, awsSecretKey, awsRegion)
     (new IoListener(userid, bucketName, bucketPrefix, s3Client, cloudwatchClient, product),
       new SqlListener(userid, bucketName, bucketPrefix, s3Client, cloudwatchClient, product))
   }
