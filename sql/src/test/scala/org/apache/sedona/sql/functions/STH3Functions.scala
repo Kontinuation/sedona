@@ -22,7 +22,7 @@ import org.apache.sedona.common.Functions
 import org.apache.sedona.common.utils.H3Utils
 import org.apache.sedona.sql.{GeometrySample, TestBaseScala}
 import org.apache.spark.sql.functions.{col, expr, lit, monotonically_increasing_id}
-import org.locationtech.jts.geom.Coordinate
+import org.locationtech.jts.geom.{Coordinate, Polygon}
 import org.scalatest.{GivenWhenThen, Matchers}
 
 import scala.collection.mutable
@@ -142,6 +142,5 @@ class STH3Functions extends TestBaseScala with Matchers with GeometrySample with
       Then("the result of spark sql should match with direct common library call")
       exacts should equal (expects)
     }
-
   }
 }

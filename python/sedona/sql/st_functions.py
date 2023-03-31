@@ -58,6 +58,7 @@ __all__ = [
     "ST_H3CellDistance",
     "ST_H3CellIDs",
     "ST_H3KRing",
+    "ST_H3ToGeom",
     "ST_InteriorRingN",
     "ST_Intersection",
     "ST_IsClosed",
@@ -573,6 +574,16 @@ def ST_H3KRing(cell: Union[ColumnOrName, int], k: Union[ColumnOrName, int], exac
     """
     args = (cell, k, exact_ring)
     return _call_st_function("ST_H3KRing", args)
+
+
+@validate_argument_types
+def ST_H3ToGeom(cells: Union[ColumnOrName, list]) -> Column:
+    """Cover Geometry with H3 Cells and return a List of Long type cell IDs
+    :param cells: h3 cells
+    :return: the reversed multipolygon
+    :rtype: Geometry
+    """
+    return _call_st_function("ST_H3ToGeom", cells)
 
 
 @validate_argument_types

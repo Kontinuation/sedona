@@ -582,14 +582,14 @@ public class Functions {
         List<Geometry> geoms = GeomUtils.extractGeometryCollection(input);
         for (Geometry geom : geoms) {
             if (geom instanceof Polygon) {
-                cellIds.addAll(H3Utils.polygonToCells((Polygon) input, level, fullCover));
+                cellIds.addAll(H3Utils.polygonToCells((Polygon) geom, level, fullCover));
             } else if (geom instanceof LineString) {
-                cellIds.addAll(H3Utils.lineStringToCells((LineString) input, level, fullCover));
+                cellIds.addAll(H3Utils.lineStringToCells((LineString) geom, level, fullCover));
             } else if (geom instanceof Point){
-                cellIds.add(H3Utils.coordinateToCell(input.getCoordinate(), level));
+                cellIds.add(H3Utils.coordinateToCell(geom.getCoordinate(), level));
             } else {
                 // if not type of polygon, point or lienSting, we cover its MBR
-                cellIds.addAll(H3Utils.polygonToCells((Polygon)input.getEnvelope(), level, fullCover));
+                cellIds.addAll(H3Utils.polygonToCells((Polygon)geom.getEnvelope(), level, fullCover));
             }
         }
         return cellIds.toArray(new Long[0]);
@@ -633,5 +633,29 @@ public class Functions {
             tbdCells.forEach(cells::remove);
         }
         return cells.toArray(new Long[0]);
+    }
+
+    /**
+     * get the neighbor cells of the input cell by h3.gridDisk function
+     * @param cells: the set of cells
+     * @return Multiple Polygons reversed
+     */
+    public static Geometry h3ToGeom(List<Long> cells) {
+        GeometryFactory geomFactory = new GeometryFactory();
+        return geomFactory.createMultiPolygon(
+                H3Utils.h3.cellsToMultiPolygon(cells, true).stream().map(
+                        shellHoles -> {
+                            List<LinearRing> rings = shellHoles.stream().map(
+                                    shell -> geomFactory.createLinearRing(shell.stream().map(latLng -> new Coordinate(latLng.lng, latLng.lat)).toArray(Coordinate[]::new))
+                            ).collect(Collectors.toList());
+                            LinearRing shell = rings.remove(0);
+                            if (rings.isEmpty()) {
+                                return geomFactory.createPolygon(shell);
+                            } else {
+                                return geomFactory.createPolygon(shell, rings.toArray(new LinearRing[0]));
+                            }
+                        }
+                ).toArray(Polygon[]::new)
+        );
     }
 }

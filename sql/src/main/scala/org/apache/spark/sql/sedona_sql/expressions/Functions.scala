@@ -34,6 +34,8 @@ import org.locationtech.jts.algorithm.MinimumBoundingCircle
 import org.locationtech.jts.geom.{Geometry, _}
 import org.locationtech.jts.simplify.TopologyPreservingSimplifier
 
+import scala.collection.JavaConverters
+
 /**
   * Return the distance between two geometries.
   *
@@ -1117,5 +1119,24 @@ case class ST_H3KRing(inputExpressions: Seq[Expression])
 
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
+  }
+}
+
+case class ST_H3ToGeom(inputExpressions: Seq[Expression])
+  extends InferredUnaryExpression(Functions.h3ToGeom) with FoldableExpression {
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+
+  override def evalWithoutSerialization(input: InternalRow): Any = {
+    val value = inputExpressions(0).eval(input).asInstanceOf[ArrayData].toLongArray().map(
+      v => v.asInstanceOf[java.lang.Long]
+    )
+    if (value != null) {
+      Functions.h3ToGeom(java.util.Arrays.asList(value:_*))
+    } else {
+      null
+    }
   }
 }

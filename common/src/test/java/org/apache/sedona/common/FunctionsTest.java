@@ -421,23 +421,20 @@ public class FunctionsTest {
         };
         int resolution = 7;
         // the expected results
-        List<Set<Long> > expects = new ArrayList<>();
-        expects.add(new HashSet<>(Collections.singletonList(H3Utils.coordinateToCell(targets[0].getCoordinate(), resolution))));
-        expects.add(new HashSet<>(H3Utils.polygonToCells((Polygon) targets[1], resolution, true)));
-        expects.add(new HashSet<>(H3Utils.lineStringToCells((LineString) targets[2], resolution, true)));
+        Set<Long> expects = new HashSet<>();
+        expects.addAll(new HashSet<>(Collections.singletonList(H3Utils.coordinateToCell(targets[0].getCoordinate(), resolution))));
+        expects.addAll(new HashSet<>(H3Utils.polygonToCells((Polygon) targets[1], resolution, true)));
+        expects.addAll(new HashSet<>(H3Utils.lineStringToCells((LineString) targets[2], resolution, true)));
         // for GeometryCollection, generate separately for the underlying geoms
-        Set<Long> geomCollectExpect = new HashSet<>();
-        geomCollectExpect.add(H3Utils.coordinateToCell(combinedGeoms[0].getCoordinate(), resolution));
-        geomCollectExpect.add(H3Utils.coordinateToCell(combinedGeoms[1].getCoordinate(), resolution));
-        geomCollectExpect.addAll(H3Utils.lineStringToCells((LineString) combinedGeoms[2], resolution, true));
-        geomCollectExpect.addAll(H3Utils.lineStringToCells((LineString) combinedGeoms[3], resolution, true));
-        geomCollectExpect.addAll(H3Utils.polygonToCells((Polygon) combinedGeoms[4], resolution, true));
-        geomCollectExpect.addAll(H3Utils.polygonToCells((Polygon) combinedGeoms[5], resolution, true));
-        expects.add(geomCollectExpect);
-        // do asserts
-        for (int i = 0;i < targets.length; i++){
-            assert expects.get(0).equals(new HashSet<>(Arrays.asList(Functions.h3CellIDs(targets[0], resolution, true))));
-        }
+        expects.add(H3Utils.coordinateToCell(combinedGeoms[0].getCoordinate(), resolution));
+        expects.add(H3Utils.coordinateToCell(combinedGeoms[1].getCoordinate(), resolution));
+        expects.addAll(H3Utils.lineStringToCells((LineString) combinedGeoms[2], resolution, true));
+        expects.addAll(H3Utils.lineStringToCells((LineString) combinedGeoms[3], resolution, true));
+        expects.addAll(H3Utils.polygonToCells((Polygon) combinedGeoms[4], resolution, true));
+        expects.addAll(H3Utils.polygonToCells((Polygon) combinedGeoms[5], resolution, true));
+        // generate exact
+        Set<Long> exacts = new HashSet<>(Arrays.asList(Functions.h3CellIDs(GEOMETRY_FACTORY.createGeometryCollection(targets), resolution, true)));
+        assert exacts.equals(expects);
     }
 
     /**
@@ -496,6 +493,5 @@ public class FunctionsTest {
             kthNeighbors.addAll(Arrays.asList(Functions.h3KRing(cell, 9, false)));
             assert allNeighbors.equals(kthNeighbors);
         }
-
     }
 }

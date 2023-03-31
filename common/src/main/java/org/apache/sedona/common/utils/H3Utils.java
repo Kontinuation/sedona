@@ -4,10 +4,7 @@ package org.apache.sedona.common.utils;
 import com.uber.h3core.H3Core;
 import com.uber.h3core.exceptions.H3Exception;
 import com.uber.h3core.util.LatLng;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.LineString;
-import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.*;
 
 import java.io.IOException;
 import java.util.*;
@@ -89,12 +86,29 @@ public class H3Utils {
                     holes.isEmpty() ? null : holes,
                     level
             );
+            // if the internal cell is empty, means no cell with centroid within, we'll use centroid to add a seed
+            if (internalCells.isEmpty()) {
+                internalCells.add(
+                        coordinateToCell(polygon.getCentroid().getCoordinate(), level)
+                );
+            }
             if (fullCover) {
-                // H3 polyfill only include hexagons with centroid within the polygon, we fix by generating the neighbors for the cells.
+                // H3 polyfill only include hexagons with centroid within the polygon, we add augmentation to guarantee full coverage.
                 Set<Long> cells = new HashSet<>();
+                // this augment shouldn't be required with cells covering shells, just in case we add them
                 internalCells.forEach(
                         cell -> cells.addAll(h3.gridDisk(cell, 1))
                 );
+                // further augment by adding the shell and holes cover cells
+                cells.addAll(
+                        lineStringToCells(polygon.getExteriorRing(), level, true)
+                );
+                for (int it = 0;it < polygon.getNumInteriorRing(); it++) {
+                    LineString hole = polygon.getInteriorRingN(it);
+                    cells.addAll(
+                            lineStringToCells(hole, level, true)
+                    );
+                }
                 return new ArrayList<>(cells);
             } else {
                 return internalCells;
@@ -208,7 +222,7 @@ public class H3Utils {
                     } catch (H3Exception e) {
                         pathCells = approxPathCells(cs, ce, level, true);
                     }
-                    if (pathCells.size() < 2 || !fullCover) {
+                    if (pathCells.size() <= 2 || !fullCover) {
                         cells.addAll(pathCells);
                     } else {
                         // the shortest path from cs to ce not guarantee cover the line, for the missed part, we generate neighbors for the cells to cover.

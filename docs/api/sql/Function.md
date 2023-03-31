@@ -670,6 +670,29 @@ Output:
 +--------------------------------------------------------------------------------------------------------------------------------------------+
 ```
 
+## ST_H3ToGeom
+
+Introduction: return the result of H3 function [cellsToMultiPolygon(cells)](https://h3geo.org/docs/api/regions#cellstolinkedmultipolygon--cellstomultipolygon).
+
+Reverse the uber h3 cells to MultiPolygon object composed by the geometry hexagons. 
+
+Format: `ST_H3ToGeom(cells: Array[Long])`
+
+Since: `v1.4.0`
+
+Spark SQL example:
+```SQL
+SELECT ST_H3ToGeom(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'), 8, true)[0], 1, true))
+```
+
+Output:
+```
+|st_h3togeom(st_h3cellids(st_geomfromwkt(POINT(1 2), 0), 8, true))                                                                                                                                                                                                                              |
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|MULTIPOLYGON (((1.0057629565404935 1.9984665139177658, 1.0037116327309032 2.001832524914011, 0.9997277993570498 2.0011632704656668, 0.9977951427833285 1.99712822839324, 0.9998461908217768 1.9937621529331915, 1.0038301712104252 1.9944311839965554, 1.0057629565404935 1.9984665139177658)))|
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+```
+
 ## ST_InteriorRingN
 
 Introduction: Returns the Nth interior linestring ring of the polygon geometry. Returns NULL if the geometry is not a polygon or the given N is out of range

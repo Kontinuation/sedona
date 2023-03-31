@@ -15,6 +15,7 @@ package org.apache.sedona.common;
 
 
 import com.uber.h3core.exceptions.H3Exception;
+import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.common.utils.H3Utils;
 import org.junit.Test;
 import org.locationtech.jts.geom.*;
@@ -69,6 +70,29 @@ public class H3UtilTest {
     @Test
     public void polygonToCells() throws ParseException {
         Polygon target = (Polygon) new WKTReader().read("POLYGON((-122.5062527079981 37.77488349032218,-122.5007595439356 37.732537587382446,-122.48839992479498 37.67223433509411,-122.3963894267481 37.69505755123785,-122.39501613573248 37.788450765773675,-122.46505397752935 37.79984535251623,-122.5062527079981 37.77488349032218))");
+        List<Long> cells = H3Utils.polygonToCells(target, 7, true);
+        // the cells of mbr must include all the cells' cells
+        Polygon mbr = (Polygon) target.getEnvelope();
+        List<Long> cellsMBR = H3Utils.polygonToCells(mbr, 7, true);
+        assert new HashSet<>(cellsMBR).containsAll(cells);
+        // generate the reversed polygons from cells, the h3 generate 1 compacted polygon for conjective cells
+        Polygon cellPolygon = cellsToJTSPolygons(cells)[0];
+        // the reversed polygons from cells must all intersect with the polygon, this means the indexing geographically make sense
+        assert cellPolygon.contains(target);
+    }
+
+    @Test
+    public void polygonToCellsNoMatch() throws ParseException {
+        Polygon target = (Polygon) new WKTReader().read("POLYGON ((-122.3852447 47.5606571, -122.385248 47.5605286, -122.385326 47.5605296, -122.3853281 47.5604473, -122.3852624 47.5604465, -122.3852646 47.5603628, -122.3853411 47.5603637, -122.3853543 47.5598464, -122.3846514 47.5598382, -122.3846307 47.5606499, -122.3852447 47.5606571))");
+        Point centroid = target.getCentroid();
+        long centroidCell = H3Utils.coordinateToCell(centroid.getCoordinate(), 8);
+        List<Long> cells = H3Utils.polygonToCells(target, 8, false);
+        assert cells.size() == 1 && cells.get(0) == centroidCell;
+    }
+
+    @Test
+    public void polygonToCellsNoMatchFullCover() throws ParseException {
+        Polygon target = (Polygon) new WKTReader().read("POLYGON ((-122.3852447 47.5606571, -122.385248 47.5605286, -122.385326 47.5605296, -122.3853281 47.5604473, -122.3852624 47.5604465, -122.3852646 47.5603628, -122.3853411 47.5603637, -122.3853543 47.5598464, -122.3846514 47.5598382, -122.3846307 47.5606499, -122.3852447 47.5606571))");
         List<Long> cells = H3Utils.polygonToCells(target, 7, true);
         // the cells of mbr must include all the cells' cells
         Polygon mbr = (Polygon) target.getEnvelope();
@@ -198,10 +222,6 @@ public class H3UtilTest {
         Polygon cellPolygon = cellsToJTSPolygons(cells)[0];
         // the reversed polygons from cells must all intersect with the polygon, this means the indexing geographically make sense
         assert cellPolygon.contains(target);
-        // plus, in this case we'll generate the cells by MBR, so the result should equal to mbr polygon To cells
-        Polygon mbr = (Polygon) target.getEnvelope();
-        List<Long> cellsMBR = H3Utils.polygonToCells(mbr, 6, true);
-        assert new HashSet<>(cellsMBR).equals(new HashSet<>(cells));
     }
 
     @Test

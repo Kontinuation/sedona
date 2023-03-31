@@ -1102,3 +1102,22 @@ class TestPredicateJoin(TestBase):
         """)
         exact_rings, all_rings, original_cells = df.take(1)[0]
         assert set(exact_rings + original_cells) == set(all_rings)
+
+    def test_st_h3_togeom(self):
+        df = self.spark.sql("""
+        SELECT
+            ST_Contains(
+                ST_H3ToGeom(ST_H3CellIDs(ST_GeomFromText('POLYGON((-1 0, 1 0, 0 0, 0 1, -1 0))'), 6, true)),
+                ST_GeomFromText('POLYGON((-1 0, 1 0, 0 0, 0 1, -1 0))')
+            ),
+            ST_Contains(
+                ST_H3ToGeom(ST_H3CellIDs(ST_GeomFromText('POLYGON((-1 0, 1 0, 0 0, 0 1, -1 0))'), 6, false)),
+                ST_GeomFromText('POLYGON((-1 0, 1 0, 0 0, 0 1, -1 0))')
+            ),
+            ST_Intersects(
+                ST_H3ToGeom(ST_H3CellIDs(ST_GeomFromText('POLYGON((-1 0, 1 0, 0 0, 0 1, -1 0))'), 6, false)),
+                ST_GeomFromText('POLYGON((-1 0, 1 0, 0 0, 0 1, -1 0))')
+            )
+        """)
+        res1, res2, res3 = df.take(1)[0]
+        assert res1 and not res2 and res3

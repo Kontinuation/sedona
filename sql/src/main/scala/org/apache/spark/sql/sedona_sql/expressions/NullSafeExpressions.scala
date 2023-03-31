@@ -141,6 +141,8 @@ object InferrableType {
     new InferrableType[Array[Byte]] {}
   implicit val longArrayInstance: InferrableType[Array[java.lang.Long]] =
     new InferrableType[Array[java.lang.Long]] {}
+  implicit val longListInstance: InferrableType[java.util.List[java.lang.Long]] =
+    new InferrableType[java.util.List[java.lang.Long]] {}
 }
 
 object InferredTypes {
@@ -196,7 +198,7 @@ object InferredTypes {
       StringType
     } else if (typeOf[T] =:= typeOf[Array[Byte]]) {
       BinaryType
-    } else if (typeOf[T] =:= typeOf[Array[java.lang.Long]]) {
+    } else if (typeOf[T] =:= typeOf[Array[java.lang.Long]] || typeOf[T] =:= typeOf[java.util.List[java.lang.Long]]) {
       DataTypes.createArrayType(LongType)
     } else {
       BooleanType

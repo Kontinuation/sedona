@@ -135,6 +135,10 @@ object st_functions extends DataFrameAPI {
 
   def ST_H3KRing(cell: Long, k: Integer, exactRing: Boolean): Column = wrapExpression[ST_H3KRing](cell, k, exactRing)
 
+  def ST_H3ToGeom(cellIds: Column): Column = wrapExpression[ST_H3ToGeom](cellIds)
+
+  def ST_H3ToGeom(cellIds: Array[Long]): Column = wrapExpression[ST_H3ToGeom](cellIds)
+
   def ST_InteriorRingN(polygon: Column, n: Column): Column = wrapExpression[ST_InteriorRingN](polygon, n)
   def ST_InteriorRingN(polygon: String, n: Int): Column = wrapExpression[ST_InteriorRingN](polygon, n)
 

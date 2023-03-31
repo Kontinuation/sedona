@@ -105,6 +105,7 @@ object Catalog {
     function[ST_GeometryN](),
     function[ST_H3CellDistance](),
     function[ST_H3CellIDs](),
+    function[ST_H3ToGeom](),
     function[ST_H3KRing](),
     function[ST_InteriorRingN](),
     function[ST_Dump](),
