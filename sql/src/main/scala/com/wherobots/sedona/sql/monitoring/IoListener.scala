@@ -26,7 +26,8 @@ import java.util
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
 import java.util.{Properties, UUID}
 
-class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S3Client, cwClient:CloudWatchClient, product:String) extends SparkListener {
+class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S3Client, cwClient:CloudWatchClient
+                 , product:String, dimensionDataPoints:util.HashMap[String, String]) extends SparkListener {
   private val jobsCompleted = new AtomicInteger(0)
   private val stagesCompleted = new AtomicInteger(0)
   private val tasksCompleted = new AtomicInteger(0)
@@ -97,7 +98,7 @@ class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S
     records.put("bytesWritten", bytesWritten)
 
     // Upload to CloudWatch
-    val responseCW = CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix + "/" + product, records, "job-stats", "JobMeasure")
+    val responseCW = CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix, records, dimensionDataPoints)
 
     // S3 object key is timestamp + UUID to avoid that multiple jobs finish the same time
     val objectKey = bucketPrefix + "/" + jobEndTime + "-" + UUID.randomUUID()

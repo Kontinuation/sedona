@@ -117,7 +117,13 @@ object ListenerRegistrator {
       }
     }
     val cloudwatchClient = CloudWatchUtils.getSyncClient(awsAccessKey, awsSecretKey, awsRegion)
-    (new IoListener(userid, bucketName, bucketPrefix, s3Client, cloudwatchClient, product),
-      new SqlListener(userid, bucketName, bucketPrefix, s3Client, cloudwatchClient, product))
+    // Get the version of individual product
+    val dimensionDataPoints = new java.util.HashMap[String, String]()
+    product.split("\\+").foreach(productSeg => {
+      val productSegInfo = productSeg.split("=")
+      dimensionDataPoints.put(productSegInfo(0), productSegInfo(1))
+    })
+    (new IoListener(userid, bucketName, bucketPrefix, s3Client, cloudwatchClient, product, dimensionDataPoints),
+      new SqlListener(userid, bucketName, bucketPrefix, s3Client, cloudwatchClient, product, dimensionDataPoints))
   }
 }

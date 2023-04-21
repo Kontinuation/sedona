@@ -44,22 +44,28 @@ public class CloudWatchUtils
                 .credentialsProvider(getProvider(accessKey, secretKey)).region(Region.of(region)).build();
         return client;
     }
-    private static PutMetricDataRequest buildMetricRequest(String namespace, Map<String, Double> dataPoints,
-            String metricName, String dimensionName) {
+    private static PutMetricDataRequest buildMetricRequest(String namespace, Map<String, Double> metricDataPoints,
+            Map<String, String> dimensionDataPoints) {
         // Set an Instant object.
         Instant instant = Instant.now();
-        List<MetricDatum> datums = new ArrayList<>();
-        for (Map.Entry<String, Double> entry : dataPoints.entrySet()) {
-            Dimension dimension = Dimension.builder()
-                    .name(dimensionName)
-                    .value(entry.getKey())
+        // Create a list of dimensions.
+        List<Dimension> dimensions = new ArrayList<>();
+        dimensionDataPoints.entrySet().forEach(d -> {
+            Dimension dim = Dimension.builder()
+                    .name(d.getKey())
+                    .value(d.getValue())
                     .build();
+            dimensions.add(dim);
+        });
+        // Create a list of MetricDatum objects.
+        List<MetricDatum> datums = new ArrayList<>();
+        for (Map.Entry<String, Double> entry : metricDataPoints.entrySet()) {
             datums.add(MetricDatum.builder()
-                    .metricName(metricName)
+                    .metricName(entry.getKey())
                     .unit(StandardUnit.NONE)
                     .value(entry.getValue())
                     .timestamp(instant)
-                    .dimensions(dimension).build());
+                    .dimensions(dimensions).build());
         }
 
         PutMetricDataRequest request = PutMetricDataRequest.builder()
@@ -67,9 +73,9 @@ public class CloudWatchUtils
                 .metricData(datums).build();
         return request;
     }
-    public static void putMetric(CloudWatchAsyncClient client, String namespace, Map<String, Double> dataPoints,
-            String metricName, String dimensionName) {
-        PutMetricDataRequest request = buildMetricRequest(namespace, dataPoints, metricName, dimensionName);
+    public static void putMetric(CloudWatchAsyncClient client, String namespace, Map<String, Double> metricDataPoints,
+            Map<String, String> dimensionDataPoints) {
+        PutMetricDataRequest request = buildMetricRequest(namespace, metricDataPoints, dimensionDataPoints);
         try {
             CompletableFuture<PutMetricDataResponse> result = client.putMetricData(request);
             result.whenComplete((resp, err) -> {
@@ -86,9 +92,9 @@ public class CloudWatchUtils
         }
     }
 
-    public static PutMetricDataResponse putMetric(CloudWatchClient client, String namespace, Map<String, Double> dataPoints,
-            String metricName, String dimensionName) {
-        PutMetricDataRequest request = buildMetricRequest(namespace, dataPoints, metricName, dimensionName);
+    public static PutMetricDataResponse putMetric(CloudWatchClient client, String namespace, Map<String, Double> metricDataPoints,
+            Map<String, String> dimensionDataPoints) {
+        PutMetricDataRequest request = buildMetricRequest(namespace, metricDataPoints, dimensionDataPoints);
         try {
             return client.putMetricData(request);
         } catch (CloudWatchException e) {
