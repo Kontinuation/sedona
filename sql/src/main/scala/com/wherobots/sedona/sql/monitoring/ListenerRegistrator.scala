@@ -53,7 +53,7 @@ object ListenerRegistrator {
       awsSecretKey = conf.get("wherobots.aws.secretkey")
       awsS3path = conf.get("wherobots.aws.s3bucket")
       awsRegion = conf.get("wherobots.aws.region")
-      product = conf.get("wherobots.product", "unknown wherobots product")
+      product = conf.get("wherobots.product")
     }
     catch {
           // Fetch data from System Environment
@@ -66,7 +66,7 @@ object ListenerRegistrator {
           awsSecretKey = sys.env("WHEROBOTS_AWS_SECRETKEY")
           awsS3path = sys.env("WHEROBOTS_AWS_S3BUCKET")
           awsRegion = sys.env("WHEROBOTS_AWS_REGION")
-          product = sys.env.getOrElse("WHEROBOTS_PRODUCT", "unknown wherobots product")
+          product = sys.env("WHEROBOTS_PRODUCT")
         }
         catch {
               // If the above two methods fail, try to fetch data from Spark RuntimeConfig
@@ -77,7 +77,7 @@ object ListenerRegistrator {
               awsSecretKey = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_SECRETKEY")
               awsS3path = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_S3BUCKET")
               awsRegion = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_REGION")
-              product = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_PRODUCT", "unknown wherobots product")
+              product = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_PRODUCT")
             }
             catch {
               case e3: NoSuchElementException => {
@@ -88,7 +88,7 @@ object ListenerRegistrator {
                     awsSecretKey = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_SECRETKEY")
                     awsS3path = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_S3BUCKET")
                     awsRegion = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_REGION")
-                    product = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_PRODUCT", "unknown wherobots product")
+                    product = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_PRODUCT")
                   }
                   catch {
                         // Only if all the above methods fail, throw the exception
