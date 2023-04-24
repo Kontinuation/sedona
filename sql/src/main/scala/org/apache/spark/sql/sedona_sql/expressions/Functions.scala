@@ -968,3 +968,14 @@ case class ST_H3ToGeom(inputExpressions: Seq[Expression])
     }
   }
 }
+
+case class ST_CollectionExtract(inputExpressions: Seq[Expression])
+  extends InferredBinaryExpression(Functions.collectionExtract) with FoldableExpression {
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+
+  override def allowRightNull: Boolean = true
+}
+
