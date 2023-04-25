@@ -34,6 +34,8 @@ class SqlListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:
   extends QueryExecutionListener {
   private val gson = new Gson()
   private val logger = Logger.getLogger("Wherobots SQL Metrics Monitor")
+  private val dimensionDataPointsUpdated = new util.HashMap[String, String](dimensionDataPoints)
+  dimensionDataPointsUpdated.put("metric-type", "sql-funcs")
 
   override def onSuccess(funcName: String, qe: QueryExecution, durationNs: Long): Unit = {
     produceLog(qe, null)
@@ -61,7 +63,7 @@ class SqlListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:
     findMatch(planAnalyzed, Seq("(?i)(\\bST_[A-Za-z0-9]+|\\bRS_[A-Za-z0-9]+)"), functionCallMap)
     // Find all internal join algorithms
     findMatch(planPhysical, Seq("(?i)(\\bDistanceJoin|\\bRangeJoin|\\bBroadcastIndexJoin|\\bgeoparquet|\\bgeotiff)"), functionCallMap)
-    val responseCW = CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix, functionCallMap, dimensionDataPoints)
+    val responseCW = CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix, functionCallMap, dimensionDataPointsUpdated)
     val timestamp = new Timestamp(System.currentTimeMillis()).getTime.toString
     val objectKey = bucketPrefix + "/" + timestamp + "-" + UUID.randomUUID()
     // Prepare the log record

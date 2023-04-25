@@ -38,7 +38,8 @@ class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S
   private val bytesWritten = new AtomicLong(0L)
   private val gson = new Gson()
   private val logger = Logger.getLogger("Wherobots IO Metrics Monitor")
-
+  private val dimensionDataPointsUpdated = new util.HashMap[String, String](dimensionDataPoints)
+  dimensionDataPointsUpdated.put("metric-type", "job-stats")
 //  override def onApplicationEnd(applicationEnd: SparkListenerApplicationEnd): Unit = {
 //    log.warn("***************** Aggregate metrics *****************************")
 //    log.warn(s"* Jobs = ${jobsCompleted.get()}, Stages = ${stagesCompleted.get()}, Tasks = ${tasksCompleted}")
@@ -98,7 +99,7 @@ class IoListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:S
     records.put("bytesWritten", bytesWritten)
 
     // Upload to CloudWatch
-    val responseCW = CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix, records, dimensionDataPoints)
+    val responseCW = CloudWatchUtils.putMetric(cwClient, s3bucket + "/" + bucketPrefix, records, dimensionDataPointsUpdated)
 
     // S3 object key is timestamp + UUID to avoid that multiple jobs finish the same time
     val objectKey = bucketPrefix + "/" + jobEndTime + "-" + UUID.randomUUID()
