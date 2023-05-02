@@ -66,4 +66,27 @@ public class TestTableFunctions extends TestBase{
                 Constructors.geomFromWKT("POLYGON ((0 0, 0 1, 0.5 1, 0.5 1.5, 1.5 1.5, 1.5 0.5, 1 0.5, 1 0, 0 0))", 0)
         );
     }
+
+    @Test
+    public void test_ST_Collect() throws ParseException {
+        registerUDTF(ST_Collect.class);
+        verifySqlSingleRes(
+                "with src_tbl as (\n" +
+                        "select sedona.ST_GeomFromText('POINT (40 10)') geom\n" +
+                        "union\n" +
+                        "select sedona.ST_GeomFromText('LINESTRING (0 5, 0 10)') geom\n" +
+                        ")\n" +
+                        "select sedona.ST_AsText(collection) from src_tbl, table(sedona.ST_Collect(src_tbl.geom) OVER (PARTITION BY 1));",
+                Constructors.geomFromWKT("GEOMETRYCOLLECTION (POINT (40 10), LINESTRING (0 5, 0 10))", 0)
+        );
+    }
+
+    @Test
+    public void test_ST_DumpExplode() {
+        registerUDTF(ST_Dump.class);
+        verifySqlSingleRes(
+                "select count(1) from table(sedona.ST_Dump(sedona.ST_GeomFromText('MULTIPOINT ((10 40), (40 30), (20 20), (30 10))')));",
+                4
+        );
+    }
 }

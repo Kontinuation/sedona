@@ -137,15 +137,6 @@ public class TestFunctions extends TestBase {
         );
     }
     @Test
-    public void test_ST_Collect() {
-        registerUDF("ST_Dump", byte[].class);
-        registerUDF("ST_Collect", String[].class);
-        verifySqlSingleRes(
-                "select sedona.ST_AsText(sedona.ST_Collect(ARRAY_SLICE(sedona.ST_Dump(sedona.ST_GeomFromText('GEOMETRYCOLLECTION(POINT(40 10), LINESTRING(0 5, 0 10), POLYGON((0 0, 0 5, 5 5, 5 0, 0 0)))')), 0, 2)))",
-                "GEOMETRYCOLLECTION (POINT (40 10), LINESTRING (0 5, 0 10))"
-        );
-    }
-    @Test
     public void test_ST_CollectionExtract() {
         registerUDF("ST_CollectionExtract", byte[].class);
         verifySqlSingleRes(
@@ -191,19 +182,11 @@ public class TestFunctions extends TestBase {
         );
     }
     @Test
-    public void test_ST_Dump() {
-        registerUDF("ST_Dump", byte[].class);
-        verifySqlSingleRes(
-                "select array_size(sedona.ST_Dump(sedona.ST_GeomFromText('MULTIPOINT((10 40), (40 30), (20 20), (30 10))')))",
-                4
-        );
-    }
-    @Test
     public void test_ST_DumpPoints() {
         registerUDF("ST_DumpPoints", byte[].class);
         verifySqlSingleRes(
-                "select array_size(sedona.ST_DumpPoints(sedona.ST_GeomFromText('MULTIPOINT((10 40), (40 30), (20 20), (30 10))')))",
-                4
+                "select sedona.ST_AsText(sedona.ST_DumpPoints(sedona.ST_GeomFromText('MULTILINESTRING((10 40, 40 30), (20 20, 30 10))')))",
+                "MULTIPOINT ((10 40), (40 30), (20 20), (30 10))"
         );
     }
     @Test
@@ -377,13 +360,13 @@ public class TestFunctions extends TestBase {
     @Test
     public void test_ST_MakePolygon() {
         registerUDF("ST_MakePolygon", byte[].class);
-        registerUDF("ST_MakePolygon", byte[].class, String[].class);
+        registerUDF("ST_MakePolygon", byte[].class, byte[].class);
         verifySqlSingleRes(
                 "select sedona.ST_AsText(sedona.ST_MakePolygon(sedona.ST_GeomFromText('LINESTRING(75 29, 77 29, 77 29, 75 29)')))",
                 "POLYGON ((75 29, 77 29, 77 29, 75 29))"
         );
         verifySqlSingleRes(
-                "select sedona.ST_AsText(sedona.ST_MakePolygon(sedona.ST_GeomFromText('LINESTRING(75 29, 77 29, 77 29, 75 29)'), sedona.ST_dump(sedona.ST_GeomFromText('MULTILINESTRING ((2 3, 1 4, 2 4, 2 3), (2 4, 3 5, 3 4, 2 4))')) ))  ",
+                "select sedona.ST_AsText(sedona.ST_MakePolygon(sedona.ST_GeomFromText('LINESTRING(75 29, 77 29, 77 29, 75 29)'), sedona.ST_GeomFromText('MULTILINESTRING ((2 3, 1 4, 2 4, 2 3), (2 4, 3 5, 3 4, 2 4))') ))  ",
                 "POLYGON ((75 29, 77 29, 77 29, 75 29), (2 3, 1 4, 2 4, 2 3), (2 4, 3 5, 3 4, 2 4))"
         );
     }
@@ -569,9 +552,8 @@ public class TestFunctions extends TestBase {
     @Test
     public void test_ST_SubDivide() {
         registerUDF("ST_SubDivide", byte[].class, int.class);
-        registerUDF("ST_Collect", String[].class);
         verifySqlSingleRes(
-                "select sedona.ST_AsText(sedona.ST_Collect(sedona.ST_SubDivide(sedona.ST_GeomFromText('LINESTRING (0 0, 1 0, 2 0, 3 0, 4 0, 5 0)'), 5)))",
+                "select sedona.ST_AsText(sedona.ST_SubDivide(sedona.ST_GeomFromText('LINESTRING (0 0, 1 0, 2 0, 3 0, 4 0, 5 0)'), 5))",
                 "MULTILINESTRING ((0 0, 2.5 0), (2.5 0, 5 0))"
         );
     }

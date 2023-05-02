@@ -5,6 +5,9 @@ import org.apache.sedona.common.Functions;
 import org.apache.sedona.common.Predicates;
 import org.apache.sedona.common.enums.FileDataSplitter;
 import org.apache.sedona.snowflake.snowsql.annotations.UDFAnnotations;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryCollection;
+import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
 import org.xml.sax.SAXException;
 
@@ -114,15 +117,6 @@ public class UDFs {
         return GeometrySerde.serialize(
                 Functions.getCentroid(
                         GeometrySerde.deserialize(geometry)
-                )
-        );
-    }
-
-    @UDFAnnotations.ParamMeta(argNames = {"geometries"})
-    public static byte[] ST_Collect(String[] geometries) throws IOException {
-        return GeometrySerde.serialize(
-                Functions.createMultiGeometry(
-                        GeometrySerde.deserialize(geometries)
                 )
         );
     }
@@ -244,20 +238,12 @@ public class UDFs {
     }
 
     @UDFAnnotations.ParamMeta(argNames = {"geometry"})
-    public static String[] ST_Dump(byte[] geometry) {
-        return GeometrySerde.serialize(
-                Functions.dump(
-                        GeometrySerde.deserialize(geometry)
-                )
+    public static byte[] ST_DumpPoints(byte[] geometry) {
+        Geometry[] points = Functions.dumpPoints(
+                GeometrySerde.deserialize(geometry)
         );
-    }
-
-    @UDFAnnotations.ParamMeta(argNames = {"geometry"})
-    public static String[] ST_DumpPoints(byte[] geometry) {
         return GeometrySerde.serialize(
-                Functions.dumpPoints(
-                        GeometrySerde.deserialize(geometry)
-                )
+                GeometrySerde.GEOMETRY_FACTORY.createMultiPoint((Point[]) points)
         );
     }
 
@@ -560,11 +546,11 @@ public class UDFs {
     }
 
     @UDFAnnotations.ParamMeta(argNames = {"shell", "holes"})
-    public static byte[] ST_MakePolygon(byte[] shell, String[] holes) {
+    public static byte[] ST_MakePolygon(byte[] shell, byte[] holes) {
         return GeometrySerde.serialize(
                 Functions.makePolygon(
                         GeometrySerde.deserialize(shell),
-                        GeometrySerde.deserialize(holes)
+                        GeometrySerde.deserialize2List(holes)
                 )
         );
     }
@@ -835,7 +821,7 @@ public class UDFs {
     }
 
     @UDFAnnotations.ParamMeta(argNames = {"geometry", "maxVertices"})
-    public static String[] ST_SubDivide(byte[] geometry, int maxVertices) {
+    public static byte[] ST_SubDivide(byte[] geometry, int maxVertices) {
         return GeometrySerde.serialize(
                 Functions.subDivide(
                         GeometrySerde.deserialize(geometry),

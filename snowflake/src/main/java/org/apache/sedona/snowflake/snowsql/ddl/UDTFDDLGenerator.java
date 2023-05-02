@@ -16,7 +16,9 @@ public class UDTFDDLGenerator {
             ST_Intersection_Aggr.class,
             ST_SubDivideExplode.class,
             ST_Envelope_Aggr.class,
-            ST_Union_Aggr.class
+            ST_Union_Aggr.class,
+            ST_Collect.class,
+            ST_Dump.class
     };
 
     public static String formatUDTFDDL(
