@@ -1,0 +1,69 @@
+package com.wherobots.snowflake.snowsql;
+
+
+import org.apache.sedona.common.Constructors;
+import org.apache.sedona.snowflake.snowsql.udtfs.*;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.locationtech.jts.io.ParseException;
+
+import java.util.Arrays;
+
+@RunWith(SnowTestRunner.class)
+public class TestTableFunctions extends TestBase{
+    @Test
+    public void test_ST_MinimumBoundingRadius() {
+        registerUDTF(ST_MinimumBoundingRadius.class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_AsText(center), radius from table(sedona.ST_MinimumBoundingRadius(sedona.ST_GeomFromText('POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))')))",
+                Arrays.asList("POINT (0.5 0.5)", 0.7071067811865476)
+        );
+    }
+    @Test
+    public void test_ST_Intersection_Aggr() throws ParseException {
+        registerUDTF(ST_Intersection_Aggr.class);
+        verifySqlSingleRes(
+                "with src_tbl as (\n" +
+                        "select sedona.ST_GeomFromText('POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))') geom\n" +
+                        "union\n" +
+                        "select sedona.ST_GeomFromText('POLYGON ((0.5 0.5, 0.5 1.5, 1.5 1.5, 1.5 0.5, 0.5 0.5))') geom\n" +
+                        ")\n" +
+                        "select sedona.ST_AsText(intersected) from src_tbl, table(sedona.ST_Intersection_Aggr(src_tbl.geom) OVER (PARTITION BY 1));",
+                Constructors.geomFromWKT("POLYGON ((0.5 1, 1 1, 1 0.5, 0.5 0.5, 0.5 1))", 0)
+        );
+    }
+    @Test
+    public void test_ST_SubDivideExplode() {
+        registerUDTF(ST_SubDivideExplode.class);
+        verifySqlSingleRes(
+                "select count(1) from table(sedona.ST_SubdivideExplode(sedona.ST_GeomFromText('LINESTRING (0 0, 1 0, 2 0, 3 0, 4 0, 5 0)'), 5));",
+                2
+        );
+    }
+    @Test
+    public void test_ST_Envelope_Aggr() throws ParseException {
+        registerUDTF(ST_Envelope_Aggr.class);
+        verifySqlSingleRes(
+                "with src_tbl as (\n" +
+                        "select sedona.ST_GeomFromText('POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))') geom\n" +
+                        "union\n" +
+                        "select sedona.ST_GeomFromText('POLYGON ((0.5 0.5, 0.5 1.5, 1.5 1.5, 1.5 0.5, 0.5 0.5))') geom\n" +
+                        ")\n" +
+                        "select sedona.ST_AsText(envelope) from src_tbl, table(sedona.ST_Envelope_Aggr(src_tbl.geom) OVER (PARTITION BY 1));",
+                Constructors.geomFromWKT("POLYGON ((0 0, 0 1.5, 1.5 1.5, 1.5 0, 0 0))", 0)
+        );
+    }
+    @Test
+    public void test_ST_Union_Aggr() throws ParseException {
+        registerUDTF(ST_Union_Aggr.class);
+        verifySqlSingleRes(
+                "with src_tbl as (\n" +
+                        "select sedona.ST_GeomFromText('POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))') geom\n" +
+                        "union\n" +
+                        "select sedona.ST_GeomFromText('POLYGON ((0.5 0.5, 0.5 1.5, 1.5 1.5, 1.5 0.5, 0.5 0.5))') geom\n" +
+                        ")\n" +
+                        "select sedona.ST_AsText(unioned) from src_tbl, table(sedona.ST_Union_Aggr(src_tbl.geom) OVER (PARTITION BY 1));",
+                Constructors.geomFromWKT("POLYGON ((0 0, 0 1, 0.5 1, 0.5 1.5, 1.5 1.5, 1.5 0.5, 1 0.5, 1 0, 0 0))", 0)
+        );
+    }
+}

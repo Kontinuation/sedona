@@ -2,6 +2,9 @@ name: Python build extension
 
 on:
   push:
+    paths-ignore:
+      - 'snowflake/**'
+      - 'snowflake-tester/**'
     branches:
       - master
   pull_request:
