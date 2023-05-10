@@ -12,6 +12,10 @@
 
     <artifactId>sedona-snowflake-tester</artifactId>
 
+    <properties>
+        <maven.deploy.skip>${skip.deploy.common.modules}</maven.deploy.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.wherobots</groupId>

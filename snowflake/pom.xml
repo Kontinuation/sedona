@@ -15,7 +15,7 @@
     <url>http://sedona.apache.org/</url>
     <packaging>jar</packaging>
     <properties>
-        <maven.deploy.skip>false</maven.deploy.skip>
+        <maven.deploy.skip>${skip.deploy.common.modules}</maven.deploy.skip>
     </properties>
 
     <artifactId>sedona-snowflake</artifactId>
