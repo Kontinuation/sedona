@@ -15,18 +15,35 @@ package org.apache.sedona.common;
 
 import com.google.common.geometry.S2CellId;
 import org.apache.sedona.common.utils.H3Utils;
+import com.google.common.math.DoubleMath;
 import org.apache.sedona.common.utils.S2Utils;
 import org.junit.Test;
 import org.locationtech.jts.geom.*;
+import org.locationtech.jts.io.WKTReader;
 
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
+import static org.junit.Assert.*;
 
 public class FunctionsTest {
     public static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
+
+    protected static final double FP_TOLERANCE = 1e-12;
+    protected static final CoordinateSequenceComparator COORDINATE_SEQUENCE_COMPARATOR = new CoordinateSequenceComparator(2){
+        @Override
+        protected int compareCoordinate(CoordinateSequence s1, CoordinateSequence s2, int i, int dimension) {
+            for (int d = 0; d < dimension; d++) {
+                double ord1 = s1.getOrdinate(i, d);
+                double ord2 = s2.getOrdinate(i, d);
+                int comp = DoubleMath.fuzzyCompare(ord1, ord2, FP_TOLERANCE);
+                if (comp != 0) return comp;
+            }
+            return 0;
+        }
+    };
+
+    private final WKTReader wktReader = new WKTReader();
 
     private Coordinate[] coordArray(double... coordValues) {
         Coordinate[] coords = new Coordinate[(int)(coordValues.length / 2)];
@@ -493,5 +510,40 @@ public class FunctionsTest {
             kthNeighbors.addAll(Arrays.asList(Functions.h3KRing(cell, 9, false)));
             assert allNeighbors.equals(kthNeighbors);
         }
+    }
+
+    @Test
+    public void geometricMedian() throws Exception {
+        MultiPoint multiPoint = GEOMETRY_FACTORY.createMultiPointFromCoords(
+                coordArray(1480,0, 620,0));
+        Geometry actual = Functions.geometricMedian(multiPoint);
+        Geometry expected = wktReader.read("POINT (1050 0)");
+        assertEquals(0, expected.compareTo(actual, COORDINATE_SEQUENCE_COMPARATOR));
+    }
+
+    @Test
+    public void geometricMedianTolerance() throws Exception {
+        MultiPoint multiPoint = GEOMETRY_FACTORY.createMultiPointFromCoords(
+                coordArray(0,0, 10,1, 5,1, 20,20));
+        Geometry actual = Functions.geometricMedian(multiPoint, 1e-15);
+        Geometry expected = wktReader.read("POINT (5 1)");
+        assertEquals(0, expected.compareTo(actual, COORDINATE_SEQUENCE_COMPARATOR));
+    }
+
+    @Test
+    public void geometricMedianUnsupported() {
+        LineString lineString = GEOMETRY_FACTORY.createLineString(
+                coordArray(1480,0, 620,0));
+        Exception e = assertThrows(Exception.class, () -> Functions.geometricMedian(lineString));
+        assertEquals("Unsupported geometry type: LineString", e.getMessage());
+    }
+
+    @Test
+    public void geometricMedianFailConverge() {
+        MultiPoint multiPoint = GEOMETRY_FACTORY.createMultiPointFromCoords(
+                coordArray(12,5, 62,7, 100,-1, 100,-5, 10,20, 105,-5));
+        Exception e = assertThrows(Exception.class,
+                () -> Functions.geometricMedian(multiPoint, 1e-6, 5, true));
+        assertEquals("Median failed to converge within 1.0E-06 after 5 iterations.", e.getMessage());
     }
 }
