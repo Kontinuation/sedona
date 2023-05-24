@@ -18,9 +18,9 @@
  */
 package org.apache.sedona.sql.utils
 
-import com.wherobots.sedona.sql.monitoring.ListenerRegistrator
 import org.apache.sedona.sql.UDF.UdfRegistrator
 import org.apache.sedona.sql.UDT.UdtRegistrator
+import org.apache.spark.sql.monitoring.ListenerRegistrator
 import org.apache.spark.sql.sedona_sql.optimization.{SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
 import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector

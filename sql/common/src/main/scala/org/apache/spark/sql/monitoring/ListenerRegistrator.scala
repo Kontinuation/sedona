@@ -12,21 +12,55 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package com.wherobots.sedona.sql.monitoring
+package org.apache.spark.sql.monitoring
 
 import com.wherobots.sedona.common.monitoring.{CloudWatchUtils, S3Utils}
+import com.wherobots.sedona.sql.monitoring.{IoListener, SqlListener}
 import org.apache.log4j.Logger
+import org.apache.spark.scheduler.SparkListenerInterface
+import org.apache.spark.sql.util.QueryExecutionListener
 import org.apache.spark.sql.{RuntimeConfig, SparkSession}
 import software.amazon.awssdk.services.s3.model.S3Exception
+
+import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 
 object ListenerRegistrator {
   val logger = Logger.getLogger(getClass.getName)
 
   def registerAll(sparkSession: SparkSession):Unit = {
+    // Check if the IoListener is already registered
+    val ioListeners:java.util.List[SparkListenerInterface] = sparkSession.sparkContext.listenerBus.listeners
+    var ioListenerRegistered = false
+    ioListeners.foreach(listener => {
+      if (listener.isInstanceOf[IoListener]) {
+        ioListenerRegistered = true
+      }
+    })
+    // Check if the SqlListener is already registered
+    val sqlListeners: Array[QueryExecutionListener] = sparkSession.listenerManager.listListeners()
+    var sqlListenerRegistered = false
+    sqlListeners.foreach(listener => {
+      if (listener.isInstanceOf[SqlListener]) {
+        sqlListenerRegistered = true
+      }
+    })
     val conf = sparkSession.conf
     val listeners = createListeners(conf)
-    sparkSession.sparkContext.addSparkListener(listeners._1)
-    sparkSession.listenerManager.register(listeners._2)
+    if (ioListenerRegistered) {
+      logger.info("IoListener is already registered!")
+    }
+    else {
+      sparkSession.sparkContext.addSparkListener(listeners._1)
+      logger.info("Registering IoListener")
+    }
+
+    if (sqlListenerRegistered) {
+      logger.info("SqlListener is already registered!")
+    }
+    else {
+      sparkSession.listenerManager.register(listeners._2)
+      logger.info("Registering SqlListener")
+    }
   }
 
   def unregisterAll(sparkSession: SparkSession): Unit = {
@@ -56,9 +90,9 @@ object ListenerRegistrator {
       product = conf.get("wherobots.product")
     }
     catch {
-          // Fetch data from System Environment
-          // Usually these values should be set by Yarn appMasterEnv or K8S driverEnv
-          // Or by the user manually
+      // Fetch data from System Environment
+      // Usually these values should be set by Yarn appMasterEnv or K8S driverEnv
+      // Or by the user manually
       case e1: NoSuchElementException => {
         try {
           userid = sys.env("WHEROBOTS_USERID")
@@ -69,7 +103,7 @@ object ListenerRegistrator {
           product = sys.env("WHEROBOTS_PRODUCT")
         }
         catch {
-              // If the above two methods fail, try to fetch data from Spark RuntimeConfig
+          // If the above two methods fail, try to fetch data from Spark RuntimeConfig
           case e2: NoSuchElementException => {
             try {
               userid = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_USERID")
@@ -91,7 +125,7 @@ object ListenerRegistrator {
                     product = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_PRODUCT")
                   }
                   catch {
-                        // Only if all the above methods fail, throw the exception
+                    // Only if all the above methods fail, throw the exception
                     case e4: NoSuchElementException => {
                       throw new RuntimeException("Your code is not running in a Wherobots managed environment!")
                     }
@@ -105,7 +139,7 @@ object ListenerRegistrator {
     }
     val bucketName = awsS3path.split("/")(0)
     val bucketPrefix = awsS3path.split("/")(1) // Get the log folder name in the bucket
-//    val s3ClientAsync = S3Utils.getAsyncClient(awsAccessKey, awsSecretKey, awsRegion)
+    //    val s3ClientAsync = S3Utils.getAsyncClient(awsAccessKey, awsSecretKey, awsRegion)
     val s3Client = S3Utils.getSyncClient(awsAccessKey, awsSecretKey, awsRegion)
     try {
       S3Utils.putObject(s3Client, bucketName, bucketPrefix + "/_SUCCESS", "")
