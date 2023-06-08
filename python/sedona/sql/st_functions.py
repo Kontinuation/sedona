@@ -112,6 +112,7 @@ __all__ = [
     "ST_Z",
     "ST_ZMax",
     "ST_ZMin",
+    "ST_NumPoints"
 ]
 
 
@@ -1292,3 +1293,12 @@ def ST_ZMin(geometry: ColumnOrName) -> Column:
     :rtype: Column
     """
     return _call_st_function("ST_ZMin", geometry)
+
+def ST_NumPoints(geometry: ColumnOrName) -> Column:
+    """Return the number of points in a LineString
+    :param geometry: Geometry column to get number of points from.
+    :type geometry: ColumnOrName
+    :return: Number of points in a LineString as an integer column
+    :rtype: Column
+    """
+    return _call_st_function("ST_NumPoints", geometry)

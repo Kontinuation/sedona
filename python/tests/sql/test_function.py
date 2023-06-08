@@ -1121,3 +1121,8 @@ class TestPredicateJoin(TestBase):
         """)
         res1, res2, res3 = df.take(1)[0]
         assert res1 and not res2 and res3
+
+    def test_st_numPoints(self):
+        actual = self.spark.sql("SELECT ST_NumPoints(ST_GeomFromText('LINESTRING(0 1, 1 0, 2 0)'))").take(1)[0][0]
+        expected = 3
+        assert expected == actual
