@@ -780,7 +780,7 @@ Since: `v1.3.0`
 Format: `ST_NPoints (A:geometry)`
 
 Example:
-```SQL
+```sql
 SELECT ST_NPoints(polygondf.countyshape)
 FROM polygondf
 ```
@@ -795,19 +795,52 @@ Since: `v1.3.1`
 
 Spark SQL example with z co-rodinate:
 
-```SQL
+```sql
 SELECT ST_NDims(ST_GeomFromEWKT('POINT(1 1 2)'))
 ```
 
 Output: `3`
 
-Spark SQL example with x,y co-ordinate:
+Example with x,y coordinate:
 
-```SQL
+```sql
 SELECT ST_NDims(ST_GeomFromText('POINT(1 1)'))
 ```
 
 Output: `2`
+
+## ST_NRings
+
+Introduction: Returns the number of rings in a Polygon or MultiPolygon. Contrary to ST_NumInteriorRings, 
+this function also takes into account the number of  exterior rings.
+
+This function returns 0 for an empty Polygon or MultiPolygon.
+If the geometry is not a Polygon or MultiPolygon, an IllegalArgument Exception is thrown.
+
+Format: `ST_NRings(geom: geometry)`
+
+Since: `1.4.1`
+
+
+Examples:
+
+Input: `POLYGON ((1 0, 1 1, 2 1, 2 0, 1 0))`
+
+Output: `1`
+
+Input: `'MULTIPOLYGON (((1 0, 1 6, 6 6, 6 0, 1 0), (2 1, 2 2, 3 2, 3 1, 2 1)), ((10 0, 10 6, 16 6, 16 0, 10 0), (12 1, 12 2, 13 2, 13 1, 12 1)))'`
+
+Output: `4`
+
+Input: `'POLYGON EMPTY'`
+
+Output: `0`
+
+Input: `'LINESTRING (1 0, 1 1, 2 1)'`
+
+Output: `Unsupported geometry type: LineString, only Polygon or MultiPolygon geometries are supported.`
+
+
 
 ## ST_NumGeometries
 
@@ -1034,29 +1067,30 @@ Transform the Spatial Reference System / Coordinate Reference System of A, from 
 For SourceCRS and TargetCRS, WKT format is also available since v1.3.1.
 
 !!!note
-By default, this function uses lat/lon order. You can use ==ST_FlipCoordinates== to swap X and Y.
+    By default, this function uses lat/lon order. You can use ==ST_FlipCoordinates== to swap X and Y.
 
 !!!note
-If ==ST_Transform== throws an Exception called "Bursa wolf parameters required", you need to disable the error notification in ST_Transform. You can append a boolean value at the end.
+    If ==ST_Transform== throws an Exception called "Bursa wolf parameters required", you need to disable the error notification in ST_Transform. You can append a boolean value at the end.
 
 Format: `ST_Transform (A:geometry, SourceCRS:string, TargetCRS:string ,[Optional] DisableError)`
 
 Since: `v1.2.0`
 
-Spark SQL example (simple):
-```SQL
+Example (simple):
+```sql
 SELECT ST_Transform(polygondf.countyshape, 'epsg:4326','epsg:3857') 
 FROM polygondf
 ```
 
-Spark SQL example (with optional parameters):
-```SQL
+Example (with optional parameters):
+```sql
 SELECT ST_Transform(polygondf.countyshape, 'epsg:4326','epsg:3857', false)
 FROM polygondf
 ```
 
 !!!note
-The detailed EPSG information can be searched on [EPSG.io](https://epsg.io/).
+    The detailed EPSG information can be searched on [EPSG.io](https://epsg.io/).
+
 
 ## ST_X
 
