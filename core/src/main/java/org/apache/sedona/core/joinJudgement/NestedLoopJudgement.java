@@ -20,8 +20,7 @@
 package org.apache.sedona.core.joinJudgement;
 
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.log4j.LogManager;
-import org.apache.log4j.Logger;
+import org.apache.sedona.core.monitoring.Metric;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.spark.api.java.function.FlatMapFunction2;
 import org.locationtech.jts.geom.Geometry;
@@ -33,17 +32,19 @@ import java.util.Iterator;
 import java.util.List;
 
 public class NestedLoopJudgement<T extends Geometry, U extends Geometry>
-        extends JudgementBase
+        extends JudgementBase<T, U>
         implements FlatMapFunction2<Iterator<T>, Iterator<U>, Pair<U, T>>, Serializable
 {
-    private static final Logger log = LogManager.getLogger(NestedLoopJudgement.class);
-
     /**
      * @see JudgementBase
      */
-    public NestedLoopJudgement(SpatialPredicate spatialPredicate)
+    public NestedLoopJudgement(SpatialPredicate spatialPredicate,
+            Metric buildCount,
+            Metric streamCount,
+            Metric resultCount,
+            Metric candidateCount)
     {
-        super(spatialPredicate);
+        super(spatialPredicate, buildCount, streamCount, resultCount, candidateCount, false);
     }
 
     @Override
@@ -51,20 +52,37 @@ public class NestedLoopJudgement<T extends Geometry, U extends Geometry>
             throws Exception
     {
         if (!iteratorObject.hasNext() || !iteratorWindow.hasNext()) {
+            buildCount.add(0);
+            streamCount.add(0);
+            resultCount.add(0);
+            candidateCount.add(0);
             return Collections.emptyIterator();
         }
 
-        JoinResultCandidateRefiner.Refiner refiner = createRefiner(true);
-
-        List<Pair<U, T>> result = new ArrayList<>();
         List<T> queryObjects = new ArrayList<>();
         while (iteratorObject.hasNext()) {
             queryObjects.add(iteratorObject.next());
         }
-        while (iteratorWindow.hasNext()) {
-            U window = iteratorWindow.next();
-            refiner.refine(window, (List<Geometry>) queryObjects, result);
-        }
-        return result.iterator();
+        return new Iterator<Pair<U, T>>()
+        {
+            private JoinResultCandidateRefiner.Refiner refiner = createRefiner(!buildLeft);
+            @Override
+            public boolean hasNext()
+            {
+                return hasNextBase(queryObjects, iteratorWindow, refiner);
+            }
+
+            @Override
+            public Pair<U, T> next()
+            {
+                return nextBase(queryObjects, iteratorWindow, refiner);
+            }
+
+            @Override
+            public void remove()
+            {
+                throw new UnsupportedOperationException();
+            }
+        };
     }
 }

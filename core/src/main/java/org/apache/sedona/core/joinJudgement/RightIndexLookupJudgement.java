@@ -20,48 +20,68 @@
 package org.apache.sedona.core.joinJudgement;
 
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.sedona.core.monitoring.Metric;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.spark.api.java.function.FlatMapFunction2;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.index.SpatialIndex;
 
 import java.io.Serializable;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Iterator;
-import java.util.List;
 
 public class RightIndexLookupJudgement<T extends Geometry, U extends Geometry>
-        extends JudgementBase
-        implements FlatMapFunction2<Iterator<T>, Iterator<SpatialIndex>, Pair<T, U>>, Serializable
+        extends JudgementBase<T, U>
+        implements FlatMapFunction2<Iterator<T>, Iterator<SpatialIndex>, Pair<U, T>>, Serializable
 {
 
     /**
      * @see JudgementBase
      */
-    public RightIndexLookupJudgement(SpatialPredicate spatialPredicate)
+    public RightIndexLookupJudgement(SpatialPredicate spatialPredicate,
+            Metric buildCount,
+            Metric streamCount,
+            Metric resultCount,
+            Metric candidateCount)
     {
-        super(spatialPredicate);
+        super(spatialPredicate, buildCount, streamCount, resultCount, candidateCount, false);
     }
 
     @Override
-    public Iterator<Pair<T, U>> call(Iterator<T> streamShapes, Iterator<SpatialIndex> indexIterator)
+    public Iterator<Pair<U, T>> call(Iterator<T> streamShapes, Iterator<SpatialIndex> indexIterator)
             throws Exception
     {
-        List<Pair<T, U>> result = new ArrayList<>();
-
         if (!indexIterator.hasNext() || !streamShapes.hasNext()) {
-            return result.iterator();
+            buildCount.add(0);
+            streamCount.add(0);
+            resultCount.add(0);
+            candidateCount.add(0);
+            return Collections.emptyIterator();
         }
 
-        JoinResultCandidateRefiner.Refiner refiner = createRefiner(true);
+        SpatialIndex spatialIndex = indexIterator.next();
 
-        SpatialIndex treeIndex = indexIterator.next();
-        while (streamShapes.hasNext()) {
-            T streamShape = streamShapes.next();
-            List<Geometry> candidates = treeIndex.query(streamShape.getEnvelopeInternal());
-            // Refine phase. Use the real polygon (instead of its MBR) to recheck the spatial relation.
-            refiner.refine(streamShape, candidates, result);
-        }
-        return result.iterator();
+        return new Iterator<Pair<U, T>>()
+        {
+            private JoinResultCandidateRefiner.Refiner refiner = createRefiner(!buildLeft);
+
+            @Override
+            public boolean hasNext()
+            {
+                return hasNextBase(spatialIndex, streamShapes, refiner);
+            }
+
+            @Override
+            public Pair<U, T> next()
+            {
+                return nextBase(spatialIndex, streamShapes, refiner);
+            }
+
+            @Override
+            public void remove()
+            {
+                throw new UnsupportedOperationException();
+            }
+        };
     }
 }

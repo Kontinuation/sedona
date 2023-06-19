@@ -2,12 +2,12 @@
 
 ## Function list
 SedonaSQL supports SQL/MM Part3 Spatial SQL Standard. It includes four kinds of SQL operators as follows. All these operators can be directly called through:
-```Scala
-var myDataFrame = sparkSession.sql("YOUR_SQL")
+```scala
+var myDataFrame = sedona.sql("YOUR_SQL")
 ```
 
 Alternatively, `expr` and `selectExpr` can be used:
-```Scala
+```scala
 myDataFrame.withColumn("geometry", expr("ST_*")).selectExpr("ST_*")
 ```
 
@@ -33,15 +33,15 @@ SedonaSQL supports SparkSQL query optimizer, documentation is [Here](../Optimize
 The detailed explanation is here [Write a SQL/DataFrame application](../../tutorial/sql.md).
 
 1. Add Sedona-core and Sedona-SQL into your project POM.xml or build.sbt
-2. Declare your Spark Session
-```Scala
-sparkSession = SparkSession.builder().
-      config("spark.serializer","org.apache.spark.serializer.KryoSerializer").
-      config("spark.kryo.registrator", "org.apache.sedona.core.serde.SedonaKryoRegistrator").
-      master("local[*]").appName("mySedonaSQLdemo").getOrCreate()
+2. Create your Sedona config if you want to customize your SparkSession.
+```scala
+import org.apache.sedona.spark.SedonaContext
+val config = SedonaContext.builder().
+    master("local[*]").appName("SedonaSQL")
+    .getOrCreate()
 ```
-3. Add the following line after your SparkSession declaration:
-```Scala
-import org.apache.sedona.sql.utils.SedonaSQLRegistrator
-SedonaSQLRegistrator.registerAll(sparkSession)
+3. Add the following line after your Sedona context declaration:
+```scala
+import org.apache.sedona.spark.SedonaContext
+val sedona = SedonaContext.create(config)
 ```
