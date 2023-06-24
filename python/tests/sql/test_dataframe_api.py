@@ -93,6 +93,7 @@ test_configurations = [
     (stf.ST_H3CellDistance, (637070450814374975, 637070450680599807), "null", "", 993),
     (stf.ST_H3CellIDs, ("point", 13, True), "point_geom", "", [637070450814374975]),
     (stf.ST_H3KRing, (637070450680599807, 3, True), "null", "array_sort(geom)", sorted([637070450680595071, 637070450680595199, 637070450680609087, 637070450680608831, 637070450680609023, 637070450680607103, 637070450680609471, 637070450680609535, 637070450680425919, 637070450680425791, 637070450680600319, 637070450680600191, 637070450680600447, 637070450680598783, 637070450680598591, 637070450680598975, 637070450680601855, 637070450680601791])),
+    (stf.ST_HausdorffDistance, ("point", "line",), "point_and_line", "", 5.0990195135927845),
     (stf.ST_InteriorRingN, ("geom", 0), "geom_with_hole", "", "LINESTRING (1 1, 2 2, 2 1, 1 1)"),
     (stf.ST_Intersection, ("a", "b"), "overlapping_polys", "", "POLYGON ((2 0, 1 0, 1 1, 2 1, 2 0))"),
     (stf.ST_IsClosed, ("geom",), "closed_linestring_geom", "", True),
@@ -395,6 +396,8 @@ class TestDataFrameAPI(TestBase):
             return TestDataFrameAPI.spark.sql("SELECT ST_GeomFromWKT('LINESTRING (0 0, 2 1)') AS line, ST_GeomFromWKT('POLYGON ((1 0, 2 0, 2 2, 1 2, 1 0))') AS poly")
         elif request.param == "square_geom":
             return TestDataFrameAPI.spark.sql("SELECT ST_GeomFromWKT('POLYGON ((1 0, 1 1, 2 1, 2 0, 1 0))') AS geom")
+        elif request.param == "point_and_line":
+            return TestDataFrameAPI.spark.sql("SELECT ST_GeomFromWKT('POINT (0.0 1.0)') AS point, ST_GeomFromWKT('LINESTRING (0 0, 1 0, 2 0, 3 0, 4 0, 5 0)') AS line")
         raise ValueError(f"Invalid base_df name passed: {request.param}")
 
     def _id_test_configuration(val):
