@@ -34,5 +34,3 @@ Scala 2.13
 ```
 mvn clean deploy -DskipTests -Dscala=2.13
 ```
-
-
