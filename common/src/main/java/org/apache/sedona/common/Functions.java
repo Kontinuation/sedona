@@ -656,10 +656,11 @@ public class Functions {
      * @param cells: the set of cells
      * @return Multiple Polygons reversed
      */
-    public static Geometry h3ToGeom(List<Long> cells) {
+    public static Geometry h3ToGeom(long[] cells) {
         GeometryFactory geomFactory = new GeometryFactory();
+        Collection<Long> h3 = Arrays.stream(cells).boxed().collect(Collectors.toList());
         return geomFactory.createMultiPolygon(
-                H3Utils.h3.cellsToMultiPolygon(cells, true).stream().map(
+                H3Utils.h3.cellsToMultiPolygon(h3, true).stream().map(
                         shellHoles -> {
                             List<LinearRing> rings = shellHoles.stream().map(
                                     shell -> geomFactory.createLinearRing(shell.stream().map(latLng -> new Coordinate(latLng.lng, latLng.lat)).toArray(Coordinate[]::new))
