@@ -1040,6 +1040,13 @@ case class ST_Translate(inputExpressions: Seq[Expression])
   }
 }
 
+case class ST_FrechetDistance(inputExpressions: Seq[Expression])
+  extends InferredExpression(Functions.frechetDistance _) with FoldableExpression {
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
 case class ST_Affine(inputExpressions: Seq[Expression])
   extends InferredExpression(InferrableFunction.allowSixRightNull(Functions.affine _)) with FoldableExpression {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
