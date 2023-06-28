@@ -31,8 +31,6 @@ import org.locationtech.jts.algorithm.MinimumBoundingCircle
 import org.locationtech.jts.geom._
 import org.apache.spark.sql.sedona_sql.expressions.InferrableFunctionConverter._
 
-import scala.collection.JavaConverters
-
 /**
   * Return the distance between two geometries.
   *
