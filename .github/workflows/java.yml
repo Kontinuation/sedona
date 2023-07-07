@@ -13,6 +13,7 @@ on:
       - 'snowflake-tester/**'
     branches:
       - '*'
+
 env:
   WHEROBOTS_USERID: ${{vars.WHEROBOTS_USERID}}
   WHEROBOTS_AWS_ACCESSKEY: ${{vars.WHEROBOTS_AWS_ACCESSKEY}}
@@ -20,6 +21,7 @@ env:
   WHEROBOTS_AWS_S3BUCKET: ${{vars.WHEROBOTS_AWS_S3BUCKET}}
   WHEROBOTS_AWS_REGION: ${{vars.WHEROBOTS_AWS_REGION}}
   WHEROBOTS_PRODUCT: ${{vars.WHEROBOTS_PRODUCT}}
+  MAVEN_OPTS: -Dmaven.wagon.httpconnectionManager.ttlSeconds=60
 
 jobs:
   build:
