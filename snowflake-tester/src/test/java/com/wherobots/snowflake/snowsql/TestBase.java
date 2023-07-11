@@ -70,6 +70,13 @@ public class TestBase extends TestCase {
         buildDDLConfigs.put(Constants.GEOTOOLS_VERSION, geotoolsVersion);
         // upload libraries
         if (!jarUploaded) {
+            // drop then create db to make sure test env fresh
+            snowClient.executeQuery("drop database if exists " + System.getenv("SNOWFLAKE_DB"));
+            snowClient.executeQuery("create database " + System.getenv("SNOWFLAKE_DB"));
+            snowClient.executeQuery("use database " + System.getenv("SNOWFLAKE_DB"));
+            snowClient.executeQuery("create schema " + System.getenv("SNOWFLAKE_SCHEMA"));
+            snowClient.executeQuery("use schema " + System.getenv("SNOWFLAKE_SCHEMA"));
+            snowClient.executeQuery("CREATE STAGE WHEROBOTS FILE_FORMAT = (COMPRESSION = NONE)");
             snowClient.uploadFile(String.format("tmp/sedona-snowflake-%s.jar", sedonaVersion), "WHEROBOTS");
             snowClient.uploadFile(String.format("tmp/geotools-wrapper-%s.jar", geotoolsVersion), "WHEROBOTS");
             jarUploaded = true;
@@ -89,6 +96,7 @@ public class TestBase extends TestCase {
 
     public void registerDependantUDFs() {
         registerUDF("ST_GeomFromWKT", String.class);
+        registerUDF("ST_GeomFromText", String.class);
         registerUDF("ST_AsText", byte[].class);
         registerUDF("ST_Point", double.class, double.class);
     }

@@ -223,6 +223,7 @@ public class TestFunctions extends TestBase {
     }
     @Test
     public void test_ST_Force_2D() {
+        registerUDF("ST_PointZ", double.class, double.class, double.class);
         registerUDF("ST_Force_2D", byte[].class);
         verifySqlSingleRes(
                 "select sedona.ST_AsText(sedona.ST_Force_2D(sedona.ST_POINTZ(1, 2, 3)))",
@@ -511,6 +512,7 @@ public class TestFunctions extends TestBase {
     }
     @Test
     public void test_ST_SetSRID() {
+        registerUDF("ST_AsEWKT", byte[].class);
         registerUDF("ST_SetSRID", byte[].class, int.class);
         verifySqlSingleRes(
                 "select sedona.ST_AsEWKT(sedona.ST_SetSRID(sedona.ST_GeomFromText('POINT(1 2)'), 4326))",
@@ -665,4 +667,107 @@ public class TestFunctions extends TestBase {
                 1.0
         );
     }
+
+    @Test
+    public void test_ST_AreaSpheroid() {
+        registerUDF("ST_AreaSpheroid", byte[].class);
+        verifySqlSingleRes(
+                "select sedona.ST_AreaSpheroid(sedona.ST_GeomFromText('Polygon ((35 34, 30 28, 34 25, 35 34))'))",
+                201824850811.76245
+        );
+    }
+
+    @Test
+    public void test_ST_DistanceSphere() {
+        registerUDF("ST_DistanceSphere", byte[].class, byte[].class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_DistanceSphere(sedona.ST_GeomFromWKT('POINT (51.3168 -0.56)'), sedona.ST_GeomFromWKT('POINT (55.9533 -3.1883)'))",
+                543796.9506134904
+        );
+        registerUDF("ST_DistanceSphere", byte[].class, byte[].class, double.class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_DistanceSphere(sedona.ST_GeomFromWKT('POINT (51.3168 -0.56)'), sedona.ST_GeomFromWKT('POINT (55.9533 -3.1883)'), 6378137.0)",
+                544405.4459192449
+        );
+    }
+
+    @Test
+    public void test_ST_DistanceSpheroid() {
+        registerUDF("ST_DistanceSpheroid", byte[].class, byte[].class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_DistanceSpheroid(sedona.ST_GeomFromWKT('POINT (51.3168 -0.56)'), sedona.ST_GeomFromWKT('POINT (55.9533 -3.1883)'))",
+                544430.9411996207
+        );
+    }
+
+    @Test
+    public void test_ST_Force3D() {
+        registerUDF("ST_Force3D", byte[].class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_AsText(sedona.ST_Force3D(sedona.ST_GeomFromText('LINESTRING(0 1, 1 2, 2 1)')))",
+                "LINESTRING Z(0 1 0, 1 2 0, 2 1 0)"
+        );
+        registerUDF("ST_Force3D", byte[].class, double.class);
+        registerUDF("ST_Force3D", byte[].class, double.class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_AsText(sedona.ST_Force3D(sedona.ST_GeomFromText('LINESTRING(0 1, 1 2, 2 1)'), 1))",
+                "LINESTRING Z(0 1 1, 1 2 1, 2 1 1)"
+        );
+    }
+
+    @Test
+    public void test_ST_LengthSpheroid() {
+        registerUDF("ST_LengthSpheroid", byte[].class);
+        verifySqlSingleRes(
+                "select sedona.ST_LengthSpheroid(sedona.ST_GeomFromWKT('Polygon ((0 0, 0 90, 0 0))'))",
+                20037508.342789244
+        );
+    }
+
+    @Test
+    public void test_ST_GeometricMedian() {
+        registerUDF("ST_GeometricMedian", byte[].class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_asText(sedona.ST_GeometricMedian(sedona.ST_GeomFromWKT('MULTIPOINT((0 0), (1 1), (2 2), (200 200))')))",
+                "POINT (1.9761550281255005 1.9761550281255005)"
+        );
+        registerUDF("ST_GeometricMedian", byte[].class, float.class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_asText(sedona.ST_GeometricMedian(sedona.ST_GeomFromWKT('MULTIPOINT ((0 -1), (0 0), (0 0), (0 1))'), 1e-6))",
+                "POINT (0 0)"
+        );
+    }
+
+    @Test
+    public void test_ST_NRings() {
+        registerUDF("ST_NRings", byte[].class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_NRings(sedona.ST_GeomFromText('POLYGON((0 0, 0 1, 1 1, 1 0, 0 0))'))",
+                1
+        );
+    }
+
+    @Test
+    public void test_ST_NumPoints() {
+        registerUDF("ST_NumPoints", byte[].class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_NumPoints(sedona.ST_GeomFromText('LINESTRING(0 0, 1 1, 2 2)'))",
+                3
+        );
+    }
+
+    @Test
+    public void test_ST_Translate() {
+        registerUDF("ST_Translate", byte[].class, double.class, double.class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_AsText(sedona.ST_Translate(sedona.ST_GeomFromText('POINT(1 3 2)'), 1, 2))",
+                "POINT Z(2 5 2)"
+        );
+        registerUDF("ST_Translate", byte[].class, double.class, double.class, double.class);
+        verifySqlSingleRes(
+                "SELECT sedona.ST_AsText(sedona.ST_Translate(sedona.ST_GeomFromText('GEOMETRYCOLLECTION(MULTIPOLYGON (((1 0 0, 1 1 0, 2 1 0, 2 0 0, 1 0 0)), ((1 2 0, 3 4 0, 3 5 0, 1 2 0))), POINT(1 1 1), LINESTRING EMPTY))'), 2, 2, 3))",
+                "GEOMETRYCOLLECTION Z(MULTIPOLYGON Z(((3 2 3, 3 3 3, 4 3 3, 4 2 3, 3 2 3)), ((3 4 3, 5 6 3, 5 7 3, 3 4 3))), POINT Z(3 3 4), LINESTRING ZEMPTY)"
+        );
+    }
+
 }

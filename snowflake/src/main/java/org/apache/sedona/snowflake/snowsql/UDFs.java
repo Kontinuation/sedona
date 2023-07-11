@@ -4,11 +4,14 @@ import org.apache.sedona.common.Constructors;
 import org.apache.sedona.common.Functions;
 import org.apache.sedona.common.Predicates;
 import org.apache.sedona.common.enums.FileDataSplitter;
+import org.apache.sedona.common.sphere.Haversine;
+import org.apache.sedona.common.sphere.Spheroid;
 import org.apache.sedona.snowflake.snowsql.annotations.UDFAnnotations;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryCollection;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.io.WKBWriter;
 import org.xml.sax.SAXException;
 
 import javax.xml.parsers.ParserConfigurationException;
@@ -949,6 +952,149 @@ public class UDFs {
     public static Double ST_ZMin(byte[] geometry) {
         return Functions.zMin(
                 GeometrySerde.deserialize(geometry)
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geometry"})
+    public static Double ST_AreaSpheroid(byte[] geometry) {
+        return Spheroid.area(
+                GeometrySerde.deserialize(geometry)
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geomA", "geomB"})
+    public static Double ST_DistanceSphere(byte[] geomA, byte[] geomB) {
+        return Haversine.distance(
+                GeometrySerde.deserialize(geomA),
+                GeometrySerde.deserialize(geomB)
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geomA", "geomB", "radius"})
+    public static Double ST_DistanceSphere(byte[] geomA, byte[] geomB, double radius) {
+        return Haversine.distance(
+                GeometrySerde.deserialize(geomA),
+                GeometrySerde.deserialize(geomB),
+                radius
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geomA", "geomB"})
+    public static Double ST_DistanceSpheroid(byte[] geomA, byte[] geomB) {
+        return Spheroid.distance(
+                GeometrySerde.deserialize(geomA),
+                GeometrySerde.deserialize(geomB)
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom", "zValue"})
+    public static byte[] ST_Force3D(byte[] geom, double zValue) {
+        WKBWriter writer = new WKBWriter(3);
+        return GeometrySerde.serialize(
+                Functions.force3D(
+                        GeometrySerde.deserialize(
+                                writer.write(GeometrySerde.deserialize(geom))
+                        ),
+                        zValue
+                )
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom"})
+    public static byte[] ST_Force3D(byte[] geom) {
+        WKBWriter writer = new WKBWriter(3);
+        return GeometrySerde.serialize(
+                Functions.force3D(
+                        GeometrySerde.deserialize(
+                                writer.write(GeometrySerde.deserialize(geom))
+                        )
+                )
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom"})
+    public static double ST_LengthSpheroid(byte[] geom) {
+        return Spheroid.length(
+                GeometrySerde.deserialize(geom)
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom"})
+    public static byte[] ST_GeometricMedian(byte[] geom) throws Exception {
+        return GeometrySerde.serialize(
+                Functions.geometricMedian(
+                        GeometrySerde.deserialize(geom)
+                )
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom", "tolerance"})
+    public static byte[] ST_GeometricMedian(byte[] geom, float tolerance) throws Exception {
+        return GeometrySerde.serialize(
+                Functions.geometricMedian(
+                        GeometrySerde.deserialize(geom),
+                        tolerance
+                )
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom", "tolerance", "maxIter"})
+    public static byte[] ST_GeometricMedian(byte[] geom, float tolerance, int maxIter) throws Exception {
+        return GeometrySerde.serialize(
+                Functions.geometricMedian(
+                        GeometrySerde.deserialize(geom),
+                        tolerance,
+                        maxIter
+                )
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom", "tolerance", "maxIter", "failIfNotConverged"})
+    public static byte[] ST_GeometricMedian(byte[] geom, float tolerance, int maxIter, boolean failIfNotConverged) throws Exception {
+        return GeometrySerde.serialize(
+                Functions.geometricMedian(
+                        GeometrySerde.deserialize(geom),
+                        tolerance,
+                        maxIter,
+                        failIfNotConverged
+                )
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom"})
+    public static int ST_NRings(byte[] geom) throws Exception {
+        return Functions.nRings(
+                GeometrySerde.deserialize(geom)
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom"})
+    public static int ST_NumPoints(byte[] geom) throws Exception {
+        return Functions.numPoints(
+                GeometrySerde.deserialize(geom)
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom", "deltaX", "deltaY"})
+    public static byte[] ST_Translate(byte[] geom, double deltaX, double deltaY) {
+        return GeometrySerde.serialize(
+                Functions.translate(
+                        GeometrySerde.deserialize(geom),
+                        deltaX,
+                        deltaY
+                )
+        );
+    }
+
+    @UDFAnnotations.ParamMeta(argNames = {"geom", "deltaX", "deltaY", "deltaZ"})
+    public static byte[] ST_Translate(byte[] geom, double deltaX, double deltaY, double deltaZ) {
+        return GeometrySerde.serialize(
+                Functions.translate(
+                        GeometrySerde.deserialize(geom),
+                        deltaX,
+                        deltaY,
+                        deltaZ
+                )
         );
     }
 }
