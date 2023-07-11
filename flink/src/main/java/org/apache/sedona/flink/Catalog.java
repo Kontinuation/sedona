@@ -116,6 +116,7 @@ public class Catalog {
                 new Functions.ST_MakePolygon(),
                 new Functions.ST_MakeValid(),
                 new Functions.ST_MinimumBoundingCircle(),
+                new Functions.ST_MinimumBoundingRadius(),
                 new Functions.ST_Multi(),
                 new Functions.ST_StartPoint(),
                 new Functions.ST_SimplifyPreserveTopology(),
