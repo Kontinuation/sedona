@@ -18,15 +18,18 @@
  */
 package org.apache.sedona.common.raster;
 
+import java.util.Set;
+import org.apache.sedona.common.utils.GeomUtils;
 import org.geotools.coverage.grid.GridCoverage2D;
-import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultEngineeringCRS;
+import org.geotools.referencing.crs.DefaultGeographicCRS;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.ReferenceIdentifier;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 import org.opengis.referencing.operation.TransformException;
@@ -36,30 +39,73 @@ public class RasterPredicates {
 
     /**
      * Test if a raster intersects a query window. If both the raster and the query window have a
-     * CRS, the query window will be transformed to the CRS of the raster before testing for intersection.
-     * Please note that the CRS transformation will be lenient, which means that the transformation may
-     * not be accurate.
+     * CRS, the query window and the envelope of the raster will be transformed to a common CRS
+     * before testing for intersection.
+     * Please note that the CRS transformation will be lenient, which means that the transformation
+     * may not be accurate.
      * @param raster the raster
      * @param queryWindow the query window
      * @return true if the raster intersects the query window
      */
     public static boolean rsIntersects(GridCoverage2D raster, Geometry queryWindow) {
-        Envelope2D rasterEnvelope2D = raster.getEnvelope2D();
-        CoordinateReferenceSystem rasterCRS = rasterEnvelope2D.getCoordinateReferenceSystem();
+        org.opengis.geometry.Envelope rasterEnvelope = raster.getEnvelope();
+        Envelope rasterJtsEnvelope = new Envelope(
+            rasterEnvelope.getMinimum(0), rasterEnvelope.getMaximum(0),
+            rasterEnvelope.getMinimum(1), rasterEnvelope.getMaximum(1));
+        Geometry rasterGeometry = GEOMETRY_FACTORY.toGeometry(rasterJtsEnvelope);
+        CoordinateReferenceSystem rasterCRS = rasterEnvelope.getCoordinateReferenceSystem();
         int queryWindowSRID = queryWindow.getSRID();
-        if (rasterCRS != null && !(rasterCRS instanceof DefaultEngineeringCRS) && queryWindowSRID > 0) {
-            try {
-                CoordinateReferenceSystem queryWindowCRS = CRS.decode("EPSG:" + queryWindowSRID);
-                if (!CRS.equalsIgnoreMetadata(rasterCRS, queryWindowCRS)) {
-                    MathTransform transform = CRS.findMathTransform(queryWindowCRS, rasterCRS, true);
-                    queryWindow = JTS.transform(queryWindow, transform);
-                }
-            } catch (FactoryException | TransformException e) {
-                throw new RuntimeException("Cannot transform CRS of query window", e);
-            }
+        if (rasterCRS == null || rasterCRS instanceof DefaultEngineeringCRS || queryWindowSRID <= 0) {
+            // Either raster or query window does not have a defined CRS, simply use the original
+            // raster envelope and the query window to test for intersection.
+            return rasterGeometry.intersects(queryWindow);
         }
-        Envelope rasterEnvelope = JTS.toEnvelope(rasterEnvelope2D);
-        Geometry rasterGeometry = GEOMETRY_FACTORY.toGeometry(rasterEnvelope);
+
+        // Both raster and query window have a defined CRS
+        Set<ReferenceIdentifier> crsIds = rasterCRS.getIdentifiers();
+        String rasterCRSCode = null;
+        String queryWindowCRSCode = "EPSG:" + queryWindowSRID;
+        if (!crsIds.isEmpty()) {
+            ReferenceIdentifier crsId = crsIds.iterator().next();
+            rasterCRSCode = crsId.getCodeSpace() + ":" + crsId.getCode();
+        }
+
+        if (rasterCRSCode != null && rasterCRSCode.equals(queryWindowCRSCode)) {
+            // The CRS of the query window has the same EPSG code as the raster, so we don't need to
+            // transform it.
+            // Please note that even though the EPSG code is the same, the CRS may not be the same.
+            // The query window and the raster may not have the same axis order. It is user's
+            // responsibility to provide a query window with the same axis order as the raster.
+            return rasterGeometry.intersects(queryWindow);
+        }
+
+        // Raster as a non-authoritative CRS, or the CRS of the raster is different from the
+        // CRS of the query window. We'll transform both sides to a common CRS (WGS84) before
+        // testing for intersection.
+        try {
+            CoordinateReferenceSystem queryWindowCRS = CRS.decode(queryWindowCRSCode);
+            MathTransform transform = CRS.findMathTransform(queryWindowCRS,
+                DefaultGeographicCRS.WGS84, true);
+            queryWindow = JTS.transform(queryWindow, transform);
+            if (queryWindowSRID != 4326) {
+                queryWindow = GeomUtils.antiMeridianSafeGeom(queryWindow);
+            } else {
+                // The query window is already in WGS84, so we don't need to transform it. We'll also
+                // assume that the query window provided by the user is already anti-meridian safe.
+                // If the query window has a width greater than 180, the antiMeridianSafeGeom method
+                // will treat it as crossing the anti-meridian, which may not be what the user wants.
+            }
+
+            // Transform the raster envelope. Here we don't use the envelope transformation method
+            // provided by GeoTools since it performs poorly when the raster envelope crosses the
+            // anti-meridian.
+            transform = CRS.findMathTransform(rasterCRS, DefaultGeographicCRS.WGS84, true);
+            rasterGeometry = JTS.transform(rasterGeometry, transform);
+            rasterGeometry = GeomUtils.antiMeridianSafeGeom(rasterGeometry);
+        } catch (FactoryException | TransformException e) {
+            throw new RuntimeException("Cannot transform CRS of query window", e);
+        }
+
         return rasterGeometry.intersects(queryWindow);
     }
 }

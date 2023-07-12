@@ -19,9 +19,11 @@ POLYGON((0 0,20 0,20 60,0 60,0 0))
 
 ### RS_Intersects
 
-Introduction: Returns true if the envelope of the raster intersects the given geometry. If the geometry does not have a
-defined SRID, it is considered to be in the same CRS with the raster. If the geometry has a defined SRID, the geometry
-will be transformed to the CRS of the raster before the intersection test.
+Introduction: Returns true if the envelope of the raster intersects the given geometry.
+
+* If the geometry does not have a defined SRID, it is considered to be in the same CRS with the raster.
+* If the geometry has an SRID which is the same with the EPSG code of the raster CRS, then perform the intersection test directly.
+* Otherwise, both the geometry and the envelope of the raster will be transformed to CRS84 before the intersection test.
 
 Format: `RS_Intersects (raster: Raster, geom: Geometry)`
 
