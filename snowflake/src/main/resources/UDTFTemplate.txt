@@ -3,6 +3,6 @@ returns table({KW_RETURN_TYPE})
 language java
 {KW_NULL_INPUT_CONF}
 {KW_IMMUTABLE_CONF}
-imports = ('@{KW_STAGE_NAME}/sedona-snowflake-{KW_SEDONA_VERSION}.jar', '@{KW_STAGE_NAME}/geotools-wrapper-{KW_GEOTOOLS_VERSION}.jar')
+imports = ('{KW_STAGE_NAME}/sedona-snowflake-{KW_SEDONA_VERSION}.jar', '{KW_STAGE_NAME}/geotools-wrapper-{KW_GEOTOOLS_VERSION}.jar')
 handler = '{KW_HANDLER_NAME}'
 ;

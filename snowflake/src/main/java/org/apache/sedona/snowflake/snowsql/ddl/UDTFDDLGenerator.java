@@ -24,26 +24,29 @@ public class UDTFDDLGenerator {
     public static String formatUDTFDDL(
             String functionName,
             String schemaName,
-            String argSpec,
+            Parameter[] argTypes,
+            String[] argNames,
             String returnType,
             String stageName,
             String handlerName,
             String sedona_version,
             String geotools_version,
             String null_input_conf,
-            String immutable_conf
+            String immutable_conf,
+            boolean isNativeApp,
+            String appRoleName
     ) {
         String ddlTemplate = new BufferedReader(
                 new InputStreamReader(
                         Objects.requireNonNull(DDLGenerator.class.getClassLoader().getResourceAsStream("UDTFTemplate.txt"))
                 )
         ).lines().collect(Collectors.joining("\n"));
-        return ddlTemplate.replace(
+        String ddl = ddlTemplate.replace(
                 "{KW_FUNCTION_NAME}", functionName
         ).replace(
                 "{KW_SCHEMA_NAME}", schemaName
         ).replace(
-                "{KW_ARG_SPEC}", argSpec
+                "{KW_ARG_SPEC}", ArgSpecBuilder.args(argTypes, argNames)
         ).replace(
                 "{KW_RETURN_TYPE}", returnType
         ).replace(
@@ -59,9 +62,14 @@ public class UDTFDDLGenerator {
         ).replace(
                 "{KW_IMMUTABLE_CONF}", immutable_conf
         );
+        if (isNativeApp) {
+            ddl += "\n";
+            ddl += "GRANT USAGE ON FUNCTION " + schemaName + "." + functionName + "(" + ArgSpecBuilder.argTypes(argTypes) + ") TO APPLICATION ROLE " + appRoleName + ";";
+        }
+        return ddl;
     }
 
-    public static String buildUDTFDDL(Class c, Map<String, String> configs) {
+    public static String buildUDTFDDL(Class c, Map<String, String> configs, String stageName, boolean isNativeApp, String appRoleName) {
         UDTFAnnotations.TabularFunc funcProps = (UDTFAnnotations.TabularFunc) c.getAnnotation(UDTFAnnotations.TabularFunc.class);
         // get return types
         Class outputRowClass = Arrays.stream(c.getDeclaredClasses()).filter(
@@ -73,39 +81,30 @@ public class UDTFDDLGenerator {
         Method processMethod = Arrays.stream(c.getDeclaredMethods()).filter(m -> m.getName().equals("process")).findFirst().get();
         Parameter[] paramTypes = processMethod.getParameters();
         String[] argNames = funcProps.argNames();
-        StringBuilder argTypesBuilder = new StringBuilder();
-        for (int it = 0; it < paramTypes.length; it++) {
-            argTypesBuilder.append(String.format(
-                    "%s %s",
-                    argNames[it],
-                    Constants.snowflakeTypeMap.get(paramTypes[it].getType().getTypeName())
-            ));
-            if (it + 1 != paramTypes.length) {
-                argTypesBuilder.append(", ");
-            }
-        }
-        String argSpec = argTypesBuilder.toString();
         String handlerName = c.getPackage().getName() + "." + c.getSimpleName();
         String null_input_conf = c.isAnnotationPresent(UDTFAnnotations.CallOnNull.class) ? "CALLED ON NULL INPUT" : "RETURNS NULL ON NULL INPUT";
-        String immutable_conf = c.isAnnotationPresent(UDTFAnnotations.Immutable.class) ? "VOLATILE" : "IMMUTABLE";
+        String immutable_conf = c.isAnnotationPresent(UDTFAnnotations.Volatile.class) ? "VOLATILE" : "IMMUTABLE";
         return formatUDTFDDL(
                 funcProps.name(),
                 configs.getOrDefault("schema", "sedona"),
-                argSpec,
+                paramTypes,
+                argNames,
                 returnTypes,
-                "WHEROBOTS",
+                stageName,
                 handlerName,
                 configs.get(Constants.SEDONA_VERSION),
                 configs.get(Constants.GEOTOOLS_VERSION),
                 null_input_conf,
-                immutable_conf
+                immutable_conf,
+                isNativeApp,
+                appRoleName
         );
     }
 
-    public static List<String> buildAll(Map<String, String> configs) {
+    public static List<String> buildAll(Map<String, String> configs, String stageName, boolean isNativeApp, String appRoleName) {
         List<String> ddlList = new ArrayList<>();
         for (Class c : udtfClz) {
-            ddlList.add(buildUDTFDDL(c, configs));
+            ddlList.add(buildUDTFDDL(c, configs, stageName, isNativeApp, appRoleName));
         }
         return ddlList;
     }

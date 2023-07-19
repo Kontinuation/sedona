@@ -17,6 +17,11 @@ public class UDTFAnnotations {
     }
 
     @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
+    public static @interface Volatile {
+    }
+
+    @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.TYPE)
     public static @interface TabularFunc {
         String name();

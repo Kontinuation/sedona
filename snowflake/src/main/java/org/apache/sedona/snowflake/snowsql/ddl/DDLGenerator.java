@@ -33,8 +33,8 @@ public class DDLGenerator {
     public static void printUsage() {
         System.out.println("Usage: java -jar snowsql-ddl-generator.jar [options]");
         System.out.println("Must have Arguments");
-        System.out.println("  --sedona-version=<version>  Sedona version");
-        System.out.println("  --geotools-version=<version>  GeoTools version");
+        System.out.println("  --sedona-version <version>");
+        System.out.println("  --geotools-version <version>");
         System.out.println("Optional have Arguments");
         System.out.println("  --schema=<schema>  snowflake schema register functions");
         System.out.println("  --h  Print this help message");
@@ -42,12 +42,28 @@ public class DDLGenerator {
     }
 
     public static void main(String[] args) {
+        // Config for generating DDL on WB3P
+        String stageName = "@WHEROBOTS";
+        boolean isNativeApp = false;
+        String appRoleName = "app_public";
+
+        // Config for generating DDL on Snowflake Native App
+//        stageName = "";
+//        isNativeApp = true;
+//        appRoleName = "app_public";
+
+        if (isNativeApp) {
+            System.out.println("-- Generating DDL for Snowflake Native App");
+            System.out.println("CREATE APPLICATION ROLE " + appRoleName + ";");
+            System.out.println("CREATE OR ALTER VERSIONED SCHEMA sedona;");
+            System.out.println("GRANT USAGE ON SCHEMA sedona TO APPLICATION ROLE " + appRoleName + ";");
+        }
         try {
             Map<String, String> argMap = parseArgs(args);
             System.out.println("-- UDFs --");
-            System.out.println(String.join("\n", UDFDDLGenerator.buildAll(argMap)));
+            System.out.println(String.join("\n", UDFDDLGenerator.buildAll(argMap, stageName, isNativeApp, appRoleName)));
             System.out.println("-- UDTFs --");
-            System.out.println(String.join("\n", UDTFDDLGenerator.buildAll(argMap)));
+            System.out.println(String.join("\n", UDTFDDLGenerator.buildAll(argMap, stageName, isNativeApp, appRoleName)));
         } catch (Exception e) {
             e.printStackTrace();
         }

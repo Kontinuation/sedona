@@ -38,7 +38,7 @@ public class TestBase extends TestCase {
             String ddl = UDFDDLGenerator.buildUDFDDL(UDFs.class.getMethod(
                     functionName,
                     paramTypes
-            ), buildDDLConfigs);
+            ), buildDDLConfigs, "@WHEROBOTS", false, "");
             System.out.println(ddl);
             ResultSet res = snowClient.executeQuery(ddl);
             res.next();
@@ -50,7 +50,7 @@ public class TestBase extends TestCase {
 
     public void registerUDTF(Class<?> clz) {
         try {
-            String ddl = UDTFDDLGenerator.buildUDTFDDL(clz, buildDDLConfigs);
+            String ddl = UDTFDDLGenerator.buildUDTFDDL(clz, buildDDLConfigs, "@WHEROBOTS", false, "");
             System.out.println(ddl);
             ResultSet res = snowClient.executeQuery(ddl);
             res.next();

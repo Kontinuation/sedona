@@ -18,6 +18,11 @@ public class UDFAnnotations {
 
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.METHOD)
+    public static @interface Volatile {
+    }
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.METHOD)
     public static @interface ParamMeta {
         String[] argNames();
 

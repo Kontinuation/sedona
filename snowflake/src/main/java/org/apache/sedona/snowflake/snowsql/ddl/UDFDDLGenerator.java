@@ -7,6 +7,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -19,26 +20,12 @@ public class UDFDDLGenerator {
         return UDFs.class.getDeclaredMethods();
     }
 
-    public static String buildUDFDDL(Method method, Map<String, String> configs) {
+    public static String buildUDFDDL(Method method, Map<String, String> configs, String stageName, boolean isNativeApp, String appRoleName) {
         if (!method.isAnnotationPresent(UDFAnnotations.ParamMeta.class)) {
             throw new RuntimeException("Missing ParamMeta annotation for method: " + method.getName());
         }
         String[] args = method.getAnnotation(UDFAnnotations.ParamMeta.class).argNames();
-        Class<?>[] argTypes = method.getParameterTypes();
-        // generate argspec
-        String argSpec = "";
-        for (int i = 0;i < args.length; i++) {
-            String argName = args[i].toLowerCase();
-            try {
-                String argType= Constants.snowflakeTypeMap.get(argTypes[i].getTypeName()).toUpperCase();
-                argSpec = argSpec + argName + " " + argType;
-                if (i + 1 != args.length) {
-                    argSpec = argSpec + ", ";
-                }
-            } catch (NullPointerException e) {
-                throw new RuntimeException("Unsupported type: " + argTypes[i].getTypeName());
-            }
-        }
+        Parameter[] argTypes = method.getParameters();
         // generate return type
         String returnType = Constants.snowflakeTypeMap.get(method.getReturnType().getTypeName());
         if (returnType == null) {
@@ -47,26 +34,29 @@ public class UDFDDLGenerator {
         String handlerName = UDFs.class.getPackage().getName() + "." + UDFs.class.getSimpleName() + "." + method.getName();
         // check some function attributes
         String null_input_conf = method.isAnnotationPresent(UDFAnnotations.CallOnNull.class) ? "CALLED ON NULL INPUT" : "RETURNS NULL ON NULL INPUT";
-        String immutable_conf = method.isAnnotationPresent(UDFAnnotations.Immutable.class) ? "IMMUTABLE" : "VOLATILE";
+        String immutable_conf = method.isAnnotationPresent(UDFAnnotations.Volatile.class) ? "VOLATILE" : "IMMUTABLE";
         return formatUDFDDL(
                 method.getName(),
                 configs.getOrDefault("schema", "sedona"),
-                argSpec,
+                argTypes,
+                args,
                 returnType,
-                "WHEROBOTS",
+                stageName,
                 handlerName,
                 configs.get(Constants.SEDONA_VERSION),
                 configs.get(Constants.GEOTOOLS_VERSION),
                 null_input_conf,
-                immutable_conf
+                immutable_conf,
+                isNativeApp,
+                appRoleName
         );
     }
 
-    public static List<String> buildAll(Map<String, String> configs) {
+    public static List<String> buildAll(Map<String, String> configs, String stageName, boolean isNativeApp, String appRoleName) {
         List<String> ddlList = new ArrayList<>();
         for (Method method : udfMethods()) {
             if (method.getModifiers() == (Modifier.PUBLIC | Modifier.STATIC)) {
-                ddlList.add(buildUDFDDL(method, configs));
+                ddlList.add(buildUDFDDL(method, configs, stageName, isNativeApp, appRoleName));
             }
         }
         return ddlList;
@@ -75,26 +65,29 @@ public class UDFDDLGenerator {
     public static String formatUDFDDL(
             String functionName,
             String schemaName,
-            String argSpec,
+            Parameter[] argTypes,
+            String[] argNames,
             String returnType,
             String stageName,
             String handlerName,
             String sedona_version,
             String geotools_version,
             String null_input_conf,
-            String immutable_conf
+            String immutable_conf,
+            boolean isNativeApp,
+            String appRoleName
     ) {
         String ddlTemplate = String.join("\n", new BufferedReader(
                 new InputStreamReader(
                         Objects.requireNonNull(DDLGenerator.class.getClassLoader().getResourceAsStream("UDFTemplate.txt"))
                 )
         ).lines().collect(Collectors.toList()));
-        return ddlTemplate.replace(
+        String ddl = ddlTemplate.replace(
                 "{KW_FUNCTION_NAME}", functionName
         ).replace(
                 "{KW_SCHEMA_NAME}", schemaName
         ).replace(
-                "{KW_ARG_SPEC}", argSpec
+                "{KW_ARG_SPEC}", ArgSpecBuilder.args(argTypes, argNames)
         ).replace(
                 "{KW_RETURN_TYPE}", returnType
         ).replace(
@@ -110,6 +103,11 @@ public class UDFDDLGenerator {
         ).replace(
                 "{KW_IMMUTABLE_CONF}", immutable_conf
         );
+        if (isNativeApp) {
+            ddl += "\n";
+            ddl += "GRANT USAGE ON FUNCTION " + schemaName + "." + functionName + "(" + ArgSpecBuilder.argTypes(argTypes) + ") TO APPLICATION ROLE " + appRoleName + ";";
+        }
+        return ddl;
     }
 
 }
