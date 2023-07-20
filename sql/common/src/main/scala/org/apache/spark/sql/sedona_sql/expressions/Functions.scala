@@ -1114,3 +1114,15 @@ case class ST_CoordDim(inputExpressions: Seq[Expression])
   }
 }
 
+/**
+ * Returns True if geometry is a collection of geometries
+ *
+ * @param inputExpressions
+ */
+case class ST_IsCollection(inputExpressions: Seq[Expression])
+  extends InferredExpression(Functions.isCollection _) {
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression = {
+    copy(inputExpressions = newChildren)
+  }
+}
+

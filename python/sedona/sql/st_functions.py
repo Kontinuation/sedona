@@ -123,6 +123,7 @@ __all__ = [
     "ST_Degrees",
     "ST_FrechetDistance",
     "ST_CoordDim",
+    "ST_IsCollection",
     "ST_Affine",
     "ST_BoundingDiagonal"
 ]
@@ -1495,3 +1496,13 @@ def ST_CoordDim(geometry: ColumnOrName) -> Column:
     """
     return _call_st_function("ST_CoordDim", geometry)
 
+@validate_argument_types
+def ST_IsCollection(geometry: ColumnOrName) -> Column:
+    """Check if the geometry is of GeometryCollection type.
+
+    :param geometry: Column for geometry collection
+    :type geometry: ColumnOrName
+    :return: True if geometry is a collection of geometries.
+    :rtype: Column
+    """
+    return _call_st_function("ST_IsCollection", geometry)
