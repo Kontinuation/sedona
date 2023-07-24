@@ -1,11 +1,15 @@
 notifications:
-    commits:      commits@sedona.apache.org
-    issues:       issues@sedona.apache.org
-    pullrequests_status:  dev@sedona.apache.org
+    commits:    commits@sedona.apache.org
+    issues_status:    dev@sedona.apache.org
+    issues_comment:    issues@sedona.apache.org
+    pullrequests_status:    dev@sedona.apache.org
+    pullrequests_comment:    issues@sedona.apache.org
     jira_options: link label worklog
 github:
   description: "A cluster computing framework for processing large-scale geospatial data"
-  homepage: http://sedona.apache.org/
+  homepage: https://sedona.apache.org/
+  autolink_jira:
+    - SEDONA
   labels:
     - geospatial
     - cluster-computing
@@ -19,7 +23,7 @@ github:
     # Enable wiki for documentation
     wiki: false
     # Enable issue management
-    issues: false
+    issues: true
     # Enable projects for project management boards
     projects: false
   ghp_branch:
