@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.FunctionIdentifier
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
 import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, ExpressionInfo, Literal}
 import org.apache.spark.sql.expressions.Aggregator
-import org.apache.spark.sql.sedona_sql.expressions.collect.{ST_Collect}
+import org.apache.spark.sql.sedona_sql.expressions.collect.ST_Collect
 import org.apache.spark.sql.sedona_sql.expressions.raster._
 import org.apache.spark.sql.sedona_sql.expressions._
 import org.locationtech.jts.geom.Geometry
@@ -197,6 +197,7 @@ object Catalog {
     function[RS_BandAsArray](),
     function[RS_FromArcInfoAsciiGrid](),
     function[RS_FromGeoTiff](),
+    function[RS_FromPath](null),
     function[RS_MakeEmptyRaster](),
     function[RS_Envelope](),
     function[RS_NumBands](),
@@ -211,7 +212,8 @@ object Catalog {
     function[RS_Width](),
     function[RS_Height](),
     function[RS_ScaleX](),
-    function[RS_ScaleY]()
+    function[RS_ScaleY](),
+    function[RS_BandPath]()
   )
 
   val aggregateExpressions: Seq[Aggregator[Geometry, Geometry, Geometry]] = Seq(

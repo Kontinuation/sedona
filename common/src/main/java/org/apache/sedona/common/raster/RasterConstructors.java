@@ -13,6 +13,8 @@
  */
 package org.apache.sedona.common.raster;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.raster.inputstream.ByteArrayImageInputStream;
 import org.geotools.coverage.CoverageFactoryFinder;
 import org.geotools.coverage.grid.GridCoverage2D;
@@ -44,6 +46,10 @@ public class RasterConstructors
     public static GridCoverage2D fromGeoTiff(byte[] bytes) throws IOException {
         GeoTiffReader geoTiffReader = new GeoTiffReader(new ByteArrayImageInputStream(bytes));
         return geoTiffReader.read(null);
+    }
+
+    public static GridCoverage2D fromPath(String path, Configuration conf) throws IOException {
+        return OutDbGridCoverage2D.create("outDbCoverage", new Path(path), conf);
     }
 
     /**

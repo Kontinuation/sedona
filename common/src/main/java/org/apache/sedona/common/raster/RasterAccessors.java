@@ -128,4 +128,24 @@ public class RasterAccessors
             throw new UnsupportedOperationException("Only AffineTransform2D is supported");
         }
     }
+
+    /**
+     * Get the path of raster file the out-db raster references to.
+     * <p>TODO: currently out-db rasters only reference one single file, but in the future we may support referencing
+     * different files for each band. In that case, this method should accept a band index as parameter.</p>
+     * @param raster the out-db raster
+     * @return the path of the raster file
+     */
+    public static String bandPath(GridCoverage2D raster) {
+        if (!(raster instanceof OutDbGridCoverage2D)) {
+            return null;
+        }
+        OutDbGridCoverage2D outDbGridCoverage2D = (OutDbGridCoverage2D) raster;
+        try {
+            OutDbGridCoverage2D.SerializableState outDbState = outDbGridCoverage2D.getSerializableState();
+            return outDbState.path.toString();
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
 }

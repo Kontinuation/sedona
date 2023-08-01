@@ -72,3 +72,8 @@ case class RS_ScaleY(inputExpressions: Seq[Expression]) extends InferredExpressi
   }
 }
 
+case class RS_BandPath(inputExpressions: Seq[Expression]) extends InferredExpression(RasterAccessors.bandPath _) {
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}

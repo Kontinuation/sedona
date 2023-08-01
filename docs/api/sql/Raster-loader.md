@@ -47,6 +47,28 @@ var df = spark.read.format("binaryFile").load("/some/path/*.tiff")
 df = df.withColumn("raster", f.expr("RS_FromGeoTiff(content)"))
 ```
 
+### RS_FromPath
+
+You can load rasters from paths. Rasters loaded in this way are called "out-db" rasters. Out-db rasters hold references to raster files instead of holding the actual pixel data.
+
+Out-db rasters can be used interchangeably with ordinary rasters. The only difference is that out-db rasters will load raster files in a deferred manner.
+The grid geometry and geo-referencing information will be loaded from the raster files when the out-db raster was constructed, pixel data may not be loaded until pixel values
+were accessed by `RS_Value` or `RS_BandAsArray`. It is more appropriate to load large raster files as out-db rasters.
+
+Introduction: Returns an out-db raster from path to image file. Currently it supports loading GeoTiff files (`*.tiff` or `*.tif`) and Arc Info Ascii Grid files (`*.asc`).
+
+Format: `RS_FromPath(path: String)`
+
+Since: `v1.5.0`
+
+Spark SQL example:
+
+```scala
+var df = spark.read.format("binaryFile").load("/some/path/*.tiff")
+df = df.selectExpr("path", "RS_FromPath(path) as rast")
+```
+
+
 ### RS_MakeEmptyRaster
 
 Introduction: Returns an empty raster geometry. Every band in the raster is initialized to `0.0`.

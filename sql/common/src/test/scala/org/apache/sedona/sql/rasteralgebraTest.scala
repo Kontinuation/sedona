@@ -18,6 +18,7 @@
  */
 package org.apache.sedona.sql
 
+import org.apache.sedona.common.raster.OutDbGridCoverage2D
 import org.apache.spark.sql.functions.{collect_list, expr}
 import org.geotools.coverage.grid.GridCoverage2D
 import org.junit.Assert.assertEquals
@@ -260,6 +261,53 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       val df = sparkSession.read.format("binaryFile").load(resourceFolder + "raster_asc/test1.asc")
       val result = df.selectExpr("RS_FromArcInfoAsciiGrid(content)").first().get(0)
       assert(result != null)
+    }
+
+    it("Passed RS_FromPath") {
+      val paths = Seq(
+        resourceFolder + "raster/test1.tiff",
+        resourceFolder + "raster/test2.tiff",
+        resourceFolder + "raster/test3.tif",
+        resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif")
+      val dfPaths = paths.toDF("path")
+      val dfRasters = paths.map { path =>
+        sparkSession.read.format("binaryFile").load(path)
+          .withColumn("name", expr("reverse(split(path, '/'))[0]"))
+          .withColumn("rast", expr("RS_FromGeoTiff(content)"))
+      }.reduce(_ union _)
+      val dfOutDbRasters = dfPaths
+        .withColumn("name", expr("reverse(split(path, '/'))[0]"))
+        .withColumn("rast_outdb", expr("RS_FromPath(path)"))
+      val dfResults = dfRasters.alias("indb").join(
+        dfOutDbRasters.alias("outdb"), dfRasters("name") === dfOutDbRasters("name"))
+        .selectExpr(
+          "indb.name as name",
+          "outdb.rast_outdb as rast_outdb",
+          "RS_Metadata(rast_outdb) as meta_outdb",
+          "RS_Metadata(rast) as meta",
+          "RS_Envelope(rast_outdb) as env_outdb",
+          "RS_Envelope(rast) as env",
+          "RS_Value(rast_outdb, ST_Centroid(RS_Envelope(rast_outdb))) as value_outdb",
+          "RS_Value(rast_outdb, ST_Centroid(RS_Envelope(rast))) as value")
+      assert(dfResults.count() == paths.length)
+      val dfPassed = dfResults.where("ST_Equals(env_outdb, env) AND meta = meta_outdb AND value_outdb = value")
+      assert(dfPassed.count() == paths.length)
+
+      // Test collecting out-db rasters as OutDbGridCoverage2D objects
+      val rows = dfResults.collect()
+      rows.foreach { row =>
+        val gridCoverage2D = row.getAs[GridCoverage2D]("rast_outdb")
+        assert(gridCoverage2D.isInstanceOf[OutDbGridCoverage2D])
+      }
+    }
+
+    it("Passed RS_BandPath") {
+      val dfBandPath = Seq(resourceFolder + "raster/test1.tiff").toDF("path")
+        .selectExpr("RS_BandPath(RS_FromPath(path)) as band_path")
+      val dfBandPathInDb = sparkSession.read.format("binaryFile").load(resourceFolder + "raster/test1.tiff")
+        .selectExpr("RS_BandPath(RS_FromGeoTiff(content)) as band_path")
+      assert(dfBandPath.first.getString(0) contains "test1.tiff")
+      assert(dfBandPathInDb.first.getString(0) == null)
     }
 
     it("Passed RS_Envelope should handle null values") {

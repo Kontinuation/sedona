@@ -143,7 +143,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         }
     }
 
-    public SerializableState getSerializableState() throws IOException {
+    public SerializableState getSerializableState() {
         // Serialize the path and configuration to construct the image input stream.
         ImageInputStream serializedStream = stream;
         while (serializedStream instanceof DiskCachedImageInputStream) {

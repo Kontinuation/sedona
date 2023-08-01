@@ -1,5 +1,24 @@
 ## Raster Accessors
 
+### RS_BandPath
+
+Introduction: Returns the path to the raster file referenced by the out-db raster. If the raster is an in-db raster,
+this function returns null.
+
+Format: `RS_BandPath(raster: Raster)`
+
+Since: `v1.5.0`
+
+Spark SQL example:
+```sql
+SELECT RS_BandPath(RS_FromPath("s3a://bucket/path/to/raster.tif"))
+```
+
+Output:
+```
+s3a://bucket/path/to/raster.tif
+```
+
 ### RS_Height
 
 Introduction: Returns the height of the raster.
