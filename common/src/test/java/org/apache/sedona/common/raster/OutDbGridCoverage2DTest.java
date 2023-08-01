@@ -18,6 +18,7 @@
  */
 package org.apache.sedona.common.raster;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.geotools.coverage.GridSampleDimension;
@@ -25,62 +26,59 @@ import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.gce.geotiff.GeoTiffReader;
+import org.geotools.geometry.DirectPosition2D;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.junit.Assert;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.opengis.coverage.grid.GridEnvelope;
+import org.opengis.geometry.DirectPosition;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.io.File;
 import java.io.IOException;
 
-import static org.junit.Assert.assertNotNull;
+@RunWith(Parameterized.class)
+public class OutDbGridCoverage2DTest extends RasterTestBase {
 
-public class SerdeTest extends RasterTestBase {
-
-    @Test
-    public void testRoundtripSerdeSingelbandRaster() throws IOException, ClassNotFoundException {
-        testRoundTrip(oneBandRaster);
-    }
-
-    @Test
-    public void testRoundtripSerdeMultibandRaster() throws IOException, ClassNotFoundException {
-        testRoundTrip(multiBandRaster);
-    }
-
-    @Test
-    public void testOutDbRaster() throws IOException, ClassNotFoundException {
-        String[] testFilePaths = {
+    // Parameterized test using various geotiff files
+    @Parameterized.Parameters(name = "{0}")
+    public static Object[] testFiles() {
+        return new Object[]{
                 resourceFolder + "/raster/test1.tiff",
                 resourceFolder + "/raster/test2.tiff",
                 resourceFolder + "/raster/test3.tif",
                 resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif"
         };
-        for (String testFilePath : testFilePaths) {
-            // Out-DB raster referencing the entire GeoTiff file
-            GridCoverage2D raster = OutDbGridCoverage2D.create("test", new Path(testFilePath), new Configuration());
-            GridCoverage2D roundTripRaster = testRoundTrip(raster);
-            Assert.assertTrue(roundTripRaster instanceof OutDbGridCoverage2D);
-
-            // Out-DB raster referencing only a small portion of the entire GeoTiff file
-            raster = createOutDbRasterTileFromGeoTiff(testFilePath);
-            roundTripRaster = testRoundTrip(raster);
-            Assert.assertTrue(roundTripRaster instanceof OutDbGridCoverage2D);
-        }
     }
 
-    private GridCoverage2D testRoundTrip(GridCoverage2D raster) throws IOException, ClassNotFoundException {
-        byte[] bytes = Serde.serialize(raster);
-        GridCoverage2D roundTripRaster = Serde.deserialize(bytes);
-        assertNotNull(roundTripRaster);
-        assertSameCoverage(raster, roundTripRaster);
-        bytes = Serde.serialize(roundTripRaster);
-        roundTripRaster = Serde.deserialize(bytes);
-        assertSameCoverage(raster, roundTripRaster);
-        return roundTripRaster;
+    private final String testFilePath;
+
+    public OutDbGridCoverage2DTest(String filePath) {
+        this.testFilePath = filePath;
     }
 
-    private GridCoverage2D createOutDbRasterTileFromGeoTiff(String path) throws IOException {
+    @Test
+    public void testGeoTiff() throws IOException {
+        testUsingGeoTiffFile(testFilePath);
+        testTileUsingGeoTiffFile(testFilePath);
+    }
+
+    private void testUsingGeoTiffFile(String path) throws IOException {
+        // Construct a GridCoverage2D object from the GeoTiff file
+        GeoTiffReader reader = new GeoTiffReader(new File(path));
+        GridCoverage2D gridCoverage2D = reader.read(null);
+
+        // Construct an OutDbGridCoverage2D from the same GeoTiff file
+        GridCoverage2D outDbGridCoverage2D = OutDbGridCoverage2D.create("test", new Path(path), new Configuration());
+
+        // Verify that they are the same coverage
+        assertSameCoverage(gridCoverage2D, outDbGridCoverage2D);
+    }
+
+    private void testTileUsingGeoTiffFile(String path) throws IOException {
+        // Construct a GridCoverage2D object from the GeoTiff file
         GeoTiffReader reader = new GeoTiffReader(new File(path));
         GridCoverage2D gridCoverage2D = reader.read(null);
         GridGeometry2D gridGeometry = gridCoverage2D.getGridGeometry();
@@ -100,13 +98,45 @@ public class SerdeTest extends RasterTestBase {
         double ipX = affine.getTranslateX() + affine.getScaleX() * outDbWidth * 0.5;
         double ipY = affine.getTranslateY() + affine.getScaleY() * outDbHeight * 0.5;
         AffineTransform2D outDbTransform = new AffineTransform2D(
-                scaleX, affine.getShearY(), affine.getShearX(), scaleY, ipX, ipY);
+                scaleX,
+                affine.getShearY(),
+                affine.getShearX(),
+                scaleY,
+                ipX,
+                ipY);
         GridGeometry2D outDbGridGeometry = new GridGeometry2D(gridEnvelope, outDbTransform, crs);
+
+        // Revert the bands for out-db raster
+        int[] outDbBandIndices = new int[bands.length];
+        for (int k = 0; k < bands.length; k++) {
+            outDbBandIndices[k] = bands.length - k - 1;
+        }
+        GridSampleDimension[] outDbBands = ArrayUtils.clone(bands);
+        ArrayUtils.reverse(outDbBands);
 
         // Construct the out-db raster
         Path outDbPath = new Path(path);
         Configuration conf = new Configuration();
-        return OutDbGridCoverage2D.create("test", outDbGridGeometry,
-                bands, null, outDbPath, conf);
+        OutDbGridCoverage2D outDbGridCoverage2D = OutDbGridCoverage2D.create("test", outDbGridGeometry,
+                outDbBands, outDbBandIndices, outDbPath, conf);
+        try {
+            // Evaluate values on some world coordinates to see if the values are correct
+            double[] outDbValues = new double[bands.length];
+            double[] values = new double[bands.length];
+            for (int y = 0; y < outDbHeight; y += 10) {
+                for (int x = 0; x < outDbWidth; x += 10) {
+                    double worldX = ipX + x * scaleX;
+                    double worldY = ipY + y * scaleY;
+                    DirectPosition worldPos = new DirectPosition2D(worldX, worldY);
+                    outDbGridCoverage2D.evaluate(worldPos, outDbValues);
+                    gridCoverage2D.evaluate(worldPos, values);
+                    for (int k = 0; k < bands.length; k++) {
+                        Assert.assertEquals(values[k], outDbValues[bands.length - k - 1], 1e-6);
+                    }
+                }
+            }
+        } finally {
+            outDbGridCoverage2D.dispose(true);
+        }
     }
 }
