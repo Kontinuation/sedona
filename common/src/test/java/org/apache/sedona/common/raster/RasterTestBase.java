@@ -16,6 +16,8 @@ package org.apache.sedona.common.raster;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
+import org.geotools.data.DataSourceException;
+import org.geotools.gce.geotiff.GeoTiffReader;
 import org.geotools.gce.geotiff.GeoTiffWriter;
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.Envelope2D;
@@ -36,6 +38,7 @@ import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.awt.image.WritableRaster;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
@@ -161,5 +164,11 @@ public class RasterTestBase {
             }
         }
         Assert.assertTrue(sampledPoints > density * density / 2);
+    }
+
+    GridCoverage2D rasterFromGeoTiff(String filePath) throws IOException {
+        File geoTiffFile = new File(filePath);
+        GridCoverage2D raster = new GeoTiffReader(geoTiffFile).read(null);
+        return raster;
     }
 }
