@@ -217,7 +217,8 @@ object Catalog {
     function[RS_ScaleX](),
     function[RS_ScaleY](),
     function[RS_BandPath](),
-    function[RS_PixelAsPoint]()
+    function[RS_PixelAsPoint](),
+    function[RS_ConvexHull]()
   )
 
   val aggregateExpressions: Seq[Aggregator[Geometry, Geometry, Geometry]] = Seq(
