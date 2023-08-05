@@ -19,6 +19,8 @@
 package org.apache.sedona.common.raster;
 
 import java.util.Set;
+
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.common.utils.GeomUtils;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.geometry.jts.JTS;
@@ -47,7 +49,28 @@ public class RasterPredicates {
      * @param queryWindow the query window
      * @return true if the raster intersects the query window
      */
-    public static boolean rsIntersects(GridCoverage2D raster, Geometry queryWindow) {
+    public static boolean rsIntersects(GridCoverage2D raster, Geometry geometry) {
+        Pair<Geometry, Geometry> geometries = convertCRSIfNeeded(raster, geometry);
+        Geometry rasterGeometry = geometries.getLeft();
+        Geometry queryWindow = geometries.getRight();
+        return rasterGeometry.intersects(queryWindow);
+    }
+
+    public static boolean rsContains(GridCoverage2D raster, Geometry geometry) {
+        Pair<Geometry, Geometry> geometries = convertCRSIfNeeded(raster, geometry);
+        Geometry rasterGeometry = geometries.getLeft();
+        Geometry queryWindow = geometries.getRight();
+        return rasterGeometry.contains(queryWindow);
+    }
+
+    public static boolean rsWithin(GridCoverage2D raster, Geometry geometry) {
+        Pair<Geometry, Geometry> geometries = convertCRSIfNeeded(raster, geometry);
+        Geometry rasterGeometry = geometries.getLeft();
+        Geometry queryWindow = geometries.getRight();
+        return rasterGeometry.within(queryWindow);
+    }
+
+    private static Pair<Geometry, Geometry> convertCRSIfNeeded(GridCoverage2D raster, Geometry queryWindow) {
         org.opengis.geometry.Envelope rasterEnvelope = raster.getEnvelope();
         Envelope rasterJtsEnvelope = new Envelope(
             rasterEnvelope.getMinimum(0), rasterEnvelope.getMaximum(0),
@@ -57,8 +80,8 @@ public class RasterPredicates {
         int queryWindowSRID = queryWindow.getSRID();
         if (rasterCRS == null || rasterCRS instanceof DefaultEngineeringCRS || queryWindowSRID <= 0) {
             // Either raster or query window does not have a defined CRS, simply use the original
-            // raster envelope and the query window to test for intersection.
-            return rasterGeometry.intersects(queryWindow);
+            // raster envelope and the query window to test for relationship.
+            return Pair.of(rasterGeometry, queryWindow);
         }
 
         // Both raster and query window have a defined CRS
@@ -76,12 +99,12 @@ public class RasterPredicates {
             // Please note that even though the EPSG code is the same, the CRS may not be the same.
             // The query window and the raster may not have the same axis order. It is user's
             // responsibility to provide a query window with the same axis order as the raster.
-            return rasterGeometry.intersects(queryWindow);
+            return Pair.of(rasterGeometry, queryWindow);
         }
 
-        // Raster as a non-authoritative CRS, or the CRS of the raster is different from the
+        // Raster has a non-authoritative CRS, or the CRS of the raster is different from the
         // CRS of the query window. We'll transform both sides to a common CRS (WGS84) before
-        // testing for intersection.
+        // testing for relationship.
         try {
             CoordinateReferenceSystem queryWindowCRS = CRS.decode(queryWindowCRSCode);
             MathTransform transform = CRS.findMathTransform(queryWindowCRS,
@@ -90,8 +113,8 @@ public class RasterPredicates {
             if (queryWindowSRID != 4326) {
                 queryWindow = GeomUtils.antiMeridianSafeGeom(queryWindow);
             } else {
-                // The query window is already in WGS84, so we don't need to transform it. We'll also
-                // assume that the query window provided by the user is already anti-meridian safe.
+                // The query window is already in WGS84, which is a geographic CRS. We'll assume that
+                // the query window provided by the user is already anti-meridian safe.
                 // If the query window has a width greater than 180, the antiMeridianSafeGeom method
                 // will treat it as crossing the anti-meridian, which may not be what the user wants.
             }
@@ -106,6 +129,6 @@ public class RasterPredicates {
             throw new RuntimeException("Cannot transform CRS of query window", e);
         }
 
-        return rasterGeometry.intersects(queryWindow);
+        return Pair.of(rasterGeometry, queryWindow);
     }
 }
