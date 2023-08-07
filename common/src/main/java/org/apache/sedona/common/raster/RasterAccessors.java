@@ -27,6 +27,7 @@ import org.geotools.referencing.crs.DefaultEngineeringCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.TransformException;
 
 import java.util.Optional;
 
@@ -73,6 +74,14 @@ public class RasterAccessors
 
     public static double getScaleY(GridCoverage2D raster) {
         return RasterUtils.getGDALAffineTransform(raster).getScaleY();
+    }
+
+    public static double getWorldCoordX(GridCoverage2D raster, int colX, int rowY) throws TransformException {
+        return RasterUtils.getCornerCoordinates(raster, colX, rowY).getX();
+    }
+
+    public static double getWorldCoordY(GridCoverage2D raster, int colX, int rowY) throws TransformException {
+        return RasterUtils.getCornerCoordinates(raster, colX, rowY).getY();
     }
 
     /**

@@ -221,6 +221,8 @@ object Catalog {
     function[RS_BandPath](),
     function[RS_PixelAsPoint](),
     function[RS_ConvexHull](),
+    function[RS_RasterToWorldCoordX](),
+    function[RS_RasterToWorldCoordY](),
     function[RS_Within](),
     function[RS_Contains]()
   )

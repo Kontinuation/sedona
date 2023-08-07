@@ -83,3 +83,15 @@ case class RS_BandPath(inputExpressions: Seq[Expression]) extends InferredExpres
     copy(inputExpressions = newChildren)
   }
 }
+
+case class RS_RasterToWorldCoordX(inputExpressions: Seq[Expression]) extends InferredExpression(RasterAccessors.getWorldCoordX _) {
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
+case class RS_RasterToWorldCoordY(inputExpressions: Seq[Expression]) extends InferredExpression(RasterAccessors.getWorldCoordY _) {
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
