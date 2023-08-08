@@ -16,6 +16,7 @@ package org.apache.sedona.common.raster;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.raster.inputstream.ByteArrayImageInputStream;
+import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.geotools.coverage.CoverageFactoryFinder;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;

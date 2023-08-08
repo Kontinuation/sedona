@@ -18,7 +18,7 @@
  */
 package org.apache.sedona.sql
 
-import org.apache.sedona.common.raster.OutDbGridCoverage2D
+import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D
 import org.apache.spark.sql.functions.{collect_list, expr}
 import org.geotools.coverage.grid.GridCoverage2D
 import org.junit.Assert.assertEquals

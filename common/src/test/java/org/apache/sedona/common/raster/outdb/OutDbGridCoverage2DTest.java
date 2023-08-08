@@ -16,11 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.sedona.common.raster;
+package org.apache.sedona.common.raster.outdb;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.sedona.common.raster.RasterTestBase;
+import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
@@ -43,26 +45,37 @@ import java.io.IOException;
 public class OutDbGridCoverage2DTest extends RasterTestBase {
 
     // Parameterized test using various geotiff files
-    @Parameterized.Parameters(name = "{0}")
-    public static Object[] testFiles() {
-        return new Object[]{
-                resourceFolder + "/raster/test1.tiff",
-                resourceFolder + "/raster/test2.tiff",
-                resourceFolder + "/raster/test3.tif",
-                resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif"
+    @Parameterized.Parameters(name = "file: {0}, no local cache: {1}")
+    public static Object[][] testFiles() {
+        return new Object[][]{
+                {resourceFolder + "/raster/test1.tiff", false},
+                {resourceFolder + "/raster/test2.tiff", false},
+                {resourceFolder + "/raster/test3.tif", false},
+                {resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif", false},
+                {resourceFolder + "/raster/test1.tiff", true},
+                {resourceFolder + "/raster/test2.tiff", true},
+                {resourceFolder + "/raster/test3.tif", true},
+                {resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif", true},
         };
     }
 
     private final String testFilePath;
+    private final Configuration conf;
 
-    public OutDbGridCoverage2DTest(String filePath) {
+    public OutDbGridCoverage2DTest(String filePath, boolean disableCacheForLocalFile) {
         this.testFilePath = filePath;
+        this.conf = new Configuration();
+        conf.setBoolean(HadoopImageInputStreamFactory.DONT_CACHE_LOCAL_FILE_CONF_KEY, disableCacheForLocalFile);
     }
 
     @Test
     public void testGeoTiff() throws IOException {
-        testUsingGeoTiffFile(testFilePath);
-        testTileUsingGeoTiffFile(testFilePath);
+        // Run the test multiple times to see if the result is consistent, since the OutDbGridCoverage2D
+        // involves resource reuse and pooling.
+        for (int k = 0; k < 3; k++) {
+            testUsingGeoTiffFile(testFilePath);
+            testTileUsingGeoTiffFile(testFilePath);
+        }
     }
 
     private void testUsingGeoTiffFile(String path) throws IOException {
@@ -71,7 +84,7 @@ public class OutDbGridCoverage2DTest extends RasterTestBase {
         GridCoverage2D gridCoverage2D = reader.read(null);
 
         // Construct an OutDbGridCoverage2D from the same GeoTiff file
-        GridCoverage2D outDbGridCoverage2D = OutDbGridCoverage2D.create("test", new Path(path), new Configuration());
+        GridCoverage2D outDbGridCoverage2D = OutDbGridCoverage2D.create("test", new Path(path), conf);
 
         // Verify that they are the same coverage
         assertSameCoverage(gridCoverage2D, outDbGridCoverage2D);
@@ -116,7 +129,6 @@ public class OutDbGridCoverage2DTest extends RasterTestBase {
 
         // Construct the out-db raster
         Path outDbPath = new Path(path);
-        Configuration conf = new Configuration();
         OutDbGridCoverage2D outDbGridCoverage2D = OutDbGridCoverage2D.create("test", outDbGridGeometry,
                 outDbBands, outDbBandIndices, outDbPath, conf);
         try {

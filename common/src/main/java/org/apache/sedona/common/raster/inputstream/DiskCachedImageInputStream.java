@@ -20,7 +20,6 @@ package org.apache.sedona.common.raster.inputstream;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
@@ -28,6 +27,7 @@ import javax.imageio.stream.FileCacheImageInputStream;
 import javax.imageio.stream.ImageInputStream;
 import javax.imageio.stream.ImageInputStreamImpl;
 
+import org.apache.sedona.common.raster.inputstream.util.BufferedRandomAccessFile;
 import org.apache.sedona.common.raster.inputstream.util.ByteRange;
 import org.apache.sedona.common.raster.inputstream.util.ByteRangeSet;
 
@@ -42,7 +42,7 @@ public class DiskCachedImageInputStream extends ImageInputStreamImpl {
 
     private final ImageInputStream stream;
     private final File cacheFile;
-    private final RandomAccessFile cache;
+    private final BufferedRandomAccessFile cache;
     private final ByteRangeSet cachedRanges;
     private final int readAheadSize;
 
@@ -65,7 +65,7 @@ public class DiskCachedImageInputStream extends ImageInputStreamImpl {
                     .toFile();
         }
         this.cacheFile.deleteOnExit();
-        this.cache = new RandomAccessFile(cacheFile, "rw");
+        this.cache = new BufferedRandomAccessFile(cacheFile, "rw");
         this.cachedRanges = new ByteRangeSet();
         this.readAheadSize = readAheadSize;
         this.streamLength = Long.MAX_VALUE;

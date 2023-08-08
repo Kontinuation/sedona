@@ -18,9 +18,9 @@
  */
 package org.apache.sedona.common.raster;
 
+import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridGeometry2D;
-import org.geotools.coverage.processing.operation.Affine;
 import org.geotools.geometry.Envelope2D;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultEngineeringCRS;

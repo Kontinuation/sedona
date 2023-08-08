@@ -23,6 +23,7 @@ import javax.imageio.stream.ImageInputStream;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
 /**
@@ -36,6 +37,7 @@ public class HadoopImageInputStreamFactory {
 
     public static final String READ_AHEAD_SIZE_CONF_KEY = "wherobots.raster.outdb.readahead";
     public static final String ENABLE_CACHE_CONF_KEY = "wherobots.raster.outdb.enablecache";
+    public static final String DONT_CACHE_LOCAL_FILE_CONF_KEY = "wherobots.raster.outdb.dont.cache.local.file";
     public static final int DEFAULT_READ_AHEAD_SIZE = 64 * 1024;
 
     /**
@@ -57,6 +59,12 @@ public class HadoopImageInputStreamFactory {
         HadoopImageInputStream stream = new HadoopImageInputStream(path, tunedConf);
         boolean isCached = tunedConf.getBoolean(ENABLE_CACHE_CONF_KEY, true);
         if (!isCached) {
+            return stream;
+        }
+
+        boolean dontCacheLocalFile = tunedConf.getBoolean(DONT_CACHE_LOCAL_FILE_CONF_KEY, true);
+        FileSystem fs = path.getFileSystem(tunedConf);
+        if (dontCacheLocalFile && fs.getScheme().equals("file")) {
             return stream;
         }
 

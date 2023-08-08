@@ -30,9 +30,11 @@ import org.apache.spark.sql.sedona_sql.expressions.implicits._
 import org.apache.spark.sql.sedona_sql.expressions.raster.implicits._
 import org.geotools.coverage.grid.GridCoverage2D
 
+import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.universe.TypeTag
 import scala.reflect.runtime.universe.Type
 import scala.reflect.runtime.universe.typeOf
+import scala.util.Try
 
 /**
  * This is the base class for wrapping Java/Scala functions as a catalyst expression in Spark SQL.
@@ -64,10 +66,76 @@ abstract class InferredExpression(fSeq: InferrableFunction *)
   override def inputTypes: Seq[AbstractDataType] = f.sparkInputTypes
   override def dataType: DataType = f.sparkReturnType
 
-  private lazy val argExtractors: Array[InternalRow => Any] = f.buildExtractors(inputExpressions)
-  private lazy val evaluator: InternalRow => Any = f.evaluatorBuilder(argExtractors)
+  private lazy val argExtractors: Array[InternalRow => Any] = buildExtractors(inputExpressions)
+  private lazy val evaluator: InternalRow => Any = buildEvaluator()
+  private lazy val serializer: Any => Any = buildSerializer()
 
-  override def eval(input: InternalRow): Any = f.serializer(evaluator(input))
+  // Keeps track of input rasters for disposal after evaluation.
+  // - Input raster arguments will be saved to this ArrayBuffer by argument extractors
+  // - Input raster arguments saved to this ArrayBuffer will be disposed by the evaluator
+  // Please note that if there are multiple cores per spark executor, the expression object will be
+  // copied to each core. Therefore, each core will have its own inputRasters ArrayBuffer. There is
+  // no need to worry about contention and thread safety here.
+  private val inputRasters: ArrayBuffer[GridCoverage2D] = ArrayBuffer.empty[GridCoverage2D]
+
+  private def buildExtractors(expressions: Seq[Expression]): Array[InternalRow => Any] = {
+    f.argExtractorBuilders.zipAll(expressions, null, null).flatMap {
+      case (null, _) => None
+      case (builder, expr) =>
+        val extractor = builder(expr)
+        if (expr.dataType.acceptsType(RasterUDT)) {
+          // Save input raster arguments into inputRasters for disposal after evaluation. The disposal
+          // will be done in the evaluator. Please see buildEvaluator for details.
+          Some((input: InternalRow) => {
+            val raster = extractor(input).asInstanceOf[GridCoverage2D]
+            if (raster != null) {
+              inputRasters += raster
+            }
+            raster
+          })
+        } else {
+          Some(extractor)
+        }
+    }.toArray
+  }
+
+  private def buildEvaluator(): InternalRow => Any = {
+    val evaluator = f.evaluatorBuilder(argExtractors)
+    if (inputTypes.exists(_.acceptsType(RasterUDT))) {
+      // Need to dispose input raster arguments after evaluation. Input raster arguments will be saved into
+      // inputRasters during argument extraction. Please see buildExtractors for details.
+      (input: InternalRow) => {
+        inputRasters.clear()
+        try {
+          evaluator(input)
+        } finally {
+          inputRasters.foreach(gridCoverage2D => Try(gridCoverage2D.dispose(true)))
+          inputRasters.clear()
+        }
+      }
+    } else {
+      // No input raster arguments, no need to dispose
+      evaluator
+    }
+  }
+
+  private def buildSerializer(): Any => Any = {
+    if (dataType.acceptsType(RasterUDT)) {
+      // If the return type is a raster, we need to dispose it after serialization
+      output => {
+        val raster = output.asInstanceOf[GridCoverage2D]
+        if (raster == null) null else {
+          val serialized = raster.serialize
+          raster.dispose(true)
+          serialized
+        }
+      }
+    } else {
+      f.serializer
+    }
+  }
+
+  override def eval(input: InternalRow): Any = serializer(evaluator(input))
   override def evalWithoutSerialization(input: InternalRow): Any = evaluator(input)
 }
 
@@ -217,14 +285,7 @@ case class InferrableFunction(sparkInputTypes: Seq[AbstractDataType],
                               sparkReturnType: DataType,
                               serializer: Any => Any,
                               argExtractorBuilders: Seq[Expression => InternalRow => Any],
-                              evaluatorBuilder: Array[InternalRow => Any] => InternalRow => Any) {
-  def buildExtractors(expressions: Seq[Expression]): Array[InternalRow => Any] = {
-    argExtractorBuilders.zipAll(expressions, null, null).flatMap {
-      case (null, _) => None
-      case (builder, expr) => Some(builder(expr))
-    }.toArray
-  }
-}
+                              evaluatorBuilder: Array[InternalRow => Any] => InternalRow => Any)
 
 object InferrableFunction {
   /**

@@ -21,12 +21,11 @@ package org.apache.sedona.common.raster.inputstream;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.nio.file.Files;
 import java.util.Random;
 import javax.imageio.stream.ImageInputStream;
 
@@ -37,28 +36,43 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
+@RunWith(Parameterized.class)
 public class DiskCachedImageInputStreamTest {
     @Rule
     public TemporaryFolder temp = new TemporaryFolder();
+
+    @Parameterized.Parameters(name = "disable cache for local file: {0}")
+    public static Object[] testConfig() {
+        return new Object[]{
+                new Object[]{true},
+                new Object[]{false}
+        };
+    }
 
     private static final int TEST_FILE_SIZE = 1000;
     private final Configuration conf = new Configuration();
     private final Random random = new Random();
     private File testFile;
 
+    public DiskCachedImageInputStreamTest(boolean disableCacheForLocalFile) {
+        conf.set(HadoopImageInputStreamFactory.READ_AHEAD_SIZE_CONF_KEY, "10B");
+        conf.setBoolean(HadoopImageInputStreamFactory.DONT_CACHE_LOCAL_FILE_CONF_KEY, disableCacheForLocalFile);
+    }
+
     @Before
     public void setup() throws IOException {
         testFile = temp.newFile();
         prepareTestData(testFile);
-        conf.set(HadoopImageInputStreamFactory.READ_AHEAD_SIZE_CONF_KEY, "10B");
     }
 
     @Test
     public void testReadSequentially() throws IOException {
         Path path = new Path(testFile.getPath());
         try (ImageInputStream stream = HadoopImageInputStreamFactory.create(path, conf);
-             InputStream in = new BufferedInputStream(new FileInputStream(testFile))) {
+             InputStream in = new BufferedInputStream(Files.newInputStream(testFile.toPath()))) {
             byte[] bActual = new byte[8];
             byte[] bExpected = new byte[bActual.length];
             while (true) {
@@ -103,7 +117,7 @@ public class DiskCachedImageInputStreamTest {
     }
 
     private void prepareTestData(File testFile) throws IOException {
-        try (OutputStream out = new BufferedOutputStream(new FileOutputStream(testFile))) {
+        try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(testFile.toPath()))) {
             for (int k = 0; k < TEST_FILE_SIZE; k++) {
                 out.write(random.nextInt());
             }

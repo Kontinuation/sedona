@@ -40,7 +40,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 public class RasterTestBase {
-    static final String resourceFolder = System.getProperty("user.dir") + "/../core/src/test/resources/";
+    static protected final String resourceFolder = System.getProperty("user.dir") + "/../core/src/test/resources/";
 
     String arc = "NCOLS 2\nNROWS 2\nXLLCORNER 378922\nYLLCORNER 4072345\nCELLSIZE 30\nNODATA_VALUE 0\n0 1 2 3\n";
     GridCoverage2D oneBandRaster;
@@ -56,7 +56,7 @@ public class RasterTestBase {
         geoTiff = bos.toByteArray();
     }
 
-    GridCoverage2D createEmptyRaster(int numBands)
+    protected GridCoverage2D createEmptyRaster(int numBands)
             throws FactoryException
     {
         int widthInPixel = 4;
@@ -67,7 +67,7 @@ public class RasterTestBase {
         return RasterConstructors.makeEmptyRaster(numBands, widthInPixel, heightInPixel, upperLeftX, upperLeftY, cellSize);
     }
 
-    GridCoverage2D createRandomRaster(int dataBufferType, int widthInPixel, int heightInPixel,
+    protected GridCoverage2D createRandomRaster(int dataBufferType, int widthInPixel, int heightInPixel,
                                       double upperLeftX, double upperLeftY, double pixelSize,
                                       int numBand, String crsCode) {
         WritableRaster raster =
@@ -98,7 +98,7 @@ public class RasterTestBase {
         return factory.create("random-raster", raster, referencedEnvelope);
     }
 
-    GridCoverage2D createMultibandRaster() throws IOException {
+    protected GridCoverage2D createMultibandRaster() throws IOException {
         GridCoverageFactory factory = new GridCoverageFactory();
         BufferedImage image = new BufferedImage(10, 10, BufferedImage.TYPE_INT_ARGB);
         for (int i = 0; i < image.getHeight(); i++) {
@@ -110,7 +110,7 @@ public class RasterTestBase {
         return factory.create("test", image, new Envelope2D(DefaultGeographicCRS.WGS84, 0, 0, 10, 10));
     }
 
-    void assertSameCoverage(GridCoverage2D expected, GridCoverage2D actual) {
+    protected void assertSameCoverage(GridCoverage2D expected, GridCoverage2D actual) {
         Assert.assertEquals(expected.getNumSampleDimensions(), actual.getNumSampleDimensions());
         Envelope expectedEnvelope = expected.getEnvelope();
         Envelope actualEnvelope = actual.getEnvelope();
@@ -121,14 +121,14 @@ public class RasterTestBase {
         assertSameValues(expected, actual, 10);
     }
 
-    void assertSameEnvelope(Envelope expected, Envelope actual, double epsilon) {
+    protected void assertSameEnvelope(Envelope expected, Envelope actual, double epsilon) {
         Assert.assertEquals(expected.getMinimum(0), actual.getMinimum(0), epsilon);
         Assert.assertEquals(expected.getMinimum(1), actual.getMinimum(1), epsilon);
         Assert.assertEquals(expected.getMaximum(0), actual.getMaximum(0), epsilon);
         Assert.assertEquals(expected.getMaximum(1), actual.getMaximum(1), epsilon);
     }
 
-    void assertSameValues(GridCoverage2D expected, GridCoverage2D actual, int density) {
+    protected void assertSameValues(GridCoverage2D expected, GridCoverage2D actual, int density) {
         Envelope expectedEnvelope = expected.getEnvelope();
         double x0 = expectedEnvelope.getMinimum(0);
         double y0 = expectedEnvelope.getMinimum(1);

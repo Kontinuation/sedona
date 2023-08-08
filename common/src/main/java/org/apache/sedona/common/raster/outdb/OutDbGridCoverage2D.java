@@ -1,0 +1,459 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.sedona.common.raster.outdb;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
+import org.geotools.coverage.GridSampleDimension;
+import org.geotools.coverage.TypeMap;
+import org.geotools.coverage.grid.GridCoordinates2D;
+import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.coverage.grid.GridEnvelope2D;
+import org.geotools.coverage.grid.GridGeometry2D;
+import org.geotools.coverage.grid.io.AbstractGridFormat;
+import org.geotools.data.DataSourceException;
+import org.geotools.gce.arcgrid.ArcGridFormat;
+import org.geotools.gce.geotiff.GeoTiffFormat;
+import org.geotools.referencing.CRS;
+import org.geotools.referencing.operation.transform.AffineTransform2D;
+import org.geotools.util.factory.Hints;
+import org.opengis.coverage.CannotEvaluateException;
+import org.opengis.geometry.DirectPosition;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
+
+import javax.imageio.stream.ImageInputStream;
+import javax.media.jai.JAI;
+import javax.media.jai.PlanarImage;
+import javax.media.jai.RenderedOp;
+import java.awt.geom.Point2D;
+import java.awt.geom.Rectangle2D;
+import java.awt.image.BandedSampleModel;
+import java.awt.image.RenderedImage;
+import java.awt.image.SampleModel;
+import java.awt.image.renderable.ParameterBlock;
+import java.io.IOException;
+import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.util.Locale;
+
+/**
+ * A grid coverage referencing raster images stored in cloud storages. The grid coverage may only
+ * reference a sub portion of the whole raster image. This is a common practice to populate multiple
+ * tiles referencing the same raster image.
+ *
+ * <p>The resources held by this class is managed by thread-local {@link OutDbResourcePool} instances.
+ * Please make sure to call {@link #dispose(boolean)} to release the resources when the grid coverage
+ * is no longer needed, and don't pass the grid coverage to other threads.
+ */
+public class OutDbGridCoverage2D extends GridCoverage2D {
+    private final OutDbResourcePool.ResourceKey resourceKey;
+    private OutDbResourcePool.OutDbResource pooledResource;
+    private final int[] bandIndices;
+
+    public OutDbGridCoverage2D(final CharSequence name,
+                               final PlanarImage image,
+                               GridGeometry2D gridGeometry,
+                               final GridSampleDimension[] bands,
+                               int[] bandIndices,
+                               OutDbResourcePool.OutDbResource pooledResource) {
+        super(name, image, gridGeometry, bands, null, null, null);
+        this.resourceKey = pooledResource.resourceKey;
+        this.bandIndices = bandIndices;
+        this.pooledResource = pooledResource;
+    }
+
+    public OutDbGridCoverage2D(final CharSequence name,
+                               GridGeometry2D gridGeometry,
+                               final GridSampleDimension[] bands,
+                               int[] bandIndices,
+                               OutDbResourcePool.ResourceKey resourceKey) {
+        // We use a placeholder image object to make sure that the parent class (GridCoverage2D) can be constructed.
+        // The placeholder image will be replaced by the real image when the pixel data is needed. Please refer to
+        // replacePlaceHolderImage() for more details.
+        super(name, createPlaceHolderImage(gridGeometry, bands, bandIndices), gridGeometry, bands, null, null, null);
+        this.resourceKey = resourceKey;
+        this.pooledResource = null;
+        this.bandIndices = bandIndices;
+    }
+
+    @Override
+    public synchronized boolean dispose(final boolean force) {
+        boolean ret = super.dispose(force);
+        if (ret) {
+            if (pooledResource != null) {
+                OutDbResourcePool pool = ThreadLocalOutDbResourcePool.get();
+                pool.release(pooledResource);
+                pooledResource = null;
+            }
+        }
+        return ret;
+    }
+
+    @Override
+    public boolean isDataEditable() {
+        return false;
+    }
+
+    @Override
+    public Object evaluate(final DirectPosition point) throws CannotEvaluateException {
+        replacePlaceHolderImage();
+        return super.evaluate(point);
+    }
+
+    @Override
+    public int[] evaluate(final Point2D coord, final int[] dest) throws CannotEvaluateException {
+        replacePlaceHolderImage();
+        return super.evaluate(coord, dest);
+    }
+
+    @Override
+    public float[] evaluate(final Point2D coord, final float[] dest)
+            throws CannotEvaluateException {
+        replacePlaceHolderImage();
+        return super.evaluate(coord, dest);
+    }
+
+    @Override
+    public double[] evaluate(final Point2D coord, final double[] dest)
+            throws CannotEvaluateException {
+        replacePlaceHolderImage();
+        return super.evaluate(coord, dest);
+    }
+
+    @Override
+    public int[] evaluate(final GridCoordinates2D coord, final int[] dest) {
+        replacePlaceHolderImage();
+        return super.evaluate(coord, dest);
+    }
+
+    @Override
+    public float[] evaluate(final GridCoordinates2D coord, final float[] dest) {
+        replacePlaceHolderImage();
+        return super.evaluate(coord, dest);
+    }
+
+    @Override
+    public double[] evaluate(final GridCoordinates2D coord, final double[] dest) {
+        replacePlaceHolderImage();
+        return super.evaluate(coord, dest);
+    }
+
+    @Override
+    public synchronized String getDebugString(final DirectPosition coord) {
+        replacePlaceHolderImage();
+        return super.getDebugString(coord);
+    }
+
+    @Override
+    public int[] getOptimalDataBlockSizes() {
+        replacePlaceHolderImage();
+        return super.getOptimalDataBlockSizes();
+    }
+
+    @Override
+    public RenderedImage getRenderedImage() {
+        replacePlaceHolderImage();
+        return super.getRenderedImage();
+    }
+
+    @Override
+    public void prefetch(final Rectangle2D area) {
+        replacePlaceHolderImage();
+        super.prefetch(area);
+    }
+
+    /**
+     * Replace the placeholder image with the actual image. This method is called when the pixel data of the grid
+     * coverage is needed.
+     */
+    private void replacePlaceHolderImage() {
+        if (pooledResource == null) {
+            OutDbResourcePool pool = ThreadLocalOutDbResourcePool.get();
+            OutDbResourcePool.OutDbResource resource = null;
+            try {
+                resource = getOrCreateOutDbResource(pool, resourceKey);
+                PlanarImage planarImage = buildImageForGridGeometry(gridGeometry, getSampleDimensions(), bandIndices, resource.gridCoverage2D);
+
+                // image field is final in GridCoverage2D, so we need to use reflection to set it.
+                final Field field = GridCoverage2D.class.getDeclaredField("image");
+                field.setAccessible(true);
+                field.set(this, planarImage);
+
+                pooledResource = resource;
+            } catch (Exception e) {
+                if (resource != null) {
+                    pool.release(resource);
+                }
+                throw new RuntimeException("Failed to build planar image for out-db grid coverage", e);
+            }
+        }
+    }
+
+    public static class SerializableState implements Serializable {
+        public CharSequence name;
+        public GridGeometry2D gridGeometry;
+        public GridSampleDimension[] bands;
+        public int[] bandIndices;
+        public Path path;
+        public byte[] serializedConf;
+
+        public OutDbGridCoverage2D restore() {
+            return create(name, gridGeometry, bands, bandIndices, path, serializedConf);
+        }
+    }
+
+    public SerializableState getSerializableState() {
+        SerializableState state = new SerializableState();
+        state.name = getName();
+        state.gridGeometry = getGridGeometry();
+        state.bands = getSampleDimensions();
+        state.bandIndices = bandIndices;
+        state.path = resourceKey.path;
+        state.serializedConf = resourceKey.serializedConf;
+        return state;
+    }
+
+    public static OutDbGridCoverage2D create(CharSequence name, GridGeometry2D gridGeometry,
+                                             GridSampleDimension[] bands,
+                                             int[] bandIndices,
+                                             Path path,
+                                             Configuration conf) {
+        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, conf);
+        return create(name, gridGeometry, bands, bandIndices, resourceKey);
+    }
+
+    public static OutDbGridCoverage2D create(CharSequence name, GridGeometry2D gridGeometry,
+                                             GridSampleDimension[] bands,
+                                             int[] bandIndices,
+                                             Path path,
+                                             byte[] serializedConf) {
+        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, serializedConf);
+        return create(name, gridGeometry, bands, bandIndices, resourceKey);
+    }
+
+    public static OutDbGridCoverage2D create(CharSequence name, GridGeometry2D gridGeometry,
+                                             GridSampleDimension[] bands,
+                                             int[] bandIndices,
+                                             OutDbResourcePool.ResourceKey resourceKey) {
+        if (bandIndices == null) {
+            bandIndices = new int[bands.length];
+            for (int i = 0; i < bands.length; i++) {
+                bandIndices[i] = i;
+            }
+        }
+        return new OutDbGridCoverage2D(name, gridGeometry, bands, bandIndices, resourceKey);
+    }
+
+    public static OutDbGridCoverage2D create(CharSequence name, Path path, Configuration conf) throws IOException {
+        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, conf);
+        return create(name, resourceKey);
+    }
+
+    public static OutDbGridCoverage2D create(CharSequence name, Path path, byte[] serializedConf) throws IOException {
+        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, serializedConf);
+        return create(name, resourceKey);
+    }
+
+    public static OutDbGridCoverage2D create(CharSequence name, OutDbResourcePool.ResourceKey resourceKey) throws IOException {
+        OutDbResourcePool pool = ThreadLocalOutDbResourcePool.get();
+        OutDbResourcePool.OutDbResource resource = getOrCreateOutDbResource(pool, resourceKey);
+        GridCoverage2D sourceGrid = resource.gridCoverage2D;
+        try {
+            int[] bandIndices = new int[sourceGrid.getNumSampleDimensions()];
+            for (int i = 0; i < bandIndices.length; i++) {
+                bandIndices[i] = i;
+            }
+            PlanarImage planarImage = PlanarImage.wrapRenderedImage(sourceGrid.getRenderedImage());
+            return new OutDbGridCoverage2D(name, planarImage, sourceGrid.getGridGeometry(), sourceGrid.getSampleDimensions(), bandIndices, resource);
+        } catch (Exception e) {
+            pool.release(resource);
+            throw new DataSourceException("Failed to create out-db grid coverage", e);
+        }
+    }
+
+    private static OutDbResourcePool.OutDbResource getOrCreateOutDbResource(OutDbResourcePool pool,
+                                                                            OutDbResourcePool.ResourceKey key)
+            throws IOException {
+        OutDbResourcePool.OutDbResource resource = pool.acquire(key);
+        if (resource == null) {
+            AbstractGridFormat format = getFileFormat(key.path);
+            ImageInputStream stream = HadoopImageInputStreamFactory.create(key.path, key.getConf());
+            try {
+                GridCoverage2D sourceGrid = readGridCoverage(format, stream);
+                resource = new OutDbResourcePool.OutDbResource(key, sourceGrid, stream);
+            } catch (Exception e) {
+                stream.close();
+                throw new DataSourceException("Failed to create out-db grid coverage", e);
+            }
+        }
+        return resource;
+    }
+
+    private static PlanarImage buildImageForGridGeometry(GridGeometry2D gridGeometry,
+                                                         GridSampleDimension[] bands,
+                                                         int[] bandIndices,
+                                                         GridCoverage2D sourceGrid) throws IOException {
+        // Construct planar image from parameters. This planar image may contain bands read from
+        // different streams, and it could be a sub image of the original image streams.
+        if (bandIndices.length != bands.length) {
+            throw new DataSourceException("Number of band numbers and bands do not match.");
+        }
+
+        // Validate the geo-referencing information of source grid, and resolve the sub portion needed
+        // by this grid coverage.
+        GridGeometry2D sourceGridGeometry = sourceGrid.getGridGeometry();
+        RenderedImage image = sourceGrid.getRenderedImage();
+        GridCoordinates2D offset = calculateImageOffset(sourceGridGeometry, gridGeometry);
+
+        // Crop a sub portion of the image and translate it to the origin of the grid geometry
+        int offsetX = offset.x;
+        int offsetY = offset.y;
+        GridEnvelope2D gridRange = gridGeometry.getGridRange2D();
+        GridCoordinates2D bound = gridRange.getHigh();
+        int width = bound.x + 1;
+        int height = bound.y + 1;
+        RenderedOp croppedImage = cropAndTranslateImage(image, offsetX, offsetY, width, height);
+
+        // Select a subset of bands from the source grid
+        for (int i = 0; i < bands.length; i++) {
+            int bandIndex = bandIndices[i];
+            GridSampleDimension sampleDimension = sourceGrid.getSampleDimension(bandIndex);
+            if (!sampleDimension.getSampleDimensionType().equals(bands[i].getSampleDimensionType())) {
+                throw new DataSourceException("Sample dimension type does not match.");
+            }
+        }
+        return selectBands(croppedImage, bandIndices);
+    }
+
+    private static PlanarImage createPlaceHolderImage(GridGeometry2D gridGeometry,
+                                                      GridSampleDimension[] bands,
+                                                      int[] bandIndices) {
+        int numBand = bandIndices.length;
+        if (numBand == 0) {
+            throw new IllegalArgumentException("Number of bands must be positive");
+        }
+        int widthInPixel = gridGeometry.getGridRange2D().width;
+        int heightInPixel = gridGeometry.getGridRange2D().height;
+
+        GridSampleDimension band = bands[bandIndices[0]];
+
+        // It doesn't matter what sample model we are using here, as long as it gives us the correct values for
+        // the number of bands then we'll make the constructor of GridCoverage2D happy.
+        int dataType = TypeMap.getDataBufferType(band.getSampleDimensionType());
+        SampleModel sampleModel = new BandedSampleModel(dataType, widthInPixel, heightInPixel, numBand);
+        final RenderedImage image = new OutDbPlaceHolderImage(widthInPixel, heightInPixel, sampleModel, null);
+        return PlanarImage.wrapRenderedImage(image);
+    }
+
+    private static AbstractGridFormat getFileFormat(Path path) {
+        String fileName = path.getName().toUpperCase(Locale.ROOT);
+        AbstractGridFormat format;
+        if (fileName.endsWith(".TIFF") || fileName.endsWith(".TIF")) {
+            format = new GeoTiffFormat();
+        } else if (fileName.endsWith(".ASC")) {
+            format = new ArcGridFormat();
+        } else {
+            // If we cannot infer the file type, we assume that it is GeoTIFF.
+            format = new GeoTiffFormat();
+        }
+        return format;
+    }
+
+    private static GridCoverage2D readGridCoverage(AbstractGridFormat format, ImageInputStream stream) throws IOException {
+        Hints hints = new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE);
+        return format.getReader(stream, hints).read(null);
+    }
+
+    /**
+     * Calculate the grid coordinate of the origin of gridGeom1 in gridGeom0.
+     * It also checks if the grid geometries of two grid coverages align with each other, and throw exception if they do
+     * not match.
+     *
+     * @param gridGeom0 grid geometry to match
+     * @param gridGeom1 another grid geometry to match
+     * @return the grid coordinate of the origin of gridGeom1 in gridGeom0
+     */
+    private static GridCoordinates2D calculateImageOffset(GridGeometry2D gridGeom0, GridGeometry2D gridGeom1) {
+        CoordinateReferenceSystem crs0 = gridGeom0.getCoordinateReferenceSystem();
+        CoordinateReferenceSystem crs1 = gridGeom1.getCoordinateReferenceSystem();
+        AffineTransform2D transform0 = (AffineTransform2D) gridGeom0.getGridToCRS2D();
+        AffineTransform2D transform1 = (AffineTransform2D) gridGeom1.getGridToCRS2D();
+
+        // CRS should match
+        if (!CRS.equalsIgnoreMetadata(crs0, crs1)) {
+            throw new IllegalStateException("The grid coverages have different CRS");
+        }
+
+        // Scale must match. Please note that PostGIS allows the scales to have the different sign, but the same
+        // absolute value. We do not support this case.
+        if (DBL_NEQ(transform0.getScaleX(), transform1.getScaleX())) {
+            throw new IllegalStateException("The grid coverages have different scales on the X axis");
+        }
+        if (DBL_NEQ(transform0.getScaleY(), transform1.getScaleY())) {
+            throw new IllegalStateException("The grid coverages have different scales on the Y axis");
+        }
+
+        // Skew must match
+        if (DBL_NEQ(transform0.getShearX(), transform1.getShearX())) {
+            throw new IllegalStateException("The grid coverages have different shears on the X axis");
+        }
+        if (DBL_NEQ(transform0.getShearY(), transform1.getShearY())) {
+            throw new IllegalStateException("The grid coverages have different shears on the Y axis");
+        }
+
+        // Calculate the grid coordinate offset of the two grid geometries
+        double x0 = transform0.getTranslateX();
+        double y0 = transform0.getTranslateY();
+        double x1 = transform1.getTranslateX();
+        double y1 = transform1.getTranslateY();
+        double scaleX = transform0.getScaleX();
+        double scaleY = transform1.getScaleY();
+        double gridOffsetX = (x1 - x0) / scaleX;
+        double gridOffsetY = (y1 - y0) / scaleY;
+        return new GridCoordinates2D((int) Math.round(gridOffsetX), (int) Math.round(gridOffsetY));
+    }
+
+    private static RenderedOp cropAndTranslateImage(RenderedImage image, int offsetX, int offsetY, int width, int height) {
+        ParameterBlock cropParams = new ParameterBlock();
+        cropParams.addSource(image);
+        cropParams.add((float) offsetX);
+        cropParams.add((float) offsetY);
+        cropParams.add((float) width);
+        cropParams.add((float) height);
+        RenderedOp croppedImage = JAI.create("crop", cropParams);
+
+        ParameterBlock translateParams = new ParameterBlock();
+        translateParams.addSource(croppedImage);
+        translateParams.add((float) -offsetX);
+        translateParams.add((float) -offsetY);
+        return JAI.create("translate", translateParams);
+    }
+
+    private static RenderedOp selectBands(RenderedOp croppedImage, int[] bandIndices) {
+        ParameterBlock bandSelectParams = new ParameterBlock();
+        bandSelectParams.addSource(croppedImage);
+        bandSelectParams.add(bandIndices);
+        return JAI.create("bandSelect", bandSelectParams);
+    }
+
+    private static boolean DBL_NEQ(double a, double b) {
+        return a != b && Math.abs(a - b) > Double.MIN_NORMAL;
+    }
+}
