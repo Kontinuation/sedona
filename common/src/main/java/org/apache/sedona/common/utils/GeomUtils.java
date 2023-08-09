@@ -13,6 +13,8 @@
  */
 package org.apache.sedona.common.utils;
 
+import org.geotools.geometry.jts.JTS;
+import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.impl.CoordinateArraySequence;
 import org.locationtech.jts.io.ByteOrderValues;
@@ -25,6 +27,10 @@ import org.locationtech.jts.algorithm.distance.DiscreteFrechetDistance;
 import org.locationtech.jts.algorithm.distance.DiscreteHausdorffDistance;
 import org.locationtech.spatial4j.context.jts.JtsSpatialContext;
 import org.locationtech.spatial4j.shape.jts.JtsGeometry;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.MathTransform;
+import org.opengis.referencing.operation.TransformException;
 
 import java.nio.ByteOrder;
 import java.util.*;
@@ -242,6 +248,11 @@ public class GeomUtils {
             outputGeom.setSRID(srid);
         }
         return outputGeom;
+    }
+
+    public static Geometry transform(Geometry geometry, CoordinateReferenceSystem sourceCRS, CoordinateReferenceSystem targetCRS, boolean lenient) throws FactoryException, TransformException {
+        MathTransform transform = CRS.findMathTransform(sourceCRS, targetCRS, lenient);
+        return JTS.transform(geometry, transform);
     }
 
     public static int getDimension(Geometry geometry) {
