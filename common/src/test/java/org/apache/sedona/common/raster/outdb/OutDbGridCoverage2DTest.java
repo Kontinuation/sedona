@@ -78,6 +78,15 @@ public class OutDbGridCoverage2DTest extends RasterTestBase {
         }
     }
 
+    @Test
+    public void testHugeGeoTiff() throws IOException {
+        String path = resourceFolder + "/raster_huge/huge.tif";
+        GeoTiffReader reader = new GeoTiffReader(new File(path));
+        GridCoverage2D gridCoverage2D = reader.read(null);
+        GridCoverage2D outDbGridCoverage2D = OutDbGridCoverage2D.create("test", new Path(path), conf);
+        assertSameCoverage(gridCoverage2D, outDbGridCoverage2D, 1);
+    }
+
     private void testUsingGeoTiffFile(String path) throws IOException {
         // Construct a GridCoverage2D object from the GeoTiff file
         GeoTiffReader reader = new GeoTiffReader(new File(path));

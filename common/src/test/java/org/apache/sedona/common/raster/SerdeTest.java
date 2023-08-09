@@ -70,14 +70,26 @@ public class SerdeTest extends RasterTestBase {
         }
     }
 
+    @Test
+    public void testHugeOutDbRaster() throws IOException, ClassNotFoundException {
+        String path = resourceFolder + "/raster_huge/huge.tif";
+        GridCoverage2D raster = OutDbGridCoverage2D.create("test", new Path(path), new Configuration());
+        GridCoverage2D roundTripRaster = testRoundTrip(raster, 1);
+        Assert.assertTrue(roundTripRaster instanceof OutDbGridCoverage2D);
+    }
+
     private GridCoverage2D testRoundTrip(GridCoverage2D raster) throws IOException, ClassNotFoundException {
+        return testRoundTrip(raster, 10);
+    }
+
+    private GridCoverage2D testRoundTrip(GridCoverage2D raster, int density) throws IOException, ClassNotFoundException {
         byte[] bytes = Serde.serialize(raster);
         GridCoverage2D roundTripRaster = Serde.deserialize(bytes);
         assertNotNull(roundTripRaster);
-        assertSameCoverage(raster, roundTripRaster);
+        assertSameCoverage(raster, roundTripRaster, density);
         bytes = Serde.serialize(roundTripRaster);
         roundTripRaster = Serde.deserialize(bytes);
-        assertSameCoverage(raster, roundTripRaster);
+        assertSameCoverage(raster, roundTripRaster, density);
         return roundTripRaster;
     }
 

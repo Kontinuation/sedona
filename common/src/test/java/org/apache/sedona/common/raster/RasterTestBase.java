@@ -113,6 +113,10 @@ public class RasterTestBase {
     }
 
     protected void assertSameCoverage(GridCoverage2D expected, GridCoverage2D actual) {
+        assertSameCoverage(expected, actual, 10);
+    }
+
+    protected void assertSameCoverage(GridCoverage2D expected, GridCoverage2D actual, int density) {
         Assert.assertEquals(expected.getNumSampleDimensions(), actual.getNumSampleDimensions());
         Envelope expectedEnvelope = expected.getEnvelope();
         Envelope actualEnvelope = actual.getEnvelope();
@@ -120,7 +124,7 @@ public class RasterTestBase {
         CoordinateReferenceSystem expectedCrs = expected.getCoordinateReferenceSystem();
         CoordinateReferenceSystem actualCrs = actual.getCoordinateReferenceSystem();
         Assert.assertTrue(CRS.equalsIgnoreMetadata(expectedCrs, actualCrs));
-        assertSameValues(expected, actual, 10);
+        assertSameValues(expected, actual, density);
     }
 
     protected void assertSameEnvelope(Envelope expected, Envelope actual, double epsilon) {

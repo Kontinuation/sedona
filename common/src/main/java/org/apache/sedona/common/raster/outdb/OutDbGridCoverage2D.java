@@ -44,9 +44,7 @@ import javax.media.jai.PlanarImage;
 import javax.media.jai.RenderedOp;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
-import java.awt.image.BandedSampleModel;
 import java.awt.image.RenderedImage;
-import java.awt.image.SampleModel;
 import java.awt.image.renderable.ParameterBlock;
 import java.io.IOException;
 import java.io.Serializable;
@@ -354,11 +352,8 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
 
         GridSampleDimension band = bands[bandIndices[0]];
 
-        // It doesn't matter what sample model we are using here, as long as it gives us the correct values for
-        // the number of bands then we'll make the constructor of GridCoverage2D happy.
         int dataType = TypeMap.getDataBufferType(band.getSampleDimensionType());
-        SampleModel sampleModel = new BandedSampleModel(dataType, widthInPixel, heightInPixel, numBand);
-        final RenderedImage image = new OutDbPlaceHolderImage(widthInPixel, heightInPixel, sampleModel, null);
+        final RenderedImage image = new OutDbPlaceHolderImage(widthInPixel, heightInPixel, numBand, dataType);
         return PlanarImage.wrapRenderedImage(image);
     }
 

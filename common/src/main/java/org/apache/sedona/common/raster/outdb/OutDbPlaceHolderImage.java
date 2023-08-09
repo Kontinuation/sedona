@@ -19,6 +19,7 @@
 package org.apache.sedona.common.raster.outdb;
 
 import java.awt.*;
+import java.awt.image.BandedSampleModel;
 import java.awt.image.ColorModel;
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
@@ -41,14 +42,28 @@ import java.util.Vector;
 public class OutDbPlaceHolderImage implements RenderedImage {
     private final int width;
     private final int height;
+    private final int tileWidth;
+    private final int tileHeight;
+    private final int numXTiles;
+    private final int numYTiles;
     private final SampleModel sampleModel;
     private final ColorModel colorModel;
 
-    public OutDbPlaceHolderImage(int width, int height, SampleModel sampleModel, ColorModel colorModel) {
+    public OutDbPlaceHolderImage(int width, int height, int numBand, int dataType) {
         this.width = width;
         this.height = height;
-        this.sampleModel = sampleModel;
-        this.colorModel = colorModel;
+
+        // The placeholder image is tiled. We have to make sure that the tile size is small, otherwise
+        // there will be an exception when constructing the sample model object.
+        this.tileWidth = Math.min(256, width);
+        this.tileHeight = Math.min(256, height);
+        this.numXTiles = (width + tileWidth - 1) / tileWidth;
+        this.numYTiles = (height + tileHeight - 1) / tileHeight;
+
+        // It doesn't matter what sample model we are using here, as long as it gives us the correct values for
+        // the number of bands then we'll make the constructor of GridCoverage2D happy.
+        this.sampleModel = new BandedSampleModel(dataType, this.tileWidth, this.tileHeight, numBand);
+        this.colorModel = null;
     }
 
     @Override
@@ -98,12 +113,12 @@ public class OutDbPlaceHolderImage implements RenderedImage {
 
     @Override
     public int getNumXTiles() {
-        return 1;
+        return numXTiles;
     }
 
     @Override
     public int getNumYTiles() {
-        return 1;
+        return numYTiles;
     }
 
     @Override
@@ -118,12 +133,12 @@ public class OutDbPlaceHolderImage implements RenderedImage {
 
     @Override
     public int getTileWidth() {
-        return width;
+        return tileWidth;
     }
 
     @Override
     public int getTileHeight() {
-        return height;
+        return tileHeight;
     }
 
     @Override
