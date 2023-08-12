@@ -84,6 +84,18 @@ case class RS_BandPath(inputExpressions: Seq[Expression]) extends InferredExpres
   }
 }
 
+case class RS_SkewX(inputExpressions: Seq[Expression]) extends InferredExpression(RasterAccessors.getSkewX _) {
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
+case class RS_SkewY(inputExpressions: Seq[Expression]) extends InferredExpression(RasterAccessors.getSkewY _) {
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
 case class RS_RasterToWorldCoordX(inputExpressions: Seq[Expression]) extends InferredExpression(RasterAccessors.getWorldCoordX _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
