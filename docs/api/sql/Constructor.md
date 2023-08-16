@@ -5,7 +5,7 @@ Since: `v1.0.0`
 
 SparkSQL example:
 
-```Scala
+```scala
 var spatialRDD = new SpatialRDD[Geometry]
 spatialRDD.rawSpatialRDD = ShapefileReader.readToGeometryRDD(sparkSession.sparkContext, shapefileInputLocation)
 var rawSpatialDf = Adapter.toDf(spatialRDD,sparkSession)
@@ -19,27 +19,27 @@ spatialDf.printSchema()
 ```
 
 !!!note
-The file extensions of .shp, .shx, .dbf must be in lowercase. Assume you have a shape file called ==myShapefile==, the file structure should be like this:
-```
-- shapefile1
-- shapefile2
-- myshapefile
-- myshapefile.shp
-- myshapefile.shx
-- myshapefile.dbf
-- myshapefile...
-- ...
-```
+	The path to the shapefile is the path to the folder that contains the .shp file, not the path to the .shp file itself. The file extensions of .shp, .shx, .dbf must be in lowercase. Assume you have a shape file called ==myShapefile==, the path should be `XXX/myShapefile`. The file structure should be like this:
+	```
+	- shapefile1
+	- shapefile2
+	- myshapefile
+		- myshapefile.shp
+		- myshapefile.shx
+		- myshapefile.dbf
+		- myshapefile...
+	- ...
+	```
 
 !!!warning
-Please make sure you use ==ST_GeomFromWKT== to create Geometry type column otherwise that column cannot be used in SedonaSQL.
+	Please make sure you use ==ST_GeomFromWKT== to create Geometry type column otherwise that column cannot be used in SedonaSQL.
 
 If the file you are reading contains non-ASCII characters you'll need to explicitly set the encoding
 via `sedona.global.charset` system property before the call to `ShapefileReader.readToGeometryRDD`.
 
 Example:
 
-```Scala
+```scala
 System.setProperty("sedona.global.charset", "utf8")
 ```
 

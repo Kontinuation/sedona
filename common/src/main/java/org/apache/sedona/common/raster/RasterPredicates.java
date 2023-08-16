@@ -85,15 +85,8 @@ public class RasterPredicates {
         }
 
         // Both raster and query window have a defined CRS
-        Set<ReferenceIdentifier> crsIds = rasterCRS.getIdentifiers();
-        String rasterCRSCode = null;
         String queryWindowCRSCode = "EPSG:" + queryWindowSRID;
-        if (!crsIds.isEmpty()) {
-            ReferenceIdentifier crsId = crsIds.iterator().next();
-            rasterCRSCode = crsId.getCodeSpace() + ":" + crsId.getCode();
-        }
-
-        if (rasterCRSCode != null && rasterCRSCode.equals(queryWindowCRSCode)) {
+        if (isCRSMatchesEPSGCode(rasterCRS, queryWindowCRSCode)) {
             // The CRS of the query window has the same EPSG code as the raster, so we don't need to
             // transform it.
             // Please note that even though the EPSG code is the same, the CRS may not be the same.
@@ -106,7 +99,7 @@ public class RasterPredicates {
         // CRS of the query window. We'll transform both sides to a common CRS (WGS84) before
         // testing for relationship.
         try {
-            CoordinateReferenceSystem queryWindowCRS = CRS.decode(queryWindowCRSCode);
+            CoordinateReferenceSystem queryWindowCRS = CRS.decode(queryWindowCRSCode, true);
             MathTransform transform = CRS.findMathTransform(queryWindowCRS,
                 DefaultGeographicCRS.WGS84, true);
             queryWindow = JTS.transform(queryWindow, transform);
@@ -130,5 +123,24 @@ public class RasterPredicates {
         }
 
         return Pair.of(rasterGeometry, queryWindow);
+    }
+
+    private static boolean isCRSMatchesEPSGCode(CoordinateReferenceSystem crs, String epsgCode) {
+        CRS.AxisOrder axisOrder = CRS.getAxisOrder(crs);
+        if (axisOrder == CRS.AxisOrder.NORTH_EAST) {
+            // SRID of geometries will always be decoded as CRS in lon/lat axis order. For projected CRS, the
+            // axis order should be east/north. If the crs is for Antarctic or Arctic, the axis order may be
+            // INAPPLICABLE. In this case, we'll assume that the axis order would match with the query window if
+            // they have the same EPSG code.
+            return false;
+        }
+
+        Set<ReferenceIdentifier> crsIds = crs.getIdentifiers();
+        if (crsIds.isEmpty()) {
+            return false;
+        }
+        ReferenceIdentifier crsId = crsIds.iterator().next();
+        String code = crsId.getCodeSpace() + ":" + crsId.getCode();
+        return code.equals(epsgCode);
     }
 }
