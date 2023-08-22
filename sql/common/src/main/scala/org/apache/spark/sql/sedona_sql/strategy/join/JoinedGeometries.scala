@@ -29,6 +29,13 @@ import org.opengis.geometry.BoundingBox
 import org.opengis.referencing.crs.{CoordinateReferenceSystem, GeographicCRS}
 
 object JoinedGeometries {
+  /**
+   * Convert the given geometry to an envelope expanded by distance.
+   * @param geom the geometry to expand
+   * @param distance the distance to expand
+   * @param isGeography whether the geometry is on a sphere
+   * @return the expanded envelope
+   */
   def geometryToExpandedEnvelope(geom: Geometry, distance: Double, isGeography: Boolean): Geometry = {
     val envelope = geom.getEnvelopeInternal.copy()
     // Here we use the polar radius of the spheroid as the radius of the sphere, so that the expanded
@@ -61,6 +68,11 @@ object JoinedGeometries {
     }
   }
 
+  /**
+   * Convert the given raster to an envelope in WGS84 CRS.
+   * @param raster the raster to convert
+   * @return the envelope in WGS84 CRS
+   */
   def rasterToWGS84Envelope(raster: GridCoverage2D): Geometry = {
     val crs = raster.getCoordinateReferenceSystem
     val envelope = raster.getEnvelope2D
@@ -71,6 +83,11 @@ object JoinedGeometries {
     }
   }
 
+  /**
+   * Convert the given geometry to an envelope in WGS84 CRS.
+   * @param geom the geometry to convert
+   * @return the envelope in WGS84 CRS
+   */
   def geometryToWGS84Envelope(geom: Geometry): Geometry = {
     val srid = geom.getSRID
     if (srid <= 0 || srid == 4326) {
@@ -84,6 +101,9 @@ object JoinedGeometries {
   }
 
   private def transformToWGS84Envelope(envelope: org.opengis.geometry.Envelope, crs: CoordinateReferenceSystem): Geometry = {
+    // We use CRS.transform for envelopes to transform envelopes between different CRSs. This transformation function
+    // could handle envelope crossing the anti-meridian and envelope near or covering poles correctly. We won't have
+    // these cases properly handled if we transform the original geometries using JTS.transform.
     val transform = CRS.findMathTransform(crs, DefaultGeographicCRS.WGS84)
     val transformedEnvelope = CRS.transform(transform, envelope)
     val minX = transformedEnvelope.getMinimum(0)
