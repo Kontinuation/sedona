@@ -119,21 +119,7 @@ abstract class InferredExpression(fSeq: InferrableFunction *)
     }
   }
 
-  private def buildSerializer(): Any => Any = {
-    if (dataType.acceptsType(RasterUDT)) {
-      // If the return type is a raster, we need to dispose it after serialization
-      output => {
-        val raster = output.asInstanceOf[GridCoverage2D]
-        if (raster == null) null else {
-          val serialized = raster.serialize
-          raster.dispose(true)
-          serialized
-        }
-      }
-    } else {
-      f.serializer
-    }
-  }
+  private def buildSerializer(): Any => Any = f.serializer
 
   override def eval(input: InternalRow): Any = serializer(evaluator(input))
   override def evalWithoutSerialization(input: InternalRow): Any = evaluator(input)
@@ -148,6 +134,8 @@ object InferrableType {
     new InferrableType[Geometry] {}
   implicit val gridCoverage2DInstance: InferrableType[GridCoverage2D] =
     new InferrableType[GridCoverage2D] {}
+  implicit val gridCoverage2DArrayInstance: InferrableType[Array[GridCoverage2D]] =
+    new InferrableType[Array[GridCoverage2D]] {}
   implicit val geometryArrayInstance: InferrableType[Array[Geometry]] =
     new InferrableType[Array[Geometry]] {}
   implicit val javaDoubleInstance: InferrableType[java.lang.Double] =
@@ -170,6 +158,8 @@ object InferrableType {
     new InferrableType[String] {}
   implicit val binaryInstance: InferrableType[Array[Byte]] =
     new InferrableType[Array[Byte]] {}
+  implicit val intArrayInstance: InferrableType[Array[Int]] =
+    new InferrableType[Array[Int]] {}
   implicit val longArrayInstance: InferrableType[Array[Long]] =
     new InferrableType[Array[Long]] {}
   implicit val javaLongArrayInstance: InferrableType[Array[java.lang.Long]] =
@@ -192,6 +182,11 @@ object InferredTypes {
       expr => input => expr.asString(input)
     } else if (t =:= typeOf[Array[Long]]) {
       expr => input => expr.eval(input).asInstanceOf[ArrayData].toLongArray()
+    } else if (t =:= typeOf[Array[Int]]) {
+      expr => input => expr.eval(input).asInstanceOf[ArrayData] match {
+        case null => null
+        case arrayData: ArrayData => arrayData.toIntArray()
+      }
     } else {
       expr => input => expr.eval(input)
     }
@@ -208,7 +203,10 @@ object InferredTypes {
     } else if (t =:= typeOf[GridCoverage2D]) {
       output => {
         if (output != null) {
-          output.asInstanceOf[GridCoverage2D].serialize
+          val raster = output.asInstanceOf[GridCoverage2D]
+          val serialized = raster.serialize
+          raster.dispose(true)
+          serialized
         } else {
           null
         }
@@ -234,6 +232,19 @@ object InferredTypes {
         } else {
           null
         }
+    } else if (t =:= typeOf[Array[GridCoverage2D]]) {
+      output =>
+        if (output != null) {
+          val rasters = output.asInstanceOf[Array[GridCoverage2D]]
+          val serialized = rasters.map { raster =>
+            val serialized = raster.serialize
+            raster.dispose(true)
+            serialized
+          }
+          ArrayData.toArrayData(serialized)
+        } else {
+          null
+        }
     } else if (t =:= typeOf[Option[Boolean]]) {
       output =>
         if (output != null) {
@@ -253,6 +264,8 @@ object InferredTypes {
       DataTypes.createArrayType(GeometryUDT)
     } else if (t =:= typeOf[GridCoverage2D]) {
       RasterUDT
+    } else if (t =:= typeOf[Array[GridCoverage2D]]) {
+      DataTypes.createArrayType(RasterUDT)
     } else if (t =:= typeOf[java.lang.Double]) {
       DoubleType
     } else if (t =:= typeOf[java.lang.Integer]) {
@@ -271,6 +284,8 @@ object InferredTypes {
       DataTypes.createArrayType(LongType)
     } else if (t =:= typeOf[Array[Double]]) {
       DataTypes.createArrayType(DoubleType)
+    } else if (t =:= typeOf[Array[Int]]) {
+      DataTypes.createArrayType(IntegerType)
     } else if (t =:= typeOf[Option[Boolean]]) {
       BooleanType
     } else if (t =:= typeOf[Boolean]) {

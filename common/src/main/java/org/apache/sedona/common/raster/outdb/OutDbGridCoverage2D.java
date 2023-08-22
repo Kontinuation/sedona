@@ -21,6 +21,7 @@ package org.apache.sedona.common.raster.outdb;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
+import org.apache.sedona.common.utils.ImageUtils;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.TypeMap;
 import org.geotools.coverage.grid.GridCoordinates2D;
@@ -39,13 +40,10 @@ import org.opengis.geometry.DirectPosition;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import javax.imageio.stream.ImageInputStream;
-import javax.media.jai.JAI;
 import javax.media.jai.PlanarImage;
-import javax.media.jai.RenderedOp;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.RenderedImage;
-import java.awt.image.renderable.ParameterBlock;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
@@ -79,13 +77,14 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
 
     public OutDbGridCoverage2D(final CharSequence name,
                                GridGeometry2D gridGeometry,
+                               int dataType,
                                final GridSampleDimension[] bands,
                                int[] bandIndices,
                                OutDbResourcePool.ResourceKey resourceKey) {
         // We use a placeholder image object to make sure that the parent class (GridCoverage2D) can be constructed.
         // The placeholder image will be replaced by the real image when the pixel data is needed. Please refer to
         // replacePlaceHolderImage() for more details.
-        super(name, createPlaceHolderImage(gridGeometry, bands, bandIndices), gridGeometry, bands, null, null, null);
+        super(name, createPlaceHolderImage(gridGeometry, dataType, bands, bandIndices), gridGeometry, bands, null, null, null);
         this.resourceKey = resourceKey;
         this.pooledResource = null;
         this.bandIndices = bandIndices;
@@ -228,25 +227,20 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         return state;
     }
 
+    /**
+     * Create an out-db grid coverage from resource key
+     * @param name name of the grid coverage
+     * @param gridGeometry grid geometry
+     * @param dataType data type of raster data buffer, e.g. DataBuffer.TYPE_FLOAT. can be -1 to infer data type from
+     *                 bands (this is not always accurate). Currently, this parameter is used by havasu to construct
+     *                 out-db grid coverages from its internal raster objects.
+     * @param bands sample dimensions
+     * @param bandIndices indices of bands to be used
+     * @param resourceKey resource key
+     * @return out-db grid coverage
+     */
     public static OutDbGridCoverage2D create(CharSequence name, GridGeometry2D gridGeometry,
-                                             GridSampleDimension[] bands,
-                                             int[] bandIndices,
-                                             Path path,
-                                             Configuration conf) {
-        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, conf);
-        return create(name, gridGeometry, bands, bandIndices, resourceKey);
-    }
-
-    public static OutDbGridCoverage2D create(CharSequence name, GridGeometry2D gridGeometry,
-                                             GridSampleDimension[] bands,
-                                             int[] bandIndices,
-                                             Path path,
-                                             byte[] serializedConf) {
-        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, serializedConf);
-        return create(name, gridGeometry, bands, bandIndices, resourceKey);
-    }
-
-    public static OutDbGridCoverage2D create(CharSequence name, GridGeometry2D gridGeometry,
+                                             int dataType,
                                              GridSampleDimension[] bands,
                                              int[] bandIndices,
                                              OutDbResourcePool.ResourceKey resourceKey) {
@@ -256,7 +250,25 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
                 bandIndices[i] = i;
             }
         }
-        return new OutDbGridCoverage2D(name, gridGeometry, bands, bandIndices, resourceKey);
+        return new OutDbGridCoverage2D(name, gridGeometry, dataType, bands, bandIndices, resourceKey);
+    }
+
+    public static OutDbGridCoverage2D create(CharSequence name, GridGeometry2D gridGeometry,
+                                             GridSampleDimension[] bands,
+                                             int[] bandIndices,
+                                             Path path,
+                                             Configuration conf) {
+        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, conf);
+        return create(name, gridGeometry, -1, bands, bandIndices, resourceKey);
+    }
+
+    public static OutDbGridCoverage2D create(CharSequence name, GridGeometry2D gridGeometry,
+                                             GridSampleDimension[] bands,
+                                             int[] bandIndices,
+                                             Path path,
+                                             byte[] serializedConf) {
+        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, serializedConf);
+        return create(name, gridGeometry, -1, bands, bandIndices, resourceKey);
     }
 
     public static OutDbGridCoverage2D create(CharSequence name, Path path, Configuration conf) throws IOException {
@@ -296,6 +308,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
             try {
                 GridCoverage2D sourceGrid = readGridCoverage(format, stream);
                 resource = new OutDbResourcePool.OutDbResource(key, sourceGrid, stream);
+                pool.add(resource);
             } catch (Exception e) {
                 stream.close();
                 throw new DataSourceException("Failed to create out-db grid coverage", e);
@@ -327,7 +340,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         GridCoordinates2D bound = gridRange.getHigh();
         int width = bound.x + 1;
         int height = bound.y + 1;
-        RenderedOp croppedImage = cropAndTranslateImage(image, offsetX, offsetY, width, height);
+        RenderedImage croppedImage = ImageUtils.cropAndTranslateImage(image, offsetX, offsetY, width, height);
 
         // Select a subset of bands from the source grid
         for (int i = 0; i < bands.length; i++) {
@@ -337,10 +350,11 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
                 throw new DataSourceException("Sample dimension type does not match.");
             }
         }
-        return selectBands(croppedImage, bandIndices);
+        return PlanarImage.wrapRenderedImage(ImageUtils.selectBands(croppedImage, bandIndices));
     }
 
     private static PlanarImage createPlaceHolderImage(GridGeometry2D gridGeometry,
+                                                      int dataType,
                                                       GridSampleDimension[] bands,
                                                       int[] bandIndices) {
         int numBand = bandIndices.length;
@@ -352,7 +366,9 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
 
         GridSampleDimension band = bands[bandIndices[0]];
 
-        int dataType = TypeMap.getDataBufferType(band.getSampleDimensionType());
+        if (dataType < 0) {
+            dataType = TypeMap.getDataBufferType(band.getSampleDimensionType());
+        }
         final RenderedImage image = new OutDbPlaceHolderImage(widthInPixel, heightInPixel, numBand, dataType);
         return PlanarImage.wrapRenderedImage(image);
     }
@@ -423,29 +439,6 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         double gridOffsetX = (x1 - x0) / scaleX;
         double gridOffsetY = (y1 - y0) / scaleY;
         return new GridCoordinates2D((int) Math.round(gridOffsetX), (int) Math.round(gridOffsetY));
-    }
-
-    private static RenderedOp cropAndTranslateImage(RenderedImage image, int offsetX, int offsetY, int width, int height) {
-        ParameterBlock cropParams = new ParameterBlock();
-        cropParams.addSource(image);
-        cropParams.add((float) offsetX);
-        cropParams.add((float) offsetY);
-        cropParams.add((float) width);
-        cropParams.add((float) height);
-        RenderedOp croppedImage = JAI.create("crop", cropParams);
-
-        ParameterBlock translateParams = new ParameterBlock();
-        translateParams.addSource(croppedImage);
-        translateParams.add((float) -offsetX);
-        translateParams.add((float) -offsetY);
-        return JAI.create("translate", translateParams);
-    }
-
-    private static RenderedOp selectBands(RenderedOp croppedImage, int[] bandIndices) {
-        ParameterBlock bandSelectParams = new ParameterBlock();
-        bandSelectParams.addSource(croppedImage);
-        bandSelectParams.add(bandIndices);
-        return JAI.create("bandSelect", bandSelectParams);
     }
 
     private static boolean DBL_NEQ(double a, double b) {

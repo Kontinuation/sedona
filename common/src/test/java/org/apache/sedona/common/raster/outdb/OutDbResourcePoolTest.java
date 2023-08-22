@@ -65,6 +65,52 @@ public class OutDbResourcePoolTest {
     }
 
     @Test
+    public void testAddingAndReleasingResource() {
+        OutDbResourcePool pool = new OutDbResourcePool(3);
+        pool.verifyIntegrity();
+        OutDbResourcePool.OutDbResource resource = pool.acquire(resourceKey("/path/1", "val1"));
+        Assert.assertNull(resource);
+
+        OutDbResourcePool.OutDbResource res1 = newResource("/path/1", "val1");
+        pool.add(res1);
+        verifyPool(pool, 1, 0);
+
+        pool.release(res1);
+        verifyPool(pool, 1, 1);
+
+        // Clean up the pool
+        pool.cleanUp();
+        verifyPool(pool, 0, 0);
+    }
+
+    @Test
+    public void testAddingAndReusingNonFreeResource() {
+        OutDbResourcePool pool = new OutDbResourcePool(3);
+        pool.verifyIntegrity();
+        OutDbResourcePool.OutDbResource resource = pool.acquire(resourceKey("/path/1", "val1"));
+        Assert.assertNull(resource);
+
+        OutDbResourcePool.OutDbResource res1 = newResource("/path/1", "val1");
+        pool.add(res1);
+        verifyPool(pool, 1, 0);
+
+        OutDbResourcePool.OutDbResource res2 = pool.acquire(resourceKey("/path/1", "val1"));
+        Assert.assertEquals(res1, res2);
+        Assert.assertEquals(2, res1.refCount);
+
+        pool.release(res1);
+        verifyPool(pool, 1, 0);
+        Assert.assertEquals(1, res2.refCount);
+
+        pool.release(res2);
+        verifyPool(pool, 1, 1);
+
+        // Clean up the pool
+        pool.cleanUp();
+        verifyPool(pool, 0, 0);
+    }
+
+    @Test
     public void testWeakReference() throws InterruptedException {
         OutDbResourcePool pool = new OutDbResourcePool(3);
         pool.release(newResource("/path/1", "val1"));

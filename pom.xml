@@ -255,16 +255,12 @@
                 <version>${jt-jiffle.version}</version>
                 <exclusions>
                     <exclusion>
-                        <groupId>org.antlr</groupId>
-                        <artifactId>*</artifactId>
-                    </exclusion>
-                    <exclusion>
-                        <groupId>org.codehaus.janino</groupId>
+                        <groupId>*</groupId>
                         <artifactId>*</artifactId>
                     </exclusion>
                 </exclusions>
             </dependency>
-           <dependency>
+            <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-client</artifactId>
                 <version>${hadoop.version}</version>

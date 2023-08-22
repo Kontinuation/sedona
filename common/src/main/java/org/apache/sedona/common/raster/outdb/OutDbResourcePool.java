@@ -63,7 +63,7 @@ public class OutDbResourcePool {
             this.resourceKey = key;
             this.gridCoverage2D = gridCoverage2D;
             this.stream = stream;
-            this.refCount = 0;
+            this.refCount = 1;
             this.prev = this;
             this.next = this;
         }
@@ -105,7 +105,7 @@ public class OutDbResourcePool {
             }
         }
 
-        ResourceKey(Path path, byte[] serializedConf) {
+        public ResourceKey(Path path, byte[] serializedConf) {
             this.path = path;
             this.serializedConf = serializedConf;
             this.conf = null;
@@ -188,13 +188,34 @@ public class OutDbResourcePool {
         if (resource != null) {
             tryRemoveFreeResource(resource);
             resource.refCount += 1;
-            logger.debug("Acquired OutDbResource object(ref={}) for thread {}. Pool stats: {}/{}",
-                    resource.refCount, threadId, freeResourceCount, allResources.size());
+            logger.debug("Acquired OutDbResource object(ref={}, path={}) for thread {}. Pool stats: {}/{}",
+                    resource.refCount, key.path, threadId, freeResourceCount, allResources.size());
         } else {
-            logger.debug("No OutDbResource object found for thread {}. Pool stats: {}/{}",
-                    threadId, freeResourceCount, allResources.size());
+            logger.debug("No OutDbResource object found for thread {}, path={}. Pool stats: {}/{}",
+                    threadId, key.path, freeResourceCount, allResources.size());
         }
         return resource;
+    }
+
+    public void add(OutDbResource resource) {
+        if (resource.refCount <= 0) {
+            throw new IllegalStateException("refCount of OutDbResource is not positive");
+        }
+        ResourceKey key = resource.resourceKey;
+        WeakOutDbResource ref = allResources.get(key);
+        OutDbResource existing = (ref == null ? null : ref.get());
+        if (existing == null) {
+            // Add this resource to the pool, so that it can be shared by other out-db grid coverage objects
+            if (resource.next != resource) {
+                throw new IllegalStateException("resource is in the free resource list of another pool");
+            }
+            allResources.put(key, new WeakOutDbResource(resource, referenceQueue));
+            logger.debug("Added new OutDbResource object for thread {}, path={}. Pool stats: {}/{}",
+                    threadId, resource.resourceKey.path, freeResourceCount, allResources.size());
+        } else {
+            logger.debug("Ignored adding duplicated OutDbResource object(ref={}, path={}) for thread {}. Pool stats: {}/{}",
+                    resource.refCount, resource.resourceKey.path, threadId, freeResourceCount, allResources.size());
+        }
     }
 
     public void release(OutDbResource resource) {
@@ -216,23 +237,23 @@ public class OutDbResourcePool {
             }
             allResources.put(key, new WeakOutDbResource(resource, referenceQueue));
             addFreeResource(resource);
-            logger.debug("Added new OutDbResource object for thread {}. Pool stats: {}/{}",
-                    threadId, freeResourceCount, allResources.size());
+            logger.debug("Releasing new OutDbResource object for thread {}, path={}. Pool stats: {}/{}",
+                    threadId, resource.resourceKey.path, freeResourceCount, allResources.size());
             return;
         }
 
         if (existing != resource) {
             resource.dispose();
-            logger.debug("Ignored releasing duplicated OutDbResource object(ref={}) for thread {}. Pool stats: {}/{}",
-                    resource.refCount, threadId, freeResourceCount, allResources.size());
+            logger.debug("Ignored releasing duplicated OutDbResource object(ref={}, path={}) for thread {}. Pool stats: {}/{}",
+                    resource.refCount, resource.resourceKey.path, threadId, freeResourceCount, allResources.size());
             return;
         }
 
         if (resource.refCount == 0) {
             addFreeResource(resource);
         }
-        logger.debug("Released OutDbResource object(ref={}) for thread {}. Pool stats: {}/{}",
-                resource.refCount, threadId, freeResourceCount, allResources.size());
+        logger.debug("Released OutDbResource object(ref={}, path={}) for thread {}. Pool stats: {}/{}",
+                resource.refCount, resource.resourceKey.path, threadId, freeResourceCount, allResources.size());
     }
 
     public int getResourceCount() {
@@ -314,6 +335,8 @@ public class OutDbResourcePool {
             OutDbResource evicted = freeResources.prev;
             tryRemoveFreeResource(evicted);
             allResources.remove(evicted.resourceKey);
+            logger.debug("Evicted OutDbResource object for thread {}, path={}. Pool stats: {}/{}",
+                    threadId, evicted.resourceKey.path, freeResourceCount, allResources.size());
             evicted.dispose();
         }
     }

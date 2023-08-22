@@ -51,10 +51,12 @@ public class OutDbGridCoverage2DTest extends RasterTestBase {
                 {resourceFolder + "/raster/test1.tiff", false},
                 {resourceFolder + "/raster/test2.tiff", false},
                 {resourceFolder + "/raster/test3.tif", false},
+                {resourceFolder + "/raster/raster_with_no_data/test5.tiff", false},
                 {resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif", false},
                 {resourceFolder + "/raster/test1.tiff", true},
                 {resourceFolder + "/raster/test2.tiff", true},
                 {resourceFolder + "/raster/test3.tif", true},
+                {resourceFolder + "/raster/raster_with_no_data/test5.tiff", true},
                 {resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif", true},
         };
     }

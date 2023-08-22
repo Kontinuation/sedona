@@ -20,11 +20,13 @@ package org.apache.sedona.common.utils;
 
 import org.geotools.coverage.Category;
 import org.geotools.coverage.GridSampleDimension;
+import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.geotools.util.NumberRange;
 import org.junit.Assert;
 import org.junit.Test;
 
 import java.awt.Color;
+import java.awt.geom.Point2D;
 
 public class RasterUtilsTest {
     @Test
@@ -131,5 +133,29 @@ public class RasterUtilsTest {
         Assert.assertEquals(2, band3.getCategories().size());
         Assert.assertEquals("GrayScale", band3.getCategory(100).getName().toString());
         Assert.assertEquals("GrayScale", band3.getCategory(199.999).getName().toString());
+    }
+
+    @Test
+    public void testTranslateAffineTransformation() {
+        AffineTransform2D affine = new AffineTransform2D(0.5, 0.1, 0.2, -0.4, 100, 200);
+        for (int transX = 0; transX < 100; transX += 10) {
+            for (int transY = 0; transY < 100; transY += 10) {
+                AffineTransform2D affine2 = RasterUtils.translateAffineTransform(affine, transX, transY);
+                assertAffineTransformationTranslation(affine, affine2, transX, transY);
+            }
+        }
+    }
+
+    private void assertAffineTransformationTranslation(AffineTransform2D affine, AffineTransform2D affine2, int transX, int transY) {
+        for (double x = 0; x < 100; x += 1) {
+            for (double y = 0; y < 100; y += 1) {
+                Point2D p1 = new Point2D.Double(x, y);
+                Point2D p1t = affine.transform(p1, null);
+                Point2D p2 = new Point2D.Double(x - transX, y - transY);
+                Point2D p2t = affine2.transform(p2, null);
+                Assert.assertEquals(p1t.getX(), p2t.getX(), 1e-9);
+                Assert.assertEquals(p1t.getY(), p2t.getY(), 1e-9);
+            }
+        }
     }
 }

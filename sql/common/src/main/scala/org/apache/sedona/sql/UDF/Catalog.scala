@@ -205,6 +205,8 @@ object Catalog {
     function[RS_FromGeoTiff](),
     function[RS_FromPath](null),
     function[RS_MakeEmptyRaster](),
+    function[RS_Tile](),
+    function[RS_TileExplode](),
     function[RS_Envelope](),
     function[RS_NumBands](),
     function[RS_Metadata](),
@@ -261,7 +263,7 @@ object Catalog {
         case e: ExpectsInputTypes =>
           val numParameters = e.inputTypes.size
           val numArguments = expressions.size
-          if (numParameters == numArguments) expr else {
+          if (numParameters == numArguments || numParameters == expr.children.size) expr else {
             val numUnspecifiedArgs = numParameters - numArguments
             if (numUnspecifiedArgs > 0) {
               if (numUnspecifiedArgs <= defaultArgs.size) {
