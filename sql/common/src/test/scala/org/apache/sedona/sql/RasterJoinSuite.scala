@@ -18,9 +18,9 @@
  */
 package org.apache.sedona.sql
 
-import org.apache.sedona.common.raster.RasterConstructors
+import org.apache.sedona.common.raster.{RasterConstructors, RasterPredicates}
 import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.sedona_sql.strategy.join.{BroadcastIndexJoinExec, JoinedGeometry, RangeJoinExec}
+import org.apache.spark.sql.sedona_sql.strategy.join.{BroadcastIndexJoinExec, RangeJoinExec}
 import org.geotools.coverage.grid.GridCoverage2D
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.io.WKTReader
@@ -29,23 +29,19 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
 
   private val spatialJoinPartitionSideConfKey = "sedona.join.spatitionside"
+  private val spatialJoinPartitionSide = sparkSession.sparkContext.getConf.get(spatialJoinPartitionSideConfKey, "left")
 
   private val rasters: Seq[(GridCoverage2D, Int)] = Seq(
     // Japan
     makeRaster(774, 787, 301485, 4106715, 300, 32654),
-
     // US
     makeRaster(751, 742, 332385,4258815, 300, 32610),
-
     // China
     makeRaster(1098, 1098, 399960, 4100040, 100, 32649),
-
     // Crossing the anti-meridian
     makeRaster(428, 419, 306210, 7840890, 600, 32601),
-
     // Covering the north pole
     makeRaster(256, 256, -345000.000,  345000.000, 2000, 3996),
-
     // Raster without CRS
     makeRaster(100, 100, 1000, 1000, 1, 0)
   ).zipWithIndex
@@ -148,6 +144,11 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     makeGeometry("""Point (1100 1100)""", 0)
   ).zipWithIndex
 
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    prepareTempViewsForTestData()
+  }
+
   describe("Sedona-SQL Spatial Join Test") {
     val joinConditions = Table("join condition",
       ("df1 JOIN df2", "RS_Intersects(df1.rast, df2.geom)"),
@@ -166,39 +167,57 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       ("df2 JOIN df1", "RS_Within(df2.geom, df1.rast)")
     )
 
-    val spatialJoinPartitionSide = sparkSession.sparkContext.getConf.get(spatialJoinPartitionSideConfKey, "left")
     try {
       forAll(joinConditions) { case (joinClause, joinCondition) =>
+        val expected = buildExpectedResult(joinCondition)
         it(s"$joinClause ON $joinCondition, with left side as dominant side") {
           sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, "left")
-          prepareTempViewsForTestData()
           val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM $joinClause ON $joinCondition")
-          result.show()
-//          val expected = buildExpectedResult(joinCondition)
-//          verifyResult(expected, result)
+          verifyResult(expected, result)
         }
         it(s"$joinClause ON $joinCondition, with right side as dominant side") {
           sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, "right")
-          prepareTempViewsForTestData()
           val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM $joinClause ON $joinCondition")
-          result.show()
-//          val expected = buildExpectedResult(joinCondition)
-//          verifyResult(expected, result)
+          verifyResult(expected, result)
         }
         it(s"$joinClause ON $joinCondition, broadcast df1") {
-          prepareTempViewsForTestData()
           val result = sparkSession.sql(s"SELECT /*+ BROADCAST(df1) */ df1.id, df2.id FROM $joinClause ON $joinCondition")
-          result.show()
-//          val expected = buildExpectedResult(joinCondition)
-//          verifyResult(expected, result)
+          verifyResult(expected, result)
         }
         it(s"$joinClause ON $joinCondition, broadcast df2") {
-          prepareTempViewsForTestData()
           val result = sparkSession.sql(s"SELECT /*+ BROADCAST(df2) */ df1.id, df2.id FROM $joinClause ON $joinCondition")
-          result.show()
-//          val expected = buildExpectedResult(joinCondition)
-//          verifyResult(expected, result)
+          verifyResult(expected, result)
         }
+      }
+    } finally {
+      sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, spatialJoinPartitionSide)
+    }
+  }
+
+  describe("raster-raster join") {
+    try {
+      val expected = rasters.flatMap { case (rast, id1) =>
+        rasters.flatMap { case (otherRast, id2) =>
+          if (RasterPredicates.rsIntersects(rast, otherRast)) Some((id1, id2)) else None
+        }
+      }
+      it("raster-raster join, with left side as dominant side") {
+        sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, "left")
+        val result = sparkSession.sql("SELECT df1.id, df3.id FROM df1 JOIN df3 ON RS_Intersects(df1.rast, df3.rast)")
+        verifyResult(expected, result)
+      }
+      it("raster-raster join, with right side as dominant side") {
+        sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, "right")
+        val result = sparkSession.sql("SELECT df1.id, df3.id FROM df1 JOIN df3 ON RS_Intersects(df1.rast, df3.rast)")
+        verifyResult(expected, result)
+      }
+      it("raster-raster join, broadcast left") {
+        val result = sparkSession.sql("SELECT /*+ BROADCAST(df1) */ df1.id, df3.id FROM df1 JOIN df3 ON RS_Intersects(df1.rast, df3.rast)")
+        verifyResult(expected, result)
+      }
+      it("raster-raster join, broadcast right") {
+        val result = sparkSession.sql("SELECT /*+ BROADCAST(df3) */ df1.id, df3.id FROM df1 JOIN df3 ON RS_Intersects(df1.rast, df3.rast)")
+        verifyResult(expected, result)
       }
     } finally {
       sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, spatialJoinPartitionSide)
@@ -209,6 +228,7 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     import sparkSession.implicits._
     rasters.toDF("rast", "id").createOrReplaceTempView("df1")
     geometries.toDF("geom", "id").createOrReplaceTempView("df2")
+    rasters.toDF("rast", "id").createOrReplaceTempView("df3")
   }
 
   private def makeRaster(width: Int, height: Int, upperLeftX: Double, upperLeftY: Double, pixelSize: Double, srid: Int): GridCoverage2D =
@@ -219,6 +239,36 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     val geom = wktReader.read(wkt)
     geom.setSRID(srid)
     geom
+  }
+
+  private def buildExpectedResult(joinCondition: String): Seq[(Int, Int)] = {
+    val evaluate = joinCondition match {
+      case "RS_Intersects(df1.rast, df2.geom)" |
+           "RS_Intersects(df2.geom, df1.rast)" =>
+        (r: GridCoverage2D, g: Geometry) => RasterPredicates.rsIntersects(r, g)
+      case "RS_Contains(df1.rast, df2.geom)" |
+           "RS_Within(df2.geom, df1.rast)" =>
+        (r: GridCoverage2D, g: Geometry) => RasterPredicates.rsContains(r, g)
+      case "RS_Contains(df2.geom, df1.rast)" |
+           "RS_Within(df1.rast, df2.geom)" =>
+        (r: GridCoverage2D, g: Geometry) => RasterPredicates.rsWithin(r, g)
+    }
+    rasters.flatMap { case (rast, rastId) =>
+      geometries.flatMap { case (geom, geomId) =>
+        if (evaluate(rast, geom)) {
+          Some((rastId, geomId))
+        } else {
+          None
+        }
+      }
+    }
+  }
+
+  private def verifyResult(expected: Seq[(Int, Int)], result: DataFrame): Unit = {
+    isUsingOptimizedSpatialJoin(result)
+    val actual = result.collect().map(row => (row.getInt(0), row.getInt(1))).sorted
+    assert(actual.nonEmpty)
+    assert(actual === expected)
   }
 
   private def isUsingOptimizedSpatialJoin(df: DataFrame): Boolean = {
