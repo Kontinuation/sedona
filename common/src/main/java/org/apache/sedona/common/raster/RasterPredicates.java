@@ -137,7 +137,8 @@ public class RasterPredicates {
 
         CoordinateReferenceSystem leftCRS = left.getCoordinateReferenceSystem();
         CoordinateReferenceSystem rightCRS = right.getCoordinateReferenceSystem();
-        if (leftCRS == null || rightCRS == null) {
+        if (leftCRS == null || leftCRS instanceof DefaultEngineeringCRS ||
+                rightCRS == null || rightCRS instanceof DefaultEngineeringCRS) {
             return Pair.of(leftGeometry, rightGeometry);
         }
         if (CRS.equalsIgnoreMetadata(leftCRS, rightCRS)) {
