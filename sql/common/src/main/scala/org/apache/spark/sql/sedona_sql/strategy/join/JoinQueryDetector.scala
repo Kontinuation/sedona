@@ -85,22 +85,11 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
                                      predicate: RS_Predicate,
                                      extraCondition: Option[Expression] = None): Option[JoinQueryDetection] = {
     // The joined shapes are coarse-grained envelopes of raster or geometry. We can only test for intersections in
-    // the spatial join no matter what the actual RS predicate is. The actual raster predicate is within `condition`
+    // the spatial join no matter what the actual RS predicate is. The actual raster predicate is in `condition`
     // and will be used for refining the join result.
     val leftShape = predicate.children.head
     val rightShape = predicate.children(1)
-
-    // Rewrite the RS predicate if the left and right shapes are swapped
-    val newPredicate = matchExpressionsToPlans(leftShape, rightShape, left, right) match {
-      case Some((_, _, false)) => predicate
-      case Some((_, _, true)) => predicate match {
-        case RS_Contains(_) => RS_Within(Seq(rightShape, leftShape))
-        case RS_Within(_) => RS_Contains(Seq(rightShape, leftShape))
-        case RS_Intersects(_) => RS_Intersects(Seq(rightShape, leftShape))
-      }
-      case None => predicate  // Actually this is an invalid query. This error will be caught later.
-    }
-    val condition = extraCondition.map(And(_, newPredicate)).getOrElse(newPredicate)
+    val condition = extraCondition.map(And(_, predicate)).getOrElse(predicate)
     Some(JoinQueryDetection(left, right, leftShape, rightShape, SpatialPredicate.INTERSECTS, false, Some(condition)))
   }
 

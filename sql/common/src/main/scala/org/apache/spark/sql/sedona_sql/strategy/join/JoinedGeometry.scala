@@ -23,12 +23,14 @@ import org.geotools.coverage.grid.GridCoverage2D
 import org.geotools.geometry.Envelope2D
 import org.geotools.geometry.jts.JTS
 import org.geotools.referencing.CRS
-import org.geotools.referencing.crs.DefaultGeographicCRS
+import org.geotools.referencing.crs.{DefaultEngineeringCRS, DefaultGeographicCRS}
 import org.locationtech.jts.geom.{Envelope, Geometry}
-import org.opengis.geometry.BoundingBox
 import org.opengis.referencing.crs.{CoordinateReferenceSystem, GeographicCRS}
 
-object JoinedGeometries {
+/**
+ * Utility functions for generating geometries for spatial join.
+ */
+object JoinedGeometry {
   /**
    * Convert the given geometry to an envelope expanded by distance.
    * @param geom the geometry to expand
@@ -68,6 +70,10 @@ object JoinedGeometries {
     }
   }
 
+  // The world envelope for WGS84 should be (-180, 180, -90, 90), but we use a larger envelope here to make sure
+  // that everything is covered.
+  private val expandedWGS84WorldEnvelope = JTS.toGeometry(new Envelope(-200, 200, -100, 100))
+
   /**
    * Convert the given raster to an envelope in WGS84 CRS.
    * @param raster the raster to convert
@@ -75,10 +81,10 @@ object JoinedGeometries {
    */
   def rasterToWGS84Envelope(raster: GridCoverage2D): Geometry = {
     val crs = raster.getCoordinateReferenceSystem
-    val envelope = raster.getEnvelope2D
-    if (crs == null) {
-      JTS.toGeometry(envelope.asInstanceOf[BoundingBox])
+    if (crs == null || crs.isInstanceOf[DefaultEngineeringCRS]) {
+      expandedWGS84WorldEnvelope.copy()
     } else {
+      val envelope = raster.getEnvelope2D
       transformToWGS84Envelope(envelope, crs)
     }
   }
@@ -90,7 +96,9 @@ object JoinedGeometries {
    */
   def geometryToWGS84Envelope(geom: Geometry): Geometry = {
     val srid = geom.getSRID
-    if (srid <= 0 || srid == 4326) {
+    if (srid <= 0) {
+      expandedWGS84WorldEnvelope.copy()
+    } else if (srid == 4326) {
       geom
     } else {
       val env = geom.getEnvelopeInternal

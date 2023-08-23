@@ -544,7 +544,11 @@ public class GeomUtils {
      * @return a geometry that does not cross the anti meridian
      */
     public static Geometry antiMeridianSafeGeom(Geometry geom) {
-        JtsGeometry jtsGeom = new JtsGeometry(geom, JtsSpatialContext.GEO, true, true);
-        return jtsGeom.getGeom();
+        try {
+            JtsGeometry jtsGeom = new JtsGeometry(geom, JtsSpatialContext.GEO, true, true);
+            return jtsGeom.getGeom();
+        } catch (TopologyException e) {
+            return geom;
+        }
     }
 }
