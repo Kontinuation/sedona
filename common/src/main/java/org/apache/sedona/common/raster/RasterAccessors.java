@@ -22,7 +22,6 @@ import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
-import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultEngineeringCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.locationtech.jts.geom.Coordinate;
@@ -30,11 +29,12 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.ReferenceIdentifier;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.TransformException;
 
 import java.util.Arrays;
-import java.util.Optional;
+import java.util.Set;
 
 public class RasterAccessors
 {
@@ -48,7 +48,16 @@ public class RasterAccessors
                 return 0;
             }
         }
-        return Optional.ofNullable(CRS.lookupEpsgCode(crs, true)).orElse(0);
+        Set<ReferenceIdentifier> crsIds = crs.getIdentifiers();
+        if (crsIds.isEmpty()) {
+            return 0;
+        }
+        for (ReferenceIdentifier crsId : crsIds) {
+            if ("EPSG".equals(crsId.getCodeSpace())) {
+                return Integer.parseInt(crsId.getCode());
+            }
+        }
+        return 0;
     }
 
     public static int numBands(GridCoverage2D raster) {
