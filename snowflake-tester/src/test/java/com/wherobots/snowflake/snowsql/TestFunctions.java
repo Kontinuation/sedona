@@ -672,7 +672,7 @@ public class TestFunctions extends TestBase {
     public void test_ST_AreaSpheroid() {
         registerUDF("ST_AreaSpheroid", byte[].class);
         verifySqlSingleRes(
-                "select sedona.ST_AreaSpheroid(sedona.ST_GeomFromText('Polygon ((35 34, 30 28, 34 25, 35 34))'))",
+                "select sedona.ST_AreaSpheroid(sedona.ST_GeomFromText('Polygon ((34 35, 28 30, 25 34, 34 35))'))",
                 201824850811.76245
         );
     }
@@ -681,12 +681,12 @@ public class TestFunctions extends TestBase {
     public void test_ST_DistanceSphere() {
         registerUDF("ST_DistanceSphere", byte[].class, byte[].class);
         verifySqlSingleRes(
-                "SELECT sedona.ST_DistanceSphere(sedona.ST_GeomFromWKT('POINT (51.3168 -0.56)'), sedona.ST_GeomFromWKT('POINT (55.9533 -3.1883)'))",
+                "SELECT sedona.ST_DistanceSphere(sedona.ST_GeomFromWKT('POINT (-0.56 51.3168)'), sedona.ST_GeomFromWKT('POINT (-3.1883 55.9533)'))",
                 543796.9506134904
         );
         registerUDF("ST_DistanceSphere", byte[].class, byte[].class, double.class);
         verifySqlSingleRes(
-                "SELECT sedona.ST_DistanceSphere(sedona.ST_GeomFromWKT('POINT (51.3168 -0.56)'), sedona.ST_GeomFromWKT('POINT (55.9533 -3.1883)'), 6378137.0)",
+                "SELECT sedona.ST_DistanceSphere(sedona.ST_GeomFromWKT('POINT (-0.56 51.3168)'), sedona.ST_GeomFromWKT('POINT (-3.1883 55.9533)'), 6378137.0)",
                 544405.4459192449
         );
     }
@@ -695,7 +695,7 @@ public class TestFunctions extends TestBase {
     public void test_ST_DistanceSpheroid() {
         registerUDF("ST_DistanceSpheroid", byte[].class, byte[].class);
         verifySqlSingleRes(
-                "SELECT sedona.ST_DistanceSpheroid(sedona.ST_GeomFromWKT('POINT (51.3168 -0.56)'), sedona.ST_GeomFromWKT('POINT (55.9533 -3.1883)'))",
+                "SELECT sedona.ST_DistanceSpheroid(sedona.ST_GeomFromWKT('POINT (-0.56 51.3168)'), sedona.ST_GeomFromWKT('POINT (-3.1883 55.9533)'))",
                 544430.9411996207
         );
     }
@@ -719,7 +719,7 @@ public class TestFunctions extends TestBase {
     public void test_ST_LengthSpheroid() {
         registerUDF("ST_LengthSpheroid", byte[].class);
         verifySqlSingleRes(
-                "select sedona.ST_LengthSpheroid(sedona.ST_GeomFromWKT('Polygon ((0 0, 0 90, 0 0))'))",
+                "select sedona.ST_LengthSpheroid(sedona.ST_GeomFromWKT('Polygon ((0 0, 90 0, 0 0))'))",
                 20037508.342789244
         );
     }
