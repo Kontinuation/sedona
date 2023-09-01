@@ -39,6 +39,10 @@ public class Serde {
     }
 
     public static byte[] serialize(GridCoverage2D raster) throws IOException {
+        return serialize(raster, true);
+    }
+
+    public static byte[] serialize(GridCoverage2D raster, boolean withOutDbConfiguration) throws IOException {
         if (!(raster instanceof OutDbGridCoverage2D)) {
             // GridCoverage2D created by GridCoverage2DReaders contain references that are not serializable.
             // Wrap the RenderedImage in DeepCopiedRenderedImage to make it serializable.
@@ -79,7 +83,7 @@ public class Serde {
             // Get a serializable state of OutDbGridCoverage2D and serialize it. We can restore the OutDbGridCoverage2D
             // object from that state on deserialization.
             OutDbGridCoverage2D outDbRaster = (OutDbGridCoverage2D) raster;
-            OutDbGridCoverage2D.SerializableState state = outDbRaster.getSerializableState();
+            OutDbGridCoverage2D.SerializableState state = outDbRaster.getSerializableState(withOutDbConfiguration);
             try (ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
                 try (ObjectOutputStream oos = new ObjectOutputStream(bos)) {
                     oos.writeObject(state);
@@ -90,6 +94,10 @@ public class Serde {
     }
 
     public static GridCoverage2D deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
+        return deserialize(bytes, null);
+    }
+
+    public static GridCoverage2D deserialize(byte[] bytes, byte[] serializedConf) throws IOException, ClassNotFoundException {
         try (ByteArrayInputStream bis = new ByteArrayInputStream(bytes)) {
             try (ObjectInputStream ois = new ObjectInputStream(bis)) {
                 Object obj = ois.readObject();
@@ -97,7 +105,11 @@ public class Serde {
                     return (GridCoverage2D) obj;
                 } else if (obj instanceof OutDbGridCoverage2D.SerializableState) {
                     OutDbGridCoverage2D.SerializableState state = (OutDbGridCoverage2D.SerializableState) obj;
-                    return state.restore();
+                    if (serializedConf != null) {
+                        return state.restore(serializedConf);
+                    } else {
+                        return state.restore();
+                    }
                 } else {
                     throw new RuntimeException("Unexpected object type: " + obj.getClass().getName());
                 }

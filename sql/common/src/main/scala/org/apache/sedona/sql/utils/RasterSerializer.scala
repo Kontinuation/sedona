@@ -20,26 +20,45 @@
 package org.apache.sedona.sql.utils
 
 import org.apache.sedona.common.raster.Serde
+import org.apache.sedona.common.raster.outdb.HadoopConfigSerializer
+import org.apache.spark.SparkEnv
+import org.apache.spark.sql.sedona_sql.utils.SparkHadoopUtil
 import org.geotools.coverage.grid.GridCoverage2D
 
+/**
+ * This raster serializer object uses {@link Serde} to serialize and deserialize raster. It serializes out-db rasters
+ * without configurations since serialized {@link org.apache.hadoop.conf.Configuration} takes too much space. We'll
+ * use the configuration retrieved from {@link org.apache.spark.SparkEnv} to deserialize out-db rasters.
+ */
 object RasterSerializer {
+  private lazy val hadoopConf = {
+    val sparkEnv = SparkEnv.get
+    if (sparkEnv == null) {
+      throw new IllegalStateException("SparkEnv is null. Cannot use RasterSerializer without an active spark context")
+    }
+    val sparkConf = sparkEnv.conf
+    SparkHadoopUtil.newConfiguration(sparkConf)
+  }
+
+  lazy val serializedConf: Array[Byte] = HadoopConfigSerializer.serialize(hadoopConf)
+
   /**
    * Given a raster returns array of bytes
    *
-   * @param GridCoverage2D raster
+   * @param raster raster to serialize
    * @return Array of bites represents this geometry
    */
   def serialize(raster: GridCoverage2D): Array[Byte] = {
-    Serde.serialize(raster);
+    Serde.serialize(raster, false)
   }
 
   /**
    * Given ArrayData returns Geometry
    *
-   * @param value ArrayData
+   * @param value serialized raster
    * @return GridCoverage2D
    */
   def deserialize(value: Array[Byte]): GridCoverage2D = {
-    Serde.deserialize(value);
+    Serde.deserialize(value, serializedConf)
   }
 }

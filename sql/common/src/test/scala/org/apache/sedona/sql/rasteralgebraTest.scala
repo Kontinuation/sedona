@@ -285,6 +285,19 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       }
     }
 
+    it("Passed RS_FromPath with fs params") {
+      val dfRasters = Seq(resourceFolder + "raster/test1.tiff").toDF("path")
+        .withColumn("rast", expr("RS_FromPath(path, 'key0=value0;key1=value1')"))
+      dfRasters.collect().foreach { row =>
+        val gridCoverage2D = row.getAs[GridCoverage2D]("rast")
+        assert(gridCoverage2D.isInstanceOf[OutDbGridCoverage2D])
+        val outDbGridCoverage2D = gridCoverage2D.asInstanceOf[OutDbGridCoverage2D]
+        val state = outDbGridCoverage2D.getSerializableState(false)
+        assert(state.params.get("key0") == "value0")
+        assert(state.params.get("key1") == "value1")
+      }
+    }
+
     it("Passed RS_BandPath") {
       val dfBandPath = Seq(resourceFolder + "raster/test1.tiff").toDF("path")
         .selectExpr("RS_BandPath(RS_FromPath(path)) as band_path")

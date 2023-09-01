@@ -15,6 +15,8 @@ package org.apache.sedona.common.raster;
 
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
@@ -181,7 +183,7 @@ public class RasterConstructorsTest
                 resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif"
         };
         for (String path : paths) {
-            GridCoverage2D raster = RasterConstructors.fromPath(path, new Configuration());
+            GridCoverage2D raster = OutDbGridCoverage2D.create("test", new Path(path), new Configuration());
             RasterConstructors.Tile[] tiles = RasterConstructors.generateTiles(raster, null, 100, 100, false, Double.NaN);
             assertTilesSameWithGridCoverage(tiles, raster, null, 100, 100, Double.NaN);
             raster.dispose(true);

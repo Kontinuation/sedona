@@ -13,11 +13,11 @@
  */
 package org.apache.sedona.common.raster;
 
-import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.FunctionsGeoTools;
 import org.apache.sedona.common.raster.inputstream.ByteArrayImageInputStream;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
+import org.apache.sedona.common.raster.outdb.OutDbResourcePool;
 import org.apache.sedona.common.utils.ImageUtils;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.GridSampleDimension;
@@ -41,6 +41,7 @@ import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
 import java.io.IOException;
+import java.util.Map;
 
 public class RasterConstructors
 {
@@ -54,8 +55,9 @@ public class RasterConstructors
         return geoTiffReader.read(null);
     }
 
-    public static GridCoverage2D fromPath(String path, Configuration conf) throws IOException {
-        return OutDbGridCoverage2D.create("outDbCoverage", new Path(path), conf);
+    public static GridCoverage2D fromPath(String path, byte[] serializedConf, Map<String, String> params) throws IOException {
+        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(new Path(path), serializedConf, params);
+        return OutDbGridCoverage2D.create("outDbCoverage", resourceKey);
     }
 
     /**
@@ -313,7 +315,7 @@ public class RasterConstructors
                                              int tileHeight) {
         AffineTransform2D affine = RasterUtils.getAffineTransform(gridCoverage2D, PixelOrientation.CENTER);
         RenderedImage image = gridCoverage2D.getRenderedImage();
-        OutDbGridCoverage2D.SerializableState state = gridCoverage2D.getSerializableState();
+        OutDbGridCoverage2D.SerializableState state = gridCoverage2D.getSerializableState(true);
         int[] tileBandIndices = new int[bandIndices.length];
         for (int i = 0; i < bandIndices.length; i++) {
             int bandIndex = bandIndices[i] - 1;
@@ -347,7 +349,7 @@ public class RasterConstructors
                     sampleDimensions[k] = gridCoverage2D.getSampleDimension(bandIndex);
                 }
                 OutDbGridCoverage2D tile = OutDbGridCoverage2D.create(gridCoverage2D.getName(), gridGeometry2D,
-                        sampleDimensions, tileBandIndices, state.path, state.serializedConf);
+                        sampleDimensions, tileBandIndices, state.path, state.serializedConf, state.params);
                 tiles[tileY * numTileX + tileX] = new Tile(tileX, tileY, tile);
             }
         }

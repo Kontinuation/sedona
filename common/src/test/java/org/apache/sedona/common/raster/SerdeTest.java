@@ -20,7 +20,9 @@ package org.apache.sedona.common.raster;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.sedona.common.raster.outdb.HadoopConfigSerializer;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
+import org.apache.sedona.common.raster.outdb.OutDbResourcePool;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
@@ -34,6 +36,8 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import static org.junit.Assert.assertNotNull;
 
@@ -76,6 +80,28 @@ public class SerdeTest extends RasterTestBase {
         GridCoverage2D raster = OutDbGridCoverage2D.create("test", new Path(path), new Configuration());
         GridCoverage2D roundTripRaster = testRoundTrip(raster, 1);
         Assert.assertTrue(roundTripRaster instanceof OutDbGridCoverage2D);
+    }
+
+    @Test
+    public void testSerdeOutDbWithoutConfiguration() throws IOException, ClassNotFoundException {
+        String testFilePath = resourceFolder + "/raster/test1.tiff";
+        Configuration conf = new Configuration();
+        Map<String, String> params = new HashMap<>();
+        params.put("test_key", "test_value");
+        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(new Path(testFilePath), conf, params);
+        GridCoverage2D raster = OutDbGridCoverage2D.create("test", resourceKey);
+        byte[] withConf = Serde.serialize(raster);
+        byte[] withoutConf = Serde.serialize(raster, false);
+        // The serialized bytes without configuration should be much smaller than the one with configuration
+        Assert.assertTrue(withConf.length > 2 * withoutConf.length);
+        // Deserialize with configuration
+        byte[] serializedConf = HadoopConfigSerializer.serialize(conf);
+        GridCoverage2D roundTripRaster = Serde.deserialize(withoutConf, serializedConf);
+        Assert.assertTrue(roundTripRaster instanceof OutDbGridCoverage2D);
+        assertSameCoverage(raster, roundTripRaster, 10);
+        // Check that the params were restored
+        Map<String, String> newParams = ((OutDbGridCoverage2D) roundTripRaster).getSerializableState(false).params;
+        Assert.assertEquals(params, newParams);
     }
 
     private GridCoverage2D testRoundTrip(GridCoverage2D raster) throws IOException, ClassNotFoundException {

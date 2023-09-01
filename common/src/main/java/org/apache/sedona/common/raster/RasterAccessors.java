@@ -220,7 +220,7 @@ public class RasterAccessors
         }
         OutDbGridCoverage2D outDbGridCoverage2D = (OutDbGridCoverage2D) raster;
         try {
-            OutDbGridCoverage2D.SerializableState outDbState = outDbGridCoverage2D.getSerializableState();
+            OutDbGridCoverage2D.SerializableState outDbState = outDbGridCoverage2D.getSerializableState(false);
             return outDbState.path.toString();
         } catch (IllegalArgumentException e) {
             return null;

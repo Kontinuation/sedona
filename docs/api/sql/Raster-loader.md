@@ -55,9 +55,12 @@ Out-db rasters can be used interchangeably with ordinary rasters. The only diffe
 The grid geometry and geo-referencing information will be loaded from the raster files when the out-db raster was constructed, pixel data may not be loaded until pixel values
 were accessed by `RS_Value` or `RS_BandAsArray`. It is more appropriate to load large raster files as out-db rasters.
 
-Introduction: Returns an out-db raster from path to image file. Currently it supports loading GeoTiff files (`*.tiff` or `*.tif`) and Arc Info Ascii Grid files (`*.asc`).
+Introduction: Returns an out-db raster from path to image file. Currently, it supports loading GeoTiff files (`*.tiff` or `*.tif`) and Arc Info Ascii Grid files (`*.asc`).
+Additional parameters for configuring the Hadoop file system can be passed in as a `;` delimited string.
 
 Format: `RS_FromPath(path: String)`
+
+Format: `RS_FromPath(path: String, params: String)`
 
 Since: `v1.5.0`
 
@@ -65,7 +68,12 @@ Spark SQL example:
 
 ```scala
 var df = spark.read.format("binaryFile").load("/some/path/*.tiff")
+
+// Load out-db rasters from path
 df = df.selectExpr("path", "RS_FromPath(path) as rast")
+
+// Load out-db rasters with custom Hadoop file system parameters
+df = df.selectExpr("path", "RS_FromPath(path, 'fs.s3a.access.key=xxx;fs.s3a.secret.key=xxx') as rast")
 ```
 
 

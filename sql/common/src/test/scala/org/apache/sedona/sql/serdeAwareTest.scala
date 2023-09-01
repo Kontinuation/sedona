@@ -76,8 +76,8 @@ class SerdeAwareFunctionSpec extends TestBaseScala {
           |0 1 2 3
           |""".stripMargin
       val mocked = mockStatic(classOf[Serde])
-      mocked.when(() => Serde.deserialize(any(classOf[Array[Byte]]))).thenReturn(fromArcInfoAsciiGrid(ascGrid.getBytes))
-      mocked.when(() => Serde.serialize(any(classOf[GridCoverage2D]))).thenReturn(Array[Byte](1, 2, 3))
+      mocked.when(() => Serde.deserialize(any(classOf[Array[Byte]]), any(classOf[Array[Byte]]))).thenReturn(fromArcInfoAsciiGrid(ascGrid.getBytes))
+      mocked.when(() => Serde.serialize(any(classOf[GridCoverage2D]), any(classOf[Boolean]))).thenReturn(Array[Byte](1, 2, 3))
 
       val expr = RS_NumBands(Seq(
         RS_FromArcInfoAsciiGrid(Seq(Literal(ascGrid.getBytes)))
@@ -89,10 +89,10 @@ class SerdeAwareFunctionSpec extends TestBaseScala {
 
         // Verify number of invocations
         mocked.verify(
-          () => Serde.deserialize(any(classOf[Array[Byte]])),
+          () => Serde.deserialize(any(classOf[Array[Byte]]), any(classOf[Array[Byte]])),
           atMost(0))
         mocked.verify(
-          () => Serde.serialize(any(classOf[GridCoverage2D])),
+          () => Serde.serialize(any(classOf[GridCoverage2D]), any(classOf[Boolean])),
           atMost(1))
       } finally {
         // Undo the mock

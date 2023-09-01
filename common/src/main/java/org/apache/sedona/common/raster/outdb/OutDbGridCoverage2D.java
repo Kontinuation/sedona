@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * A grid coverage referencing raster images stored in cloud storages. The grid coverage may only
@@ -210,20 +211,37 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         public int[] bandIndices;
         public Path path;
         public byte[] serializedConf;
+        public Map<String, String> params;
 
         public OutDbGridCoverage2D restore() {
-            return create(name, gridGeometry, bands, bandIndices, path, serializedConf);
+            if (serializedConf == null) {
+                throw new IllegalStateException("Configuration was not serialized, cannot restore without user specified configuration");
+            }
+            return restore(serializedConf);
+        }
+
+        public OutDbGridCoverage2D restore(byte[] serializedConf) {
+            if (serializedConf == null) {
+                throw new IllegalStateException("Cannot restore out-db grid coverage without configuration");
+            }
+            return create(name, gridGeometry, bands, bandIndices, path, serializedConf, params);
         }
     }
 
-    public SerializableState getSerializableState() {
+    public SerializableState getSerializableState(boolean withConfiguration) {
         SerializableState state = new SerializableState();
         state.name = getName();
         state.gridGeometry = getGridGeometry();
         state.bands = getSampleDimensions();
         state.bandIndices = bandIndices;
         state.path = resourceKey.path;
-        state.serializedConf = resourceKey.serializedConf;
+        state.params = resourceKey.params;
+        // Serialized configuration is pretty large (usually >= 80KB). We serialize configuration only if requested.
+        if (withConfiguration) {
+            state.serializedConf = resourceKey.serializedConf;
+        } else {
+            state.serializedConf = null;
+        }
         return state;
     }
 
@@ -266,18 +284,14 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
                                              GridSampleDimension[] bands,
                                              int[] bandIndices,
                                              Path path,
-                                             byte[] serializedConf) {
-        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, serializedConf);
+                                             byte[] serializedConf,
+                                             Map<String, String> params) {
+        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, serializedConf, params);
         return create(name, gridGeometry, -1, bands, bandIndices, resourceKey);
     }
 
     public static OutDbGridCoverage2D create(CharSequence name, Path path, Configuration conf) throws IOException {
         OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, conf);
-        return create(name, resourceKey);
-    }
-
-    public static OutDbGridCoverage2D create(CharSequence name, Path path, byte[] serializedConf) throws IOException {
-        OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, serializedConf);
         return create(name, resourceKey);
     }
 
@@ -304,7 +318,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         OutDbResourcePool.OutDbResource resource = pool.acquire(key);
         if (resource == null) {
             AbstractGridFormat format = getFileFormat(key.path);
-            ImageInputStream stream = HadoopImageInputStreamFactory.create(key.path, key.getConf());
+            ImageInputStream stream = HadoopImageInputStreamFactory.create(key.path, key.getConfWithParams());
             try {
                 GridCoverage2D sourceGrid = readGridCoverage(format, stream);
                 resource = new OutDbResourcePool.OutDbResource(key, sourceGrid, stream);

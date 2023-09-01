@@ -16,25 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.spark.sql.sedona_sql.UDT
+package org.apache.spark.sql.sedona_sql.utils
 
+import org.apache.hadoop.conf.Configuration
+import org.apache.spark.SparkConf
 
-import org.apache.sedona.sql.utils.RasterSerializer
-import org.apache.spark.sql.types.{BinaryType, DataType, UserDefinedType}
-import org.geotools.coverage.grid.GridCoverage2D
-
-class RasterUDT extends UserDefinedType[GridCoverage2D] {
-  override def sqlType: DataType = BinaryType
-
-  override def serialize(raster: GridCoverage2D): Array[Byte] = RasterSerializer.serialize(raster)
-
-  override def deserialize(datum: Any): GridCoverage2D = {
-    datum match {
-      case bytes: Array[Byte] => RasterSerializer.deserialize(bytes)
-    }
+/**
+ * We need to call some package-private functions in SparkHadoopUtil to retrieve
+ * Hadoop Configuration from SparkConf, so we need this util as an indirection.
+ */
+object SparkHadoopUtil {
+  def newConfiguration(conf: SparkConf): Configuration = {
+    org.apache.spark.deploy.SparkHadoopUtil.get.newConfiguration(conf)
   }
-
-  override def userClass: Class[GridCoverage2D] = classOf[GridCoverage2D]
 }
-
-case object RasterUDT extends RasterUDT with Serializable

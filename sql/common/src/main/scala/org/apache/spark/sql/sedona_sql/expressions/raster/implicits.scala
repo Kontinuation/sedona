@@ -18,7 +18,7 @@
  */
 package org.apache.spark.sql.sedona_sql.expressions.raster
 
-import org.apache.sedona.common.raster.Serde
+import org.apache.sedona.sql.utils.RasterSerializer
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.sedona_sql.expressions.SerdeAware
@@ -32,7 +32,7 @@ object implicits {
         inputExpression.asInstanceOf[SerdeAware].evalWithoutSerialization(input).asInstanceOf[GridCoverage2D]
       } else {
         inputExpression.eval(input).asInstanceOf[Array[Byte]] match {
-          case binary: Array[Byte] => Serde.deserialize(binary)
+          case binary: Array[Byte] => RasterSerializer.deserialize(binary)
           case _ => null
         }
       }
@@ -40,6 +40,6 @@ object implicits {
   }
 
   implicit class RasterEnhancer(raster: GridCoverage2D) {
-    def serialize: Array[Byte] = Serde.serialize(raster)
+    def serialize: Array[Byte] = RasterSerializer.serialize(raster)
   }
 }

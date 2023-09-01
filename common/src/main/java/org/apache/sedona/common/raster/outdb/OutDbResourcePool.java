@@ -94,27 +94,43 @@ public class OutDbResourcePool {
         public final Path path;
         public final byte[] serializedConf;
         private Configuration conf;
+        public Map<String, String> params;
 
         public ResourceKey(Path path, Configuration conf) {
-            this.path = path;
-            this.conf = conf;
+            this(path, conf, null);
+        }
+
+        public ResourceKey(Path path, Configuration conf, Map<String, String> params) {
             try {
                 serializedConf = HadoopConfigSerializer.serialize(conf);
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
+            if (params != null && !params.isEmpty()) {
+                conf = new Configuration(conf);
+                params.forEach(conf::set);
+            }
+            this.path = path;
+            this.conf = conf;
+            this.params = params;
         }
 
-        public ResourceKey(Path path, byte[] serializedConf) {
+        public ResourceKey(Path path, byte[] serializedConf, Map<String, String> params) {
             this.path = path;
             this.serializedConf = serializedConf;
             this.conf = null;
+            this.params = params;
         }
 
-        public Configuration getConf() {
+        public Configuration getConfWithParams() {
             if (conf == null) {
                 try {
                     conf = HadoopConfigSerializer.deserialize(serializedConf);
+                    if (params != null && !params.isEmpty()) {
+                        // The deserialized conf may be cached, so we need to create a new conf object
+                        conf = new Configuration(conf);
+                        params.forEach(conf::set);
+                    }
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
@@ -126,14 +142,16 @@ public class OutDbResourcePool {
         public boolean equals(Object obj) {
             if (obj instanceof ResourceKey) {
                 ResourceKey other = (ResourceKey) obj;
-                return path.equals(other.path) && Arrays.equals(serializedConf, other.serializedConf);
+                return path.equals(other.path) &&
+                        Arrays.equals(serializedConf, other.serializedConf) &&
+                        Objects.equals(params, other.params);
             }
             return false;
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(path.hashCode(), Arrays.hashCode(serializedConf));
+            return Objects.hash(path.hashCode(), Arrays.hashCode(serializedConf), params);
         }
     }
 
