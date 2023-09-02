@@ -690,7 +690,6 @@
                 <module>core</module>
                 <module>sql</module>
                 <module>viz</module>
-                <module>python-adapter</module>
                 <module>spark-shaded</module>
             </modules>
         </profile>
@@ -713,7 +712,6 @@
                 <module>core</module>
                 <module>sql</module>
                 <module>viz</module>
-                <module>python-adapter</module>
                 <module>spark-shaded</module>
                 <module>flink</module>
                 <module>flink-shaded</module>
