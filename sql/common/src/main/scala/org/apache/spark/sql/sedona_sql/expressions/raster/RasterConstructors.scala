@@ -32,6 +32,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.geotools.coverage.grid.GridCoverage2D
 
+import java.util
 import scala.collection.JavaConverters._
 
 case class RS_FromArcInfoAsciiGrid(inputExpressions: Seq[Expression])
@@ -79,7 +80,7 @@ case class RS_FromPath(inputExpressions: Seq[Expression])
           }
         }.toMap
       } else Map.empty
-      RasterConstructors.fromPath(path.toString, serializedConf, paramsMap.asJava)
+      RasterConstructors.fromPath(path.toString, serializedConf, new util.HashMap[String, String](paramsMap.asJava))
     }
   }
 

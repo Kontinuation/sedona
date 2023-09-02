@@ -292,9 +292,9 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
         val gridCoverage2D = row.getAs[GridCoverage2D]("rast")
         assert(gridCoverage2D.isInstanceOf[OutDbGridCoverage2D])
         val outDbGridCoverage2D = gridCoverage2D.asInstanceOf[OutDbGridCoverage2D]
-        val state = outDbGridCoverage2D.getSerializableState(false)
-        assert(state.params.get("key0") == "value0")
-        assert(state.params.get("key1") == "value1")
+        val params = outDbGridCoverage2D.getOutDbParams
+        assert(params.get("key0") == "value0")
+        assert(params.get("key1") == "value1")
       }
     }
 

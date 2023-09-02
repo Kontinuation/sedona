@@ -43,6 +43,13 @@ import static org.junit.Assert.assertNotNull;
 
 public class SerdeTest extends RasterTestBase {
 
+    private static final String[] testFilePaths = {
+            resourceFolder + "/raster/test1.tiff",
+            resourceFolder + "/raster/test2.tiff",
+            resourceFolder + "/raster/test3.tif",
+            resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif"
+    };
+
     @Test
     public void testRoundtripSerdeSingelbandRaster() throws IOException, ClassNotFoundException {
         testRoundTrip(oneBandRaster);
@@ -54,13 +61,16 @@ public class SerdeTest extends RasterTestBase {
     }
 
     @Test
+    public void testInDbRaster() throws IOException, ClassNotFoundException {
+        for (String testFilePath : testFilePaths) {
+            GeoTiffReader reader = new GeoTiffReader(new File(testFilePath));
+            GridCoverage2D raster = reader.read(null);
+            testRoundTrip(raster);
+        }
+    }
+
+    @Test
     public void testOutDbRaster() throws IOException, ClassNotFoundException {
-        String[] testFilePaths = {
-                resourceFolder + "/raster/test1.tiff",
-                resourceFolder + "/raster/test2.tiff",
-                resourceFolder + "/raster/test3.tif",
-                resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif"
-        };
         for (String testFilePath : testFilePaths) {
             // Out-DB raster referencing the entire GeoTiff file
             GridCoverage2D raster = OutDbGridCoverage2D.create("test", new Path(testFilePath), new Configuration());
@@ -100,7 +110,7 @@ public class SerdeTest extends RasterTestBase {
         Assert.assertTrue(roundTripRaster instanceof OutDbGridCoverage2D);
         assertSameCoverage(raster, roundTripRaster, 10);
         // Check that the params were restored
-        Map<String, String> newParams = ((OutDbGridCoverage2D) roundTripRaster).getSerializableState(false).params;
+        Map<String, String> newParams = ((OutDbGridCoverage2D) roundTripRaster).getOutDbParams();
         Assert.assertEquals(params, newParams);
     }
 

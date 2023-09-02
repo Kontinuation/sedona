@@ -20,6 +20,7 @@ package org.apache.sedona.common.raster.outdb;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.sedona.common.raster.CRSSerializer;
 import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
 import org.apache.sedona.common.utils.ImageUtils;
 import org.geotools.coverage.GridSampleDimension;
@@ -38,6 +39,7 @@ import org.geotools.util.factory.Hints;
 import org.opengis.coverage.CannotEvaluateException;
 import org.opengis.geometry.DirectPosition;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.referencing.operation.MathTransform;
 
 import javax.imageio.stream.ImageInputStream;
 import javax.media.jai.PlanarImage;
@@ -102,6 +104,22 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
             }
         }
         return ret;
+    }
+
+    public Path getOutDbPath() {
+        return resourceKey.path;
+    }
+
+    public byte[] getSerializedConfiguration() {
+        return resourceKey.serializedConf;
+    }
+
+    public int[] getOutDbBandIndices() {
+        return bandIndices;
+    }
+
+    public Map<String, String> getOutDbParams() {
+        return resourceKey.params;
     }
 
     @Override
@@ -206,8 +224,16 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
 
     public static class SerializableState implements Serializable {
         public CharSequence name;
-        public GridGeometry2D gridGeometry;
+
+        // The following three components are used to construct a GridGeometry2D object.
+        // We serialize CRS separately because the default serializer is pretty slow, we use a
+        // cached serializer to speed up the serialization and reuse CRS on deserialization.
+        public GridEnvelope2D gridEnvelope2D;
+        public MathTransform gridToCRS;
+        public byte[] serializedCRS;
+
         public GridSampleDimension[] bands;
+        public int dataType;
         public int[] bandIndices;
         public Path path;
         public byte[] serializedConf;
@@ -224,15 +250,21 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
             if (serializedConf == null) {
                 throw new IllegalStateException("Cannot restore out-db grid coverage without configuration");
             }
-            return create(name, gridGeometry, bands, bandIndices, path, serializedConf, params);
+            GridGeometry2D gridGeometry = new GridGeometry2D(gridEnvelope2D, gridToCRS, CRSSerializer.deserialize(serializedCRS));
+            OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, serializedConf, params);
+            return create(name, gridGeometry, dataType, bands, bandIndices, resourceKey);
         }
     }
 
     public SerializableState getSerializableState(boolean withConfiguration) {
         SerializableState state = new SerializableState();
+        GridGeometry2D gridGeometry = getGridGeometry();
         state.name = getName();
-        state.gridGeometry = getGridGeometry();
+        state.gridEnvelope2D = gridGeometry.getGridRange2D();
+        state.gridToCRS = gridGeometry.getGridToCRS2D();
+        state.serializedCRS = CRSSerializer.serialize(gridGeometry.getCoordinateReferenceSystem());
         state.bands = getSampleDimensions();
+        state.dataType = image.getSampleModel().getDataType();
         state.bandIndices = bandIndices;
         state.path = resourceKey.path;
         state.params = resourceKey.params;
