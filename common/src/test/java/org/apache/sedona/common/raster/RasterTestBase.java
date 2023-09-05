@@ -42,9 +42,10 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 public class RasterTestBase {
-    static protected final String resourceFolder = System.getProperty("user.dir") + "/../core/src/test/resources/";
-
     String arc = "NCOLS 2\nNROWS 2\nXLLCORNER 378922\nYLLCORNER 4072345\nCELLSIZE 30\nNODATA_VALUE 0\n0 1 2 3\n";
+
+    static protected final String resourceFolder = System.getProperty("user.dir") + "/../spark/common/src/test/resources/";
+
     GridCoverage2D oneBandRaster;
     GridCoverage2D multiBandRaster;
     byte[] geoTiff;
