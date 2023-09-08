@@ -164,6 +164,31 @@ public class RasterConstructors
         return RasterUtils.create(raster, gridGeometry, null);
     }
 
+    /**
+     * Convert an out-db raster to an in-db raster.
+     * @param gridCoverage2D the out-db raster
+     * @return the in-db raster
+     */
+    public static GridCoverage2D asInDbRaster(GridCoverage2D gridCoverage2D) {
+        if (!(gridCoverage2D instanceof OutDbGridCoverage2D)) {
+            // Already an in-db raster, simply return a new instance
+            return new GridCoverage2D(gridCoverage2D.getName(), gridCoverage2D);
+        }
+        OutDbGridCoverage2D outDbGridCoverage2D = (OutDbGridCoverage2D) gridCoverage2D;
+        RenderedImage renderedImage = outDbGridCoverage2D.getRenderedImage();
+        // This will fetch all pixel data from the out-db image
+        Raster raster = RasterUtils.getRaster(renderedImage);
+
+        // Create a new in-db raster using that raster
+        int dataType = raster.getDataBuffer().getDataType();
+        int width = raster.getWidth();
+        int height = raster.getHeight();
+        int numBands = raster.getNumBands();
+        WritableRaster wr = RasterFactory.createBandedRaster(dataType, width, height, numBands, null);
+        wr.setRect(raster);
+        return RasterUtils.create(wr, gridCoverage2D.getGridGeometry(), gridCoverage2D.getSampleDimensions());
+    }
+
     public static class Tile {
         private final int tileX;
         private final int tileY;

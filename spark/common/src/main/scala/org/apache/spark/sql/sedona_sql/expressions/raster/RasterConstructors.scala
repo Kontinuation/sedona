@@ -119,6 +119,13 @@ case class RS_Tile(inputExpressions: Seq[Expression])
   }
 }
 
+case class RS_AsInDb(inputExpressions: Seq[Expression]) extends InferredExpression(RasterConstructors.asInDbRaster _) {
+  override def foldable: Boolean = false
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
 case class RS_TileExplode(children: Seq[Expression]) extends Generator with CodegenFallback {
   private val arguments = RS_TileExplode.arguments(children)
 

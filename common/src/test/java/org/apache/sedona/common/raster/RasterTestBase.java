@@ -13,6 +13,7 @@
  */
 package org.apache.sedona.common.raster;
 
+import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -125,6 +126,12 @@ public class RasterTestBase {
         CoordinateReferenceSystem expectedCrs = expected.getCoordinateReferenceSystem();
         CoordinateReferenceSystem actualCrs = actual.getCoordinateReferenceSystem();
         Assert.assertTrue(CRS.equalsIgnoreMetadata(expectedCrs, actualCrs));
+        Assert.assertEquals(expected.getNumSampleDimensions(), actual.getNumSampleDimensions());
+        for (int k = 0; k < expected.getNumSampleDimensions(); k++) {
+            double expectedNoDataValue = RasterUtils.getNoDataValue(expected.getSampleDimension(k));
+            double actualNoDataValue = RasterUtils.getNoDataValue(actual.getSampleDimension(k));
+            Assert.assertEquals(expectedNoDataValue, actualNoDataValue, 1e-6);
+        }
         assertSameValues(expected, actual, density);
     }
 

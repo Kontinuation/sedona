@@ -18,16 +18,21 @@
  */
 package org.apache.sedona.sql
 
+import org.apache.commons.io.FileUtils
 import org.apache.sedona.common.raster.MapAlgebra
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D
 import org.apache.sedona.common.utils.RasterUtils
 import org.apache.spark.sql.functions.{collect_list, expr}
 import org.geotools.coverage.grid.GridCoverage2D
+import org.geotools.gce.geotiff.GeoTiffReader
 import org.junit.Assert.{assertEquals, assertNull}
 import org.locationtech.jts.geom.{Coordinate, Geometry}
+import org.opengis.parameter.GeneralParameterValue
 import org.scalatest.{BeforeAndAfter, GivenWhenThen}
 
 import java.awt.image.DataBuffer
+import java.io.File
+import java.nio.file.Files
 import scala.collection.mutable
 
 
@@ -997,6 +1002,55 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       df = df.selectExpr("RS_FromGeoTiff(content) as raster")
       val result = df.selectExpr("RS_BandPixelType(raster)").first().getString(0)
       assertEquals("UNSIGNED_8BITS", result)
+    }
+
+    it("Passed RS_AsInDb") {
+      val paths = Seq(
+        resourceFolder + "raster/test1.tiff",
+        resourceFolder + "raster/test2.tiff",
+        resourceFolder + "raster/test3.tif",
+        resourceFolder + "raster/raster_with_no_data/test5.tiff",
+        resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif")
+      val dfPaths = paths.toDF("path")
+      val dfRasters = dfPaths
+          .withColumn("rast_outdb", expr("RS_FromPath(path)"))
+          .withColumn("rast", expr("RS_AsInDb(rast_outdb)"))
+      val dfResults = dfRasters.selectExpr(
+          "RS_Metadata(rast_outdb) as meta_outdb",
+          "RS_Metadata(rast) as meta",
+          "RS_Envelope(rast_outdb) as env_outdb",
+          "RS_Envelope(rast) as env",
+          "RS_Value(rast_outdb, ST_Centroid(RS_Envelope(rast_outdb))) as value_outdb",
+          "RS_Value(rast_outdb, ST_Centroid(RS_Envelope(rast))) as value")
+      val dfPassed = dfResults.where("ST_Equals(env_outdb, env) AND meta = meta_outdb AND value_outdb = value")
+      assert(dfPassed.count() == paths.length)
+
+      val rows = dfRasters.collect()
+      rows.foreach { row =>
+        val outDb = row.getAs[GridCoverage2D]("rast_outdb")
+        val inDb = row.getAs[GridCoverage2D]("rast")
+        assert(!inDb.isInstanceOf[OutDbGridCoverage2D])
+        assert(outDb.isInstanceOf[OutDbGridCoverage2D])
+      }
+    }
+
+    it("Passed RS_AsInDb on tiled out-db rasters") {
+      val df = sparkSession.read.format("binaryFile").load(resourceFolder + "raster/raster_with_no_data/test5.tiff")
+        .selectExpr("RS_FromPath(path) as raster")
+      val tileDf = df.selectExpr("RS_TileExplode(raster, 100, 100) AS (x, y, rast_outdb)")
+      val tileWithInDbDf = tileDf.withColumn("rast", expr("RS_AsInDb(rast_outdb)"))
+      val dfResults = tileWithInDbDf.selectExpr(
+        "RS_Metadata(rast_outdb) as meta_outdb",
+        "RS_Metadata(rast) as meta",
+        "RS_Envelope(rast_outdb) as env_outdb",
+        "RS_Envelope(rast) as env",
+        "RS_Value(rast_outdb, ST_Centroid(RS_Envelope(rast_outdb))) as value_outdb",
+        "RS_Value(rast_outdb, ST_Centroid(RS_Envelope(rast))) as value")
+      val dfPassed = dfResults.where(
+        """
+          |ST_Equals(env_outdb, env) AND meta = meta_outdb AND
+          |(value_outdb = value OR (value_outdb IS NULL AND value IS NULL))""".stripMargin)
+      assert(dfPassed.count() == dfResults.count())
     }
 
     it("Passed RS_Tile - in-db raster") {

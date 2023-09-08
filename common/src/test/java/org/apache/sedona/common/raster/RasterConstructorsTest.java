@@ -20,6 +20,7 @@ import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.gce.geotiff.GeoTiffReader;
 import org.junit.Assert;
 import org.junit.Test;
 import org.locationtech.jts.geom.Geometry;
@@ -29,6 +30,7 @@ import org.opengis.referencing.operation.TransformException;
 
 import java.awt.image.DataBuffer;
 import java.awt.image.RenderedImage;
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.HashSet;
@@ -38,6 +40,14 @@ import static org.junit.Assert.assertEquals;
 
 public class RasterConstructorsTest
         extends RasterTestBase {
+
+    private static final String[] testGeoTiffPaths = {
+            resourceFolder + "/raster/test1.tiff",
+            resourceFolder + "/raster/test2.tiff",
+            resourceFolder + "/raster/test3.tif",
+            resourceFolder + "/raster/raster_with_no_data/test5.tiff",
+            resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif"
+    };
 
     @Test
     public void fromArcInfoAsciiGrid() throws IOException, FactoryException {
@@ -121,6 +131,41 @@ public class RasterConstructorsTest
     }
 
     @Test
+    public void testAsInDbRasterFromInDb() throws IOException {
+        // Test using in-db raster read from GeoTiff
+        for (String testFilePath : testGeoTiffPaths) {
+            GeoTiffReader reader = new GeoTiffReader(new File(testFilePath));
+            GridCoverage2D raster = reader.read(null);
+            GridCoverage2D inDbRaster = RasterConstructors.asInDbRaster(raster);
+            Assert.assertNotSame(inDbRaster, raster);
+            assertSameCoverage(raster, inDbRaster);
+        }
+
+        // Test using in-db raster constructed from scratch
+        int[] dataTypes = {DataBuffer.TYPE_BYTE, DataBuffer.TYPE_SHORT, DataBuffer.TYPE_USHORT, DataBuffer.TYPE_INT, DataBuffer.TYPE_FLOAT, DataBuffer.TYPE_DOUBLE};
+        for (int dataType : dataTypes) {
+            GridCoverage2D raster = createRandomRaster(dataType, 100, 100, 1000, 1010, 10, 1, "EPSG:3857");
+            GridCoverage2D inDbRaster = RasterConstructors.asInDbRaster(raster);
+            Assert.assertNotSame(inDbRaster, raster);
+            assertSameCoverage(raster, inDbRaster);
+        }
+    }
+
+    @Test
+    public void testAsInDbRasterFromOutDb() throws IOException {
+        for (String path : testGeoTiffPaths) {
+            GridCoverage2D raster = OutDbGridCoverage2D.create("test", new Path(path), new Configuration());
+            RasterConstructors.Tile[] tiles = RasterConstructors.generateTiles(raster, null, 100, 100, false, Double.NaN);
+            for (RasterConstructors.Tile tile : tiles) {
+                OutDbGridCoverage2D outDbRaster = (OutDbGridCoverage2D) tile.getCoverage();
+                GridCoverage2D inDbRaster = RasterConstructors.asInDbRaster(outDbRaster);
+                assertSameCoverage(outDbRaster, inDbRaster);
+                outDbRaster.dispose(true);
+            }
+        }
+    }
+
+    @Test
     public void testInDbTileWithoutPadding() {
         GridCoverage2D raster = createRandomRaster(DataBuffer.TYPE_BYTE, 100, 100, 1000, 1010, 10, 1, "EPSG:3857");
         RasterConstructors.Tile[] tiles = RasterConstructors.generateTiles(raster, null, 10, 10, false, Double.NaN);
@@ -175,19 +220,13 @@ public class RasterConstructorsTest
 
     @Test
     public void testOutDbTile() throws IOException {
-        String[] paths = {
-                resourceFolder + "/raster/test1.tiff",
-                resourceFolder + "/raster/test2.tiff",
-                resourceFolder + "/raster/test3.tif",
-                resourceFolder + "/raster/raster_with_no_data/test5.tiff",
-                resourceFolder + "/raster_geotiff_color/FAA_UTM18N_NAD83.tif"
-        };
-        for (String path : paths) {
+        for (String path : testGeoTiffPaths) {
             GridCoverage2D raster = OutDbGridCoverage2D.create("test", new Path(path), new Configuration());
             RasterConstructors.Tile[] tiles = RasterConstructors.generateTiles(raster, null, 100, 100, false, Double.NaN);
             assertTilesSameWithGridCoverage(tiles, raster, null, 100, 100, Double.NaN);
             raster.dispose(true);
             for (RasterConstructors.Tile tile : tiles) {
+                Assert.assertTrue(tile.getCoverage() instanceof OutDbGridCoverage2D);
                 tile.getCoverage().dispose(true);
             }
         }

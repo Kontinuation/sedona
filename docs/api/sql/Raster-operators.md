@@ -1196,6 +1196,33 @@ Output:
 +----+------------+-------+
 ```
 
+### RS_AsInDb
+
+Introduction: convert an out-db raster to an in-db raster. If the input raster is already an in-db raster, the
+input raster will be returned as-is.
+
+Format: `RS_AsInDb(raster: Raster)`
+
+Since: `v1.5.0`
+
+Spark SQL example:
+
+```sql
+SELECT RS_AsInDb(RS_FromPath("/path/to/raster.tif"))
+```
+
+Output:
+
+```
++-------------------------------------------------+
+|rs_asindb(rs_frompath(/path/to/raster.tif, NULL))|
++-------------------------------------------------+
+|                             GridCoverage2D[""...|
++-------------------------------------------------+
+```
+
+Please note that this is a very dumb example. Please use `RS_FromGeoTiff` for loading GeoTiff files as in-db rasters.
+
 ## Raster Tiles
 
 ### RS_Tile
