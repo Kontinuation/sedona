@@ -17,7 +17,8 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import com.esotericsoftware.kryo.serializers.JavaSerializer;
+import com.esotericsoftware.kryo.io.UnsafeInput;
+import com.esotericsoftware.kryo.io.UnsafeOutput;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.geotools.coverage.Category;
 import org.geotools.coverage.GridSampleDimension;
@@ -121,25 +122,22 @@ public class Serde {
         }
     }
 
-    private static final ThreadLocal<Kryo> kryos = new ThreadLocal<Kryo>() {
-        protected Kryo initialValue() {
-            Kryo kryo = new Kryo();
-            kryo.setInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
-            kryo.register(AffineTransform2D.class, new KryoAffineTransform2DSerializer());
-            kryo.register(GridSampleDimension.class, new KryoGridSampleDimensionSerializer());
-            kryo.register(URI.class, new URISerializer());
-            // DeepCopiedRenderedImage has a well written serializer, so we use the default one.
-            kryo.register(DeepCopiedRenderedImage.class, new JavaSerializer());
-            try {
-                kryo.register(Class.forName("org.geotools.coverage.grid.RenderedSampleDimension"),
-                        new KryoGridSampleDimensionSerializer());
-            } catch (ClassNotFoundException e) {
-                throw new RuntimeException("Cannot register kryo serializer for class RenderedSampleDimension", e);
-            }
-            kryo.setClassLoader(Thread.currentThread().getContextClassLoader());
-            return kryo;
+    private static final ThreadLocal<Kryo> kryos = ThreadLocal.withInitial(() -> {
+        Kryo kryo = new Kryo();
+        kryo.setInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
+        kryo.register(AffineTransform2D.class, new KryoAffineTransform2DSerializer());
+        kryo.register(GridSampleDimension.class, new KryoGridSampleDimensionSerializer());
+        kryo.register(URI.class, new URISerializer());
+        DeepCopiedRenderedImage.registerKryo(kryo);
+        try {
+            kryo.register(Class.forName("org.geotools.coverage.grid.RenderedSampleDimension"),
+                    new KryoGridSampleDimensionSerializer());
+        } catch (ClassNotFoundException e) {
+            throw new RuntimeException("Cannot register kryo serializer for class RenderedSampleDimension", e);
         }
-    };
+        kryo.setClassLoader(Thread.currentThread().getContextClassLoader());
+        return kryo;
+    });
 
     private static class SerializableState implements Serializable {
         public CharSequence name;
@@ -188,7 +186,7 @@ public class Serde {
             state.serializedCRS = CRSSerializer.serialize(gridGeometry.getCoordinateReferenceSystem());
             state.bands = raster.getSampleDimensions();
             state.image = deepCopiedRenderedImage;
-            try (Output out = new Output(4096, -1)) {
+            try (UnsafeOutput out = new UnsafeOutput(4096, -1)) {
                 out.writeBoolean(false);
                 kryo.writeObject(out, state);
                 return out.toBytes();
@@ -198,7 +196,7 @@ public class Serde {
             // object from that state on deserialization.
             OutDbGridCoverage2D outDbRaster = (OutDbGridCoverage2D) raster;
             OutDbGridCoverage2D.SerializableState state = outDbRaster.getSerializableState(withOutDbConfiguration);
-            try (Output out = new Output(4096, -1)) {
+            try (UnsafeOutput out = new UnsafeOutput(4096, -1)) {
                 out.writeBoolean(true);
                 kryo.writeObject(out, state);
                 return out.toBytes();
@@ -212,7 +210,7 @@ public class Serde {
 
     public static GridCoverage2D deserialize(byte[] bytes, byte[] serializedConf) throws IOException, ClassNotFoundException {
         Kryo kryo = kryos.get();
-        try (Input in = new Input(bytes)) {
+        try (UnsafeInput in = new UnsafeInput(bytes)) {
             boolean isOutDb = in.readBoolean();
             if (!isOutDb) {
                 SerializableState state = kryo.readObject(in, SerializableState.class);
