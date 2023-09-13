@@ -221,6 +221,7 @@ object Catalog {
     function[RS_AsArcGrid](),
     function[RS_AsBase64](),
     function[RS_AsInDb](),
+    function[RS_AsPNG](),
     function[RS_Width](),
     function[RS_Height](),
     function[RS_UpperLeftX](),

@@ -22,6 +22,7 @@ import org.apache.commons.io.FileUtils
 import org.apache.sedona.common.raster.MapAlgebra
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D
 import org.apache.sedona.common.utils.RasterUtils
+import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.functions.{collect_list, expr}
 import org.geotools.coverage.grid.GridCoverage2D
 import org.geotools.gce.geotiff.GeoTiffReader
@@ -32,7 +33,7 @@ import org.scalatest.{BeforeAndAfter, GivenWhenThen}
 
 import java.awt.image.DataBuffer
 import java.io.File
-import java.nio.file.Files
+import java.net.URLConnection
 import scala.collection.mutable
 
 
@@ -582,6 +583,17 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       assert(resultLoaded != null)
       assert(resultLoaded.isInstanceOf[GridCoverage2D])
       assertEquals(resultRaw.asInstanceOf[GridCoverage2D].getEnvelope.toString, resultLoaded.asInstanceOf[GridCoverage2D].getEnvelope.toString)
+    }
+
+    it("Passed RS_AsPNG") {
+      val dirPath = System.getProperty("user.dir") + "/target/testAsPNGFunction/"
+      new File(dirPath).mkdirs()
+      var df = sparkSession.read.format("binaryFile").load(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif")
+      df = df.selectExpr("RS_AsPNG(RS_FromGeoTiff(content)) as raster")
+      df.write.format("raster").option("rasterField", "raster").option("fileExtension", ".png").mode(SaveMode.Overwrite).save(dirPath)
+      val f = new File(dirPath + "part-*/*.png")
+      val mimeType = URLConnection.guessContentTypeFromName(f.getName)
+      assertEquals("image/png", mimeType)
     }
 
     it("Passed RS_AsArcGrid with different bands") {
