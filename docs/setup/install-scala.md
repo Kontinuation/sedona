@@ -13,7 +13,7 @@ There are two ways to use a Scala or Java library with Apache Spark. You can use
 
 2. Run Spark shell with `--packages` option. This command will automatically download Sedona jars from Maven Central.
 ```
-./bin/spark-shell --packages MavenCoordiantes
+./bin/spark-shell --packages MavenCoordinates
 ```
 Please refer to [Sedona Maven Central coordinates](maven-coordinates.md) to select the corresponding Sedona packages for your Spark version.
 

@@ -120,7 +120,7 @@ Class property which returns org.datasyslab.geospark.serde.GeoSparkKryoRegistrat
 
 ## Writing Application
 
-Use KryoSerializer.getName and GeoSparkKryoRegistrator.getName class properties to reduce memory impact, reffering to  <a href="https://datasystemslab.github.io/GeoSpark/tutorial/sql/"> GeoSpark docs </a>. To do that use spark config as follows:
+Use KryoSerializer.getName and GeoSparkKryoRegistrator.getName class properties to reduce memory impact, referring to  <a href="https://datasystemslab.github.io/GeoSpark/tutorial/sql/"> GeoSpark docs </a>. To do that use spark config as follows:
 
 ```python
 

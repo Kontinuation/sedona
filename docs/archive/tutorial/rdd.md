@@ -93,7 +93,7 @@ val polygonRDDSplitter = FileDataSplitter.TSV
 
 The way to create a LineStringRDD is the same as PolygonRDD.
 
-### Create a generic SpatialRDD (behavoir changed in v1.2.0)
+### Create a generic SpatialRDD (behavior changed in v1.2.0)
 
 A generic SpatialRDD is not typed to a certain geometry type and open to more scenarios. It allows an input data file contains mixed types of geometries. For instance, a WKT file contains three types gemetries ==LineString==, ==Polygon== and ==MultiPolygon==.
 
@@ -213,7 +213,7 @@ objectRDD.CRSTransform(sourceCrsCode, targetCrsCode)
 ```
 
 !!!warning
-	CRS transformation should be done right after creating each SpatialRDD, otherwise it will lead to wrong query results. For instace, use something like this:
+	CRS transformation should be done right after creating each SpatialRDD, otherwise it will lead to wrong query results. For instance, use something like this:
 	```Scala
 	var objectRDD = new PointRDD(sc, pointRDDInputLocation, pointRDDOffset, pointRDDSplitter, carryOtherAttributes)
 	objectRDD.CRSTransform("epsg:4326", "epsg:3857")
@@ -267,7 +267,7 @@ val geometryFactory = new GeometryFactory()
 val pointObject = geometryFactory.createPoint(new Coordinate(-84.01, 34.01))
 ```
 
-The code to create a polygon (with 4 vertexes) is as follows:
+The code to create a polygon (with 4 vertices) is as follows:
 
 ```Scala
 val geometryFactory = new GeometryFactory()
@@ -280,7 +280,7 @@ coordinates(4) = coordinates(0) // The last coordinate is the same as the first 
 val polygonObject = geometryFactory.createPolygon(coordinates)
 ```
 
-The code to create a line string (with 4 vertexes) is as follows:
+The code to create a line string (with 4 vertices) is as follows:
 
 ```Scala
 val geometryFactory = new GeometryFactory()
@@ -397,7 +397,7 @@ val result = JoinQuery.SpatialJoinQuery(objectRDD, queryWindowRDD, usingIndex, c
 	FROM city, superhero
 	WHERE ST_Contains(city.geom, superhero.geom);
 	```
-	Find the super heros in each city
+	Find the super heroes in each city
 
 ### Use spatial partitioning
 
@@ -486,7 +486,7 @@ The output format of the distance join query is [here](#output-format_2).
 	FROM city, superhero
 	WHERE ST_Distance(city.geom, superhero.geom) <= 10;
 	```
-	Find the super heros within 10 miles of each city
+	Find the super heroes within 10 miles of each city
 	
 ## Save to permanent storage
 

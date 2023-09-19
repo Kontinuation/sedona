@@ -47,7 +47,7 @@ public class GeometryOpTest extends SpatialRDDTestBase
     }
 
     @Test
-    public void testFlipPolygonCoordiantes()
+    public void testFlipPolygonCoordinates()
     {
         PolygonRDD spatialRDD = new PolygonRDD(sc, InputLocation, splitter, true, numPartitions);
         Polygon oldGeom = spatialRDD.rawSpatialRDD.take(1).get(0);

@@ -51,7 +51,7 @@ class SqlListener(userid:String, s3bucket:String, bucketPrefix:String, s3client:
     val planPhysical = qe.sparkPlan.treeString(verbose = false)
     val planAll = planAnalyzed + "\n" + planPhysical
 //    println("analyze: " + planAnalyzed)
-//    println("phyiscal: " + planPhysical)
+//    println("physical: " + planPhysical)
 //    println("all: " + planAll)
 
     val functionCallMap = initFunctionCallMap()

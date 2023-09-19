@@ -239,7 +239,7 @@ The other attributes are combined together to a string and stored in ==UserData=
 To retrieve the UserData field, use the following code:
 ```python
 rdd_with_other_attributes = object_rdd.rawSpatialRDD.map(lambda x: x.getUserData())
-``` 
+```
 
 ## Write a Spatial Range Query
 
@@ -301,7 +301,7 @@ query_result = RangeQuery.SpatialRangeQuery(
 
 The output format of the spatial range query is another RDD which consists of GeoData objects.
 
-SpatialRangeQuery result can be used as RDD with map or other spark RDD funtions. Also it can be used as 
+SpatialRangeQuery result can be used as RDD with map or other spark RDD functions. Also it can be used as 
 Python objects when using collect method.
 Example:
 

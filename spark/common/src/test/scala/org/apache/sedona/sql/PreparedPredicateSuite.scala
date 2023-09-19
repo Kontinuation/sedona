@@ -30,7 +30,7 @@ import org.locationtech.jts.io.WKTReader
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 /**
- * Test if prepared predicates were correctly populated by the optimizer, and if they evalutes to the correct result.
+ * Test if prepared predicates were correctly populated by the optimizer, and if they evaluates to the correct result.
  */
 class PreparedPredicateSuite extends TestBaseScala with TableDrivenPropertyChecks {
 

@@ -4,7 +4,7 @@ Before getting into this advanced tutorial, please make sure that you have tried
 ## Pick a proper GeoSpark version
 The versions of GeoSpark have three levels: X.X.X (i.e., 0.8.1). In addition, GeoSpark also supports Spark 1.X in Spark1.X version.
 
-The first level means that this verion contains big structure redesign which may bring big changes in APIs and performance. Hopefully, we can see these big changes in GeoSpark 1.X version.
+The first level means that this version contains big structure redesign which may bring big changes in APIs and performance. Hopefully, we can see these big changes in GeoSpark 1.X version.
 
 The second level (i.e., 0.8) indicates that this version contains significant performance enhancement, big new features and API changes. An old GeoSpark user who wants to pick this version needs to be careful about the API changes. Before you move to this version, please read [GeoSpark version release notes](https://github.com/DataSystemsLab/GeoSpark/wiki/GeoSpark-Full-Version-Release-notes) and make sure you are ready to accept the API changes.
 

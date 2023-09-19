@@ -148,7 +148,7 @@ public class BufferedRandomAccessFile implements AutoCloseable {
      * @return the actual number of bytes read, or -1 if there is not more data
      *         due to the end of the raf being reached.
      * @exception IOException
-     *                if an I/O error occurrs.
+     *                if an I/O error occurs.
      */
     public int read(byte[] b, int off, int len) throws IOException {
         if (len < 0) {

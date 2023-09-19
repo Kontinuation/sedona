@@ -1240,7 +1240,7 @@ Output:
 ## ST_H3CellIDs
 
 Introduction: Cover the geometry by H3 cell IDs with the given resolution(level).
-To understand the cell statics please refer to [H3 Doc](https://h3geo.org/docs/core-library/restable)
+To understand the cell statistics please refer to [H3 Doc](https://h3geo.org/docs/core-library/restable)
 H3 native fill functions doesn't guarantee full coverage on the shapes.
 
 ### Cover Polygon
@@ -1259,7 +1259,7 @@ From H3's documentation
 
 When the `gridPathCells` function throw error, Sedona implemented in-house approximate implementation to generate the shortest path, which can cover the corner cases.
 
-Both functions can't guarnatee full coverage. When the `fullCover = true`, we'll do extra cell traversal to guarantee full cover.
+Both functions can't guarantee full coverage. When the `fullCover = true`, we'll do extra cell traversal to guarantee full cover.
 In worst case, sedona will use MBR to guarantee the full coverage.
 
 If you seek to get the shortest path between cells, you can call this function with `fullCover = false`

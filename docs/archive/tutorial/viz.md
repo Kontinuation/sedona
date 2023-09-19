@@ -83,7 +83,7 @@ CREATE OR REPLACE TEMP VIEW boundtable AS
 SELECT ST_Envelope_Aggr(shape) as bound FROM pointtable
 ```
 
-Then use ST_Pixelize to conver them to pixels.
+Then use ST_Pixelize to convert them to pixels.
 
 ```sql
 CREATE OR REPLACE TEMP VIEW pixels AS
@@ -94,7 +94,7 @@ LATERAL VIEW ST_Pixelize(ST_Transform(shape, 'epsg:4326','epsg:3857'), 256, 256,
 This will give you a 256*256 resolution image after you run ST_Render at the end of this tutorial.
 
 !!!warning
-	We highly suggest that you should use ST_Transform to transfrom coordiantes to a visualization-specific coordinate sysmte such as epsg:3857. Otherwise you map may look distorted.
+	We highly suggest that you should use ST_Transform to transform coordinates to a visualization-specific coordinate system such as epsg:3857. Otherwise you map may look distorted.
 	
 ### Aggregate pixels
 

@@ -557,11 +557,11 @@ This version is a maintenance release on Sedona 1.0.0 line. It includes bug fixe
 
 ### Known issue
 
-In Sedona v1.0.1 and eariler versions, the Spark dependency in setup.py was configured to be ==< v3.1.0== [by mistake](https://github.com/apache/incubator-sedona/blob/8235924ac80939cbf2ce562b0209b71833ed9429/python/setup.py#L39). When you install  Sedona Python (apache-sedona v1.0.1) from Pypi, pip might unstall PySpark 3.1.1 and install PySpark 3.0.2 on your machine.
+In Sedona v1.0.1 and earlier versions, the Spark dependency in setup.py was configured to be ==< v3.1.0== [by mistake](https://github.com/apache/sedona/blob/8235924ac80939cbf2ce562b0209b71833ed9429/python/setup.py#L39). When you install Sedona Python (apache-sedona v1.0.1) from PyPI, pip might uninstall PySpark 3.1.1 and install PySpark 3.0.2 on your machine.
 
 Three ways to fix this:
 
-1. After install apache-sedona v1.0.1, unstall PySpark 3.0.2 and reinstall PySpark 3.1.1
+1. After install apache-sedona v1.0.1, uninstall PySpark 3.0.2 and reinstall PySpark 3.1.1
 
 2. Ask pip not to install Sedona dependencies: `pip install --no-deps apache-sedona`
 
@@ -774,7 +774,7 @@ Bug fix:
 New functions:
 
 * PR #[270](https://github.com/DataSystemsLab/GeoSpark/pull/270) #[298](https://github.com/DataSystemsLab/GeoSpark/pull/298) Add GeoJSON Reader to load GeoJSON with all attributes. See [GeoSpark doc](../tutorial/rdd/#from-geojson) for an example.
-* PR #[314](https://github.com/DataSystemsLab/GeoSpark/pull/314) Add WktReader and WkbReader. Their usage is simialr to GeoJSON reader.
+* PR #[314](https://github.com/DataSystemsLab/GeoSpark/pull/314) Add WktReader and WkbReader. Their usage is similar to GeoJSON reader.
 
 **GeoSpark SQL**
 
@@ -935,9 +935,9 @@ None
     * **SpatialJoinQueryFlat/DistanceJoinQueryFlat** returns the join query in a flat way following database iteration model: Each row has fixed two members [Polygon, Point]. This API is more efficient for unbalanced length of join results. 
     * The left and right shapes in Range query, Distance query, Range join query, Distance join query can be switched.
     * The index side in Range query, Distance query, Range join query, Distance join query can be switched.
-    * The generic SpatialRdd supports heterogenous geometries
+    * The generic SpatialRdd supports heterogeneous geometries
     * Add KDB-Tree spatial partitioning method which is more balanced than Quad-Tree
-    * Range query, Distance query, Range join query, Distance join query, KNN query supports heterogenous inputs.
+    * Range query, Distance query, Range join query, Distance join query, KNN query supports heterogeneous inputs.
 ### v0.8.2 (GeoSpark-core)
 * **Bug fixes**: Fix the shapefile RDD null pointer bug when running in cluster mode. See Issue https://github.com/DataSystemsLab/GeoSpark/issues/115
 * **New function added**: Provide granular control to SpatialRDD sampling utils. SpatialRDD has a setter and getter for a parameter called "sampleNumber". The user can manually specify the sample size for spatial partitioning.
@@ -966,7 +966,7 @@ None
 |0.5.2| **Bug fix:** Fix [Issue #58](https://github.com/DataSystemsLab/GeoSpark/issues/58) and [Issue #60](https://github.com/DataSystemsLab/GeoSpark/issues/60); **Performance enhancement:** (1) Deprecate all old Spatial RDD constructors. See the JavaDoc [here](http://www.public.asu.edu/~jiayu2/geospark/javadoc/0.5.2/). (2) Recommend the new SRDD constructors which take an additional RDD storage level and automatically cache rawSpatialRDD to accelerate internal SRDD analyze step|
 |0.5.1| **Bug fix:** (1) GeoSpark: Fix inaccurate KNN result when K is large (2) GeoSpark: Replace incompatible Spark API call [Issue #55](https://github.com/DataSystemsLab/GeoSpark/issues/55); (3) Babylon: Remove JPG output format temporarily due to the lack of OpenJDK support|
 | 0.5.0| **Major updates:** We are pleased to announce the initial version of [Babylon](https://github.com/DataSystemsLab/GeoSpark/tree/master/src/main/java/org/datasyslab/babylon) a large-scale in-memory geospatial visualization system extending GeoSpark. Babylon and GeoSpark are integrated together. You can just import GeoSpark and enjoy! More details are available here: [Babylon GeoSpatial Visualization](https://github.com/DataSystemsLab/GeoSpark/tree/master/src/main/java/org/datasyslab/babylon)|
-| 0.4.0| **Major updates:** ([Example](https://github.com/DataSystemsLab/GeoSpark/blob/master/src/main/java/org/datasyslab/geospark/showcase/Example.java)) 1. Refactor constrcutor API usage. 2. Simplify Spatial Join Query API. 3. Add native support for LineStringRDD; **Functionality enhancement:** 1. Release the persist function back to users. 2. Add more exception explanations.
+| 0.4.0| **Major updates:** ([Example](https://github.com/DataSystemsLab/GeoSpark/blob/master/src/main/java/org/datasyslab/geospark/showcase/Example.java)) 1. Refactor constructor API usage. 2. Simplify Spatial Join Query API. 3. Add native support for LineStringRDD; **Functionality enhancement:** 1. Release the persist function back to users. 2. Add more exception explanations.
 |       0.3.2      	| Functionality enhancement: 1. [JTSplus Spatial Objects](https://github.com/jiayuasu/JTSplus) now carry the original input data. Each object stores "UserData" and provides getter and setter. 2. Add a new SpatialRDD constructor to transform a regular data RDD to a spatial partitioned SpatialRDD.                                                                             	|
 |       0.3.1      	| Bug fix: Support Apache Spark 2.X version, fix a bug which results in inaccurate results when doing join query, add more unit test cases                                                                              	|
 |        0.3       	| Major updates: Significantly shorten query time on spatial join for skewed data; Support load balanced spatial partitioning methods (also serve as the global index); Optimize code for iterative spatial data mining 	|

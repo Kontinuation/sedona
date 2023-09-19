@@ -112,7 +112,7 @@ Body:
 New PMC NAME has been voted as a new member of the Apache Sedona PPMC. the vote thread is at: *link to the vote result thread*
 ```
 
-**Note that there is a grace period of 72 hours from when the PPMC sends the NOTICE to the IPMC to when the PPMC should formally invite the proposed member. This is an important part of the overall process. Failure to do this can result in an embarassing situation for people involved.**
+**Note that there is a grace period of 72 hours from when the PPMC sends the NOTICE to the IPMC to when the PPMC should formally invite the proposed member. This is an important part of the overall process. Failure to do this can result in an embarrassing situation for people involved.**
 
 ### Send the invitation
 
@@ -224,7 +224,7 @@ Once Sedona graduates, the PMC chair will make the request.
 
 Once the new PPMC subscribes to the Sedona mailing lists using his/her ASF account, one of the PPMC needs to add the new PPMC to the Whimsy system (https://whimsy.apache.org/roster/ppmc/sedona).
 
-### PMC annoucement
+### PMC announcement
 
 This is the email to announce the new committer to sedona-dev once the account has been created.
 
