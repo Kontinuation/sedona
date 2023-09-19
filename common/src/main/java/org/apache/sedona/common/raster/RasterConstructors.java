@@ -481,7 +481,7 @@ public class RasterConstructors
     private static Tile[] generateOutDbTiles(OutDbGridCoverage2D gridCoverage2D, int[] bandIndices, int tileWidth,
                                              int tileHeight) {
         AffineTransform2D affine = RasterUtils.getAffineTransform(gridCoverage2D, PixelOrientation.CENTER);
-        RenderedImage image = gridCoverage2D.getRenderedImage();
+        GridEnvelope2D gridRange = gridCoverage2D.getGridGeometry().getGridRange2D();
         int[] outDbBandIndices = gridCoverage2D.getOutDbBandIndices();
         Path outDbPath = gridCoverage2D.getOutDbPath();
         byte[] serializedConf = gridCoverage2D.getSerializedConfiguration();
@@ -491,8 +491,8 @@ public class RasterConstructors
             int bandIndex = bandIndices[i] - 1;
             tileBandIndices[i] = outDbBandIndices[bandIndex];
         }
-        int width = image.getWidth();
-        int height = image.getHeight();
+        int width = gridRange.width;
+        int height = gridRange.height;
         int numTileX = (int) Math.ceil((double) width / tileWidth);
         int numTileY = (int) Math.ceil((double) height / tileHeight);
         Tile[] tiles = new Tile[numTileX * numTileY];
