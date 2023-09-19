@@ -54,8 +54,19 @@ public class DiskCachedImageInputStream extends ImageInputStreamImpl {
         if (stream == null) {
             throw new IllegalArgumentException("stream == null!");
         }
-        if ((cacheDir != null) && !(cacheDir.isDirectory())) {
-            throw new IllegalArgumentException("Not a directory!");
+        if (cacheDir != null) {
+            if (cacheDir.exists()) {
+                if (!cacheDir.isDirectory()) {
+                    throw new IllegalArgumentException("Cache dir for disk cached image is not a directory!");
+                }
+            } else {
+                if (!cacheDir.mkdirs()) {
+                    // Maybe someone else created the directory in the meantime
+                    if (!cacheDir.isDirectory()) {
+                        throw new IllegalArgumentException("Cannot create cache dir for disk cached image");
+                    }
+                }
+            }
         }
         this.stream = stream;
         if (cacheDir == null) {
@@ -69,10 +80,6 @@ public class DiskCachedImageInputStream extends ImageInputStreamImpl {
         this.cachedRanges = new ByteRangeSet();
         this.readAheadSize = readAheadSize;
         this.streamLength = Long.MAX_VALUE;
-    }
-
-    public DiskCachedImageInputStream(ImageInputStream stream, int readAheadSize) throws IOException {
-        this(stream, readAheadSize, null);
     }
 
     public ImageInputStream getStream() {

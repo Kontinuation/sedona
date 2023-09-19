@@ -24,8 +24,11 @@ package org.apache.sedona.common.raster.outdb;
 public class ThreadLocalOutDbResourcePool {
     private ThreadLocalOutDbResourcePool() {}
 
+    public static final String FREE_RESOURCES_POOL_SIZE_CONF_KEY = "wherobots.raster.outdb.pool.size";
+    public static final int DEFAULT_FREE_RESOURCES_POOL_SIZE = 100;
+
     private static int freeResourcesCapacity = Integer.parseInt(System.getProperty(
-            "wherobots.raster.outdb.freeResourcesCapacity", "100"));
+            FREE_RESOURCES_POOL_SIZE_CONF_KEY, Integer.toString(DEFAULT_FREE_RESOURCES_POOL_SIZE)));
 
     public static void setFreeResourcesCapacity(int freeResourcesCapacity) {
         ThreadLocalOutDbResourcePool.freeResourcesCapacity = freeResourcesCapacity;

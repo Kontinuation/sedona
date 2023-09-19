@@ -18,6 +18,7 @@
  */
 package org.apache.sedona.common.raster.inputstream;
 
+import java.io.File;
 import java.io.IOException;
 import javax.imageio.stream.ImageInputStream;
 
@@ -37,6 +38,7 @@ public class HadoopImageInputStreamFactory {
 
     public static final String READ_AHEAD_SIZE_CONF_KEY = "wherobots.raster.outdb.readahead";
     public static final String ENABLE_CACHE_CONF_KEY = "wherobots.raster.outdb.enablecache";
+    public static final String CACHE_DIR_CONF_KEY = "wherobots.raster.outdb.cache.dir";
     public static final String DONT_CACHE_LOCAL_FILE_CONF_KEY = "wherobots.raster.outdb.dont.cache.local.file";
     public static final int DEFAULT_READ_AHEAD_SIZE = 64 * 1024;
 
@@ -68,6 +70,9 @@ public class HadoopImageInputStreamFactory {
             return stream;
         }
 
+        String cacheDirString = tunedConf.get(CACHE_DIR_CONF_KEY, null);
+        File cacheDir = cacheDirString != null? new File(cacheDirString): null;
+
         try {
             int readAhead = (int) tunedConf.getStorageSize(READ_AHEAD_SIZE_CONF_KEY, -1,
                     StorageUnit.BYTES);
@@ -80,7 +85,7 @@ public class HadoopImageInputStreamFactory {
             if (readAhead < 0) {
                 readAhead = DEFAULT_READ_AHEAD_SIZE;
             }
-            return new DiskCachedImageInputStream(stream, readAhead);
+            return new DiskCachedImageInputStream(stream, readAhead, cacheDir);
         } catch (Exception e) {
             stream.close();
             throw e;

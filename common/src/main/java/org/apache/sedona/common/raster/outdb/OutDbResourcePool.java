@@ -184,7 +184,7 @@ public class OutDbResourcePool {
     private final ReferenceQueue<OutDbResource> referenceQueue;
     private final OutDbResource freeResources;
     private int freeResourceCount;
-    private final int freeResourcesCapacity;
+    private int freeResourcesCapacity;
 
     public OutDbResourcePool(int freeResourcesCapacity) {
         if (freeResourcesCapacity <= 0) {
@@ -227,6 +227,19 @@ public class OutDbResourcePool {
             if (resource.next != resource) {
                 throw new IllegalStateException("resource is in the free resource list of another pool");
             }
+
+            // Reconfigure the pool to reflect changes to the spark configuration
+            Configuration conf = key.getConfWithParams();
+            int newCapacity = conf.getInt(ThreadLocalOutDbResourcePool.FREE_RESOURCES_POOL_SIZE_CONF_KEY,
+                    freeResourcesCapacity);
+            if (newCapacity != freeResourcesCapacity) {
+                logger.debug("Reconfiguring OutDbResourcePool for thread {}, free resources capacity: {}",
+                        threadId, newCapacity);
+            }
+            freeResourcesCapacity = newCapacity;
+
+            // Put the resource into the resource pool. This resource is still being used (refCount > 0), so we don't
+            // add it to the free list.
             allResources.put(key, new WeakOutDbResource(resource, referenceQueue));
             logger.debug("Added new OutDbResource object for thread {}, path={}. Pool stats: {}/{}",
                     threadId, resource.resourceKey.path, freeResourceCount, allResources.size());
