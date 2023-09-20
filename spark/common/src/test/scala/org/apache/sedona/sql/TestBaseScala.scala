@@ -41,6 +41,7 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
     // We need to be explicit about broadcasting in tests.
     .config("sedona.join.autoBroadcastJoinThreshold", "-1")
     .config("spark.kryoserializer.buffer.max", "64m")
+//    .config("spark.metrics.conf.*.sink.console.class", "org.apache.spark.metrics.sink.ConsoleSink")
     .getOrCreate()
 
   val sc = sparkSession.sparkContext

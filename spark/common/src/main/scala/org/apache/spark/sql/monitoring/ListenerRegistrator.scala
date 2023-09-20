@@ -14,13 +14,13 @@
  */
 package org.apache.spark.sql.monitoring
 
-import com.wherobots.sedona.common.monitoring.{CloudWatchUtils, S3Utils}
-import com.wherobots.sedona.sql.monitoring.{IoListener, SqlListener}
 import org.apache.log4j.Logger
+import org.apache.sedona.core.monitoring.{IoListener, SqlListener}
+import org.apache.spark.SparkEnv
+import org.apache.spark.metrics.source.SedonaMetrics
 import org.apache.spark.scheduler.SparkListenerInterface
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.util.QueryExecutionListener
-import org.apache.spark.sql.{RuntimeConfig, SparkSession}
-import software.amazon.awssdk.services.s3.model.S3Exception
 
 import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 
@@ -44,8 +44,9 @@ object ListenerRegistrator {
         sqlListenerRegistered = true
       }
     })
-    val conf = sparkSession.conf
-    val listeners = createListeners(conf)
+    val sedonaMetrics: SedonaMetrics = new SedonaMetrics
+    SparkEnv.get.metricsSystem.registerSource(sedonaMetrics)
+    val listeners = createListeners(sedonaMetrics)
     if (ioListenerRegistered) {
       logger.info("IoListener is already registered!")
     }
@@ -64,100 +65,14 @@ object ListenerRegistrator {
   }
 
   def unregisterAll(sparkSession: SparkSession): Unit = {
-    val conf = sparkSession.conf
-    val listeners = createListeners(conf)
+    val sedonaMetrics: SedonaMetrics = new SedonaMetrics
+    SparkEnv.get.metricsSystem.removeSource(sedonaMetrics)
+    val listeners = createListeners(sedonaMetrics)
     sparkSession.sparkContext.removeSparkListener(listeners._1)
     sparkSession.listenerManager.unregister(listeners._2)
   }
 
-  def createListeners(conf:RuntimeConfig): (IoListener, SqlListener) = {
-    var userid = ""
-    var awsAccessKey = ""
-    var awsSecretKey = ""
-    var awsS3path = ""
-    var awsRegion = ""
-    var product = ""
-    // Fetch data from Spark RuntimeConfig
-    // These keys are supposed to exist in the environment
-    // If not, it will throw RuntimeException
-    // Catch the original exception to hide key info
-    try {
-      userid = conf.get("wherobots.userid")
-      awsAccessKey = conf.get("wherobots.aws.accesskey")
-      awsSecretKey = conf.get("wherobots.aws.secretkey")
-      awsS3path = conf.get("wherobots.aws.s3bucket")
-      awsRegion = conf.get("wherobots.aws.region")
-      product = conf.get("wherobots.product")
-    }
-    catch {
-      // Fetch data from System Environment
-      // Usually these values should be set by Yarn appMasterEnv or K8S driverEnv
-      // Or by the user manually
-      case e1: NoSuchElementException => {
-        try {
-          userid = sys.env("WHEROBOTS_USERID")
-          awsAccessKey = sys.env("WHEROBOTS_AWS_ACCESSKEY")
-          awsSecretKey = sys.env("WHEROBOTS_AWS_SECRETKEY")
-          awsS3path = sys.env("WHEROBOTS_AWS_S3BUCKET")
-          awsRegion = sys.env("WHEROBOTS_AWS_REGION")
-          product = sys.env("WHEROBOTS_PRODUCT")
-        }
-        catch {
-          // If the above two methods fail, try to fetch data from Spark RuntimeConfig
-          case e2: NoSuchElementException => {
-            try {
-              userid = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_USERID")
-              awsAccessKey = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_ACCESSKEY")
-              awsSecretKey = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_SECRETKEY")
-              awsS3path = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_S3BUCKET")
-              awsRegion = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_AWS_REGION")
-              product = conf.get("spark.yarn.appMasterEnv.WHEROBOTS_PRODUCT")
-            }
-            catch {
-              case e3: NoSuchElementException => {
-                {
-                  try {
-                    userid = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_USERID")
-                    awsAccessKey = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_ACCESSKEY")
-                    awsSecretKey = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_SECRETKEY")
-                    awsS3path = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_S3BUCKET")
-                    awsRegion = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_AWS_REGION")
-                    product = conf.get("spark.kubernetes.driverEnv.WHEROBOTS_PRODUCT")
-                  }
-                  catch {
-                    // Only if all the above methods fail, throw the exception
-                    case e4: NoSuchElementException => {
-                      throw new RuntimeException("Your code is not running in a Wherobots managed environment!")
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    }
-    val bucketName = awsS3path.split("/")(0)
-    val bucketPrefix = awsS3path.split("/")(1) // Get the log folder name in the bucket
-    //    val s3ClientAsync = S3Utils.getAsyncClient(awsAccessKey, awsSecretKey, awsRegion)
-    val s3Client = S3Utils.getSyncClient(awsAccessKey, awsSecretKey, awsRegion)
-    try {
-      S3Utils.putObject(s3Client, bucketName, bucketPrefix + "/_SUCCESS", "")
-      logger.info("Successfully verified your Wherobots audit credential!")
-    }
-    catch {
-      case e: S3Exception => {
-        throw new RuntimeException("Your Wherobots audit credential is not valid!")
-      }
-    }
-    val cloudwatchClient = CloudWatchUtils.getSyncClient(awsAccessKey, awsSecretKey, awsRegion)
-    // Get the version of individual product
-    val dimensionDataPoints = new java.util.HashMap[String, String]()
-    product.split("\\+").foreach(productSeg => {
-      val productSegInfo = productSeg.split("=")
-      dimensionDataPoints.put(productSegInfo(0), productSegInfo(1))
-    })
-    (new IoListener(userid, bucketName, bucketPrefix, s3Client, cloudwatchClient, product, dimensionDataPoints),
-      new SqlListener(userid, bucketName, bucketPrefix, s3Client, cloudwatchClient, product, dimensionDataPoints))
+  def createListeners(sedonaMetrics: SedonaMetrics): (IoListener, SqlListener) = {
+    (new IoListener(sedonaMetrics), new SqlListener(sedonaMetrics))
   }
 }
