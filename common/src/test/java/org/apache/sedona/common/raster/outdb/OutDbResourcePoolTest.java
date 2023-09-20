@@ -168,6 +168,30 @@ public class OutDbResourcePoolTest {
         verifyPool(pool, 2, 2);
     }
 
+    @Test
+    public void testResourcePoolWithZeroCapacity() {
+        OutDbResourcePool pool = new OutDbResourcePool(0);
+        OutDbResourcePool.OutDbResource resource = pool.acquire(resourceKey("/path/1", "val1"));
+        Assert.assertNull(resource);
+
+        OutDbResourcePool.OutDbResource res1 = newResource("/path/1", "val1");
+        pool.add(res1);
+        verifyPool(pool, 1, 0);
+
+        // Can share resource being used
+        OutDbResourcePool.OutDbResource res2 = pool.acquire(resourceKey("/path/1", "val1"));
+        Assert.assertEquals(res1, res2);
+        Assert.assertEquals(2, res1.refCount);
+
+        pool.release(res1);
+        verifyPool(pool, 1, 0);
+        Assert.assertEquals(1, res2.refCount);
+
+        // Don't put resource back to free list since capacity is 0
+        pool.release(res2);
+        verifyPool(pool, 0, 0);
+    }
+
     private OutDbResourcePool.ResourceKey resourceKey(String path, String value) {
         Configuration conf = new Configuration(false);
         conf.set("test_key", value);

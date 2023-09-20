@@ -187,8 +187,8 @@ public class OutDbResourcePool {
     private int freeResourcesCapacity;
 
     public OutDbResourcePool(int freeResourcesCapacity) {
-        if (freeResourcesCapacity <= 0) {
-            throw new IllegalArgumentException("freeResourcesCapacity must be positive");
+        if (freeResourcesCapacity < 0) {
+            throw new IllegalArgumentException("freeResourcesCapacity must be non-negative");
         }
         threadId = Thread.currentThread().getId();
         logger.debug("Creating OutDbResourcePool for thread {}, capacity: {}", threadId, freeResourcesCapacity);
