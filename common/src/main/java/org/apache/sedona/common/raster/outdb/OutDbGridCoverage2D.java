@@ -217,7 +217,8 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
                 if (resource != null) {
                     pool.release(resource);
                 }
-                throw new RuntimeException("Failed to build planar image for out-db grid coverage", e);
+                throw new RuntimeException("Failed to build planar image for out-db grid coverage, path=" +
+                        resourceKey.path, e);
             }
         }
     }
@@ -453,9 +454,11 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         AffineTransform2D transform0 = (AffineTransform2D) gridGeom0.getGridToCRS2D();
         AffineTransform2D transform1 = (AffineTransform2D) gridGeom1.getGridToCRS2D();
 
-        // CRS should match
+        // CRS should match. However, due to the weird behavior of GeoTools, sometimes the CRS won't equal to itself
+        // after formatting to WKT then read back, so let's just log a warning here.
         if (!CRS.equalsIgnoreMetadata(crs0, crs1)) {
-            throw new IllegalStateException("The grid coverages have different CRS");
+            LOGGER.warning(String.format("The grid coverages have different CRS (%s vs %s)",
+                    crs0.toWKT(), crs1.toWKT()));
         }
 
         // Scale must match. Please note that PostGIS allows the scales to have the different sign, but the same
