@@ -1211,7 +1211,7 @@ Output:
 ST_LINESTRING
 ```
 
-## ST_H3CellIDs
+## ST_H3CellDistance
 
 Introduction: return result of h3 function [gridDistance(cel1, cell2)](https://h3geo.org/docs/api/traversal#griddistance).
 As described by H3 documentation
@@ -1221,7 +1221,7 @@ In this case, Sedona use in-house implementation of estimation the shortest path
 
 Format: `ST_H3CellDistance(cell1: Long, cell2: Long)`
 
-Since: `v1.4.0`
+Since: `v1.5.0`
 
 Example:
 ```SQL
@@ -1266,7 +1266,7 @@ If you seek to get the shortest path between cells, you can call this function w
 
 Format: `ST_H3CellIDs(geom: geometry, level: Int, fullCover: true)`
 
-Since: `v1.4.0`
+Since: `v1.5.0`
 
 Example:
 ```SQL
@@ -1293,7 +1293,7 @@ means only keep the cells with distance exactly `k` from the original cell
 
 Format: `ST_H3KRing(cell: Long, k: Int, exactRing: Boolean)`
 
-Since: `v1.4.0`
+Since: `v1.5.0`
 
 Example:
 ```SQL
@@ -1307,6 +1307,29 @@ Output:
 +----+--------------------------------+--------------------------------+
 | +I | [614552609325318143, 614552... | [614552597293957119, 614552... |
 +----+--------------------------------+--------------------------------+
+```
+
+## ST_H3ToGeom
+
+Introduction: return the result of H3 function [cellsToMultiPolygon(cells)](https://h3geo.org/docs/api/regions#cellstolinkedmultipolygon--cellstomultipolygon).
+
+Reverse the uber h3 cells to MultiPolygon object composed by the geometry hexagons.
+
+Format: `ST_H3ToGeom(cells: Array[Long])`
+
+Since: `v1.5.0`
+
+Example:
+```SQL
+SELECT ST_H3ToGeom(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'), 8, true)[0], 1, true))
+```
+
+Output:
+```
+|st_h3togeom(st_h3cellids(st_geomfromwkt(POINT(1 2), 0), 8, true))                                                                                                                                                                                                                              |
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|MULTIPOLYGON (((1.0057629565404935 1.9984665139177658, 1.0037116327309032 2.001832524914011, 0.9997277993570498 2.0011632704656668, 0.9977951427833285 1.99712822839324, 0.9998461908217768 1.9937621529331915, 1.0038301712104252 1.9944311839965554, 1.0057629565404935 1.9984665139177658)))|
++-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 ```
 
 ## ST_HausdorffDistance

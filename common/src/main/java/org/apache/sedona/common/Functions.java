@@ -759,12 +759,12 @@ public class Functions {
     }
 
     public static Geometry makeLine(Geometry geom1, Geometry geom2) {
-       Geometry[] geoms = new Geometry[]{geom1, geom2};
-       return makeLine(geoms);
+        Geometry[] geoms = new Geometry[]{geom1, geom2};
+        return makeLine(geoms);
     }
 
     public static Geometry makeLine(Geometry[] geoms) {
-        ArrayList<Coordinate> coordinates = new ArrayList<>();      
+        ArrayList<Coordinate> coordinates = new ArrayList<>();
         for (Geometry geom : geoms) {
             if (geom instanceof Point || geom instanceof MultiPoint || geom instanceof LineString) {
                 for (Coordinate coord : geom.getCoordinates()) {
@@ -775,7 +775,7 @@ public class Functions {
                 throw new IllegalArgumentException("ST_MakeLine only supports Point, MultiPoint and LineString geometries");
             }
         }
-        
+
         Coordinate[] coords = coordinates.toArray(new Coordinate[0]);
         return GEOMETRY_FACTORY.createLineString(coords);
     }
@@ -814,7 +814,7 @@ public class Functions {
         }
         return geom;
     }
-    
+
     public static Geometry createMultiGeometry(Geometry[] geometries) {
         if (geometries.length > 1){
             return GEOMETRY_FACTORY.buildGeometry(Arrays.asList(geometries));
@@ -1001,7 +1001,7 @@ public class Functions {
     }
 
     public static Geometry force3D(Geometry geometry) {
-       return GeomUtils.get3DGeom(geometry, 0.0);
+        return GeomUtils.get3DGeom(geometry, 0.0);
     }
 
     public static Integer nRings(Geometry geometry) throws Exception {
@@ -1039,7 +1039,7 @@ public class Functions {
     }
 
     public static Geometry affine(Geometry geometry, double a, double b, double c, double d, double e, double f, double g, double h, double i, double xOff, double yOff,
-                                  double zOff) {
+            double zOff) {
         if (!geometry.isEmpty()) {
             GeomUtils.affineGeom(geometry, a, b, c, d, e, f, g, h, i, xOff, yOff, zOff);
         }

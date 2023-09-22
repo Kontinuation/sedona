@@ -1230,7 +1230,7 @@ In this case, Sedona use in-house implementation of estimation the shortest path
 
 Format: `ST_H3CellDistance(cell1: Long, cell2: Long)`
 
-Since: `v1.4.0`
+Since: `v1.5.0`
 
 Spark SQL example:
 ```SQL
@@ -1275,7 +1275,7 @@ If you seek to get the shortest path between cells, you can call this function w
 
 Format: `ST_H3CellIDs(geom: geometry, level: Int, fullCover: Boolean)`
 
-Since: `v1.4.0`
+Since: `v1.5.0`
 
 Spark SQL example:
 ```SQL
@@ -1302,7 +1302,7 @@ means only keep the cells with distance exactly `k` from the original cell
 
 Format: `ST_H3KRing(cell: Long, k: Int, exactRing: Boolean)`
 
-Since: `v1.4.0`
+Since: `v1.5.0`
 
 Spark SQL example:
 ```SQL
@@ -1327,7 +1327,7 @@ Reverse the uber h3 cells to MultiPolygon object composed by the geometry hexago
 
 Format: `ST_H3ToGeom(cells: Array[Long])`
 
-Since: `v1.4.0`
+Since: `v1.5.0`
 
 Spark SQL example:
 ```SQL
