@@ -20,11 +20,11 @@ sedona.read.format("binaryFile").load("/some/path/*.asc")
 
 Introduction: Returns a raster geometry from an Arc Info Ascii Grid file.
 
-Format: `RS_FromArcInfoAsciiGrid(asc: Array[Byte])`
+Format: `RS_FromArcInfoAsciiGrid(asc: ARRAY[Byte])`
 
 Since: `v1.4.0`
 
-Spark SQL example:
+Spark SQL Example:
 
 ```scala
 var df = sedona.read.format("binaryFile").load("/some/path/*.asc")
@@ -36,11 +36,11 @@ df = df.withColumn("raster", f.expr("RS_FromArcInfoAsciiGrid(content)"))
 
 Introduction: Returns a raster geometry from a GeoTiff file.
 
-Format: `RS_FromGeoTiff(asc: Array[Byte])`
+Format: `RS_FromGeoTiff(asc: ARRAY[Byte])`
 
 Since: `v1.4.0`
 
-Spark SQL example:
+Spark SQL Example:
 
 ```scala
 var df = sedona.read.format("binaryFile").load("/some/path/*.tiff")
@@ -83,7 +83,11 @@ Introduction: Returns an empty raster geometry. Every band in the raster is init
 
 Since: `v1.5.0`
 
-Format: `RS_MakeEmptyRaster(numBands:Int, bandDataType:String = 'D', width: Int, height: Int, upperleftX: Double, upperleftY: Double, cellSize:Double)`
+Format: 
+
+```
+RS_MakeEmptyRaster(numBands: Integer, bandDataType: String = 'D', width: Integer, height: Integer, upperleftX: Double, upperleftY: Double, cellSize: Double)
+```
 
 * NumBands: The number of bands in the raster. If not specified, the raster will have a single band.
 * BandDataType: Optional parameter specifying the data types of all the bands in the created raster.
@@ -102,7 +106,11 @@ Accepts one of:
 
 It uses the default Cartesian coordinate system.
 
-Format: `RS_MakeEmptyRaster(numBands:Int, bandDataType = 'D', width: Int, height: Int, upperleftX: Double, upperleftY: Double, scaleX:Double, scaleY:Double, skewX:Double, skewY:Double, srid: Int)`
+Format: 
+
+```
+RS_MakeEmptyRaster(numBands: Integer, bandDataType: String = 'D', width: Integer, height: Integer, upperleftX: Double, upperleftY: Double, scaleX: Double, scaleY: Double, skewX: Double, skewY: Double, srid: Integer)
+```
 
 * NumBands: The number of bands in the raster. If not specified, the raster will have a single band.
 * BandDataType: Optional parameter specifying the data types of all the bands in the created raster.
@@ -127,13 +135,14 @@ Accepts one of:
 !!!Note
   If any other value than the accepted values for the bandDataType is provided, RS_MakeEmptyRaster defaults to double as the data type for the raster.
 
-SQL example 1 (with 2 bands):
+Spark SQL example 1 (with 2 bands):
 
 ```sql
 SELECT RS_MakeEmptyRaster(2, 10, 10, 0.0, 0.0, 1.0)
 ```
 
 Output:
+
 ```
 +--------------------------------------------+
 |rs_makeemptyraster(2, 10, 10, 0.0, 0.0, 1.0)|
@@ -142,13 +151,14 @@ Output:
 +--------------------------------------------+
 ```
 
-SQL example 2 (with 2 bands and dataType):
+Spark SQL example 2 (with 2 bands and dataType):
 
 ```sql
 SELECT RS_MakeEmptyRaster(2, 'I', 10, 10, 0.0, 0.0, 1.0) - Create a raster with integer datatype
 ```
 
 Output:
+
 ```
 +--------------------------------------------+
 |rs_makeemptyraster(2, 10, 10, 0.0, 0.0, 1.0)|
@@ -158,13 +168,14 @@ Output:
 ```
 
 
-SQL example 3 (with 2 bands, scale, skew, and SRID):
+Spark SQL example 3 (with 2 bands, scale, skew, and SRID):
 
 ```sql
 SELECT RS_MakeEmptyRaster(2, 10, 10, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, 4326)
 ```
 
 Output:
+
 ```
 +------------------------------------------------------------------+
 |rs_makeemptyraster(2, 10, 10, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, 4326)|
@@ -174,7 +185,7 @@ Output:
 ```
 
 
-SQL example 4 (with 2 bands, scale, skew, and SRID):
+Spark SQL example 4 (with 2 bands, scale, skew, and SRID):
 
 ```sql
 SELECT RS_MakeEmptyRaster(2, 'F', 10, 10, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, 4326) - Create a raster with float datatype
