@@ -32,10 +32,13 @@ class IoListener(sedonaMetrics: SedonaMetrics) extends SparkListener {
 
   override def onTaskEnd(taskEnd: SparkListenerTaskEnd): Unit = {
     sedonaMetrics.tasksCompleteMetric.inc()
-    sedonaMetrics.executorRuntimeMetric.inc(taskEnd.taskMetrics.executorRunTime)
-    sedonaMetrics.recordsReadMetric.inc(taskEnd.taskMetrics.inputMetrics.recordsRead)
-    sedonaMetrics.recordsWrittenMetric.inc(taskEnd.taskMetrics.outputMetrics.recordsWritten)
-    sedonaMetrics.bytesReadMetric.inc(taskEnd.taskMetrics.inputMetrics.bytesRead)
-    sedonaMetrics.bytesWrittenMetric.inc(taskEnd.taskMetrics.outputMetrics.bytesWritten)
+    val taskMetrics = taskEnd.taskMetrics
+    if (taskMetrics != null) {
+      sedonaMetrics.executorRuntimeMetric.inc(taskMetrics.executorRunTime)
+      sedonaMetrics.recordsReadMetric.inc(taskMetrics.inputMetrics.recordsRead)
+      sedonaMetrics.recordsWrittenMetric.inc(taskMetrics.outputMetrics.recordsWritten)
+      sedonaMetrics.bytesReadMetric.inc(taskMetrics.inputMetrics.bytesRead)
+      sedonaMetrics.bytesWrittenMetric.inc(taskMetrics.outputMetrics.bytesWritten)
+    }
   }
 }
