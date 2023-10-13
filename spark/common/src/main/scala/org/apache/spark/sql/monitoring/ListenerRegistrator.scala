@@ -44,8 +44,12 @@ object ListenerRegistrator {
         sqlListenerRegistered = true
       }
     })
-    val sedonaMetrics: SedonaMetrics = new SedonaMetrics
-    SparkEnv.get.metricsSystem.registerSource(sedonaMetrics)
+    var sedonaMetrics: SedonaMetrics = new SedonaMetrics
+    val currentMetrics = SparkEnv.get.metricsSystem.getSourcesByName(sedonaMetrics.sourceName)
+    if (currentMetrics.isEmpty) {
+      SparkEnv.get.metricsSystem.registerSource(sedonaMetrics)
+    }
+    else sedonaMetrics = currentMetrics.head.asInstanceOf[SedonaMetrics]
     val listeners = createListeners(sedonaMetrics)
     if (ioListenerRegistered) {
       logger.info("IoListener is already registered!")
