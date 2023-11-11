@@ -133,4 +133,3 @@ mike deploy --update-aliases latest-snapshot latest
 mike set-default latest
 mike serve
 ```
-
