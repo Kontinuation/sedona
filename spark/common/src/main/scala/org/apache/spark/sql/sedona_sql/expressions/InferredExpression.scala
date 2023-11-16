@@ -31,6 +31,7 @@ import org.apache.spark.sql.sedona_sql.expressions.raster.implicits._
 import org.geotools.coverage.grid.GridCoverage2D
 
 import scala.collection.mutable.ArrayBuffer
+import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import scala.reflect.runtime.universe.TypeTag
 import scala.reflect.runtime.universe.Type
 import scala.reflect.runtime.universe.typeOf
@@ -168,6 +169,10 @@ object InferrableType {
     new InferrableType[Array[java.lang.Long]] {}
   implicit val doubleArrayInstance: InferrableType[Array[Double]] =
     new InferrableType[Array[Double]] {}
+  implicit val javaDoubleListInstance: InferrableType[java.util.List[java.lang.Double]] =
+    new InferrableType[java.util.List[java.lang.Double]] {}
+  implicit val javaGeomListInstance: InferrableType[java.util.List[Geometry]] =
+    new InferrableType[java.util.List[Geometry]] {}
 }
 
 object InferredTypes {
@@ -189,6 +194,10 @@ object InferredTypes {
         case null => null
         case arrayData: ArrayData => arrayData.toIntArray()
       }
+    } else if (t =:= typeOf[java.util.List[Geometry]]) {
+      expr => input => expr.toGeometryList(input)
+    } else if (t =:= typeOf[java.util.List[java.lang.Double]]) {
+      expr => input => expr.toDoubleList(input)
     } else {
       expr => input => expr.eval(input)
     }
@@ -220,14 +229,23 @@ object InferredTypes {
         } else {
           null
         }
-    } else if (t =:= typeOf[Array[java.lang.Long]] || t =:= typeOf[Array[Long]] || t =:= typeOf[Array[Double]]) {
+    } else if (t =:= typeOf[Array[java.lang.Long]] || t =:= typeOf[Array[Long]] ||
+      t =:= typeOf[Array[Double]]) {
       output =>
         if (output != null) {
           ArrayData.toArrayData(output)
         } else {
           null
         }
-    } else if (t =:= typeOf[Array[Geometry]]) {
+    }else if (t =:= typeOf[java.util.List[java.lang.Double]]) {
+      output =>
+        if (output != null) {
+          ArrayData.toArrayData(output.asInstanceOf[java.util.List[java.lang.Double]].map(elem => elem))
+        }else {
+          null
+        }
+    }
+    else if (t =:= typeOf[Array[Geometry]] || t =:= typeOf[java.util.List[Geometry]]) {
       output =>
         if (output != null) {
           ArrayData.toArrayData(output.asInstanceOf[Array[Geometry]].map(_.toGenericArrayData))
@@ -262,7 +280,7 @@ object InferredTypes {
   def inferSparkType(t: Type): DataType = {
     if (t =:= typeOf[Geometry]) {
       GeometryUDT
-    } else if (t =:= typeOf[Array[Geometry]]) {
+    } else if (t =:= typeOf[Array[Geometry]] || t =:= typeOf[java.util.List[Geometry]]) {
       DataTypes.createArrayType(GeometryUDT)
     } else if (t =:= typeOf[GridCoverage2D]) {
       RasterUDT
@@ -286,7 +304,7 @@ object InferredTypes {
       DataTypes.createArrayType(IntegerType)
     } else if (t =:= typeOf[Array[Long]] || t =:= typeOf[Array[java.lang.Long]]) {
       DataTypes.createArrayType(LongType)
-    } else if (t =:= typeOf[Array[Double]]) {
+    } else if (t =:= typeOf[Array[Double]] || t =:= typeOf[java.util.List[java.lang.Double]]) {
       DataTypes.createArrayType(DoubleType)
     } else if (t =:= typeOf[Option[Boolean]]) {
       BooleanType
