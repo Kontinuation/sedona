@@ -133,7 +133,7 @@ public class RasterConstructors
         double [] samples = RasterUtils.getRaster(rasterized.getRenderedImage()).getSamples(0, 0, width, height, 0, (double[]) null);
         writableRaster.setSamples(0, 0, width, height, 0, samples);
 
-        return RasterUtils.create(writableRaster, rasterized.getGridGeometry(), rasterized.getSampleDimensions(), noDataValue);
+        return RasterUtils.clone(writableRaster, rasterized.getSampleDimensions(), rasterized, noDataValue, false); //no need to original raster metadata since this is a new raster.
     }
 
     /**
