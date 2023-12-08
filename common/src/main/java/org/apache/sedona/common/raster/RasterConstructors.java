@@ -19,6 +19,7 @@ import org.apache.sedona.common.raster.inputstream.ByteArrayImageInputStream;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbResourcePool;
 import org.apache.sedona.common.utils.ImageUtils;
+import org.apache.sedona.common.raster.netcdf.NetCdfReader;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
@@ -33,6 +34,7 @@ import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.process.vector.VectorToRasterProcess;
+import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultEngineeringCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.geotools.util.factory.Hints;
@@ -44,6 +46,8 @@ import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.datum.PixelInCell;
 import org.opengis.referencing.operation.MathTransform;
+import ucar.nc2.NetcdfFile;
+import ucar.nc2.NetcdfFiles;
 
 import javax.media.jai.RasterFactory;
 import java.awt.Rectangle;
@@ -53,8 +57,8 @@ import java.awt.image.WritableRaster;
 import java.io.IOException;
 import java.util.Map;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 public class RasterConstructors
 {
@@ -71,6 +75,24 @@ public class RasterConstructors
     public static GridCoverage2D fromPath(String path, byte[] serializedConf, Map<String, String> params) throws IOException {
         OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(new Path(path), serializedConf, params);
         return OutDbGridCoverage2D.create("outDbCoverage", resourceKey);
+    }
+    public static GridCoverage2D fromNetCDF(byte[] bytes, String variableName, String lonDimensionName, String latDimensionName) throws IOException, FactoryException {
+       NetcdfFile netcdfFile = openNetCdfBytes(bytes);
+       return NetCdfReader.getRaster(netcdfFile, variableName, latDimensionName, lonDimensionName);
+    }
+
+    public static GridCoverage2D fromNetCDF(byte[] bytes, String recordVariableName) throws IOException, FactoryException {
+        NetcdfFile netcdfFile = openNetCdfBytes(bytes);
+        return NetCdfReader.getRaster(netcdfFile, recordVariableName);
+    }
+
+    public static String getRecordInfo(byte[] bytes) throws IOException {
+        NetcdfFile netcdfFile = openNetCdfBytes(bytes);
+        return NetCdfReader.getRecordInfo(netcdfFile);
+    }
+
+    private static NetcdfFile openNetCdfBytes(byte[] bytes) throws IOException {
+        return NetcdfFiles.openInMemory("", bytes);
     }
 
     /**
@@ -325,7 +347,31 @@ public class RasterConstructors
                 new GridEnvelope2D(0, 0, widthInPixel, heightInPixel),
                 PixelInCell.CELL_CORNER,
                 transform, crs, null);
-        return RasterUtils.create(raster, gridGeometry, null);
+        return RasterUtils.create(raster, gridGeometry, null, null);
+    }
+
+    public static GridCoverage2D makeNonEmptyRaster(int numBand, int widthInPixel, int heightInPixel, double upperLeftX, double upperLeftY, double scaleX, double scaleY, double skewX, double skewY, int srid, double[][] data, Map<String, List<String>> properties, Double noDataValue, PixelInCell anchor) throws FactoryException {
+        CoordinateReferenceSystem crs;
+        if (srid == 0) {
+            crs = DefaultEngineeringCRS.GENERIC_2D;
+        } else {
+            // Create the CRS from the srid
+            // Longitude first, Latitude second
+            crs = CRS.decode("EPSG:" + srid, true);
+        }
+
+        // Create a new empty raster
+        WritableRaster raster = RasterFactory.createBandedRaster(5, widthInPixel, heightInPixel, numBand, null); //create a raster with double values
+        for (int i = 0; i < numBand; i++) {
+            raster.setSamples(0, 0, widthInPixel, heightInPixel, i, data[i]);
+        }
+        //raster.setPixels(0, 0, widthInPixel, heightInPixel, data);
+        MathTransform transform = new AffineTransform2D(scaleX, skewY, skewX, scaleY, upperLeftX, upperLeftY);
+        GridGeometry2D gridGeometry = new GridGeometry2D(
+                new GridEnvelope2D(0, 0, widthInPixel, heightInPixel),
+                anchor,
+                transform, crs, null);
+        return RasterUtils.create(raster, gridGeometry, null, noDataValue, properties);
     }
 
     public static GridCoverage2D makeNonEmptyRaster(int numBands, String bandDataType, int widthInPixel, int heightInPixel, double upperLeftX, double upperLeftY, double scaleX, double scaleY, double skewX, double skewY, int srid, double[][] rasterValues) {
