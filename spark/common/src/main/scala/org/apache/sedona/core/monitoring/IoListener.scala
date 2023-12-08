@@ -14,15 +14,28 @@
  */
 package org.apache.sedona.core.monitoring
 
+import com.codahale.metrics.Timer
 import org.apache.log4j.Logger
 import org.apache.spark.metrics.source.SedonaMetrics
 import org.apache.spark.scheduler._
 
+import java.util.concurrent.ConcurrentHashMap
+
 class IoListener(sedonaMetrics: SedonaMetrics) extends SparkListener {
   private val logger = Logger.getLogger("Sedona IO Metrics Monitor")
+  private val jobTimers = new ConcurrentHashMap[Int, Timer.Context]()
 
+  override def onJobStart(jobStart: SparkListenerJobStart): Unit = {
+    jobTimers.put(jobStart.jobId, sedonaMetrics.jobExecutiontimeMetric.time())
+  }
   override def onJobEnd(jobEnd: SparkListenerJobEnd): Unit = {
+    val jobTimer = jobTimers.remove(jobEnd.jobId)
+    jobTimer.stop()
     sedonaMetrics.jobsCompleteMetric.inc()
+    jobEnd.jobResult match {
+      case JobSucceeded => sedonaMetrics.jobSuccessMetric.inc()
+      case _ => sedonaMetrics.jobFailedMetric.inc()
+    }
     logger.info("Reported Sedona IO metrics")
   }
 

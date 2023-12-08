@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 package org.apache.spark.metrics.source
-import com.codahale.metrics.{Counter, MetricRegistry}
+import com.codahale.metrics.{Counter, MetricRegistry, Timer}
 import org.apache.sedona.sql.UDF.Catalog
 
 import scala.collection.mutable
@@ -33,6 +33,9 @@ class SedonaMetrics extends Source {
   val recordsWrittenMetric: Counter = createCounterMetric("recordsWritten", "Total records written")
   val bytesReadMetric: Counter = createCounterMetric("bytesRead", "Total bytes read")
   val bytesWrittenMetric: Counter = createCounterMetric("bytesWritten", "Total bytes written")
+  val jobExecutiontimeMetric: Timer = createTimerMetric("jobExecutionTime", "Total job execution time in nanoseconds")
+  val jobFailedMetric: Counter = createCounterMetric("jobFailed", "Number of failed Sedona jobs")
+  val jobSuccessMetric: Counter = createCounterMetric("jobSuccess", "Number of successful Sedona jobs")
   val functionCallMetrics: mutable.Map[String, Counter] = createCounterMetricMap()
 
   /**
@@ -60,6 +63,10 @@ class SedonaMetrics extends Source {
 
   private def createCounterMetric(name: String, description: String): Counter = {
     metricRegistry.counter(MetricRegistry.name(name))
+  }
+
+  private def createTimerMetric(name: String, description: String): Timer = {
+    metricRegistry.timer(name)
   }
 
   private def createCounterMetricMap(): mutable.HashMap[String, Counter] = {
