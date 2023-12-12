@@ -34,6 +34,7 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
   Logger.getLogger("akka").setLevel(Level.WARN)
   Logger.getLogger("org.apache.sedona.core").setLevel(Level.WARN)
 
+  val resourceFolder = System.getProperty("user.dir") + "/src/test/resources/"
   val warehouseLocation = System.getProperty("user.dir") + "/target/"
   val sparkSession = SedonaContext.builder().
     master("local[*]").appName("sedonasqlScalaTest")
@@ -41,12 +42,15 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
     // We need to be explicit about broadcasting in tests.
     .config("sedona.join.autoBroadcastJoinThreshold", "-1")
     .config("spark.kryoserializer.buffer.max", "64m")
-//    .config("spark.metrics.conf.*.sink.console.class", "org.apache.spark.metrics.sink.ConsoleSink")
+    .config("sedonaai.entrance", resourceFolder + "python/udfEntrance.py")
+    .config("sedonaai.files", resourceFolder + "python/udfDefinition.py")
+    // This arg is for the batch parameter used in the Python Pandas UDF test.
+    .config("sedonaai.args", "3")
+    //    .config("spark.metrics.conf.*.sink.console.class", "org.apache.spark.metrics.sink.ConsoleSink")
     .getOrCreate()
 
   val sc = sparkSession.sparkContext
 
-  val resourceFolder = System.getProperty("user.dir") + "/src/test/resources/"
   val mixedWkbGeometryInputLocation = resourceFolder + "county_small_wkb.tsv"
   val mixedWktGeometryInputLocation = resourceFolder + "county_small.tsv"
   val shapefileInputLocation = resourceFolder + "shapefiles/dbf"

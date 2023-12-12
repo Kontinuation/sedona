@@ -18,16 +18,25 @@
  */
 package org.apache.sedona.spark
 
+import org.apache.log4j.Logger
 import org.apache.sedona.core.serde.SedonaKryoRegistrator
 import org.apache.sedona.sql.UDF.UdfRegistrator
 import org.apache.sedona.sql.UDT.UdtRegistrator
+import org.apache.spark.SparkConf
+import org.apache.spark.api.java.JavaSparkContext
+import org.apache.spark.deploy.PythonRunner
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.monitoring.ListenerRegistrator
 import org.apache.spark.sql.sedona_sql.optimization.{SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
 import org.apache.spark.sql.{SQLContext, SparkSession}
 
+import scala.collection.mutable.ListBuffer
+
 object SedonaContext {
+  val logger: Logger = Logger.getLogger("SedonaContext")
+  var jsc: JavaSparkContext = _
+  var jconf: SparkConf = _
   def create(sqlContext: SQLContext): SQLContext = {
     create(sqlContext.sparkSession)
     sqlContext
@@ -51,6 +60,30 @@ object SedonaContext {
     UdtRegistrator.registerAll()
     UdfRegistrator.registerAll(sparkSession)
     ListenerRegistrator.registerAll(sparkSession)
+    jsc = new JavaSparkContext(sparkSession.sparkContext)
+    jconf = jsc.getConf
+    try {
+      val pythonRunnerInputs = ListBuffer.empty[String]
+      // This is the path to the Python entrance. It should contain the main() method. This is a mandatory configuration.
+      val pythonEntrancePath = sparkSession.conf.get("sedonaai.entrance")
+      pythonRunnerInputs += pythonEntrancePath
+      // This is the path to the Python files. This is an optional configuration.
+      // If no dependencies are provided, this will use the Python entrance path.
+      var pythonFilesPath = sparkSession.conf.get("sedonaai.files", "")
+      if (pythonFilesPath == "") {
+        pythonFilesPath = pythonEntrancePath
+      }
+      pythonRunnerInputs += pythonFilesPath
+      // This is a list of comma separated arguments to be passed to the Python entrance. This is an optional configuration.
+      val pythonFilesArgs = sparkSession.conf.get("sedonaai.args", "")
+      if (pythonFilesArgs != "") {
+        pythonFilesArgs.split(",").foreach(arg => pythonRunnerInputs += arg)
+      }
+      PythonRunner.main(pythonRunnerInputs.toArray)
+    }
+    catch {
+      case e: NoSuchElementException => logger.warn("Python files are not set. Sedona will not pre-load Python UDFs.")
+    }
     sparkSession
   }
 
