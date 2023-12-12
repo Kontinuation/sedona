@@ -158,6 +158,11 @@
                 <version>${jts.version}</version>
             </dependency>
             <dependency>
+                <groupId>org.locationtech.jts.io</groupId>
+                <artifactId>jts-io-common</artifactId>
+                <version>${jts.version}</version>
+            </dependency>
+            <dependency>
                 <groupId>org.locationtech.spatial4j</groupId>
                 <artifactId>spatial4j</artifactId>
                 <version>${spatial4j.version}</version>
