@@ -2,9 +2,6 @@ name: Python build wheels
 
 on:
   push:
-    paths-ignore:
-      - 'snowflake/**'
-      - 'snowflake-tester/**'
     branches:
       - master
     paths:
@@ -14,9 +11,6 @@ on:
       - 'pom.xml'
       - 'python/**'
   pull_request:
-    paths-ignore:
-      - 'snowflake/**'
-      - 'snowflake-tester/**'
     branches:
       - '*'
     paths:

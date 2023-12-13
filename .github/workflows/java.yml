@@ -2,9 +2,6 @@ name: Scala and Java build
 
 on:
   push:
-    paths-ignore:
-      - 'snowflake/**'
-      - 'snowflake-tester/**'
     branches:
       - master
     paths:
@@ -16,9 +13,6 @@ on:
       - 'snowflake/**'
       - 'pom.xml'
   pull_request:
-    paths-ignore:
-      - 'snowflake/**'
-      - 'snowflake-tester/**'
     branches:
       - '*'
     paths:
