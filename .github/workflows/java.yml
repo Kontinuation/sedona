@@ -7,12 +7,28 @@ on:
       - 'snowflake-tester/**'
     branches:
       - master
+    paths:
+      - 'common/**'
+      - 'spark/**'
+      - 'spark-shaded/**'
+      - 'flink/**'
+      - 'flink-shaded/**'
+      - 'snowflake/**'
+      - 'pom.xml'
   pull_request:
     paths-ignore:
       - 'snowflake/**'
       - 'snowflake-tester/**'
     branches:
       - '*'
+    paths:
+      - 'common/**'
+      - 'spark/**'
+      - 'spark-shaded/**'
+      - 'flink/**'
+      - 'flink-shaded/**'
+      - 'snowflake/**'
+      - 'pom.xml'
 
 env:
   MAVEN_OPTS: -Dmaven.wagon.httpconnectionManager.ttlSeconds=60
