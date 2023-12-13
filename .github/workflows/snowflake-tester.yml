@@ -1,4 +1,4 @@
-name: Snowflake intergation test with real snowflake env
+name: Snowflake integration test with real snowflake env
 
 on:
   push:
