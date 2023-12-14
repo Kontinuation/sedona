@@ -19,6 +19,7 @@ on:
       - 'spark-shaded/**'
       - 'pom.xml'
       - 'python/**'
+
 jobs:
   build:
     strategy:
@@ -37,7 +38,7 @@ jobs:
       with:
         python-version: ${{ matrix.python }}
     - name: Install pipenv
-      run: pip install -U pipenv==2023.9.1
+      run: pip install -U pipenv
     - name: Install dependencies
       run: |
         cd python
