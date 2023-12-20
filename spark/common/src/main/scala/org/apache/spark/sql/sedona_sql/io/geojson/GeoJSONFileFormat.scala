@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.sedona_sql.io.stac
+package org.apache.spark.sql.sedona_sql.io.geojson
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
@@ -33,8 +33,8 @@ import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
 import org.apache.spark.sql.types.StructType
 
-class StacFileFormat extends TextBasedFileFormat with DataSourceRegister {
-  override val shortName: String = "stac"
+class GeoJSONFileFormat extends TextBasedFileFormat with DataSourceRegister {
+  override val shortName: String = "geojson"
 
   override def isSplitable(
                             sparkSession: SparkSession,
@@ -63,19 +63,9 @@ class StacFileFormat extends TextBasedFileFormat with DataSourceRegister {
       sparkSession, files, parsedOptions)
 
     fullSchemaOption.map { fullSchema =>
-      // Add a new field for the UDT representation of geometry
-      val geometryUDTField = StructField("geometryUDT", GeometryUDT, nullable = true)
-      val newFields = fullSchema.fields :+ geometryUDTField
-
-      if (fullSchema.fieldNames.contains("properties") && fullSchema("properties").dataType.isInstanceOf[StructType]) {
-        val propertiesSchema = fullSchema("properties").dataType.asInstanceOf[StructType]
-
-        // Use createExtendedSchema to elevate 'properties' fields to top level
-        StacUtils.createExtendedSchema(StructType(newFields), propertiesSchema.fields.map(f => f.name -> f.dataType).toMap)
-      } else {
-
-        StructType(newFields)
-      }
+      // Replace 'geometry' field type with GeometryUDT
+      val newFields = GeoJSONUtils.updateGeometrySchema(fullSchema, GeometryUDT)
+      StructType(newFields)
     }
   }
 
@@ -100,25 +90,13 @@ class StacFileFormat extends TextBasedFileFormat with DataSourceRegister {
                                 dataSchema: StructType,
                                 context: TaskAttemptContext): OutputWriter = {
 
-        // Extract the names of nested property fields
-        val propertiesFieldNames: Set[String] = dataSchema.find(_.name == "properties") match {
-          case Some(structField) if structField.dataType.isInstanceOf[StructType] =>
-            structField.dataType.asInstanceOf[StructType].fieldNames.toSet
-          case _ => Set.empty[String]
-        }
+        // Replace 'geometry' field type with StringType
+        val alteredSchema = GeoJSONUtils.updateGeometrySchema(dataSchema, StringType)
 
-        // Define the STAC schema
-        val stacSchema = StructType(dataSchema.fields.filterNot(field =>
-          propertiesFieldNames.contains(field.name) || field.name == "geometryUDT" // exclude elevated properties and geometryUDT
-        ))
-
-        val transformToStac: InternalRow => InternalRow = row =>
-          StacUtils.extractStacFields(row, dataSchema, stacSchema)
-
-        new JsonOutputWriter(path, parsedOptions, stacSchema, context) {
+        new JsonOutputWriter(path, parsedOptions, alteredSchema, context) {
           override def write(row: InternalRow): Unit = {
-            // Transform the row to STAC format before writing
-            super.write(transformToStac(row))
+            val modifiedRow = GeoJSONUtils.convertGeometryToGeoJson(row, dataSchema)
+            super.write(modifiedRow)
           }
         }
       }
@@ -151,14 +129,16 @@ class StacFileFormat extends TextBasedFileFormat with DataSourceRegister {
       StructType(requiredSchema.filterNot(_.name == parsedOptions.columnNameOfCorruptRecord))
     ExprUtils.verifyColumnNameOfCorruptRecord(dataSchema, parsedOptions.columnNameOfCorruptRecord)
 
+    val alteredSchema = GeoJSONUtils.updateGeometrySchema(actualSchema, StringType)
+
     if (requiredSchema.length == 1 &&
       requiredSchema.head.name == parsedOptions.columnNameOfCorruptRecord) {
-//      throw QueryCompilationErrors.queryFromRawFilesIncludeCorruptRecordColumnError()
+      //      throw QueryCompilationErrors.queryFromRawFilesIncludeCorruptRecordColumnError()
     }
 
     (file: PartitionedFile) => {
       val parser = new JacksonParser(
-        actualSchema,
+        alteredSchema,
         parsedOptions,
         allowArrayAsStructs = true)
       val dataSource = JsonDataSource(parsedOptions)
@@ -167,22 +147,9 @@ class StacFileFormat extends TextBasedFileFormat with DataSourceRegister {
         broadcastedHadoopConf.value.value,
         file,
         parser,
-        requiredSchema).map(row => {
-
-        // Extract and elevate properties from the row
-        var elevatedProperties = StacUtils.elevateProperties(row, actualSchema)
-
-        // If geometry field exists, convert it and add to elevatedProperties
-        if (actualSchema.fieldNames.contains("geometry")) {
-          val geometryFieldIndex = actualSchema.fieldIndex("geometry")
-          val geometryInternalRow = row.getStruct(geometryFieldIndex, actualSchema("geometry").dataType.asInstanceOf[StructType].fields.length)
-          val geometrySchema = actualSchema("geometry").dataType.asInstanceOf[StructType]
-          val geometryUDT = StacUtils.convertGeometryStructToSerialized(geometryInternalRow, geometrySchema)
-          elevatedProperties = elevatedProperties + ("geometryUDT" -> geometryUDT)
-        }
-
-        // Create a new row with elevated properties using the extended schema
-        StacUtils.createNewRow(row, elevatedProperties, actualSchema, requiredSchema)
+        actualSchema).map(row => {
+        val newRow = GeoJSONUtils.convertGeoJsonToGeometry(row, alteredSchema)
+        newRow
       })
     }
   }
@@ -192,7 +159,7 @@ class StacFileFormat extends TextBasedFileFormat with DataSourceRegister {
 
   override def hashCode(): Int = getClass.hashCode()
 
-  override def equals(other: Any): Boolean = other.isInstanceOf[StacFileFormat]
+  override def equals(other: Any): Boolean = other.isInstanceOf[GeoJSONFileFormat]
 
   override def supportDataType(dataType: DataType): Boolean = dataType match {
 
