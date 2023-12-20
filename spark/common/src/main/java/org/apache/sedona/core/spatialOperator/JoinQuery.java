@@ -37,6 +37,8 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.PairFunction;
+import org.apache.spark.rdd.RDDExtension;
+import org.apache.spark.sql.execution.metric.SQLMetric;
 import org.apache.spark.util.LongAccumulator;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
@@ -560,14 +562,38 @@ public class JoinQuery
                 joinResult = leftRDD.indexedRDD.zipPartitions(rightRDD.spatialPartitionedRDD, judgement);
             }
             else {
-                log.warn("UseIndex is true, but no index exists. Will build index on the fly.");
-                DynamicIndexLookupJudgement judgement =
-                        new DynamicIndexLookupJudgement(
-                                joinParams.spatialPredicate,
-                                joinParams.indexType,
-                                joinParams.joinBuildSide,
-                                buildCount, streamCount, resultCount, candidateCount);
-                joinResult = leftRDD.spatialPartitionedRDD.zipPartitions(rightRDD.spatialPartitionedRDD, judgement);
+                if (leftRDD.getStatistics() != null && rightRDD.getStatistics() != null) {
+                    // Left and right are both partitioned using advanced statistics. We can use the statistics to
+                    // run adaptive spatial join.
+                    LongAccumulator buildTime = Metrics.createMetric(sparkContext, "buildTime");
+                    LongAccumulator buildLeftTasks = Metrics.createMetric(sparkContext, "buildLeftTasks");
+                    LongAccumulator buildRightTasks = Metrics.createMetric(sparkContext, "buildRightTasks");
+                    LongAccumulator prepareBuildTasks = Metrics.createMetric(sparkContext, "prepareBuildTasks");
+                    LongAccumulator prepareStreamTasks = Metrics.createMetric(sparkContext, "prepareStreamTasks");
+                    AdaptiveIndexLookupJudgement<U, T> judgement =
+                            new AdaptiveIndexLookupJudgement<>(
+                                    joinParams.spatialPredicate,
+                                    leftRDD.getStatistics(),
+                                    rightRDD.getStatistics(),
+                                    leftRDD.getPartitioner(),
+                                    buildCount, streamCount, resultCount, candidateCount, buildTime,
+                                    buildLeftTasks, buildRightTasks,
+                                    prepareBuildTasks, prepareStreamTasks,
+                                    joinParams.buildCount, joinParams.streamCount, joinParams.resultCount,
+                                    joinParams.candidateCount, joinParams.buildTime, joinParams.buildLeftTasks,
+                                    joinParams.buildRightTasks, joinParams.prepareBuildTasks,
+                                    joinParams.prepareStreamTasks);
+                    return runAdvancedSpatialJoin(leftRDD, rightRDD, judgement);
+                } else {
+                    log.warn("UseIndex is true, but no index exists. Will build index on the fly.");
+                    DynamicIndexLookupJudgement judgement =
+                            new DynamicIndexLookupJudgement(
+                                    joinParams.spatialPredicate,
+                                    joinParams.indexType,
+                                    joinParams.joinBuildSide,
+                                    buildCount, streamCount, resultCount, candidateCount);
+                    joinResult = leftRDD.spatialPartitionedRDD.zipPartitions(rightRDD.spatialPartitionedRDD, judgement);
+                }
             }
         }
         else {
@@ -580,6 +606,15 @@ public class JoinQuery
                 .mapToPair((PairFunction<Pair<U, T>, U, T>) pair -> new Tuple2<>(pair.getKey(), pair.getValue()));
     }
 
+    private static <U extends Geometry, T extends Geometry> JavaPairRDD<U, T> runAdvancedSpatialJoin(
+            SpatialRDD<U> leftRDD, SpatialRDD<T> rightRDD, AdaptiveIndexLookupJudgement<U, T> judgement) {
+        JavaSparkContext sparkContext = new JavaSparkContext(leftRDD.spatialPartitionedRDD.context());
+        judgement.prepare(sparkContext);
+        final JavaRDD<Pair<U, T>> joinResult = RDDExtension.javaZipPartitionsWithIndex(leftRDD.spatialPartitionedRDD,
+                rightRDD.spatialPartitionedRDD, judgement);
+        return joinResult.mapToPair((PairFunction<Pair<U, T>, U, T>) pair -> new Tuple2<>(pair.getKey(), pair.getValue()));
+    }
+
     public static final class JoinParams
     {
         public final boolean useIndex;
@@ -587,12 +622,43 @@ public class JoinQuery
         public final IndexType indexType;
         public final JoinBuildSide joinBuildSide;
 
+        // SQL metrics to be used for updating metrics shown on the SQL execution page when running advanced spatial join
+        public final SQLMetric buildCount;
+        public final SQLMetric streamCount;
+        public final SQLMetric resultCount;
+        public final SQLMetric candidateCount;
+        public final SQLMetric buildTime;
+        public final SQLMetric buildLeftTasks;
+        public final SQLMetric buildRightTasks;
+        public final SQLMetric prepareBuildTasks;
+        public final SQLMetric prepareStreamTasks;
+
         public JoinParams(boolean useIndex, SpatialPredicate spatialPredicate, IndexType polygonIndexType, JoinBuildSide joinBuildSide)
+        {
+            this(useIndex, spatialPredicate, polygonIndexType, joinBuildSide,
+                    null, null, null, null, null,
+                    null, null, null, null);
+        }
+
+        public JoinParams(boolean useIndex, SpatialPredicate spatialPredicate, IndexType polygonIndexType,
+                          JoinBuildSide joinBuildSide,
+                          SQLMetric buildCount, SQLMetric streamCount, SQLMetric resultCount, SQLMetric candidateCount,
+                          SQLMetric buildTime, SQLMetric buildLeftTasks, SQLMetric buildRightTasks,
+                          SQLMetric prepareBuildTasks, SQLMetric prepareStreamTasks)
         {
             this.useIndex = useIndex;
             this.spatialPredicate = spatialPredicate;
             this.indexType = polygonIndexType;
             this.joinBuildSide = joinBuildSide;
+            this.buildCount = buildCount;
+            this.streamCount = streamCount;
+            this.resultCount = resultCount;
+            this.candidateCount = candidateCount;
+            this.buildTime = buildTime;
+            this.buildLeftTasks = buildLeftTasks;
+            this.buildRightTasks = buildRightTasks;
+            this.prepareBuildTasks = prepareBuildTasks;
+            this.prepareStreamTasks = prepareStreamTasks;
         }
 
         public JoinParams(boolean useIndex, SpatialPredicate spatialPredicate)

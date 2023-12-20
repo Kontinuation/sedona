@@ -57,7 +57,7 @@ case class DistanceJoinExec(left: SparkPlan,
                             isGeography: Boolean,
                             extraCondition: Option[Expression] = None)
   extends SedonaBinaryExecNode
-    with TraitJoinQueryExec
+    with TraitAdvancedJoinQueryExec
     with Logging {
 
   private val boundRadius = if (distanceBoundToLeft) {

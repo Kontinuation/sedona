@@ -33,6 +33,12 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
 
   val testDataDelimiter = "\t"
   val spatialJoinPartitionSideConfKey = "sedona.join.spatitionside"
+  val advancedSpatialJoinConfKey = "sedona.join.advanced"
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    prepareTempViewsForTestData()
+  }
 
   describe("Sedona-SQL Spatial Join Test") {
     val joinConditions = Table("join condition",
@@ -67,39 +73,38 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       "ST_Distance(df2.geom, df1.geom) < df2.dist"
     )
 
-    var spatialJoinPartitionSide = "left"
-    try {
-      spatialJoinPartitionSide = sparkSession.sparkContext.getConf.get(spatialJoinPartitionSideConfKey, "left")
-      forAll (joinConditions) { joinCondition =>
-        it(s"should join two dataframes with $joinCondition") {
-          sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, "left")
-          prepareTempViewsForTestData()
+    forAll (joinConditions) { joinCondition =>
+      it(s"should join two dataframes with $joinCondition") {
+        withConf(Map(spatialJoinPartitionSideConfKey -> "left", advancedSpatialJoinConfKey -> "false")) {
           val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
-          val expected = buildExpectedResult(joinCondition)
-          verifyResult(expected, result)
-        }
-        it(s"should join two dataframes with $joinCondition, with right side as dominant side") {
-          sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, "right")
-          prepareTempViewsForTestData()
-          val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
-          val expected = buildExpectedResult(joinCondition)
-          verifyResult(expected, result)
-        }
-        it(s"should join two dataframes with $joinCondition, broadcast the left side") {
-          prepareTempViewsForTestData()
-          val result = sparkSession.sql(s"SELECT /*+ BROADCAST(df1) */ df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
-          val expected = buildExpectedResult(joinCondition)
-          verifyResult(expected, result)
-        }
-        it(s"should join two dataframes with $joinCondition, broadcast the right side") {
-          prepareTempViewsForTestData()
-          val result = sparkSession.sql(s"SELECT /*+ BROADCAST(df2) */ df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
           val expected = buildExpectedResult(joinCondition)
           verifyResult(expected, result)
         }
       }
-    } finally {
-      sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, spatialJoinPartitionSide)
+      it(s"should join two dataframes with $joinCondition, with right side as dominant side") {
+        withConf(Map(spatialJoinPartitionSideConfKey -> "right", advancedSpatialJoinConfKey -> "false")) {
+          val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+          val expected = buildExpectedResult(joinCondition)
+          verifyResult(expected, result)
+        }
+      }
+      it(s"should join two dataframes with $joinCondition, broadcast the left side") {
+        val result = sparkSession.sql(s"SELECT /*+ BROADCAST(df1) */ df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+        val expected = buildExpectedResult(joinCondition)
+        verifyResult(expected, result)
+      }
+      it(s"should join two dataframes with $joinCondition, broadcast the right side") {
+        val result = sparkSession.sql(s"SELECT /*+ BROADCAST(df2) */ df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+        val expected = buildExpectedResult(joinCondition)
+        verifyResult(expected, result)
+      }
+      it(s"should join two dataframes with $joinCondition, using advanced spatial join") {
+        withConf(Map(advancedSpatialJoinConfKey -> "true")) {
+          val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+          val expected = buildExpectedResult(joinCondition)
+          verifyResult(expected, result)
+        }
+      }
     }
   }
 
@@ -113,7 +118,6 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
 
     forAll (joinConditions) { joinCondition =>
       it(s"should SELECT * in join query with $joinCondition produce correct result") {
-        prepareTempViewsForTestData()
         val resultAll = sparkSession.sql(s"SELECT * FROM df1 JOIN df2 ON $joinCondition").collect()
         val result = resultAll.map(row => (row.getInt(0), row.getInt(3))).sorted
         val expected = buildExpectedResult(joinCondition)
@@ -122,7 +126,6 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       }
 
       it(s"should SELECT * in join query with $joinCondition produce correct result, broadcast the left side") {
-        prepareTempViewsForTestData()
         val resultAll = sparkSession.sql(s"SELECT /*+ BROADCAST(df1) */ * FROM df1 JOIN df2 ON $joinCondition").collect()
         val result = resultAll.map(row => (row.getInt(0), row.getInt(3))).sorted
         val expected = buildExpectedResult(joinCondition)
@@ -131,7 +134,6 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       }
 
       it(s"should SELECT * in join query with $joinCondition produce correct result, broadcast the right side") {
-        prepareTempViewsForTestData()
         val resultAll = sparkSession.sql(s"SELECT /*+ BROADCAST(df2) */ * FROM df1 JOIN df2 ON $joinCondition").collect()
         val result = resultAll.map(row => (row.getInt(0), row.getInt(3))).sorted
         val expected = buildExpectedResult(joinCondition)
@@ -144,7 +146,6 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
   describe("Spatial join in Sedona SQL should be configurable using sedona.join.optimizationmode") {
     it("Optimize all spatial joins when sedona.join.optimizationmode = all") {
       withOptimizationMode("all") {
-        prepareTempViewsForTestData()
         val df = sparkSession.sql("SELECT df1.id, df2.id FROM df1 JOIN df2 ON df1.id = df2.id AND ST_Intersects(df1.geom, df2.geom)")
         assert(isUsingOptimizedSpatialJoin(df))
         val expectedResult = buildExpectedResult("ST_Intersects(df1.geom, df2.geom)")
@@ -155,7 +156,6 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
 
     it("Only optimize non-equi-joins when sedona.join.optimizationmode = nonequi") {
       withOptimizationMode("nonequi") {
-        prepareTempViewsForTestData()
         val df = sparkSession.sql("SELECT df1.id, df2.id FROM df1 JOIN df2 ON ST_Intersects(df1.geom, df2.geom)")
         assert(isUsingOptimizedSpatialJoin(df))
         val df2 = sparkSession.sql("SELECT df1.id, df2.id FROM df1 JOIN df2 ON df1.id = df2.id AND ST_Intersects(df1.geom, df2.geom)")
@@ -165,21 +165,26 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
 
     it("Won't optimize spatial joins when sedona.join.optimizationmode = none") {
       withOptimizationMode("none") {
-        prepareTempViewsForTestData()
         val df = sparkSession.sql("SELECT df1.id, df2.id FROM df1 JOIN df2 ON ST_Intersects(df1.geom, df2.geom)")
         assert(!isUsingOptimizedSpatialJoin(df))
       }
     }
   }
 
-  private def withOptimizationMode(mode: String)(body: => Unit) : Unit = {
-    val oldOptimizationMode = sparkSession.conf.get("sedona.join.optimizationmode", "nonequi")
-    try {
-      sparkSession.conf.set("sedona.join.optimizationmode", mode)
-      body
-    } finally {
-      sparkSession.conf.set("sedona.join.optimizationmode", oldOptimizationMode)
+  describe("Advanced spatial join on datasets with disjoint extents") {
+    it("Should give empty result") {
+      withConf(Map(advancedSpatialJoinConfKey -> "true")) {
+        val result = sparkSession.sql(
+          "SELECT df1.id, df2.id FROM df1 JOIN df2 ON ST_Intersects(df1.geom, df2.geom) " +
+            "WHERE ST_Within(df1.geom, ST_PolygonFromEnvelope(-100, -100, 0, 100)) AND " +
+            "ST_Within(df2.geom, ST_PolygonFromEnvelope(0, -100, 100, 100))")
+        assert(result.isEmpty)
+      }
     }
+  }
+
+  private def withOptimizationMode(mode: String)(body: => Unit) : Unit = {
+    withConf(Map("sedona.join.optimizationmode" -> mode))(body)
   }
 
   private def prepareTempViewsForTestData(): (DataFrame, DataFrame) = {

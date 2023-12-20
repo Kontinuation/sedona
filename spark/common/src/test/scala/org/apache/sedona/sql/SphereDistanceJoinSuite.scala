@@ -28,7 +28,7 @@ import scala.util.Random
 
 class SphereDistanceJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
   private val spatialJoinPartitionSideConfKey = "sedona.join.spatitionside"
-  private val spatialJoinPartitionSide = sparkSession.sparkContext.getConf.get(spatialJoinPartitionSideConfKey, "left")
+  private val advancedSpatialJoinConfKey = "sedona.join.advanced"
   private val factory = new GeometryFactory()
 
   private val testData1: Seq[(Int, Double, Geometry)] = generateTestData()
@@ -57,30 +57,34 @@ class SphereDistanceJoinSuite extends TestBaseScala with TableDrivenPropertyChec
       "ST_DistanceSpheroid(df2.geom, df1.geom) < df2.dist"
     )
 
-    try {
-      forAll(joinConditions) { joinCondition =>
-        val expected = buildExpectedResult(joinCondition)
-        it(s"sphere distance join ON $joinCondition, with left side as dominant side") {
-          sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, "left")
+    forAll(joinConditions) { joinCondition =>
+      val expected = buildExpectedResult(joinCondition)
+      it(s"sphere distance join ON $joinCondition, with left side as dominant side") {
+        withConf(Map(spatialJoinPartitionSideConfKey -> "left", advancedSpatialJoinConfKey -> "false")) {
           val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
-          verifyResult(expected, result)
-        }
-        it(s"sphere distance join ON $joinCondition, with right side as dominant side") {
-          sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, "right")
-          val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
-          verifyResult(expected, result)
-        }
-        it(s"sphere distance ON $joinCondition, broadcast df1") {
-          val result = sparkSession.sql(s"SELECT /*+ BROADCAST(df1) */ df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
-          verifyResult(expected, result)
-        }
-        it(s"sphere distance ON $joinCondition, broadcast df2") {
-          val result = sparkSession.sql(s"SELECT /*+ BROADCAST(df2) */ df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
           verifyResult(expected, result)
         }
       }
-    } finally {
-      sparkSession.sparkContext.getConf.set(spatialJoinPartitionSideConfKey, spatialJoinPartitionSide)
+      it(s"sphere distance join ON $joinCondition, with right side as dominant side") {
+        withConf(Map(spatialJoinPartitionSideConfKey -> "right", advancedSpatialJoinConfKey -> "false")) {
+          val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+          verifyResult(expected, result)
+        }
+      }
+      it(s"sphere distance ON $joinCondition, broadcast df1") {
+        val result = sparkSession.sql(s"SELECT /*+ BROADCAST(df1) */ df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+        verifyResult(expected, result)
+      }
+      it(s"sphere distance ON $joinCondition, broadcast df2") {
+        val result = sparkSession.sql(s"SELECT /*+ BROADCAST(df2) */ df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+        verifyResult(expected, result)
+      }
+      it(s"sphere distance on $joinCondition, using advanced spatial join") {
+        withConf(Map(advancedSpatialJoinConfKey -> "true")) {
+          val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+          verifyResult(expected, result)
+        }
+      }
     }
   }
 

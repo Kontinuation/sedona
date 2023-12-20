@@ -42,19 +42,15 @@ public class QuadtreePartitioning
      * @param boundary the boundary
      * @param partitions the partitions
      */
-    public QuadtreePartitioning(List<Envelope> samples, Envelope boundary, int partitions)
-            throws Exception
-    {
+    public QuadtreePartitioning(List<Envelope> samples, Envelope boundary, int partitions) {
         this(samples, boundary, partitions, -1);
     }
 
-    public QuadtreePartitioning(List<Envelope> samples, Envelope boundary, final int partitions, int minTreeLevel)
-            throws Exception
-    {
+    public QuadtreePartitioning(List<Envelope> samples, Envelope boundary, final int partitions, int minTreeLevel) {
         // Make sure the tree doesn't get too deep in case of data skew
         int maxLevel = partitions;
         int maxItemsPerNode = samples.size() / partitions;
-        partitionTree = new StandardQuadTree(new QuadRectangle(boundary), 0,
+        partitionTree = new StandardQuadTree<>(new QuadRectangle(boundary), 0,
                 maxItemsPerNode, maxLevel);
         if (minTreeLevel > 0) {
             partitionTree.forceGrowUp(minTreeLevel);
@@ -67,7 +63,22 @@ public class QuadtreePartitioning
         partitionTree.assignPartitionIds();
     }
 
-    public StandardQuadTree getPartitionTree()
+    public QuadtreePartitioning(long totalSamples, Envelope boundary, final int partitions, int minTreeLevel) {
+        // Make sure the tree doesn't get too deep in case of data skew
+        int maxLevel = partitions;
+        int maxItemsPerNode = Math.max((int) (totalSamples / partitions), 1);
+        partitionTree = new StandardQuadTree<>(new QuadRectangle(boundary), 0,
+                maxItemsPerNode, maxLevel);
+        if (minTreeLevel > 0) {
+            partitionTree.forceGrowUp(minTreeLevel);
+        }
+    }
+
+    public QuadtreePartitioning(long totalSamples, Envelope boundary, final int partitions) {
+        this(totalSamples, boundary, partitions, -1);
+    }
+
+    public StandardQuadTree<Integer> getPartitionTree()
     {
         return this.partitionTree;
     }

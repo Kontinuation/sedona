@@ -72,4 +72,28 @@ public class JoinQueryDeduplicationTest extends TestBase {
         JavaPairRDD<Geometry, Geometry> joined = JoinQuery.spatialJoin(leftRDD, rightRDD, new JoinQuery.JoinParams(false, SpatialPredicate.INTERSECTS));
         assertEquals(8, joined.union(joined).count());
     }
+
+    @Test
+    public void testDeduplicationOfAdvancedSpatialJoin() throws Exception {
+        SpatialRDD<Geometry> leftRDD = new SpatialRDD<>();
+        leftRDD.setRawSpatialRDD(
+                sc.parallelize(
+                        Arrays.asList(
+                                "POLYGON ((3 0, 3 3, 0 3, 0 0, 3 0))",
+                                "POLYGON ((4 1, 4 4, 1 4, 1 1, 4 1))",
+                                "POLYGON ((3 1, 3 4, 0 4, 0 1, 3 1))",
+                                "POLYGON ((4 0, 4 3, 1 3, 1 0, 4 0))"
+                        )
+                ).map(wkt -> Constructors.geomFromWKT(wkt, 0)));
+        SpatialRDD<Geometry> rightRDD = new SpatialRDD<>();
+        rightRDD.setRawSpatialRDD(sc.parallelize(Arrays.asList("POLYGON ((4 0, 4 4, 0 4, 0 0, 4 0))"))
+                .map(wkt -> Constructors.geomFromWKT(wkt, 0)));
+
+        leftRDD.advancedAnalyze();
+        rightRDD.advancedAnalyze();
+        leftRDD.spatialPartitioning(GridType.KDBTREE, rightRDD, 2);
+
+        JavaPairRDD<Geometry, Geometry> joined = JoinQuery.spatialJoin(leftRDD, rightRDD, new JoinQuery.JoinParams(true, SpatialPredicate.INTERSECTS));
+        assertEquals(8, joined.union(joined).count());
+    }
 }

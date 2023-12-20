@@ -32,9 +32,9 @@ import java.util.Iterator;
 public class QuadTreePartitioner
         extends SpatialPartitioner
 {
-    private final StandardQuadTree<? extends Geometry> quadTree;
+    private final StandardQuadTree<?> quadTree;
 
-    public QuadTreePartitioner(StandardQuadTree<? extends Geometry> quadTree)
+    public QuadTreePartitioner(StandardQuadTree<?> quadTree)
     {
         super(GridType.QUADTREE, quadTree.fetchLeafZones());
         this.quadTree = quadTree;
@@ -67,7 +67,7 @@ public class QuadTreePartitioner
     @Override
     public boolean equals(Object o)
     {
-        if (o == null || !(o instanceof QuadTreePartitioner)) {
+        if (!(o instanceof QuadTreePartitioner)) {
             return false;
         }
 

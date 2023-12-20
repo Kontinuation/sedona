@@ -340,11 +340,7 @@ public class GeomUtils {
         Envelope intersection =
                 left.getEnvelopeInternal().intersection(right.getEnvelopeInternal());
         if (!intersection.isNull()) {
-            final Point referencePoint =
-                    left.getFactory().createPoint(new Coordinate(intersection.getMinX(), intersection.getMinY()));
-            if (!extent.contains(referencePoint)) {
-                return true;
-            }
+            return !extent.contains(intersection.getMinX(), intersection.getMinY());
         }
 
         return false;

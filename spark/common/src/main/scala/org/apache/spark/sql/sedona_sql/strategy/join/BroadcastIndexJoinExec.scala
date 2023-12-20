@@ -19,7 +19,6 @@
 package org.apache.spark.sql.sedona_sql.strategy.join
 
 import org.apache.sedona.core.spatialOperator.{SpatialPredicate, SpatialPredicateEvaluators}
-import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators.SpatialPredicateEvaluator
 import org.apache.sedona.sql.utils.{GeometrySerializer, RasterSerializer}
 
 import scala.collection.JavaConverters._
@@ -38,7 +37,6 @@ import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
 import org.locationtech.jts.index.SpatialIndex
 
-import java.util.Collections
 import scala.collection.mutable
 
 case class BroadcastIndexJoinExec(
@@ -120,40 +118,35 @@ case class BroadcastIndexJoinExec(
   override def simpleString(maxFields: Int): String = super.simpleString(maxFields) + s" $spatialExpression" // SPARK3 anchor
 //  override def simpleString: String = super.simpleString + s" $spatialExpression" // SPARK2 anchor
 
-  private lazy val evaluator: SpatialPredicateEvaluator = if (indexBuildSide == windowJoinSide) {
-    SpatialPredicateEvaluators.create(spatialPredicate)
-  } else {
-    SpatialPredicateEvaluators.create(SpatialPredicate.inverse(spatialPredicate))
-  }
+  // Make sure that geometries from broadcast (indexed) side are always on the left of the predicate
+  private val actualPredicate = if (indexBuildSide == windowJoinSide) spatialPredicate else SpatialPredicate.inverse(spatialPredicate)
 
-  private def innerJoin(streamIter: Iterator[(Geometry, UnsafeRow)], index: Broadcast[SpatialIndex]): Iterator[InternalRow] = {
-    val factory = new PreparedGeometryFactory()
-    val preparedGeometries = new mutable.HashMap[Geometry, PreparedGeometry]
+  private def innerJoin(
+    streamIter: Iterator[(Geometry, UnsafeRow)], broadcastIndex: Broadcast[SpatialIndex]
+  ): Iterator[InternalRow] = {
     val joinedRow = new JoinedRow
+    val index = broadcastIndex.value
+    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(actualPredicate)
     streamIter.flatMap { case (geom, row) =>
       joinedRow.withLeft(row)
-      index.value.query(geom.getEnvelopeInternal)
-        .iterator.asScala.asInstanceOf[Iterator[Geometry]]
-        .filter(candidate => evaluator.eval(preparedGeometries.getOrElseUpdate(candidate, { factory.create(candidate) }), geom))
-        .map(candidate => joinedRow.withRight(candidate.getUserData.asInstanceOf[UnsafeRow]))
+      val candidates = index.query(geom.getEnvelopeInternal).asInstanceOf[java.util.List[Geometry]]
+      refiner.refine(candidates, geom)
+        .map(result => joinedRow.withRight(result.getUserData.asInstanceOf[UnsafeRow]))
         .filter(boundCondition)
     }
   }
 
   private def semiJoin(
-    streamIter: Iterator[(Geometry, UnsafeRow)], index: Broadcast[SpatialIndex]
+    streamIter: Iterator[(Geometry, UnsafeRow)], broadcastIndex: Broadcast[SpatialIndex]
   ): Iterator[InternalRow] = {
-    val factory = new PreparedGeometryFactory()
-    val preparedGeometries = new mutable.HashMap[Geometry, PreparedGeometry]
     val joinedRow = new JoinedRow
+    val index = broadcastIndex.value
+    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(actualPredicate)
     streamIter.flatMap { case (geom, row) =>
       val left = row
       joinedRow.withLeft(left)
-      val anyMatches = index.value.query(geom.getEnvelopeInternal)
-        .iterator.asScala.asInstanceOf[Iterator[Geometry]]
-        .filter(candidate => evaluator.eval(preparedGeometries.getOrElseUpdate(candidate, {
-          factory.create(candidate)
-        }), geom))
+      val candidates = index.query(geom.getEnvelopeInternal).asInstanceOf[java.util.List[Geometry]]
+      val anyMatches = refiner.refine(candidates, geom)
         .map(candidate => joinedRow.withRight(candidate.getUserData.asInstanceOf[UnsafeRow]))
         .exists(boundCondition)
 
@@ -166,21 +159,20 @@ case class BroadcastIndexJoinExec(
   }
 
   private def antiJoin(
-    streamIter: Iterator[(Geometry, UnsafeRow)], index: Broadcast[SpatialIndex]
+    streamIter: Iterator[(Geometry, UnsafeRow)], broadcastIndex: Broadcast[SpatialIndex]
   ): Iterator[InternalRow] = {
-    val factory = new PreparedGeometryFactory()
-    val preparedGeometries = new mutable.HashMap[Geometry, PreparedGeometry]
     val joinedRow = new JoinedRow
+    val index = broadcastIndex.value
+    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(actualPredicate)
     streamIter.flatMap { case (geom, row) =>
       val left = row
       joinedRow.withLeft(row)
-      val anyMatches = (if (geom == null) Collections.EMPTY_LIST else index.value.query(geom.getEnvelopeInternal))
-        .iterator.asScala.asInstanceOf[Iterator[Geometry]]
-        .filter(candidate => evaluator.eval(preparedGeometries.getOrElseUpdate(candidate, {
-          factory.create(candidate)
-        }), geom))
-        .map(candidate => joinedRow.withRight(candidate.getUserData.asInstanceOf[UnsafeRow]))
-        .exists(boundCondition)
+      val anyMatches = if (geom == null) false else {
+        val candidates = index.query(geom.getEnvelopeInternal).asInstanceOf[java.util.List[Geometry]]
+        refiner.refine(candidates, geom)
+          .map(candidate => joinedRow.withRight(candidate.getUserData.asInstanceOf[UnsafeRow]))
+          .exists(boundCondition)
+      }
 
       if (anyMatches) {
         Iterator.empty
@@ -191,20 +183,19 @@ case class BroadcastIndexJoinExec(
   }
 
   private def outerJoin(
-    streamIter: Iterator[(Geometry, UnsafeRow)], index: Broadcast[SpatialIndex]
+    streamIter: Iterator[(Geometry, UnsafeRow)], broadcastIndex: Broadcast[SpatialIndex]
   ): Iterator[InternalRow] = {
-    val factory = new PreparedGeometryFactory()
-    val preparedGeometries = new mutable.HashMap[Geometry, PreparedGeometry]
     val joinedRow = new JoinedRow
     val nullRow = new GenericInternalRow(broadcast.output.length)
+    val index = broadcastIndex.value
+    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(actualPredicate)
 
     streamIter.flatMap { case (geom, row) =>
       joinedRow.withLeft(row)
-      val candidates = (if (geom == null) Collections.EMPTY_LIST else index.value.query(geom.getEnvelopeInternal))
-        .iterator.asScala.asInstanceOf[Iterator[Geometry]]
-        .filter(candidate => evaluator.eval(preparedGeometries.getOrElseUpdate(candidate, {
-          factory.create(candidate)
-        }), geom))
+      val candidates = if (geom == null) Iterator.empty else {
+        val candidates = index.query(geom.getEnvelopeInternal).asInstanceOf[java.util.List[Geometry]]
+        refiner.refine(candidates, geom)
+      }
 
       new RowIterator {
         private var found = false
@@ -299,5 +290,57 @@ case class BroadcastIndexJoinExec(
 
   protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): SparkPlan = {
     copy(left = newLeft, right = newRight)
+  }
+}
+
+object BroadcastIndexJoinExec {
+  private def createJoinCandidateRefiner(predicate: SpatialPredicate): Refiner = {
+    predicate match {
+      case SpatialPredicate.INTERSECTS |
+           SpatialPredicate.COVERED_BY |
+           SpatialPredicate.WITHIN =>
+        new PrepareStreamSideRefiner(predicate)
+
+      case SpatialPredicate.CONTAINS |
+           SpatialPredicate.COVERS =>
+        new PrepareBuildSideRefiner(predicate)
+
+      case _ => new PlainRefiner(predicate)
+    }
+  }
+
+  trait Refiner {
+    def refine(buildSide: java.util.List[Geometry], streamSide: Geometry): Iterator[Geometry]
+  }
+
+  private class PlainRefiner(predicate: SpatialPredicate) extends Refiner {
+    private val evaluator = SpatialPredicateEvaluators.create(predicate)
+    override def refine(buildSide: java.util.List[Geometry], streamSide: Geometry): Iterator[Geometry] = {
+      buildSide.iterator.asScala.filter(evaluator.eval(_, streamSide))
+    }
+  }
+
+  private class PrepareBuildSideRefiner(predicate: SpatialPredicate) extends Refiner {
+    private val evaluator = SpatialPredicateEvaluators.create(predicate)
+    private val factory = new PreparedGeometryFactory()
+    private val preparedGeometries = new mutable.HashMap[Geometry, PreparedGeometry]
+    override def refine(buildSide: java.util.List[Geometry], streamSide: Geometry): Iterator[Geometry] =
+      buildSide.iterator.asScala.filter { candidate =>
+        val preparedGeom = preparedGeometries.getOrElseUpdate(candidate, {
+          factory.create(candidate)
+        })
+        evaluator.eval(preparedGeom, streamSide)
+      }
+  }
+
+  private class PrepareStreamSideRefiner(predicate: SpatialPredicate) extends Refiner {
+    private val evaluator = SpatialPredicateEvaluators.create(predicate)
+    private val factory = new PreparedGeometryFactory()
+    override def refine(buildSide: java.util.List[Geometry], streamSide: Geometry): Iterator[Geometry] = {
+      if (buildSide.isEmpty) Iterator.empty else {
+        val preparedGeom = factory.create(streamSide)
+        buildSide.iterator.asScala.filter(evaluator.eval(_, preparedGeom))
+      }
+    }
   }
 }

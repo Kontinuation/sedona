@@ -156,7 +156,7 @@ public class KDB extends PartitioningUtils
 
     private boolean disjoint(Envelope r1, Envelope r2)
     {
-        return !r1.intersects(r2) && !r1.covers(r2) && !r2.covers(r1);
+        return !r1.intersects(r2);
     }
 
     /**

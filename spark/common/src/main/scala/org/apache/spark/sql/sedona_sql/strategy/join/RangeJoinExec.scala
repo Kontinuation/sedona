@@ -43,7 +43,7 @@ case class RangeJoinExec(left: SparkPlan,
                          spatialPredicate: SpatialPredicate,
                          extraCondition: Option[Expression] = None)
   extends SedonaBinaryExecNode
-    with TraitJoinQueryExec
+    with TraitAdvancedJoinQueryExec
     with Logging {
 
   protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): SparkPlan = {

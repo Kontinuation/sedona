@@ -104,11 +104,7 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
       }
     }
 
-
     val joinParams = new JoinParams(sedonaConf.getUseIndex, spatialPredicate, sedonaConf.getIndexType, sedonaConf.getJoinBuildSide)
-
-    //logInfo(s"leftShape count ${leftShapes.spatialPartitionedRDD.count()}")
-    //logInfo(s"rightShape count ${rightShapes.spatialPartitionedRDD.count()}")
 
     val matchesRDD: RDD[(Geometry, Geometry)] = (leftShapes.spatialPartitionedRDD, rightShapes.spatialPartitionedRDD) match {
       case (null, null) =>
@@ -117,9 +113,11 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
       case _ => JoinQuery.spatialJoin(leftShapes, rightShapes, joinParams).rdd
     }
 
-    logDebug(s"Join result has ${matchesRDD.count()} rows")
+    joinedRddToRowRdd(matchesRDD)
+  }
 
-    matchesRDD.mapPartitions { iter =>
+  protected def joinedRddToRowRdd(joinedRdd: RDD[(Geometry, Geometry)]): RDD[InternalRow] = {
+    joinedRdd.mapPartitions { iter =>
       val joinRow = {
         val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
         (l: UnsafeRow, r: UnsafeRow) => joiner.join(l, r)

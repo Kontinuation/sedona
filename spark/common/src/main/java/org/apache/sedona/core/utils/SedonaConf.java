@@ -24,6 +24,8 @@ import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.enums.JoinBuildSide;
 import org.apache.sedona.core.enums.JoinSparitionDominantSide;
 import org.apache.sedona.core.enums.SpatialJoinOptimizationMode;
+import org.apache.sedona.core.spatialPartitioning.SpatialPartitionerBuilder.SpatialPartitionBuildingStrategy;
+import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector;
 import org.apache.spark.sql.RuntimeConfig;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.Utils;
@@ -31,6 +33,7 @@ import org.locationtech.jts.geom.Envelope;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.util.Locale;
 
 public class SedonaConf
         implements Serializable
@@ -60,6 +63,17 @@ public class SedonaConf
 
     private SpatialJoinOptimizationMode spatialJoinOptimizationMode;
 
+    private boolean useAdvancedSpatialJoin;
+
+    // Internal parameters for self-driving optimized spatial join
+    private long maxSamplesForSpatialPartitioning;
+    private long minSamplesPerPartition;
+    private double minSamplingRate;
+    private double sizeEstimationSampleGrowthRate;
+    private long expectedPerPartitionCount;
+    private int maxGuessedPartitionNumber;
+    private SpatialPartitionBuildingStrategy spatialPartitionBuildingStrategy;
+
     public static SedonaConf fromActiveSession() {
         return new SedonaConf(SparkSession.active().conf());
     }
@@ -83,6 +97,41 @@ public class SedonaConf
         );
         this.spatialJoinOptimizationMode = SpatialJoinOptimizationMode.getSpatialJoinOptimizationMode(
                 runtimeConfig.get("sedona.join.optimizationmode", "nonequi"));
+        this.useAdvancedSpatialJoin = Boolean.parseBoolean(runtimeConfig.get("sedona.join.advanced", "true"));
+        if (this.useAdvancedSpatialJoin) {
+            // Always use R-Tree index for advanced spatial join, even for broadcast indexed join.
+            this.useIndex = true;
+            this.indexType = IndexType.RTREE;
+        }
+
+        // Internal parameters for advanced, self-driving optimized spatial join. Users usually do not need to
+        // tune these parameters.
+        this.maxSamplesForSpatialPartitioning = Long.parseLong(
+                runtimeConfig.get("sedona.join.maxSamplesForSpatialPartitioning",
+                        Long.toString(AdvancedStatCollector.DEFAULT_MAX_SAMPLES)));
+        this.minSamplesPerPartition = Long.parseLong(
+                runtimeConfig.get("sedona.join.minSamplesPerPartition",
+                        Long.toString(AdvancedStatCollector.DEFAULT_MIN_SAMPLES)));
+        this.minSamplingRate = Double.parseDouble(
+            runtimeConfig.get("sedona.join.minSamplingRate",
+                    Double.toString(AdvancedStatCollector.DEFAULT_MIN_SAMPLING_RATE)));
+        this.sizeEstimationSampleGrowthRate = Double.parseDouble(
+                runtimeConfig.get("sedona.join.sizeEstimationSampleGrowthRate",
+                        Double.toString(AdvancedStatCollector.DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE)));
+        this.expectedPerPartitionCount = Long.parseLong(
+                runtimeConfig.get("sedona.join.expectedPerPartitionCount", "1000000"));
+        this.maxGuessedPartitionNumber = Integer.parseInt(
+                runtimeConfig.get("sedona.join.maxGuessedPartitionNumber", "-1"));
+        if (this.maxGuessedPartitionNumber == -1) {
+            // If maxGuessedPartitionNumber is not set, we use 10 times the total number of executor cores as the default value.
+            int totalExecutorCores = Integer.parseInt(runtimeConfig.get("spark.executor.instances", "1")) *
+                    Integer.parseInt(runtimeConfig.get("spark.executor.cores", "1"));
+            this.maxGuessedPartitionNumber = Math.max(10 * totalExecutorCores, 10000);
+        }
+        this.spatialPartitionBuildingStrategy =
+                SpatialPartitionBuildingStrategy.valueOf(
+                        runtimeConfig.get("sedona.join.spatialPartitionBuildingStrategy", "subsampling")
+                                .toUpperCase(Locale.ROOT));
     }
 
     public boolean getUseIndex()
@@ -161,5 +210,37 @@ public class SedonaConf
 
     public SpatialJoinOptimizationMode getSpatialJoinOptimizationMode() {
         return spatialJoinOptimizationMode;
+    }
+
+    public boolean useAdvancedSpatialJoin() {
+        return useAdvancedSpatialJoin;
+    }
+
+    public long getMaxSamplesForSpatialPartitioning() {
+        return maxSamplesForSpatialPartitioning;
+    }
+
+    public long getMinSamplesPerPartition() {
+        return minSamplesPerPartition;
+    }
+
+    public double getMinSamplingRate() {
+        return minSamplingRate;
+    }
+
+    public double getSizeEstimationSampleGrowthRate() {
+        return sizeEstimationSampleGrowthRate;
+    }
+
+    public long getExpectedPerPartitionCount() {
+        return expectedPerPartitionCount;
+    }
+
+    public int getMaxGuessedPartitionNumber() {
+        return maxGuessedPartitionNumber;
+    }
+
+    public SpatialPartitionBuildingStrategy getSpatialPartitionBuildingStrategy() {
+        return spatialPartitionBuildingStrategy;
     }
 }
