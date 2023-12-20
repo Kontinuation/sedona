@@ -270,10 +270,11 @@ object Catalog {
 
   val rasterAggregateExpression: Aggregator[(GridCoverage2D, Int), ArrayBuffer[BandData], GridCoverage2D] = new RS_Union_Aggr
 
-  val aggregateExpressions: Seq[Aggregator[Geometry, Geometry, Geometry]] = Seq(
+  val aggregateExpressions: Seq[Aggregator[Geometry, _, _]] = Seq(
     new ST_Union_Aggr,
     new ST_Envelope_Aggr,
-    new ST_Intersection_Aggr
+    new ST_Intersection_Aggr,
+    new ST_Analyze_Aggr
   )
 
   private def function[T <: Expression : ClassTag](defaultArgs: Any *): FunctionDescription = {

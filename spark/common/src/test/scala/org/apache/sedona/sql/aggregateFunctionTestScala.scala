@@ -19,6 +19,7 @@
 
 package org.apache.sedona.sql
 
+import org.apache.spark.sql.Row
 import org.locationtech.jts.geom.{Coordinate, Geometry, GeometryFactory}
 
 class aggregateFunctionTestScala extends TestBaseScala {
@@ -78,6 +79,28 @@ class aggregateFunctionTestScala extends TestBaseScala {
       val intersectionDF = sparkSession.sql("select ST_Intersection_Aggr(polygon) from two_polygons_no_intersection")
 
       assertResult(0.0)(intersectionDF.take(1)(0).get(0).asInstanceOf[Geometry].getArea)
+    }
+
+    it("Passed ST_Analyze_Aggr") {
+      val pointCsvDF = sparkSession.read.format("csv").option("delimiter", ",").option("header", "false").load(csvPointInputLocation)
+      pointCsvDF.createOrReplaceTempView("points")
+      val stats = sparkSession.sql("select ST_Analyze_Aggr(ST_Point(points._c0, points._c1)) from points").first().get(0).asInstanceOf[Row]
+      assert(stats.getAs[Long]("count") == 1000)
+      assert(stats.getAs[Double]("minx") < stats.getAs[Double]("maxx"))
+      assert(stats.getAs[Double]("miny") < stats.getAs[Double]("maxy"))
+      assert(Math.round(stats.getAs[Double]("mean_points_per_geometry")) == 1)
+      assert(stats.getAs[Long]("puntal_count") == 1000)
+    }
+
+    it("Passed ST_Analyze_Aggr with stats expanded") {
+      val twoPolygonsAsWktDf = sparkSession.read.textFile(intersectionPolygonInputLocation).toDF("polygon_wkt")
+      twoPolygonsAsWktDf.createOrReplaceTempView("polygons")
+      val stats = sparkSession.sql("SELECT stat.* FROM (SELECT ST_Analyze_Aggr(ST_GeomFromWKT(polygon_wkt)) stat FROM polygons) t").first()
+      assert(stats.getAs[Long]("count") == 2)
+      assert(stats.getAs[Double]("minx") < stats.getAs[Double]("maxx"))
+      assert(stats.getAs[Double]("miny") < stats.getAs[Double]("maxy"))
+      assert(Math.round(stats.getAs[Double]("mean_points_per_geometry")) > 4)
+      assert(stats.getAs[Long]("polygonal_count") == 2)
     }
   }
 }
