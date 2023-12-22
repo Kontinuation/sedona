@@ -511,11 +511,6 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
                 count++;
                 U geometry = buildIterator.next();
                 Envelope envelope = geometry.getEnvelopeInternal();
-                // Quadtree works poorly with envelopes with 0 extent. Such envelopes are usually obtained from
-                // points. We expand the envelope by a small amount to avoid this problem.
-                if (envelope.getWidth() == 0 && envelope.getHeight() == 0) {
-                    envelope.expandBy(1e-6);
-                }
                 if (executionMode == ExecutionMode.PREPARE_BUILD) {
                     PreparedGeometry preparedGeometry = PREPARED_GEOMETRY_FACTORY.create(geometry);
                     spatialIndex.insert(envelope, preparedGeometry);
