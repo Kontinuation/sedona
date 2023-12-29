@@ -30,8 +30,8 @@ import org.apache.spark.sql.monitoring.ListenerRegistrator
 import org.apache.spark.sql.sedona_sql.optimization.{SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
 import org.apache.spark.sql.{SQLContext, SparkSession}
-
 import scala.collection.mutable.ListBuffer
+import scala.util.Try
 
 object SedonaContext {
   val logger: Logger = Logger.getLogger("SedonaContext")
@@ -57,6 +57,7 @@ object SedonaContext {
     if (!sparkSession.experimental.extraOptimizations.exists(_.isInstanceOf[SpatialFilterPushDownForGeoParquet])) {
       sparkSession.experimental.extraOptimizations ++= Seq(new SpatialFilterPushDownForGeoParquet(sparkSession))
     }
+    addGeoParquetToSupportNestedFilterSources(sparkSession)
     UdtRegistrator.registerAll()
     UdfRegistrator.registerAll(sparkSession)
     ListenerRegistrator.registerAll(sparkSession)
@@ -96,5 +97,16 @@ object SedonaContext {
   def builder(): SparkSession.Builder = {
     SparkSession.builder().config("spark.serializer", classOf[KryoSerializer].getName).
       config("spark.kryo.registrator", classOf[SedonaKryoRegistrator].getName)
+  }
+
+  private def addGeoParquetToSupportNestedFilterSources(session: SparkSession): Unit = {
+    // File formats that support nested predicate pushdown is configured by
+    // spark.sql.optimizer.nestedPredicatePushdown.supportedFileSources, which is a comma-separated list of data source
+    // names. We need to append "geoparquet" to the list to enable nested predicate pushdown for GeoParquet.
+    val sources = Try(session.conf.get("spark.sql.optimizer.nestedPredicatePushdown.supportedFileSources")).getOrElse("")
+    if (!sources.contains("geoparquet")) {
+      val newSources = if (sources.isEmpty) "geoparquet" else sources + ",geoparquet"
+      session.conf.set("spark.sql.optimizer.nestedPredicatePushdown.supportedFileSources", newSources)
+    }
   }
 }
