@@ -56,13 +56,13 @@ JAVA_HOME="${JAVA_HOME:-$(/usr/libexec/java_home -v 1.8)}" exec "/usr/local/Cell
 ### 3. Use SVN to update KEYS
 
 Use SVN to append your armored PGP public key to the `KEYS` files
-     * https://dist.apache.org/repos/dist/dev/incubator/sedona/KEYS
-     * https://dist.apache.org/repos/dist/release/incubator/sedona/KEYS
+   * https://dist.apache.org/repos/dist/dev/sedona/KEYS
+   * https://dist.apache.org/repos/dist/release/sedona/KEYS
 
 1. Check out both KEYS files
 ```bash
-svn checkout https://dist.apache.org/repos/dist/dev/incubator/sedona/ sedona-dev --depth files
-svn checkout https://dist.apache.org/repos/dist/release/incubator/sedona/ sedona-release --depth files
+svn checkout https://dist.apache.org/repos/dist/dev/sedona/ sedona-dev --depth files
+svn checkout https://dist.apache.org/repos/dist/release/sedona/ sedona-release --depth files
 ```
 2. Use your favorite text editor to open `sedona-dev/KEYS` and `sedona-release/KEYS`.
 3. Paste your armored key to the end of both files. Note: There must be an empty line between `-----BEGIN PGP PUBLIC KEY BLOCK-----` and the actual key.
