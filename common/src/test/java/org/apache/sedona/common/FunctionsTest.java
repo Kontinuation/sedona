@@ -85,7 +85,7 @@ public class FunctionsTest {
         actual = Constructors.geomFromEWKT(expectedResult);
         assertEquals(geometry, actual);
         assertEquals(expectedResult, actualResult);
-        
+
         geometry = geometryFactory.createPoint(new CoordinateXYM(1.0, 2.0, 3.0));
         actualResult = Functions.asEWKT(geometry);
         expectedResult = "SRID=4236;POINT M(1 2 3)";
@@ -116,14 +116,14 @@ public class FunctionsTest {
         actual = Constructors.geomFromEWKT(expectedResult);
         assertEquals(geometry, actual);
         assertEquals(expectedResult, actualResult);
-        
+
         geometry = GEOMETRY_FACTORY.createPoint(new CoordinateXYM(1.0, 2.0, 3.0));
         actualResult = Functions.asWKT(geometry);
         expectedResult = "POINT M(1 2 3)";
         actual = Constructors.geomFromEWKT(expectedResult);
         assertEquals(geometry, actual);
         assertEquals(expectedResult, actualResult);
-        
+
         geometry = GEOMETRY_FACTORY.createPoint(new CoordinateXYZM(1.0, 2.0, 3.0, 4.0));
         actualResult = Functions.asWKT(geometry);
         expectedResult = "POINT ZM(1 2 3 4)";
@@ -144,7 +144,7 @@ public class FunctionsTest {
         expected = Constructors.geomFromWKB(actualResult);
         assertEquals(expected, geometry);
     }
-    
+
     @Test
     public void splitLineStringByMultipoint() {
         LineString lineString = GEOMETRY_FACTORY.createLineString(coordArray(0.0, 0.0, 1.5, 1.5, 2.0, 2.0));
@@ -1051,7 +1051,7 @@ public class FunctionsTest {
         LineString actualLinestring = (LineString) Functions.makeLine(point1, point2);
         LineString expectedLineString = GEOMETRY_FACTORY.createLineString(coordArray3d( 1, 1, 1, 2, 2, 2));
         assertEquals(wktWriter3D.write(actualLinestring), wktWriter3D.write(expectedLineString));
-        
+
         MultiPoint multiPoint1 = GEOMETRY_FACTORY.createMultiPointFromCoords(coordArray3d(0.5, 0.5, 1, 1, 1, 1));
         MultiPoint multiPoint2 = GEOMETRY_FACTORY.createMultiPointFromCoords(coordArray3d(0.5, 0.5, 2, 2, 2, 2));
         actualLinestring = (LineString) Functions.makeLine(multiPoint1, multiPoint2);
@@ -1598,7 +1598,7 @@ public class FunctionsTest {
         String expected1 = "POINT";
         String actual1 = Functions.geometryTypeWithMeasured(GEOMETRY_FACTORY.createPoint(new Coordinate(10, 5)));
         assertEquals(expected1, actual1);
-        
+
         // Create a point with measure value
         CoordinateXYM coords = new CoordinateXYM(2, 3, 4);
         Point measuredPoint = GEOMETRY_FACTORY.createPoint(coords);
@@ -1626,7 +1626,7 @@ public class FunctionsTest {
         String expected1 = "POINT";
         String actual1 = Functions.geometryTypeWithMeasured(GEOMETRY_FACTORY.createPoint(new Coordinate(10, 5, 1)));
         assertEquals(expected1, actual1);
-        
+
         // Create a point with measure value
         CoordinateXYZM coordsPoint = new CoordinateXYZM(2, 3, 4, 0);
         Point measuredPoint = GEOMETRY_FACTORY.createPoint(coordsPoint);
@@ -1654,7 +1654,7 @@ public class FunctionsTest {
         String expected1 = "GEOMETRYCOLLECTION";
         String actual1 = Functions.geometryTypeWithMeasured(GEOMETRY_FACTORY.createGeometryCollection(new Geometry[] {GEOMETRY_FACTORY.createPoint(new Coordinate(10, 5))}));
         assertEquals(expected1, actual1);
-        
+
         // Create a geometrycollection with measure value
         CoordinateXYM coords = new CoordinateXYM(2, 3, 4);
         Point measuredPoint = GEOMETRY_FACTORY.createPoint(coords);
@@ -1739,7 +1739,7 @@ public class FunctionsTest {
         String expected = "ST_ClosestPoint doesn't support empty geometry object.";
         Exception e1 = assertThrows(IllegalArgumentException.class, () -> Functions.closestPoint(point, emptyLineString));
         assertEquals(expected, e1.getMessage());
-        
+
         // Both objects are empty
         Polygon emptyPolygon = GEOMETRY_FACTORY.createPolygon();
         Exception e2 = assertThrows(IllegalArgumentException.class, () -> Functions.closestPoint(emptyPolygon, emptyLineString));
@@ -1857,7 +1857,7 @@ public class FunctionsTest {
 
 
     }
-    
+
     @Test
     public void voronoiPolygons() {
         MultiPoint multiPoint = GEOMETRY_FACTORY.createMultiPointFromCoords(coordArray(0, 0, 2, 2));

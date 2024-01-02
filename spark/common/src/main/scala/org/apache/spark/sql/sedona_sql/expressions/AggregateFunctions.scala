@@ -21,6 +21,7 @@ package org.apache.spark.sql.sedona_sql.expressions
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector
 import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.expressions.Aggregator
+import org.apache.spark.sql.sedona_sql.utils.SparkCompatUtil
 import org.apache.spark.sql.types.{DoubleType, LongType, StructField, StructType}
 import org.apache.spark.sql.{Encoder, Encoders, Row}
 import org.locationtech.jts.geom.{Coordinate, Geometry, GeometryFactory}
@@ -211,7 +212,7 @@ class ST_Analyze_Aggr extends Aggregator[Geometry, AdvancedStatCollector, Row] {
 
   override def bufferEncoder: Encoder[AdvancedStatCollector] = Encoders.kryo[AdvancedStatCollector]
 
-  override def outputEncoder: Encoder[Row] = RowEncoder(StructType(Seq(
+  override def outputEncoder: Encoder[Row] = SparkCompatUtil.rowEncoderFor(StructType(Seq(
     StructField("count", LongType, nullable = false),
     StructField("minx", DoubleType, nullable = false),
     StructField("miny", DoubleType, nullable = false),

@@ -39,10 +39,10 @@ public class BufferedRandomAccessFileTest {
             random.nextBytes(randomBytes);
             braf.write(randomBytes, 0, randomBytes.length);
             braf.seek(0);
-            
+
             byte[] buf = new byte[200];
             int bytesRead = braf.read(buf, 0, 0);
-            
+
             Assert.assertEquals(0, bytesRead);
             Assert.assertThrows(IllegalArgumentException.class, () -> braf.read(buf, 0, -1));
 

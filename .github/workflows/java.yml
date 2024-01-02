@@ -83,7 +83,7 @@ jobs:
         java-version: ${{ matrix.jdk }}
     - uses: actions/setup-python@v4
       with:
-        python-version: '3.7'
+        python-version: '3.8'
     - name: Cache Maven packages
       uses: actions/cache@v3
       with:

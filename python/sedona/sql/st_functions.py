@@ -392,7 +392,7 @@ def ST_CollectionExtract(collection: ColumnOrName, geom_type: Optional[Union[Col
 
 @validate_argument_types
 def ST_ClosestPoint(a: ColumnOrName, b: ColumnOrName) -> Column:
-    """Returns the 2-dimensional point on geom1 that is closest to geom2. 
+    """Returns the 2-dimensional point on geom1 that is closest to geom2.
     This is the first point of the shortest line between the geometries.
 
     :param a: Geometry column to use in the calculation.
