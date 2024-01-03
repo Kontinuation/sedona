@@ -18,14 +18,30 @@ println(sedonaConf)
 ```scala
 sparkSession.conf.set("sedona.global.index","false")
 ```
-## Explanation
+
+## Tuning for Spatial Join
+
+SedonaDB features an advanced spatial join algorithm since v1.2.1, which does not require tuning to achieve good performance. Advanced spatial join would analyze both joined datasets and tune spatial join parameters automatically. The following parameters for tuning spatial join won't work when using advanced spatial join:
 
 * sedona.global.index
-	* Use spatial index (currently, only supports in SQL range join and SQL distance join)
+* sedona.global.indextype
+* sedona.join.indexbuildside
+* sedona.join.spatitionside
+
+The advanced spatial join algorithm is enabled by default, users can disable advanced spatial join by setting `sedona.join.advanced` to false and tune spatial join parameters manually.
+
+## Explanation
+
+* sedona.join.advanced
+    * Using advanced spatial join algorithm
+    * Default: true
+    * Possible values: true, false
+* sedona.global.index
+	* Use spatial index (currently, only supports in SQL range join and SQL distance join), only valid when "sedona.join.advanced" is false
 	* Default: true
 	* Possible values: true, false
 * sedona.global.indextype
-	* Spatial index type, only valid when "sedona.global.index" is true
+	* Spatial index type, only valid when "sedona.global.index" is true and "sedona.join.advanced" is false
 	* Default: rtree
 	* Possible values: rtree, quadtree
 * sedona.join.autoBroadcastJoinThreshold
@@ -38,15 +54,15 @@ sparkSession.conf.set("sedona.global.index","false")
 	* Default: kdbtree
 	* Possible values: quadtree, kdbtree
 * sedona.join.indexbuildside **(Advanced users only!)**
-	* The side which Sedona builds spatial indices on
+	* The side which Sedona builds spatial indices on, only valid when "sedona.join.advanced" is false
 	* Default: left
 	* Possible values: left, right
 * sedona.join.numpartition **(Advanced users only!)**
 	* Number of partitions for both sides in a join query
-	* Default: -1, which means use the existing partitions
+	* Default: -1, in this case it will be automatically tuned according to the size of both datasets when using advanced spatial join algorithm; when not using advanced spatial join it means use the existing partitions of the dominant side.
 	* Possible values: any integers
 * sedona.join.spatitionside **(Advanced users only!)**
-	* The dominant side in spatial partitioning stage
+	* The dominant side in spatial partitioning stage, only valid when "sedona.join.advanced" is false
 	* Default: left
 	* Possible values: left, right
 * sedona.join.optimizationmode **(Advanced users only!)**

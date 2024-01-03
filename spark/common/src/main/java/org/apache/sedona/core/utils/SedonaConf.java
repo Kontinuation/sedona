@@ -119,7 +119,7 @@ public class SedonaConf
                 runtimeConfig.get("sedona.join.sizeEstimationSampleGrowthRate",
                         Double.toString(AdvancedStatCollector.DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE)));
         this.expectedPerPartitionCount = Long.parseLong(
-                runtimeConfig.get("sedona.join.expectedPerPartitionCount", "1000000"));
+                runtimeConfig.get("sedona.join.expectedPerPartitionCount", "10000000"));
         this.maxGuessedPartitionNumber = Integer.parseInt(
                 runtimeConfig.get("sedona.join.maxGuessedPartitionNumber", "-1"));
         if (this.maxGuessedPartitionNumber == -1) {
