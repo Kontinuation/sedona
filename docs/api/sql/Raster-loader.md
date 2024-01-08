@@ -74,7 +74,6 @@ df = df.selectExpr("path", "RS_FromPath(path) as rast")
 df = df.selectExpr("path", "RS_FromPath(path, 'fs.s3a.access.key=xxx;fs.s3a.secret.key=xxx') as rast")
 ```
 
-
 ### RS_MakeEmptyRaster
 
 Introduction: Returns an empty raster geometry. Every band in the raster is initialized to `0.0`.

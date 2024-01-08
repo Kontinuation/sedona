@@ -1,8 +1,26 @@
-package com.wherobots.snowflake.snowsql;
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+package org.apache.sedona.snowflake.snowsql;
 
 import junit.framework.TestCase;
 import org.apache.sedona.common.Constructors;
-import org.apache.sedona.snowflake.snowsql.UDFs;
 import org.apache.sedona.snowflake.snowsql.ddl.Constants;
 import org.apache.sedona.snowflake.snowsql.ddl.UDFDDLGenerator;
 import org.apache.sedona.snowflake.snowsql.ddl.UDTFDDLGenerator;
@@ -14,6 +32,7 @@ import org.slf4j.LoggerFactory;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +57,22 @@ public class TestBase extends TestCase {
             String ddl = UDFDDLGenerator.buildUDFDDL(UDFs.class.getMethod(
                     functionName,
                     paramTypes
-            ), buildDDLConfigs, "@WHEROBOTS", false, "");
+            ), buildDDLConfigs, "@ApacheSedona", false, "");
+            System.out.println(ddl);
+            ResultSet res = snowClient.executeQuery(ddl);
+            res.next();
+            assert res.getString(1).contains("successfully created");
+        } catch (SQLException | NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void registerUDFV2(String functionName, Class<?> ... paramTypes) {
+        try {
+            String ddl = UDFDDLGenerator.buildUDFDDL(UDFsV2.class.getMethod(
+                    functionName,
+                    paramTypes
+            ), buildDDLConfigs, "@ApacheSedona", false, "");
             System.out.println(ddl);
             ResultSet res = snowClient.executeQuery(ddl);
             res.next();
@@ -50,7 +84,7 @@ public class TestBase extends TestCase {
 
     public void registerUDTF(Class<?> clz) {
         try {
-            String ddl = UDTFDDLGenerator.buildUDTFDDL(clz, buildDDLConfigs, "@WHEROBOTS", false, "");
+            String ddl = UDTFDDLGenerator.buildUDTFDDL(clz, buildDDLConfigs, "@ApacheSedona", false, "");
             System.out.println(ddl);
             ResultSet res = snowClient.executeQuery(ddl);
             res.next();
@@ -76,9 +110,9 @@ public class TestBase extends TestCase {
             snowClient.executeQuery("use database " + System.getenv("SNOWFLAKE_DB"));
             snowClient.executeQuery("create schema " + System.getenv("SNOWFLAKE_SCHEMA"));
             snowClient.executeQuery("use schema " + System.getenv("SNOWFLAKE_SCHEMA"));
-            snowClient.executeQuery("CREATE STAGE WHEROBOTS FILE_FORMAT = (COMPRESSION = NONE)");
-            snowClient.uploadFile(String.format("tmp/sedona-snowflake-%s.jar", sedonaVersion), "WHEROBOTS");
-            snowClient.uploadFile(String.format("tmp/geotools-wrapper-%s.jar", geotoolsVersion), "WHEROBOTS");
+            snowClient.executeQuery("CREATE STAGE ApacheSedona FILE_FORMAT = (COMPRESSION = NONE)");
+            snowClient.uploadFile(String.format("tmp/sedona-snowflake-%s.jar", sedonaVersion), "ApacheSedona");
+            snowClient.uploadFile(String.format("tmp/geotools-wrapper-%s.jar", geotoolsVersion), "ApacheSedona");
             jarUploaded = true;
         }
         registerDependantUDFs();

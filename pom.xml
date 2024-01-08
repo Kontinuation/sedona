@@ -743,6 +743,13 @@
         </profile>
         <profile>
             <id>snowflake</id>
+            <activation>
+                <property>
+                    <name>snowflake</name>
+                    <value>true</value>
+                </property>
+                <activeByDefault>false</activeByDefault>
+            </activation>
             <modules>
                 <module>common</module>
                 <module>snowflake</module>

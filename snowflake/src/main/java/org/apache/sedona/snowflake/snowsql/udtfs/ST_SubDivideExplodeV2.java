@@ -22,16 +22,23 @@ import org.locationtech.jts.io.ParseException;
 
 import java.util.stream.Stream;
 
-@UDTFAnnotations.TabularFunc(name = "ST_SubDivideExplode", argNames = {"geom", "maxVertices"})
-public class ST_SubDivideExplode {
+/**
+ * This class is a copy of ST_SubDivideExplode.java, but with the input and output types changed to Snowflake Geometry
+ * Unfortunately, Data type GEOMETRY is not supported in non-SQL UDTF return type.
+ * Just keep this class here for future reference.
+ * The error message is "java.lang.RuntimeException: net.snowflake.client.jdbc.SnowflakeSQLException: Data type GEOMETRY is not supported in non-SQL UDTF return type."
+ */
+@UDTFAnnotations.TabularFunc(name = "ST_SubDivideExplode", argNames = {"geom", "maxVertices"}, argTypes = {"Geometry", "int"}, returnTypes = "Geometry")
+public class ST_SubDivideExplodeV2
+{
 
     public static final GeometryFactory geometryFactory = new GeometryFactory();
 
     public static class OutputRow {
 
-        public byte[] geom;
+        public String geom;
 
-        public OutputRow(byte[] geom) {
+        public OutputRow(String geom) {
             this.geom = geom;
         }
     }
@@ -40,14 +47,14 @@ public class ST_SubDivideExplode {
         return OutputRow.class;
     }
 
-    public ST_SubDivideExplode() {
+    public ST_SubDivideExplodeV2() {
     }
 
-    public Stream<OutputRow> process(byte[] geometry, int maxVertices) throws ParseException {
+    public Stream<OutputRow> process(String geometry, int maxVertices) throws ParseException {
         Geometry[] geometries = Functions.subDivide(
-                GeometrySerde.deserialize(geometry),
+                GeometrySerde.deserGeoJson(geometry),
                 maxVertices
         );
-        return Stream.of(geometries).map(g -> new OutputRow(GeometrySerde.serialize(g)));
+        return Stream.of(geometries).map(g -> new OutputRow(GeometrySerde.serGeoJson(g)));
     }
 }

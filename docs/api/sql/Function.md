@@ -1300,7 +1300,7 @@ Introduction: Cover the geometry by H3 cell IDs with the given resolution(level)
 To understand the cell statistics please refer to [H3 Doc](https://h3geo.org/docs/core-library/restable)
 H3 native fill functions doesn't guarantee full coverage on the shapes.
 
-### Cover Polygon 
+### Cover Polygon
 When fullCover = false, for polygon sedona will use [polygonToCells](https://h3geo.org/docs/api/regions#polygontocells).
 This can't guarantee full coverage but will guarantee no false positive.
 
@@ -1371,7 +1371,7 @@ Output:
 
 Introduction: return the result of H3 function [cellsToMultiPolygon(cells)](https://h3geo.org/docs/api/regions#cellstolinkedmultipolygon--cellstomultipolygon).
 
-Reverse the uber h3 cells to MultiPolygon object composed by the geometry hexagons. 
+Reverse the uber h3 cells to MultiPolygon object composed by the geometry hexagons.
 
 Format: `ST_H3ToGeom(cells: Array[Long])`
 
