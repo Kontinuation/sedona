@@ -1,4 +1,5 @@
 ## Usage
+
 SedonaSQL supports many parameters. To change their values,
 
 1. Set it through SparkConf:
