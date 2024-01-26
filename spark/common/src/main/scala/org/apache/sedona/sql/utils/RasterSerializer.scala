@@ -19,8 +19,8 @@
 
 package org.apache.sedona.sql.utils
 
-import org.apache.sedona.common.raster.Serde
 import org.apache.sedona.common.raster.outdb.HadoopConfigSerializer
+import org.apache.sedona.common.raster.serde.Serde
 import org.apache.spark.SparkEnv
 import org.apache.spark.sql.sedona_sql.utils.SparkHadoopUtil
 import org.geotools.coverage.grid.GridCoverage2D

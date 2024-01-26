@@ -18,10 +18,18 @@
  */
 package org.apache.sedona.common.raster.outdb;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.KryoSerializable;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.sedona.common.raster.CRSSerializer;
+import org.apache.sedona.common.raster.serde.AffineTransform2DSerializer;
+import org.apache.sedona.common.raster.serde.CRSSerializer;
 import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
+import org.apache.sedona.common.raster.serde.GridEnvelopeSerializer;
+import org.apache.sedona.common.raster.serde.GridSampleDimensionSerializer;
+import org.apache.sedona.common.raster.serde.KryoUtil;
 import org.apache.sedona.common.utils.ImageUtils;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.TypeMap;
@@ -223,7 +231,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         }
     }
 
-    public static class SerializableState implements Serializable {
+    public static class SerializableState implements KryoSerializable, Serializable {
         public CharSequence name;
 
         // The following three components are used to construct a GridGeometry2D object.
@@ -254,6 +262,66 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
             GridGeometry2D gridGeometry = new GridGeometry2D(gridEnvelope2D, gridToCRS, CRSSerializer.deserialize(serializedCRS));
             OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(path, serializedConf, params);
             return create(name, gridGeometry, dataType, bands, bandIndices, resourceKey);
+        }
+
+        private static final GridEnvelopeSerializer gridEnvelopeSerializer = new GridEnvelopeSerializer();
+        private static final AffineTransform2DSerializer affineTransform2DSerializer = new AffineTransform2DSerializer();
+        private static final GridSampleDimensionSerializer gridSampleDimensionSerializer = new GridSampleDimensionSerializer();
+
+        @Override
+        public void write(Kryo kryo, Output output) {
+            // Common part
+            KryoUtil.writeUTF8String(output, name.toString());
+            gridEnvelopeSerializer.write(kryo, output, gridEnvelope2D);
+            if (!(gridToCRS instanceof AffineTransform2D)) {
+                throw new UnsupportedOperationException("Only AffineTransform2D is supported");
+            }
+            affineTransform2DSerializer.write(kryo, output, (AffineTransform2D) gridToCRS);
+            output.writeInt(serializedCRS.length);
+            output.writeBytes(serializedCRS);
+            output.writeInt(bands.length);
+            for (GridSampleDimension band : bands) {
+                gridSampleDimensionSerializer.write(kryo, output, band);
+            }
+
+            // Out-db specific part
+            output.writeInt(dataType);
+            KryoUtil.writeIntArray(output, bandIndices);
+            KryoUtil.writeUTF8String(output, path.toString());
+            if (serializedConf != null) {
+                output.writeInt(serializedConf.length);
+                output.writeBytes(serializedConf);
+            } else {
+                output.writeInt(-1);
+            }
+
+            KryoUtil.writeUTF8StringMap(output, params);
+        }
+
+        @Override
+        public void read(Kryo kryo, Input input) {
+            // Common part
+            name = KryoUtil.readUTF8String(input);
+            gridEnvelope2D = gridEnvelopeSerializer.read(kryo, input, GridEnvelope2D.class);
+            gridToCRS = affineTransform2DSerializer.read(kryo, input, AffineTransform2D.class);
+            serializedCRS = new byte[input.readInt()];
+            input.readBytes(serializedCRS);
+            bands = new GridSampleDimension[input.readInt()];
+            for (int i = 0; i < bands.length; i++) {
+                bands[i] = gridSampleDimensionSerializer.read(kryo, input, GridSampleDimension.class);
+            }
+
+            dataType = input.readInt();
+            bandIndices = KryoUtil.readIntArray(input);
+            path = new Path(KryoUtil.readUTF8String(input));
+            int serializedConfLength = input.readInt();
+            if (serializedConfLength >= 0) {
+                serializedConf = new byte[serializedConfLength];
+                input.readBytes(serializedConf);
+            } else {
+                serializedConf = null;
+            }
+            params = KryoUtil.readUTF8StringMap(input);
         }
     }
 

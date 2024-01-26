@@ -50,8 +50,8 @@ public class RasterTestBase {
 
     protected static final double FP_TOLERANCE = 1E-4;
 
-    GridCoverage2D oneBandRaster;
-    GridCoverage2D multiBandRaster;
+    protected GridCoverage2D oneBandRaster;
+    protected GridCoverage2D multiBandRaster;
     byte[] geoTiff;
     byte[] testNc;
     String ncFile = resourceFolder + "raster/netcdf/test.nc";

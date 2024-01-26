@@ -32,7 +32,7 @@ import org.opengis.parameter.GeneralParameterValue
 import org.locationtech.jts.geom.{Coordinate, Geometry, Point}
 import org.scalatest.{BeforeAndAfter, GivenWhenThen}
 
-import java.awt.image.DataBuffer
+import java.awt.image.{DataBuffer, SinglePixelPackedSampleModel}
 import java.io.File
 import java.net.URLConnection
 import scala.collection.mutable
@@ -847,6 +847,13 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       //Test with skewX, skewY, srid and datatype
       result = sparkSession.sql(s"SELECT RS_Metadata(RS_MakeEmptyRaster($numBands, 'I', $widthInPixel, $heightInPixel, $upperLeftX, $upperLeftY, $cellSize, -$cellSize, $skewX, $skewY, $srid))").first().getSeq(0)
       assertEquals(numBands, result(9), 0.001)
+    }
+
+    it("Passed RS_MakeRasterForTesting") {
+      val result = sparkSession.sql("SELECT RS_MakeRasterForTesting(4, 'I', 'SinglePixelPackedSampleModel', 10, 10, 100, 100, 10, -10, 0, 0, 3857) as raster").first().get(0)
+      assert(result.isInstanceOf[GridCoverage2D])
+      val gridCoverage2D = result.asInstanceOf[GridCoverage2D]
+      assert(gridCoverage2D.getRenderedImage.getSampleModel.isInstanceOf[SinglePixelPackedSampleModel])
     }
 
     it("Passed RS_BandAsArray") {

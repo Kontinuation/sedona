@@ -16,10 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.sedona.common.raster;
+package org.apache.sedona.common.raster.serde;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.sedona.common.raster.RasterConstructors;
+import org.apache.sedona.common.raster.RasterTestBase;
 import org.apache.sedona.common.raster.outdb.HadoopConfigSerializer;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbResourcePool;
@@ -32,6 +34,7 @@ import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.junit.Assert;
 import org.junit.Test;
 import org.opengis.coverage.grid.GridEnvelope;
+import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.io.File;
@@ -51,12 +54,12 @@ public class SerdeTest extends RasterTestBase {
     };
 
     @Test
-    public void testRoundtripSerdeSingelbandRaster() throws IOException, ClassNotFoundException {
+    public void testRoundTripSerdeSingleBandRaster() throws IOException, ClassNotFoundException {
         testRoundTrip(oneBandRaster);
     }
 
     @Test
-    public void testRoundtripSerdeMultibandRaster() throws IOException, ClassNotFoundException {
+    public void testRoundTripSerdeMultiBandRaster() throws IOException, ClassNotFoundException {
         testRoundTrip(multiBandRaster);
     }
 
@@ -67,6 +70,20 @@ public class SerdeTest extends RasterTestBase {
             GridCoverage2D raster = reader.read(null);
             testRoundTrip(raster);
         }
+    }
+
+    @Test
+    public void testInDbNorthPoleRaster() throws IOException, ClassNotFoundException, FactoryException {
+        // If we are not using non-strict mode to serializing CRS, this will raise an exception:
+        // org.geotools.referencing.wkt.UnformattableObjectException: This "AxisDirection" object is too complex for
+        // WKT syntax.
+        GridCoverage2D raster = RasterConstructors.makeEmptyRaster(
+                1, "B", 256, 256,
+                -345000.000,  345000.000,
+                2000, -2000,
+                0, 0,
+                3996);
+        testRoundTrip(raster);
     }
 
     @Test

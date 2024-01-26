@@ -11,16 +11,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.sedona.common.raster;
+package org.apache.sedona.common.raster.serde;
 
 import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.KryoSerializable;
 import com.esotericsoftware.kryo.Serializer;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.io.UnsafeInput;
 import com.esotericsoftware.kryo.io.UnsafeOutput;
+import org.apache.sedona.common.raster.DeepCopiedRenderedImage;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
-import org.geotools.coverage.Category;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
@@ -34,74 +35,10 @@ import javax.media.jai.RenderedImageAdapter;
 import java.awt.image.RenderedImage;
 import java.io.IOException;
 import java.io.Serializable;
-import java.lang.reflect.Field;
 import java.net.URI;
-import java.util.List;
 
 public class Serde {
-
-    static final Field field;
-    static {
-        try {
-            field = GridCoverage2D.class.getDeclaredField("serializedImage");
-            field.setAccessible(true);
-        } catch (NoSuchFieldException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    /**
-     * GridSampleDimension and RenderedSampleDimension are not serializable. We need to provide a custom serializer
-     */
-    private static class KryoGridSampleDimensionSerializer extends Serializer<GridSampleDimension> {
-        @Override
-        public void write(Kryo kryo, Output output, GridSampleDimension sampleDimension) {
-            String description = sampleDimension.getDescription().toString();
-            List<Category> categories = sampleDimension.getCategories();
-            double offset = sampleDimension.getOffset();
-            double scale = sampleDimension.getScale();
-            output.writeString(description);
-            kryo.writeObject(output, categories.toArray());
-            output.writeDouble(offset);
-            output.writeDouble(scale);
-        }
-
-        @Override
-        public GridSampleDimension read(Kryo kryo, Input input, Class aClass) {
-            String description = input.readString();
-            Category[] categories = kryo.readObject(input, Category[].class);
-            double offset = input.readDouble();
-            double scale = input.readDouble();
-            return new GridSampleDimension(description, categories, offset, scale);
-        }
-    }
-
-    /**
-     * AffineTransform2D cannot be correctly deserialized by the default serializer of Kryo, so we need to provide a
-     * custom serializer.
-     */
-    private static class KryoAffineTransform2DSerializer extends Serializer<AffineTransform2D> {
-        @Override
-        public void write(Kryo kryo, Output output, AffineTransform2D affineTransform2D) {
-            output.writeDouble(affineTransform2D.getScaleX());
-            output.writeDouble(affineTransform2D.getShearY());
-            output.writeDouble(affineTransform2D.getShearX());
-            output.writeDouble(affineTransform2D.getScaleY());
-            output.writeDouble(affineTransform2D.getTranslateX());
-            output.writeDouble(affineTransform2D.getTranslateY());
-        }
-
-        @Override
-        public AffineTransform2D read(Kryo kryo, Input input, Class<AffineTransform2D> aClass) {
-            double scaleX = input.readDouble();
-            double skewY = input.readDouble();
-            double skewX = input.readDouble();
-            double scaleY = input.readDouble();
-            double upperLeftX = input.readDouble();
-            double upperLeftY = input.readDouble();
-            return new AffineTransform2D(scaleX, skewY, skewX, scaleY, upperLeftX, upperLeftY);
-        }
-    }
+    private Serde() {}
 
     /**
      * URIs are not serializable. We need to provide a custom serializer
@@ -113,25 +50,25 @@ public class Serde {
 
         @Override
         public void write(final Kryo kryo, final Output output, final URI uri) {
-            output.writeString(uri.toString());
+            KryoUtil.writeUTF8String(output, uri.toString());
         }
 
         @Override
         public URI read(final Kryo kryo, final Input input, final Class<URI> uriClass) {
-            return URI.create(input.readString());
+            return URI.create(KryoUtil.readUTF8String(input));
         }
     }
 
     private static final ThreadLocal<Kryo> kryos = ThreadLocal.withInitial(() -> {
         Kryo kryo = new Kryo();
         kryo.setInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
-        kryo.register(AffineTransform2D.class, new KryoAffineTransform2DSerializer());
-        kryo.register(GridSampleDimension.class, new KryoGridSampleDimensionSerializer());
+        kryo.register(AffineTransform2D.class, new AffineTransform2DSerializer());
+        kryo.register(GridSampleDimension.class, new GridSampleDimensionSerializer());
         kryo.register(URI.class, new URISerializer());
         DeepCopiedRenderedImage.registerKryo(kryo);
         try {
             kryo.register(Class.forName("org.geotools.coverage.grid.RenderedSampleDimension"),
-                    new KryoGridSampleDimensionSerializer());
+                    new GridSampleDimensionSerializer());
         } catch (ClassNotFoundException e) {
             throw new RuntimeException("Cannot register kryo serializer for class RenderedSampleDimension", e);
         }
@@ -139,7 +76,7 @@ public class Serde {
         return kryo;
     });
 
-    private static class SerializableState implements Serializable {
+    private static class SerializableState implements Serializable, KryoSerializable {
         public CharSequence name;
 
         // The following three components are used to construct a GridGeometry2D object.
@@ -155,6 +92,43 @@ public class Serde {
         public GridCoverage2D restore() {
             GridGeometry2D gridGeometry = new GridGeometry2D(gridEnvelope2D, gridToCRS, CRSSerializer.deserialize(serializedCRS));
             return new GridCoverageFactory().create(name, image, gridGeometry, bands, null, null);
+        }
+
+        private static final GridEnvelopeSerializer gridEnvelopeSerializer = new GridEnvelopeSerializer();
+        private static final AffineTransform2DSerializer affineTransform2DSerializer = new AffineTransform2DSerializer();
+        private static final GridSampleDimensionSerializer gridSampleDimensionSerializer = new GridSampleDimensionSerializer();
+
+        @Override
+        public void write(Kryo kryo, Output output) {
+            KryoUtil.writeUTF8String(output, name.toString());
+            gridEnvelopeSerializer.write(kryo, output, gridEnvelope2D);
+            if (!(gridToCRS instanceof AffineTransform2D)) {
+                throw new UnsupportedOperationException("Only AffineTransform2D is supported");
+            }
+            affineTransform2DSerializer.write(kryo, output, (AffineTransform2D) gridToCRS);
+            output.writeInt(serializedCRS.length);
+            output.writeBytes(serializedCRS);
+            output.writeInt(bands.length);
+            for (GridSampleDimension band : bands) {
+                gridSampleDimensionSerializer.write(kryo, output, band);
+            }
+            image.write(kryo, output);
+        }
+
+        @Override
+        public void read(Kryo kryo, Input input) {
+            name = KryoUtil.readUTF8String(input);
+            gridEnvelope2D = gridEnvelopeSerializer.read(kryo, input, GridEnvelope2D.class);
+            gridToCRS = affineTransform2DSerializer.read(kryo, input, AffineTransform2D.class);
+            int serializedCRSLength = input.readInt();
+            serializedCRS = input.readBytes(serializedCRSLength);
+            int bandCount = input.readInt();
+            bands = new GridSampleDimension[bandCount];
+            for (int i = 0; i < bandCount; i++) {
+                bands[i] = gridSampleDimensionSerializer.read(kryo, input, GridSampleDimension.class);
+            }
+            image = new DeepCopiedRenderedImage();
+            image.read(kryo, input);
         }
     }
 
@@ -188,7 +162,7 @@ public class Serde {
             state.image = deepCopiedRenderedImage;
             try (UnsafeOutput out = new UnsafeOutput(4096, -1)) {
                 out.writeBoolean(false);
-                kryo.writeObject(out, state);
+                state.write(kryo, out);
                 return out.toBytes();
             }
         } else {
@@ -198,7 +172,7 @@ public class Serde {
             OutDbGridCoverage2D.SerializableState state = outDbRaster.getSerializableState(withOutDbConfiguration);
             try (UnsafeOutput out = new UnsafeOutput(4096, -1)) {
                 out.writeBoolean(true);
-                kryo.writeObject(out, state);
+                state.write(kryo, out);
                 return out.toBytes();
             }
         }
@@ -213,10 +187,12 @@ public class Serde {
         try (UnsafeInput in = new UnsafeInput(bytes)) {
             boolean isOutDb = in.readBoolean();
             if (!isOutDb) {
-                SerializableState state = kryo.readObject(in, SerializableState.class);
+                SerializableState state = new SerializableState();
+                state.read(kryo, in);
                 return state.restore();
             } else {
-                OutDbGridCoverage2D.SerializableState state = kryo.readObject(in, OutDbGridCoverage2D.SerializableState.class);
+                OutDbGridCoverage2D.SerializableState state = new OutDbGridCoverage2D.SerializableState();
+                state.read(kryo, in);
                 if (serializedConf != null) {
                     return state.restore(serializedConf);
                 } else {
