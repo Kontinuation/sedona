@@ -21,10 +21,8 @@ package org.apache.sedona.sql
 import org.apache.sedona.common.sphere.{Haversine, Spheroid}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.sedona_sql.strategy.join.{BroadcastIndexJoinExec, DistanceJoinExec}
-import org.locationtech.jts.geom.{Coordinate, Geometry, GeometryFactory}
+import org.locationtech.jts.geom.{Geometry, GeometryFactory}
 import org.scalatest.prop.TableDrivenPropertyChecks
-
-import scala.util.Random
 
 class SphereDistanceJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
   private val spatialJoinPartitionSideConfKey = "sedona.join.spatitionside"
@@ -101,17 +99,6 @@ class SphereDistanceJoinSuite extends TestBaseScala with TableDrivenPropertyChec
     testData2.toDF("id", "dist", "geom").createOrReplaceTempView("df2")
   }
 
-  private def generateTestData(): Seq[(Int, Double, Geometry)] = {
-    val geometries = (-180 to 180 by 10).flatMap { x =>
-      (-80 to 80 by 10).map { y =>
-        factory.createPoint(new Coordinate(x, y))
-      }
-    } ++ Seq(factory.createPoint(new Coordinate(0, -90)), factory.createPoint(new Coordinate(0, 90)))
-    val rand = new Random()
-    geometries.zipWithIndex.map { case (geom, idx) =>
-      (idx, 110000 + 2000000 * rand.nextDouble, geom)
-    }
-  }
 
   private def buildExpectedResult(joinCondition: String): Seq[(Int, Int)] = {
     val evaluate = joinCondition match {
