@@ -190,6 +190,8 @@ public class RasterBandEditorsTest extends RasterTestBase{
         assertTrue(Arrays.equals(expectedValues, actualValues));
 
         GridCoverage2D croppedRaster = RasterBandEditors.clip(raster, 1, geom, 200, true);
+        assertEquals(0, croppedRaster.getRenderedImage().getMinX());
+        assertEquals(0, croppedRaster.getRenderedImage().getMinY());
         GridCoverage2D croppedRaster2 = Serde.deserialize(Serde.serialize(croppedRaster));
         assertSameCoverage(croppedRaster, croppedRaster2);
         points = new ArrayList<>();
