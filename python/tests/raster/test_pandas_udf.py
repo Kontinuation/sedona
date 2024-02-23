@@ -23,6 +23,7 @@ from pyspark.sql.types import IntegerType
 import pyspark
 import pandas as pd
 import numpy as np
+import rasterio
 
 from tests import world_map_raster_input_location
 
@@ -44,9 +45,31 @@ class TestRasterPandasUDF(TestBase):
 
             return s.apply(func)
 
+        # A Python Pandas UDF that takes a geometry as input
+        @pandas_udf(IntegerType())
+        def pandas_udf_raster_as_param_2(s: pd.Series) -> pd.Series:
+            from sedona.raster import raster_serde
+
+            def func(x):
+                with raster_serde.deserialize(x) as raster:
+                    ds = raster.as_rasterio()
+                    return int(np.sum(ds.read(1)))
+
+            # wrap s.apply() with a rasterio env to get rid of the overhead of repeated
+            # env initialization in as_rasterio()
+            with rasterio.Env():
+                return s.apply(func)
+
         spark.udf.register("pandas_udf_raster_as_param", pandas_udf_raster_as_param)
+        spark.udf.register("pandas_udf_raster_as_param_2", pandas_udf_raster_as_param_2)
 
         df_result = df.selectExpr("pandas_udf_raster_as_param(rast) as res")
+        rows = df_result.collect()
+        assert len(rows) == 10
+        for row in rows:
+            assert row['res'] == 66
+
+        df_result = df.selectExpr("pandas_udf_raster_as_param_2(rast) as res")
         rows = df_result.collect()
         assert len(rows) == 10
         for row in rows:

@@ -15,40 +15,82 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
-from typing import List, Optional
+from typing import List, Dict, Optional
 from abc import ABC, abstractmethod
+from xml.etree.ElementTree import Element, SubElement, tostring
 
-import rasterio
-from rasterio.transform import Affine
-from rasterio.io import MemoryFile
-from rasterio.io import DatasetReader
-from rasterio.vrt import WarpedVRT
-from rasterio.enums import Resampling
 import numpy as np
+import rasterio                       # type: ignore
+import rasterio.env                   # type: ignore
+from rasterio.transform import Affine # type: ignore
+from rasterio.io import MemoryFile    # type: ignore
+from rasterio.io import DatasetReader # type: ignore
+
+try:
+    # for rasterio >= 1.3.0
+    from rasterio._path import _parse_path as parse_path # type: ignore
+except:
+    # for rasterio >= 1.2.0
+    from rasterio.path import parse_path # type: ignore
 
 from .awt_raster import AWTRaster
-from .meta import AffineTransform
+from .data_buffer import DataBuffer
+from .meta import AffineTransform, PixelAnchor
 from .meta import SampleDimension
 from .meta import OutDbMeta
 
 
+def _rasterio_open(fp, driver=None):
+    """A variant of rasterio.open. This function skip setting up a new GDAL env
+    when there is already an environment. This saves us lots of overhead
+    introduced by GDAL env initialization.
+
+    """
+    if rasterio.env.hasenv():
+        # There is already an env, so we can get rid of the overhead of
+        # GDAL env initialization in rasterio.open().
+        return DatasetReader(parse_path(fp), driver=driver)
+    else:
+        return rasterio.open(fp, mode="r", driver=driver)
+
+
 class SedonaRaster(ABC):
-    width: int
-    height: int
-    bands_meta: List[SampleDimension]
-    affine_trans: AffineTransform
-    crs_wkt: str
+    _width: int
+    _height: int
+    _bands_meta: List[SampleDimension]
+    _affine_trans: AffineTransform
+    _crs_wkt: str
 
     def __init__(self, width: int, height: int, bands_meta: List[SampleDimension],
                  affine_trans: AffineTransform, crs_wkt: str):
-        self.width = width
-        self.height = height
-        self.bands_meta = bands_meta
-        self.affine_trans = affine_trans
-        self.crs_wkt = crs_wkt
+        self._width = width
+        self._height = height
+        self._bands_meta = bands_meta
+        self._affine_trans = affine_trans
+        self._crs_wkt = crs_wkt
+
+    @property
+    def width(self) -> int:
+        return self._width
+
+    @property
+    def height(self) -> int:
+        return self._height
+
+    @property
+    def crs_wkt(self) -> str:
+        return self._crs_wkt
+
+    @property
+    def bands_meta(self) -> List[SampleDimension]:
+        return self._bands_meta
+
+    @property
+    def affine_trans(self) -> AffineTransform:
+        return self._affine_trans
 
     @abstractmethod
-    def as_numpy(self) -> np.array:
+    def as_numpy(self) -> np.ndarray:
         raise NotImplementedError()
 
     @abstractmethod
@@ -70,19 +112,17 @@ class SedonaRaster(ABC):
 
 
 class InDbSedonaRaster(SedonaRaster):
-    awt_raster: Optional[AWTRaster]
-    rasterio_memfile: Optional[MemoryFile]
+    awt_raster: AWTRaster
     rasterio_dataset_reader: Optional[DatasetReader]
 
     def __init__(self, width: int, height: int, bands_meta: List[SampleDimension],
                  affine_trans: AffineTransform, crs_wkt: str,
-                 awt_raster: AWTRaster = None):
+                 awt_raster: AWTRaster):
         super().__init__(width, height, bands_meta, affine_trans, crs_wkt)
         self.awt_raster = awt_raster
-        self.rasterio_memfile = None
         self.rasterio_dataset_reader = None
 
-    def as_numpy(self) -> np.array:
+    def as_numpy(self) -> np.ndarray:
         sm = self.awt_raster.sample_model
         return sm.as_numpy(self.awt_raster.data_buffer)
 
@@ -90,99 +130,133 @@ class InDbSedonaRaster(SedonaRaster):
         if self.rasterio_dataset_reader is not None:
             return self.rasterio_dataset_reader
 
-        # XXX: We have a round trip of writing the raster as GeoTIFF to an
-        # in-memory file and then read it back. This is super slow. We'll
-        # explore other approaches to make it fast.
-        if self.rasterio_memfile is None:
-            memfile = MemoryFile(ext='.tif')
+        affine = Affine.from_gdal(
+            self._affine_trans.ip_x, self._affine_trans.scale_x, self._affine_trans.skew_x,
+            self._affine_trans.ip_y, self._affine_trans.skew_y, self._affine_trans.scale_y)
+        num_bands = len(self._bands_meta)
 
-            # write to memfile as GeoTIFF. Here dataset is a rasterio.io.DatasetWriter
-            driver = "GTiff"
-            affine = Affine.from_gdal(
-                self.affine_trans.ip_x, self.affine_trans.scale_x, self.affine_trans.skew_x,
-                self.affine_trans.ip_y, self.affine_trans.skew_y, self.affine_trans.scale_y)
-            num_bands = len(self.bands_meta)
-            dataset = memfile.open(
-                driver=driver, width=self.width, height=self.height, count=num_bands,
-                crs=self.crs_wkt, transform=affine, dtype=rasterio.uint8,
-                nodata=None, sharing=False)
-            data_array = self.as_numpy()
-            dataset.write(data_array)
-            dataset.close()
+        data_array = np.ascontiguousarray(self.as_numpy())
 
-            self.rasterio_memfile = memfile
+        dtype = data_array.dtype
+        if dtype == np.uint8:
+            data_type = 'Byte'
+        elif dtype == np.int8:
+            data_type = 'Int8'
+        elif dtype == np.uint16:
+            data_type = 'Uint16'
+        elif dtype == np.int16:
+            data_type = 'Int16'
+        elif dtype == np.uint32:
+            data_type = 'UInt32'
+        elif dtype == np.int32:
+            data_type = 'Int32'
+        elif dtype == np.float32:
+            data_type = 'Float32'
+        elif dtype == np.float64:
+            data_type = 'Float64'
+        elif dtype == np.int64:
+            data_type = 'Int64'
+        elif dtype == np.uint64:
+            data_type = 'Uint64'
+        else:
+            raise RuntimeError("unknown dtype: " + str(dtype))
 
-        # read back. Here dataset is a rasterio.io.DatasetReader
-        self.rasterio_dataset_reader = memfile.open(driver=driver)
-        return self.rasterio_dataset_reader
+        arr_if = data_array.__array_interface__
+        data_pointer = arr_if['data'][0]
+        geotransform = (f"{self._affine_trans.ip_x}/{self._affine_trans.scale_x}/{self._affine_trans.skew_x}/" +
+                        f"{self._affine_trans.ip_y}/{self._affine_trans.skew_y}/{self._affine_trans.scale_y}")
+        # FIXME: GDAL 3.6 shipped with rasterio does not support
+        # SPATIALREFERENCE parameter, so we have to workaround this issue in a
+        # hacky way. If newer versions of rasterio bundle GDAL 3.7 then this
+        # won't be a problem. See https://gdal.org/drivers/raster/mem.html
+        desc = (f"MEM:::DATAPOINTER={data_pointer},PIXELS={self._width},LINES={self._height},BANDS={num_bands}," +
+                f"DATATYPE={data_type},GEOTRANSFORM={geotransform}")
+        dataset = _rasterio_open(desc, driver="MEM")
+
+        # XXX: dataset does not copy the data held by data_array, so we set
+        # data_array as a property of dataset to make sure that the lifetime of
+        # data_array is as long as dataset, otherwise we may see band data
+        # corruption.
+        dataset.mem_data_array = data_array
+        return dataset
 
     def close(self):
         if self.rasterio_dataset_reader is not None:
            self.rasterio_dataset_reader.close()
            self.rasterio_dataset_reader = None
-        if self.rasterio_memfile is not None:
-            self.rasterio_memfile.close()
-            self.rasterio_memfile = None
 
 
-class OutDbSedonaRaster(SedonaRaster):
-    normalized_path: str
-    outdb_meta: Optional[OutDbMeta]
+class OutDbSedonaRasterBase(SedonaRaster):
+    _outdb_meta: OutDbMeta
+
+    @property
+    def outdb_meta(self) -> OutDbMeta:
+        return self._outdb_meta
+
+    def as_numpy(self) -> np.ndarray:
+        ds = self.as_rasterio()
+        band_indices = [b + 1 for b in self._outdb_meta.band_indices]
+        arr = ds.read(band_indices)
+        return arr
+
+
+class OutDbSedonaRaster(OutDbSedonaRasterBase):
     rasterio_memfile: Optional[MemoryFile]
     rasterio_dataset_reader: Optional[DatasetReader]
 
     def __init__(self, width: int, height: int, bands_meta: List[SampleDimension],
                  affine_trans: AffineTransform, crs_wkt: str,
-                 outdb_meta : OutDbMeta = None):
+                 outdb_meta : OutDbMeta):
         super().__init__(width, height, bands_meta, affine_trans, crs_wkt)
-        self.outdb_meta = outdb_meta
+        self._outdb_meta = outdb_meta
         self.rasterio_memfile = None
         self.rasterio_dataset_reader = None
-
-        path = self.outdb_meta.path
-        if path.startswith("s3a://"):
-            path = path.replace("s3a://", "s3://")
-        self.normalized_path = path
-
-    def as_numpy(self) -> np.array:
-        with rasterio.open(self.normalized_path) as src:
-            dst_trans = Affine(
-                self.affine_trans.scale_x, self.affine_trans.skew_x, self.affine_trans.ip_x,
-                self.affine_trans.skew_y, self.affine_trans.scale_y, self.affine_trans.ip_y)
-            with WarpedVRT(src, width=self.width, height=self.height, transform=dst_trans) as vrt:
-                band_indices = [b + 1 for b in self.outdb_meta.band_indices]
-                arr = vrt.read(band_indices)
-                return arr
 
     def as_rasterio(self) -> DatasetReader:
         if self.rasterio_dataset_reader is not None:
             return self.rasterio_dataset_reader
 
         if self.rasterio_memfile is None:
-            with rasterio.open(self.normalized_path) as src:
-                dst_trans = Affine(
-                    self.affine_trans.scale_x, self.affine_trans.skew_x, self.affine_trans.ip_x,
-                    self.affine_trans.skew_y, self.affine_trans.scale_y, self.affine_trans.ip_y)
-                # XXX: WarpedVRT does not support specifying panSrcBands and
-                # panDstBands options of GDAL's GDALWarpOptions, so we have to
-                # warp all the bands then select the bands we need using
-                # vrt.read(band_indices).
-                with WarpedVRT(src, width=self.width, height=self.height, transform=dst_trans) as vrt:
-                    band_indices = [b + 1 for b in self.outdb_meta.band_indices]
-                    arr = vrt.read(band_indices)
+            # XXX: WarpedVRT does not support specifying panSrcBands and
+            # panDstBands options of GDAL's GDALWarpOptions, so we cannot use
+            # WarpedVRT directly. As a workaround we construct an in-memory VRT
+            # XML file and open it using the VRT driver.
+            src_path = self._outdb_meta.path
+            if src_path.startswith("s3a://"):
+                src_path = src_path.replace("s3a://", "s3://")
+            src_path = src_path.replace("s3://", "/vsis3/")
+            with _rasterio_open(src_path) as src:
+                ip_x, scale_x, skew_x, ip_y, skew_y, scale_y = src.get_transform()
+                crs_wkt = src.crs.wkt if src.crs is not None else None
+            off_x = round((self._affine_trans.ip_x - ip_x) / scale_x)
+            off_y = round((self._affine_trans.ip_y - ip_y) / scale_y)
+            width  = self._width
+            height = self._height
+            band_indices = self.outdb_meta.band_indices
+            geo_transform = (f"{self._affine_trans.ip_x}, {self._affine_trans.scale_x}, {self._affine_trans.skew_x}, " +
+                             f"{self._affine_trans.ip_y}, {self._affine_trans.skew_y}, {self._affine_trans.scale_y}")
 
-                    memfile = MemoryFile(ext='.tif')
-                    driver = "GTiff"
-                    num_bands = len(band_indices)
-                    dataset = memfile.open(
-                        driver=driver, width=self.width, height=self.height, count=num_bands,
-                        crs=src.crs, transform=dst_trans, dtype=src.dtypes[0],
-                        nodata=src.nodata, sharing=False)
-                    dataset.write(arr)
-                    dataset.close()
-                    self.rasterio_memfile = memfile
+            dt = self._outdb_meta.data_type
+            if dt == DataBuffer.TYPE_BYTE:
+                data_type = 'Byte'
+            elif dt == DataBuffer.TYPE_USHORT:
+                data_type = 'UInt16'
+            elif dt == DataBuffer.TYPE_SHORT:
+                data_type = 'Int16'
+            elif dt == DataBuffer.TYPE_INT:
+                data_type = 'Int32'
+            elif dt == DataBuffer.TYPE_FLOAT:
+                data_type = 'Float32'
+            elif dt == DataBuffer.TYPE_DOUBLE:
+                data_type = 'Float64'
+            else:
+                raise RuntimeError("unknown outdb band data type: " + str(dt))
 
-        self.rasterio_dataset_reader = memfile.open(driver=driver)
+            # assemble a VRT XML file to describe how we want to retrieve the sub region
+            vrt_xml = self.generate_vrt_xml(src_path, data_type, width, height, geo_transform, crs_wkt, off_x, off_y, band_indices)
+            self.rasterio_memfile = MemoryFile(vrt_xml, ext='.vrt')
+
+        self.rasterio_dataset_reader = self.rasterio_memfile.open(driver='VRT')
         return self.rasterio_dataset_reader
 
     def close(self):
@@ -192,3 +266,138 @@ class OutDbSedonaRaster(SedonaRaster):
         if self.rasterio_memfile is not None:
             self.rasterio_memfile.close()
             self.rasterio_memfile = None
+
+    @classmethod
+    def generate_vrt_xml(cls, src_path, data_type, width, height, geo_transform, crs_wkt, off_x, off_y, band_indices) -> bytes:
+        # Create root element
+        root = Element('VRTDataset')
+        root.set('rasterXSize', str(width))
+        root.set('rasterYSize', str(height))
+
+        # Add CRS
+        if crs_wkt is not None and crs_wkt != '':
+            srs = SubElement(root, 'SRS')
+            srs.text = crs_wkt
+
+        # Add GeoTransform
+        gt = SubElement(root, 'GeoTransform')
+        gt.text = geo_transform
+
+        # Add bands
+        for i, band_index in enumerate(band_indices, start=1):
+            band = SubElement(root, 'VRTRasterBand')
+            band.set('dataType', data_type)
+            band.set('band', str(i))
+
+            # Add source
+            source = SubElement(band, 'SimpleSource')
+            src_prop = SubElement(source, 'SourceFilename')
+            src_prop.text = src_path
+
+            # Set source properties
+            SubElement(source, 'SourceBand').text = str(band_index + 1)
+            SubElement(source, 'SrcRect', {'xOff': str(off_x), 'yOff': str(off_y), 'xSize': str(width), 'ySize': str(height)})
+            SubElement(source, 'DstRect', {'xOff': '0', 'yOff': '0', 'xSize': str(width), 'ySize': str(height)})
+
+        # Generate pretty XML
+        xml_bytes = tostring(root, encoding='utf-8')
+        return xml_bytes
+
+
+class LazyLoadOutDbSedonaRaster(OutDbSedonaRasterBase):
+    path: str
+    params: Optional[Dict[str, str]]
+    rasterio_dataset_reader: Optional[DatasetReader]
+
+    def __init__(self, path: str, params: Optional[Dict[str, str]]):
+        super().__init__(-1, -1, [], AffineTransform(0, 0, 0, 0, 0, 0, PixelAnchor.UPPER_LEFT), "")
+        self._outdb_meta = OutDbMeta(DataBuffer.TYPE_BYTE, [], "", None)
+        self.path = path
+        self.params = params
+        self.rasterio_dataset_reader = None
+
+    def _ensure_loaded(self):
+        if self.rasterio_dataset_reader is not None:
+            return
+
+        # Load the raster file and extract its metadata
+        src_path = self.path
+        if src_path.startswith("s3a://"):
+            src_path = src_path.replace("s3a://", "s3://")
+        src_path = src_path.replace("s3://", "/vsis3/")
+        ds = _rasterio_open(src_path)
+        ip_x, scale_x, skew_x, ip_y, skew_y, scale_y = ds.get_transform()
+        crs_wkt = ds.crs.wkt if ds.crs is not None else None
+        affine_trans = AffineTransform(scale_x, skew_y, skew_x, scale_y, ip_x, ip_y, PixelAnchor.UPPER_LEFT)
+        width = ds.width
+        height = ds.height
+        bands_meta = []
+        band_indices = []
+        nodatavals = ds.nodatavals
+        dtype = ds.dtypes[0]
+
+        if dtype in ('uint8', 'int8'):
+            data_type = DataBuffer.TYPE_BYTE
+        elif dtype == 'uint16':
+            data_type = DataBuffer.TYPE_USHORT
+        elif dtype == 'int16':
+            data_type = DataBuffer.TYPE_SHORT
+        elif dtype in ('int32', 'uint32'):
+            data_type = DataBuffer.TYPE_INT
+        elif dtype == 'float32':
+            data_type = DataBuffer.TYPE_FLOAT
+        elif dtype == 'float64':
+            data_type = DataBuffer.TYPE_DOUBLE
+        else:
+            raise RuntimeError("unknown rasterio band data type: " + dtype)
+
+        for idx, band_idx in enumerate(ds.indexes):
+            sample_dimension = SampleDimension(f"band_{band_idx}", 0.0, 1.0, nodatavals[idx])
+            bands_meta.append(sample_dimension)
+            band_indices.append(idx)
+
+        # Initialize the internal states with raster metadata
+        super().__init__(width, height, bands_meta, affine_trans, crs_wkt)
+        self._outdb_meta = OutDbMeta(data_type, band_indices, self.path, self.params)
+
+        # Keep the reference to the rasterio DatasetReader for future usage
+        self.rasterio_dataset_reader = ds
+
+    def as_rasterio(self) -> DatasetReader:
+        self._ensure_loaded()
+        return self.rasterio_dataset_reader
+
+    def close(self):
+        if self.rasterio_dataset_reader is not None:
+           self.rasterio_dataset_reader.close()
+           self.rasterio_dataset_reader = None
+
+    @property
+    def width(self) -> int:
+        self._ensure_loaded()
+        return self._width
+
+    @property
+    def height(self) -> int:
+        self._ensure_loaded()
+        return self._height
+
+    @property
+    def crs_wkt(self) -> str:
+        self._ensure_loaded()
+        return self._crs_wkt
+
+    @property
+    def bands_meta(self) -> List[SampleDimension]:
+        self._ensure_loaded()
+        return self._bands_meta
+
+    @property
+    def affine_trans(self) -> AffineTransform:
+        self._ensure_loaded()
+        return self._affine_trans
+
+    @property
+    def outdb_meta(self) -> OutDbMeta:
+        self._ensure_loaded()
+        return self._outdb_meta

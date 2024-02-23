@@ -16,6 +16,7 @@ package org.apache.sedona.common.raster;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.Constructors;
 import org.apache.sedona.common.utils.RasterUtils;
@@ -295,6 +296,22 @@ public class RasterConstructorsTest
     }
 
     @Test
+    public void testAsInDbRasterFromLazyLoadOutDb() throws IOException {
+        for (String path : testGeoTiffPaths) {
+            GridCoverage2D outDbRaster = new LazyLoadOutDbGridCoverage2D("test", new Path(path), new Configuration());
+            GridCoverage2D inDbRaster = RasterConstructors.asInDbRaster(outDbRaster);
+            outDbRaster.dispose(true);
+
+            GeoTiffReader reader = new GeoTiffReader(new File(path));
+            GridCoverage2D expectedRaster = reader.read(null);
+
+            assertSameCoverage(expectedRaster, inDbRaster);
+            inDbRaster.dispose(true);
+            expectedRaster.dispose(true);
+        }
+    }
+
+    @Test
     public void testInDbTileWithoutPadding() {
         GridCoverage2D raster = createRandomRaster(DataBuffer.TYPE_BYTE, 100, 100, 1000, 1010, 10, 1, "EPSG:3857");
         RasterConstructors.Tile[] tiles = RasterConstructors.generateTiles(raster, null, 10, 10, false, Double.NaN);
@@ -351,6 +368,20 @@ public class RasterConstructorsTest
     public void testOutDbTile() throws IOException {
         for (String path : testGeoTiffPaths) {
             GridCoverage2D raster = OutDbGridCoverage2D.create("test", new Path(path), new Configuration());
+            RasterConstructors.Tile[] tiles = RasterConstructors.generateTiles(raster, null, 100, 100, false, Double.NaN);
+            assertTilesSameWithGridCoverage(tiles, raster, null, 100, 100, Double.NaN);
+            raster.dispose(true);
+            for (RasterConstructors.Tile tile : tiles) {
+                Assert.assertTrue(tile.getCoverage() instanceof OutDbGridCoverage2D);
+                tile.getCoverage().dispose(true);
+            }
+        }
+    }
+
+    @Test
+    public void testOutDbTileFromLazyLoadingOutDbRaster() {
+        for (String path : testGeoTiffPaths) {
+            GridCoverage2D raster = new LazyLoadOutDbGridCoverage2D("test", new Path(path), new Configuration());
             RasterConstructors.Tile[] tiles = RasterConstructors.generateTiles(raster, null, 100, 100, false, Double.NaN);
             assertTilesSameWithGridCoverage(tiles, raster, null, 100, 100, Double.NaN);
             raster.dispose(true);

@@ -21,6 +21,7 @@ import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.io.UnsafeInput;
 import com.esotericsoftware.kryo.io.UnsafeOutput;
 import org.apache.sedona.common.raster.DeepCopiedRenderedImage;
+import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
@@ -132,6 +133,10 @@ public class Serde {
         }
     }
 
+    private static final int IN_DB = 0;
+    private static final int OUT_DB = 1;
+    private static final int LAZY_LOAD_OUT_DB = 2;
+
     public static byte[] serialize(GridCoverage2D raster) throws IOException {
         return serialize(raster, true);
     }
@@ -161,7 +166,7 @@ public class Serde {
             state.bands = raster.getSampleDimensions();
             state.image = deepCopiedRenderedImage;
             try (UnsafeOutput out = new UnsafeOutput(4096, -1)) {
-                out.writeBoolean(false);
+                out.writeByte(IN_DB);
                 state.write(kryo, out);
                 return out.toBytes();
             }
@@ -169,12 +174,28 @@ public class Serde {
             // Get a serializable state of OutDbGridCoverage2D and serialize it. We can restore the OutDbGridCoverage2D
             // object from that state on deserialization.
             OutDbGridCoverage2D outDbRaster = (OutDbGridCoverage2D) raster;
-            OutDbGridCoverage2D.SerializableState state = outDbRaster.getSerializableState(withOutDbConfiguration);
+            boolean isLazy = false;
+            if (raster instanceof LazyLoadOutDbGridCoverage2D) {
+                OutDbGridCoverage2D wrapped = ((LazyLoadOutDbGridCoverage2D) raster).getWrapped();
+                if (wrapped != null) {
+                    // Serialize the wrapped OutDbGridCoverage2D object, discard the lazy loading wrapper.
+                    outDbRaster = wrapped;
+                } else {
+                    isLazy = true;
+                }
+            }
+
             try (UnsafeOutput out = new UnsafeOutput(4096, -1)) {
-                out.writeBoolean(true);
-                state.write(kryo, out);
+                out.writeByte(isLazy? LAZY_LOAD_OUT_DB : OUT_DB);
+                if (!isLazy) {
+                    OutDbGridCoverage2D.SerializableState state = outDbRaster.getSerializableState(withOutDbConfiguration);
+                    state.write(kryo, out);
+                } else {
+                    ((LazyLoadOutDbGridCoverage2D) raster).writeKryo(out, withOutDbConfiguration);
+                }
                 return out.toBytes();
             }
+
         }
     }
 
@@ -185,18 +206,23 @@ public class Serde {
     public static GridCoverage2D deserialize(byte[] bytes, byte[] serializedConf) throws IOException, ClassNotFoundException {
         Kryo kryo = kryos.get();
         try (UnsafeInput in = new UnsafeInput(bytes)) {
-            boolean isOutDb = in.readBoolean();
-            if (!isOutDb) {
+            int rasterType = in.readByte();
+            if (rasterType == IN_DB) {
                 SerializableState state = new SerializableState();
                 state.read(kryo, in);
                 return state.restore();
             } else {
-                OutDbGridCoverage2D.SerializableState state = new OutDbGridCoverage2D.SerializableState();
-                state.read(kryo, in);
-                if (serializedConf != null) {
-                    return state.restore(serializedConf);
+                boolean isLazy = rasterType == LAZY_LOAD_OUT_DB;
+                if (!isLazy) {
+                    OutDbGridCoverage2D.SerializableState state = new OutDbGridCoverage2D.SerializableState();
+                    state.read(kryo, in);
+                    if (serializedConf != null) {
+                        return state.restore(serializedConf);
+                    } else {
+                        return state.restore();
+                    }
                 } else {
-                    return state.restore();
+                    return LazyLoadOutDbGridCoverage2D.readKryo(in, serializedConf);
                 }
             }
         }

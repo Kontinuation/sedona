@@ -46,7 +46,7 @@ class SampleModel(ABC):
         self.height = height
 
     @abstractmethod
-    def as_numpy(self, data_buffer: DataBuffer) -> np.array:
+    def as_numpy(self, data_buffer: DataBuffer) -> np.ndarray:
         raise NotImplementedError("Abstract method as_numpy was not implemented by subclass")
 
 
@@ -63,7 +63,7 @@ class ComponentSampleModel(SampleModel):
         self.bank_indices = bank_indices
         self.band_offsets = band_offsets
 
-    def as_numpy(self, data_buffer: DataBuffer) -> np.array:
+    def as_numpy(self, data_buffer: DataBuffer) -> np.ndarray:
         if self.scanline_stride == self.width and self.pixel_stride == 1:
             # Fast path: no gaps between pixels
             band_arrs = []
@@ -104,7 +104,7 @@ class PixelInterleavedSampleModel(SampleModel):
         self.scanline_stride = scanline_stride
         self.band_offsets = band_offsets
 
-    def as_numpy(self, data_buffer: DataBuffer) -> np.array:
+    def as_numpy(self, data_buffer: DataBuffer) -> np.ndarray:
         num_bands = len(self.band_offsets)
         bank_data = data_buffer.bank_data[0]
         if self.pixel_stride == num_bands and \
@@ -139,7 +139,7 @@ class SinglePixelPackedSampleModel(SampleModel):
         for v in self.bit_masks:
             self.bit_offsets.append((v & -v).bit_length() - 1)
 
-    def as_numpy(self, data_buffer: DataBuffer) -> np.array:
+    def as_numpy(self, data_buffer: DataBuffer) -> np.ndarray:
         num_bands = len(self.bit_masks)
         bank_data = data_buffer.bank_data[0]
         pixel_data = []
@@ -166,7 +166,7 @@ class MultiPixelPackedSampleModel(SampleModel):
         self.scanline_stride = scanline_stride
         self.data_bit_offset = data_bit_offset
 
-    def as_numpy(self, data_buffer: DataBuffer) -> np.array:
+    def as_numpy(self, data_buffer: DataBuffer) -> np.ndarray:
         bank_data = data_buffer.bank_data[0]
         bits_per_value = bank_data.dtype.itemsize * 8
         pixel_per_value = bits_per_value / self.num_bits
@@ -179,7 +179,7 @@ class MultiPixelPackedSampleModel(SampleModel):
             value = bank_data[pos]
             shift = self.data_bit_offset % bits_per_value
             value = (value << shift)
-            pixels = []
+            pixels: List[int] = []
             while len(pixels) < self.width:
                 while shift < bits_per_value and len(pixels) < self.width:
                     pixels.append((value & mask) >> shift_right)

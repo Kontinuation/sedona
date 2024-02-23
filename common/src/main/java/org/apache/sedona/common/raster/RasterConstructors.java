@@ -16,6 +16,7 @@ package org.apache.sedona.common.raster;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.FunctionsGeoTools;
 import org.apache.sedona.common.raster.inputstream.ByteArrayImageInputStream;
+import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbResourcePool;
 import org.apache.sedona.common.utils.ImageUtils;
@@ -72,9 +73,13 @@ public class RasterConstructors
         return geoTiffReader.read(null);
     }
 
-    public static GridCoverage2D fromPath(String path, byte[] serializedConf, Map<String, String> params) throws IOException {
+    public static GridCoverage2D fromPath(String path, byte[] serializedConf, Map<String, String> params, boolean eagerLoadMetadata) throws IOException {
         OutDbResourcePool.ResourceKey resourceKey = new OutDbResourcePool.ResourceKey(new Path(path), serializedConf, params);
-        return OutDbGridCoverage2D.create("outDbCoverage", resourceKey);
+        if (eagerLoadMetadata) {
+            return OutDbGridCoverage2D.create("outDbCoverage", resourceKey);
+        } else {
+            return new LazyLoadOutDbGridCoverage2D("outDbCoverage", resourceKey);
+        }
     }
     public static GridCoverage2D fromNetCDF(byte[] bytes, String variableName, String lonDimensionName, String latDimensionName) throws IOException, FactoryException {
        NetcdfFile netcdfFile = openNetCdfBytes(bytes);

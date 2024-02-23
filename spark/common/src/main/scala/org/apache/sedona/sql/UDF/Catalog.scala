@@ -205,7 +205,7 @@ object Catalog {
     function[RS_MapAlgebra](null),
     function[RS_FromArcInfoAsciiGrid](),
     function[RS_FromGeoTiff](),
-    function[RS_FromPath](null),
+    function[RS_FromPath](null, false),
     function[RS_MakeEmptyRaster](),
     function[RS_MakeRasterForTesting](),
     function[RS_Tile](),

@@ -16,6 +16,7 @@
 #  under the License.
 
 import pytest
+import rasterio
 
 from tests.test_base import TestBase
 from pyspark.sql.functions import expr
@@ -61,31 +62,59 @@ class TestRasterSerde(TestBase):
 
     def test_raster_read_from_geotiff(self):
         raster_path = world_map_raster_input_location
+        r_orig = rasterio.open(raster_path)
+        band = r_orig.read(1)
         df = TestRasterSerde.spark.read.format("binaryFile").load(raster_path).selectExpr("RS_FromGeoTiff(content) as raster")
         raster = df.first()[0]
-        assert raster.width == 1440
-        assert raster.height == 720
+        assert raster.width == r_orig.width
+        assert raster.height == r_orig.height
+        assert (band == raster.as_numpy()[0, :, :]).all()
         ds = raster.as_rasterio()
-        row, col = ds.index(114.737, 38.215)
-        band = ds.read(1)
-        assert row == 207
-        assert col == 1178
-        assert band[row, col] == 121
+        band_actual = ds.read(1)
+        assert (band == band_actual).all()
         raster.close()
+        r_orig.close()
 
     def test_outdb_raster(self):
         raster_path = world_map_raster_input_location
-        df = TestRasterSerde.spark.sql("SELECT RS_FromPath('{}') as raster".format(raster_path))
-        raster = df.first()[0]
-        assert raster.width == 1440
-        assert raster.height == 720
-        ds = raster.as_rasterio()
-        row, col = ds.index(114.737, 38.215)
-        band = ds.read(1)
-        assert row == 207
-        assert col == 1178
-        assert band[row, col] == 121
-        raster.close()
+        r_orig = rasterio.open(raster_path)
+        band = r_orig.read(1)
+        for eager_loading in ['true', 'false']:
+            df = TestRasterSerde.spark.sql("SELECT RS_FromPath('{}', '', {}) as raster".format(raster_path, eager_loading))
+            raster = df.first()[0]
+            assert raster.width == r_orig.width
+            assert raster.height == r_orig.height
+            ds = raster.as_rasterio()
+            band_actual = ds.read(1)
+            assert (band == band_actual).all()
+            raster.close()
+        r_orig.close()
+
+    def test_outdb_tiled_raster(self):
+        raster_path = world_map_raster_input_location
+        r_orig = rasterio.open(raster_path)
+        band = r_orig.read(1)
+        r_orig.close()
+        df = TestRasterSerde.spark.sql("SELECT RS_TileExplode(RS_FromPath('{}'), 1, 256, 256) AS (x, y, rast)".format(raster_path))
+        df = df.withColumn("meta", expr("RS_Metadata(rast)"))
+        rows = df.collect()
+        for row in rows:
+            ip_x, ip_y, width, height, scale_x, scale_y, skew_x, skew_y, srid, num_bands = row['meta']
+            r_tile = row['rast']
+            assert width == r_tile.width
+            assert height == r_tile.height
+            assert ip_x == r_tile.affine_trans.ip_x
+            assert ip_y == r_tile.affine_trans.ip_y
+            assert scale_x == r_tile.affine_trans.scale_x
+            assert scale_y == r_tile.affine_trans.scale_y
+            assert skew_x == r_tile.affine_trans.skew_x
+            assert skew_y == r_tile.affine_trans.skew_y
+            start_x = row['x'] * 256
+            end_x = (row['x'] + 1) * 256
+            start_y = row['y'] * 256
+            end_y = (row['y'] + 1) * 256
+            assert (band[start_y:end_y, start_x:end_x] == r_tile.as_numpy()).all()
+            r_tile.close()
 
     def test_to_pandas(self):
         spark = TestRasterSerde.spark

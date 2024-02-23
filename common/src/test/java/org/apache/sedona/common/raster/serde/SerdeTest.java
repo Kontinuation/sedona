@@ -23,6 +23,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.raster.RasterConstructors;
 import org.apache.sedona.common.raster.RasterTestBase;
 import org.apache.sedona.common.raster.outdb.HadoopConfigSerializer;
+import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbResourcePool;
 import org.geotools.coverage.GridSampleDimension;
@@ -98,6 +99,35 @@ public class SerdeTest extends RasterTestBase {
             raster = createOutDbRasterTileFromGeoTiff(testFilePath);
             roundTripRaster = testRoundTrip(raster);
             Assert.assertTrue(roundTripRaster instanceof OutDbGridCoverage2D);
+        }
+    }
+
+    @Test
+    public void testLazyOutDbRaster() throws IOException, ClassNotFoundException {
+        Configuration conf = new Configuration();
+        byte[] serializedConf = HadoopConfigSerializer.serialize(conf);
+        for (String testFilePath : testFilePaths) {
+            // Out-DB raster referencing the entire GeoTiff file
+            GridCoverage2D raster = new LazyLoadOutDbGridCoverage2D("test", new Path(testFilePath), conf);
+
+            // Single round-trip
+            byte[] bytes = Serde.serialize(raster);
+            GridCoverage2D roundTripRaster = Serde.deserialize(bytes);
+            assertNotNull(roundTripRaster);
+            Assert.assertTrue(roundTripRaster instanceof LazyLoadOutDbGridCoverage2D);
+
+            // Multiple round-trip with lazy-loading (reading raster data)
+            raster = new LazyLoadOutDbGridCoverage2D("test", new Path(testFilePath), conf);
+            roundTripRaster = testRoundTrip(raster);
+            Assert.assertTrue(roundTripRaster instanceof OutDbGridCoverage2D);
+
+            // Serialize without configuration
+            raster = new LazyLoadOutDbGridCoverage2D("test", new Path(testFilePath), conf);
+            bytes = Serde.serialize(raster, false);
+            roundTripRaster = Serde.deserialize(bytes, serializedConf);
+            assertNotNull(roundTripRaster);
+            Assert.assertTrue(roundTripRaster instanceof LazyLoadOutDbGridCoverage2D);
+            assertSameCoverage(raster, roundTripRaster);
         }
     }
 

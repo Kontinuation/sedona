@@ -74,12 +74,13 @@ case class RS_FromPath(inputExpressions: Seq[Expression])
 
   override def dataType: DataType = RasterUDT
 
-  override def inputTypes: Seq[AbstractDataType] = Seq(StringType, StringType)
+  override def inputTypes: Seq[AbstractDataType] = Seq(StringType, StringType, BooleanType)
 
   override def evalWithoutSerialization(input: InternalRow): Any = {
     val serializedConf = RasterSerializer.serializedConf
     val path = inputExpressions(0).eval(input).asInstanceOf[UTF8String]
     val params = inputExpressions(1).eval(input).asInstanceOf[UTF8String]
+    val eagerLoadMetadata = inputExpressions(2).eval(input).asInstanceOf[Boolean]
     if (path == null) null else {
       val paramsMap: Map[String, String] = if (params != null && params.toString.nonEmpty) {
         params.toString.split(";").flatMap { param =>
@@ -89,7 +90,8 @@ case class RS_FromPath(inputExpressions: Seq[Expression])
           }
         }.toMap
       } else Map.empty
-      RasterConstructors.fromPath(path.toString, serializedConf, new util.HashMap[String, String](paramsMap.asJava))
+      val jParamsMap = new util.HashMap[String, String](paramsMap.asJava)
+      RasterConstructors.fromPath(path.toString, serializedConf, jParamsMap, eagerLoadMetadata)
     }
   }
 

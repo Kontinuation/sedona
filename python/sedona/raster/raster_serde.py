@@ -25,7 +25,13 @@ from .sample_model import SampleModel, ComponentSampleModel, PixelInterleavedSam
 from .data_buffer import DataBuffer
 from .awt_raster import AWTRaster
 from .meta import AffineTransform, PixelAnchor, SampleDimension, OutDbMeta
-from .sedona_raster import SedonaRaster, InDbSedonaRaster, OutDbSedonaRaster
+from .sedona_raster import SedonaRaster, InDbSedonaRaster, OutDbSedonaRaster, LazyLoadOutDbSedonaRaster
+
+
+class RasterTypes:
+    IN_DB = 0
+    OUT_DB = 1
+    LAZY_LOAD_OUT_DB = 2
 
 
 def deserialize(buf: Union[bytearray, bytes]) -> Optional[SedonaRaster]:
@@ -33,30 +39,40 @@ def deserialize(buf: Union[bytearray, bytes]) -> Optional[SedonaRaster]:
         return None
 
     bio = BytesIO(buf)
-    is_outdb = bio.read(1)
-    return _deserialize(bio, is_outdb == b'\x01')
+    raster_type = int(bio.read(1)[0])
+    return _deserialize(bio, raster_type)
 
 
-def _deserialize(bio: BytesIO, is_outdb: bool) -> SedonaRaster:
+def _deserialize(bio: BytesIO, raster_type: int) -> SedonaRaster:
     name = _read_utf8_string(bio)
-    width, height, x, y = _read_grid_envelope(bio)
-    affine_trans = _read_affine_transformation(bio)
-    affine_trans = affine_trans.translate(x, y)
-    affine_trans = affine_trans.with_anchor(PixelAnchor.UPPER_LEFT)
-    crs_wkt = _read_crs_wkt(bio)
-    bands_meta = _read_sample_dimensions(bio)
-    if not is_outdb:
-        # In-DB raster
-        awt_raster = _read_awt_raster(bio)
-        return InDbSedonaRaster(width, height, bands_meta, affine_trans, crs_wkt, awt_raster)
+    if raster_type != RasterTypes.LAZY_LOAD_OUT_DB:
+        width, height, x, y = _read_grid_envelope(bio)
+        affine_trans = _read_affine_transformation(bio)
+        affine_trans = affine_trans.translate(x, y)
+        affine_trans = affine_trans.with_anchor(PixelAnchor.UPPER_LEFT)
+        crs_wkt = _read_crs_wkt(bio)
+        bands_meta = _read_sample_dimensions(bio)
+        if raster_type == RasterTypes.IN_DB:
+            # In-DB raster
+            awt_raster = _read_awt_raster(bio)
+            return InDbSedonaRaster(width, height, bands_meta, affine_trans, crs_wkt, awt_raster)
+        else:
+            # Out-DB raster
+            outdb_meta = _read_outdb_meta(bio)
+            return OutDbSedonaRaster(width, height, bands_meta, affine_trans, crs_wkt, outdb_meta)
     else:
-        # Out-DB raster
-        outdb_meta = _read_outdb_meta(bio)
-        return OutDbSedonaRaster(width, height, bands_meta, affine_trans, crs_wkt, outdb_meta)
+        params = _read_utf8_string_map(bio)
+        path = _read_utf8_string(bio)
+        # skip serialized config (hadoop configuration)
+        size, = struct.unpack("=i", bio.read(4))
+        if size > 0:
+            bio.read(size)
+        return LazyLoadOutDbSedonaRaster(path, params)
 
 
 def _read_grid_envelope(bio: BytesIO) -> Tuple[int, int, int, int]:
-    return struct.unpack("=iiii", bio.read(4 * 4))
+    width, height, x, y = struct.unpack("=iiii", bio.read(4 * 4))
+    return (width, height, x, y)
 
 
 def _read_affine_transformation(bio: BytesIO) -> AffineTransform:
@@ -179,7 +195,7 @@ def _read_int_array(bio: BytesIO) -> List[int]:
     return [struct.unpack("=i", bio.read(4))[0] for _ in range(length)]
 
 
-def _read_utf8_string_map(bio: BytesIO) -> Dict[str, str]:
+def _read_utf8_string_map(bio: BytesIO) -> Optional[Dict[str, str]]:
     size, = struct.unpack("=i", bio.read(4))
     if size == -1:
         return None

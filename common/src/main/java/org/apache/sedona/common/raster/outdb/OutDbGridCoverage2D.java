@@ -35,13 +35,16 @@ import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.TypeMap;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.data.DataSourceException;
 import org.geotools.gce.arcgrid.ArcGridFormat;
 import org.geotools.gce.geotiff.GeoTiffFormat;
+import org.geotools.geometry.Envelope2D;
 import org.geotools.referencing.CRS;
+import org.geotools.referencing.crs.DefaultEngineeringCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.geotools.util.factory.Hints;
 import org.opengis.coverage.CannotEvaluateException;
@@ -99,6 +102,27 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         this.resourceKey = resourceKey;
         this.pooledResource = null;
         this.bandIndices = bandIndices;
+    }
+
+    /**
+     * This dummy coverage object is for supporting the construction of LazyLoadingGridCoverage2D.
+     */
+    private static final GridCoverage2D dummyCoverage;
+    static {
+        GridCoverageFactory factory = new GridCoverageFactory();
+        float[][] matrix = {{0}};
+        dummyCoverage = factory.create("__dummy_static__", matrix, new Envelope2D(DefaultEngineeringCRS.GENERIC_2D, 0, 0, 1, 1));
+    }
+
+    /**
+     * This is for supporting the construction of LazyLoadingGridCoverage2D. The object will be initialized as a
+     * well-defined dummy state since this object won't be actually used after construction. All the methods in
+     * LazyLoadingGridCoverage2D will be delegated to a real OutDbGridCoverage2D object.
+     */
+    protected OutDbGridCoverage2D(CharSequence name) {
+        super(name, dummyCoverage);
+        this.resourceKey = null;
+        this.bandIndices = null;
     }
 
     @Override

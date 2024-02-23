@@ -50,15 +50,20 @@ df = df.withColumn("raster", f.expr("RS_FromGeoTiff(content)"))
 You can load rasters from paths. Rasters loaded in this way are called "out-db" rasters. Out-db rasters hold references to raster files instead of holding the actual pixel data.
 
 Out-db rasters can be used interchangeably with ordinary rasters. The only difference is that out-db rasters will load raster files in a deferred manner.
-The grid geometry and geo-referencing information will be loaded from the raster files when the out-db raster was constructed, pixel data may not be loaded until pixel values
-were accessed by `RS_Value` or `RS_BandAsArray`. It is more appropriate to load large raster files as out-db rasters.
+Pixel data won't be loaded until pixel values were accessed by functions such as `RS_Value` or `RS_BandAsArray`. It is more appropriate to load large raster files as out-db rasters.
 
 Introduction: Returns an out-db raster from path to image file. Currently, it supports loading GeoTiff files (`*.tiff` or `*.tif`) and Arc Info Ascii Grid files (`*.asc`).
 Additional parameters for configuring the Hadoop file system can be passed in as a `;` delimited string.
 
+`RS_FromPath` will load the metadata of the raster file immediately when `eagerLoadMetadata` is set to `true`, and report any errors encountered
+reading the raster file, otherwise it will only keep the path to raster file without loading it, until the metadata of the raster is actually needed.
+The default value of `eagerLoadMetadata` is `false`.
+
 Format: `RS_FromPath(path: String)`
 
 Format: `RS_FromPath(path: String, params: String)`
+
+Format: `RS_FromPath(path: String, params: String, eagerLoadMetadata: Boolean)`
 
 Since: `v1.5.0`
 

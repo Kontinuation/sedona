@@ -20,7 +20,7 @@ package org.apache.sedona.sql
 
 import org.apache.commons.io.FileUtils
 import org.apache.sedona.common.raster.MapAlgebra
-import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D
+import org.apache.sedona.common.raster.outdb.{LazyLoadOutDbGridCoverage2D, OutDbGridCoverage2D}
 import org.apache.sedona.common.utils.RasterUtils
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{Row, SaveMode}
@@ -301,7 +301,7 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       val rows = dfResults.collect()
       rows.foreach { row =>
         val gridCoverage2D = row.getAs[GridCoverage2D]("rast_outdb")
-        assert(gridCoverage2D.isInstanceOf[OutDbGridCoverage2D])
+        assert(gridCoverage2D.isInstanceOf[LazyLoadOutDbGridCoverage2D])
       }
     }
 
@@ -310,11 +310,42 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
         .withColumn("rast", expr("RS_FromPath(path, 'key0=value0;key1=value1')"))
       dfRasters.collect().foreach { row =>
         val gridCoverage2D = row.getAs[GridCoverage2D]("rast")
-        assert(gridCoverage2D.isInstanceOf[OutDbGridCoverage2D])
+        assert(gridCoverage2D.isInstanceOf[LazyLoadOutDbGridCoverage2D])
         val outDbGridCoverage2D = gridCoverage2D.asInstanceOf[OutDbGridCoverage2D]
         val params = outDbGridCoverage2D.getOutDbParams
         assert(params.get("key0") == "value0")
         assert(params.get("key1") == "value1")
+      }
+    }
+
+    it("Passed RS_FromPath with eager meta loading") {
+      val paths = Seq(
+        resourceFolder + "raster/test1.tiff",
+        resourceFolder + "raster/test2.tiff",
+        resourceFolder + "raster/test3.tif",
+        resourceFolder + "raster/raster_with_no_data/test5.tiff",
+        resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif")
+      val dfRasters = paths.toDF("path")
+        .withColumn("rast_eager", expr("RS_FromPath(path, '', true)"))
+        .withColumn("rast_lazy", expr("RS_FromPath(path, '', false)"))
+      val dfResults = dfRasters.selectExpr(
+        "rast_eager",
+          "RS_Metadata(rast_eager) as meta_eager",
+          "RS_Metadata(rast_lazy) as meta_lazy",
+          "RS_Envelope(rast_eager) as env_eager",
+          "RS_Envelope(rast_lazy) as env_lazy",
+          "RS_Value(rast_eager, ST_Centroid(RS_Envelope(rast_eager))) as value_eager",
+          "RS_Value(rast_lazy, ST_Centroid(RS_Envelope(rast_lazy))) as value_lazy")
+      assert(dfResults.count() == paths.length)
+      val dfPassed = dfResults.where("ST_Equals(env_eager, env_lazy) AND meta_eager = meta_lazy AND value_eager = value_lazy")
+      assert(dfPassed.count() == paths.length)
+
+      // Test collecting out-db rasters as non-lazy OutDbGridCoverage2D objects
+      val rows = dfResults.collect()
+      rows.foreach { row =>
+        val gridCoverage2D = row.getAs[GridCoverage2D]("rast_eager")
+        assert(gridCoverage2D.isInstanceOf[OutDbGridCoverage2D])
+        assert(!gridCoverage2D.isInstanceOf[LazyLoadOutDbGridCoverage2D])
       }
     }
 
@@ -325,6 +356,10 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
         .selectExpr("RS_BandPath(RS_FromGeoTiff(content)) as band_path")
       assert(dfBandPath.first.getString(0) contains "test1.tiff")
       assert(dfBandPathInDb.first.getString(0) == null)
+
+      val dfBandPathEager = Seq(resourceFolder + "raster/test1.tiff").toDF("path")
+        .selectExpr("RS_BandPath(RS_FromPath(path, '', true)) as band_path")
+      assert(dfBandPathEager.first.getString(0) contains "test1.tiff")
     }
 
     it("Passed RS_Envelope should handle null values") {
