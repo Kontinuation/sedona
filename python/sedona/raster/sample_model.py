@@ -151,7 +151,7 @@ class SinglePixelPackedSampleModel(SampleModel):
                 for mask, bit_offset in zip(self.bit_masks, self.bit_offsets):
                     pixel.append((value & mask) >> bit_offset)
                 pixel_data.append(pixel)
-        arr = np.array(pixel_data).reshape(self.height, self.width, num_bands)
+        arr = np.array(pixel_data, dtype=bank_data.dtype).reshape(self.height, self.width, num_bands)
         return np.transpose(arr, [2, 0, 1])
 
 
@@ -188,6 +188,6 @@ class MultiPixelPackedSampleModel(SampleModel):
                 pos += 1
                 value = bank_data[pos]
                 shift = 0
-            band_data.append(np.array(pixels))
+            band_data.append(np.array(pixels, dtype=bank_data.dtype))
 
         return np.array(band_data).reshape(1, self.height, self.width)

@@ -17,6 +17,7 @@
 
 import pytest
 import rasterio
+import numpy as np
 
 from tests.test_base import TestBase
 from pyspark.sql.functions import expr
@@ -25,6 +26,13 @@ from sedona.sql.types import RasterType
 from tests import world_map_raster_input_location
 
 class TestRasterSerde(TestBase):
+    def test_empty_raster(self):
+        df = TestRasterSerde.spark.sql("SELECT RS_MakeEmptyRaster(2, 100, 200, 1000, 2000, 1) as raster")
+        raster = df.first()[0]
+        assert raster.width == 100 and raster.height == 200 and len(raster.bands_meta) == 2
+        assert raster.affine_trans.ip_x == 1000 and raster.affine_trans.ip_y == 2000
+        assert raster.affine_trans.scale_x == 1 and raster.affine_trans.scale_y == -1
+
     def test_banded_sample_model(self):
         df = TestRasterSerde.spark.sql("SELECT RS_MakeRasterForTesting(3, 'I', 'BandedSampleModel', 10, 8, 100, 100, 10, -10, 0, 0, 3857) as raster")
         raster = df.first()[0]
@@ -64,14 +72,28 @@ class TestRasterSerde(TestBase):
         raster_path = world_map_raster_input_location
         r_orig = rasterio.open(raster_path)
         band = r_orig.read(1)
+        band_masked = np.where(band == 0, np.nan, band)
         df = TestRasterSerde.spark.read.format("binaryFile").load(raster_path).selectExpr("RS_FromGeoTiff(content) as raster")
         raster = df.first()[0]
         assert raster.width == r_orig.width
         assert raster.height == r_orig.height
+        assert raster.bands_meta[0].nodata == 0
+
+        # test as_rasterio
         assert (band == raster.as_numpy()[0, :, :]).all()
         ds = raster.as_rasterio()
+        assert ds.crs is not None
         band_actual = ds.read(1)
         assert (band == band_actual).all()
+
+        # test as_numpy
+        arr = raster.as_numpy()
+        assert (arr[0, :, :] == band).all()
+
+        # test as_numpy_masked
+        arr = raster.as_numpy_masked()[0, :, :]
+        assert np.array_equal(arr, band_masked) or np.array_equal(np.isnan(arr), np.isnan(band_masked))
+
         raster.close()
         r_orig.close()
 
@@ -79,14 +101,28 @@ class TestRasterSerde(TestBase):
         raster_path = world_map_raster_input_location
         r_orig = rasterio.open(raster_path)
         band = r_orig.read(1)
+        band_masked = np.where(band == 0, np.nan, band)
         for eager_loading in ['true', 'false']:
             df = TestRasterSerde.spark.sql("SELECT RS_FromPath('{}', '', {}) as raster".format(raster_path, eager_loading))
             raster = df.first()[0]
             assert raster.width == r_orig.width
             assert raster.height == r_orig.height
+            assert raster.bands_meta[0].nodata == 0
+
+            # test as_rasterio
             ds = raster.as_rasterio()
+            assert ds.crs is not None
             band_actual = ds.read(1)
             assert (band == band_actual).all()
+
+            # test as_numpy
+            arr = raster.as_numpy()
+            assert (arr[0, :, :] == band).all()
+
+            # test as_numpy_masked
+            arr = raster.as_numpy_masked()[0, :, :]
+            assert np.array_equal(arr, band_masked) or np.array_equal(np.isnan(arr), np.isnan(band_masked))
+
             raster.close()
         r_orig.close()
 
@@ -113,7 +149,15 @@ class TestRasterSerde(TestBase):
             end_x = (row['x'] + 1) * 256
             start_y = row['y'] * 256
             end_y = (row['y'] + 1) * 256
+
+            # test as_numpy
             assert (band[start_y:end_y, start_x:end_x] == r_tile.as_numpy()).all()
+
+            # test as_rasterio
+            ds = r_tile.as_rasterio()
+            assert ds.crs is not None
+            assert (band[start_y:end_y, start_x:end_x] == ds.read(1)).all()
+
             r_tile.close()
 
     def test_to_pandas(self):
@@ -125,12 +169,16 @@ class TestRasterSerde(TestBase):
 
     def validate_test_raster(self, raster, packed = False):
         arr = raster.as_numpy()
+        ds = raster.as_rasterio()
         bands, height, width = arr.shape
         assert bands > 0 and width > 0 and height > 0
+        assert ds.crs is not None
         for b in range(bands):
+            band = ds.read(b + 1)
             for y in range(height):
                 for x in range(width):
                     expected = b + y * width + x
                     if packed:
                         expected = expected % 16
                     assert arr[b, y, x] == expected
+                    assert band[y, x] == expected

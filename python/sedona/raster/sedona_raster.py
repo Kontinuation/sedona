@@ -71,34 +71,61 @@ class SedonaRaster(ABC):
 
     @property
     def width(self) -> int:
+        """Width of the raster in pixel"""
         return self._width
 
     @property
     def height(self) -> int:
+        """Height of the raster in pixel"""
         return self._height
 
     @property
     def crs_wkt(self) -> str:
+        """CRS of the raster as a WKT string"""
         return self._crs_wkt
 
     @property
     def bands_meta(self) -> List[SampleDimension]:
+        """Metadata of bands, including nodata value for each band"""
         return self._bands_meta
 
     @property
     def affine_trans(self) -> AffineTransform:
+        """Geo transform of the raster"""
         return self._affine_trans
 
     @abstractmethod
     def as_numpy(self) -> np.ndarray:
+        """Get the bands data as an numpy array in CHW layout
+
+        """
         raise NotImplementedError()
+
+    def as_numpy_masked(self) -> np.ndarray:
+        """Get the bands data as an numpy array in CHW layout, with nodata
+        values masked as nan.
+
+        """
+        arr = self.as_numpy()
+        nodata_values = np.array([bm.nodata for bm in self._bands_meta])
+        nodata_values_reshaped = nodata_values[:, None, None]
+        mask = arr == nodata_values_reshaped
+        masked_arr = np.where(mask, np.nan, arr)
+        return masked_arr
 
     @abstractmethod
     def as_rasterio(self) -> DatasetReader:
+        """Retrieve the raster as an rasterio DatasetReader
+
+        """
         raise NotImplementedError()
 
     @abstractmethod
     def close(self):
+        """Release all resources allocated for this sedona raster. The rasterio
+        DatasetReader returned by as_rasterio() will also be closed.
+
+        """
         raise NotImplementedError()
 
     def __enter__(self):
@@ -113,6 +140,7 @@ class SedonaRaster(ABC):
 
 class InDbSedonaRaster(SedonaRaster):
     awt_raster: AWTRaster
+    rasterio_memfile: Optional[MemoryFile]
     rasterio_dataset_reader: Optional[DatasetReader]
 
     def __init__(self, width: int, height: int, bands_meta: List[SampleDimension],
@@ -120,6 +148,7 @@ class InDbSedonaRaster(SedonaRaster):
                  awt_raster: AWTRaster):
         super().__init__(width, height, bands_meta, affine_trans, crs_wkt)
         self.awt_raster = awt_raster
+        self.rasterio_memfile = None
         self.rasterio_dataset_reader = None
 
     def as_numpy(self) -> np.ndarray:
@@ -171,7 +200,15 @@ class InDbSedonaRaster(SedonaRaster):
         # won't be a problem. See https://gdal.org/drivers/raster/mem.html
         desc = (f"MEM:::DATAPOINTER={data_pointer},PIXELS={self._width},LINES={self._height},BANDS={num_bands}," +
                 f"DATATYPE={data_type},GEOTRANSFORM={geotransform}")
-        dataset = _rasterio_open(desc, driver="MEM")
+
+        # construct a VRT to wrap this MEM dataset, with SRS set up properly
+        vrt_xml = OutDbSedonaRaster.generate_vrt_xml(
+            desc, data_type, self._width, self._height, geotransform.replace('/', ','), self._crs_wkt,
+            0, 0, list(range(num_bands)))
+
+        # dataset = _rasterio_open(desc, driver="MEM")
+        self.rasterio_memfile = MemoryFile(vrt_xml, ext='.vrt')
+        dataset = self.rasterio_memfile.open(driver='VRT')
 
         # XXX: dataset does not copy the data held by data_array, so we set
         # data_array as a property of dataset to make sure that the lifetime of
@@ -184,6 +221,9 @@ class InDbSedonaRaster(SedonaRaster):
         if self.rasterio_dataset_reader is not None:
            self.rasterio_dataset_reader.close()
            self.rasterio_dataset_reader = None
+        if self.rasterio_memfile is not None:
+            self.rasterio_memfile.close()
+            self.rasterio_memfile = None
 
 
 class OutDbSedonaRasterBase(SedonaRaster):
