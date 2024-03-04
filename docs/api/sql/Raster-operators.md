@@ -10,7 +10,7 @@ Format: `RS_PixelAsCentroid(raster: Raster, colX: Integer, rowY: Integer)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT ST_AsText(RS_PixelAsCentroid(RS_MakeEmptyRaster(1, 12, 13, 134, -53, 9), 3, 3))
@@ -31,7 +31,7 @@ Format: `RS_PixelAsCentroids(raster: Raster, band: Integer)`
 
 Since: `v1.5.1`
 
-Spark SQL Example:
+SQL Example
 ```sql
 SELECT ST_AsText(RS_PixelAsCentroids(raster, 1)) from rasters
 ```
@@ -82,7 +82,7 @@ Format: `RS_PixelAsPoint(raster: Raster, colX: Integer, rowY: Integer)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT ST_AsText(RS_PixelAsPoint(raster, 2, 1)) from rasters
@@ -93,7 +93,7 @@ Output:
 POINT (123.19, -12)
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT ST_AsText(RS_PixelAsPoint(raster, 6, 2)) from rasters
@@ -112,7 +112,7 @@ Format: `RS_PixelAsPoints(raster: Raster, band: Integer)`
 
 Since: `v1.5.1`
 
-Spark SQL Example:
+SQL Example
 ```sql
 SELECT ST_AsText(RS_PixelAsPoints(raster, 1)) from rasters
 ```
@@ -162,7 +162,7 @@ Format: `RS_PixelAsPolygon(raster: Raster, colX: Integer, rowY: Integer)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT ST_AsText(RS_PixelAsPolygon(RS_MakeEmptyRaster(1, 5, 10, 123, -230, 8), 2, 3))
@@ -182,7 +182,7 @@ Format: `RS_PixelAsPolygons(raster: Raster, band: Integer)`
 
 Since: `v1.5.1`
 
-Spark SQL Example:
+SQL Example
 ```sql
 SELECT ST_AsText(RS_PixelAsPolygons(raster, 1)) from rasters
 ```
@@ -234,7 +234,7 @@ Format: `RS_Envelope (raster: Raster)`
 
 Since: `v1.4.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Envelope(raster) FROM raster_table
@@ -255,7 +255,7 @@ Format: `RS_ConvexHull(raster: Raster)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_ConvexHull(RS_MakeEmptyRaster(1, 5, 10, 156, -132, 5, 10, 3, 5, 0));
@@ -284,7 +284,7 @@ Format:
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val inputDf = Seq((Seq(0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0),
@@ -302,7 +302,7 @@ Output:
 +----------------------------------------+
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val inputDf = Seq((Seq(0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0),
@@ -320,7 +320,7 @@ Output:
 +----------------------------------------+
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_MinConvexHull(raster, 3) from rasters;
@@ -408,7 +408,7 @@ UpperLeftX + ScaleX * 0.5
 UpperLeftY + ScaleY * 0.5
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_GeoReference(ST_MakeEmptyRaster(1, 100, 100, -53, 51, 2, -2, 4, 5, 4326))
@@ -425,7 +425,7 @@ Output:
 51.000000
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_GeoReferrence(ST_MakeEmptyRaster(1, 3, 4, 100.0, 200.0,2.0, -3.0, 0.1, 0.2, 0), "GDAL")
@@ -442,7 +442,7 @@ Output:
 200.000000
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_GeoReferrence(ST_MakeEmptyRaster(1, 3, 4, 100.0, 200.0,2.0, -3.0, 0.1, 0.2, 0), "ERSI")
@@ -475,7 +475,7 @@ Format: `RS_GeoTransform(raster: Raster)`
 
 Since: `v1.5.1`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_GeoTransform(
@@ -497,7 +497,7 @@ Format: `RS_Height(raster: Raster)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Height(raster) FROM rasters
@@ -517,7 +517,7 @@ Format: `RS_RasterToWorldCoordX(raster: Raster, colX: Integer, rowY: Integer)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_RasterToWorldCoordX(ST_MakeEmptyRaster(1, 5, 10, -123, 54, 5, -10, 0, 0, 4326), 1, 1) from rasters
@@ -537,7 +537,7 @@ Format: `RS_RasterToWorldCoordY(raster: Raster, colX: Integer, rowY: Integer)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_RasterToWorldCoordY(ST_MakeEmptyRaster(1, 5, 10, -123, 54, 5, -10, 0, 0, 4326), 1, 1) from rasters
@@ -557,7 +557,7 @@ Format: `RS_RasterToWorldCoord(raster: Raster, colX: Integer, rowY: Integer)`
 
 Since: `v1.5.1`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_RasterToWorldCoord(ST_MakeEmptyRaster(1, 5, 10, -123, 54, 5, -10, 0, 0, 4326), 1, 1) from rasters
@@ -577,7 +577,7 @@ Format: `RS_Rotation(raster: Raster)`
 
 Since: `v1.5.1`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Rotation(
@@ -604,7 +604,7 @@ Format: `RS_ScaleX(raster: Raster)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_ScaleX(raster) FROM rasters
@@ -629,7 +629,7 @@ Format: `RS_ScaleY(raster: Raster)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_ScaleY(raster) FROM rasters
@@ -648,7 +648,7 @@ Format: `RS_SkewX(raster: Raster)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_SkewX(RS_MakeEmptyRaster(2, 10, 10, 0.0, 0.0, 1.0, -1.0, 0.1, 0.2, 4326))
@@ -668,7 +668,7 @@ Format: `RS_SkewY(raster: Raster)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_SkewY(RS_MakeEmptyRaster(2, 10, 10, 0.0, 0.0, 1.0, -1.0, 0.1, 0.2, 4326))
@@ -688,7 +688,7 @@ Format: `RS_UpperLeftX(raster: Raster)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_UpperLeftX(raster) FROM rasters
@@ -708,7 +708,7 @@ Format: `RS_UpperLeftY(raster: Raster)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_UpperLeftY(raster) FROM rasters
@@ -728,7 +728,7 @@ Format: `RS_Width(raster: Raster)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Width(raster) FROM rasters
@@ -751,7 +751,7 @@ Format:
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_WorldToRasterCoord(ST_MakeEmptyRaster(1, 5, 5, -53, 51, 1, -1, 0, 0, 4326), -53, 51) from rasters;
@@ -763,7 +763,7 @@ Output:
 POINT (1 1)
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_WorldToRasterCoord(ST_MakeEmptyRaster(1, 5, 5, -53, 51, 1, -1, 0, 0, 4326), ST_GeomFromText('POINT (-52 51)')) from rasters;
@@ -790,7 +790,7 @@ Format:
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_WorldToRasterCoordX(ST_MakeEmptyRaster(1, 5, 5, -53, 51, 1, -1, 0, 0), -53, 51) from rasters;
@@ -802,7 +802,7 @@ Output:
 1
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_WorldToRasterCoordX(ST_MakeEmptyRaster(1, 5, 5, -53, 51, 1, -1, 0, 0), ST_GeomFromText('POINT (-53 51)')) from rasters;
@@ -829,7 +829,7 @@ Format:
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_WorldToRasterCoordY(ST_MakeEmptyRaster(1, 5, 5, -53, 51, 1, -1, 0, 0), ST_GeomFromText('POINT (-50 50)'));
@@ -841,7 +841,7 @@ Output:
 2
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_WorldToRasterCoordY(ST_MakeEmptyRaster(1, 5, 5, -53, 51, 1, -1, 0, 0), -50, 49);
@@ -869,7 +869,7 @@ Format:
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_NumBands(
@@ -900,7 +900,7 @@ Format: `RS_BandNoDataValue (raster: Raster, band: Integer = 1)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_BandNoDataValue(raster, 1) from rasters;
@@ -912,7 +912,7 @@ Output:
 0.0
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_BandNoDataValue(raster) from rasters_without_nodata;
@@ -924,7 +924,7 @@ Output:
 null
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_BandNoDataValue(raster, 3) from rasters;
@@ -944,7 +944,7 @@ Format: `RS_BandIsNoData(raster: Raster, band: Integer = 1)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 WITH rast_table AS (SELECT RS_AddBandFromArray(RS_MakeEmptyRaster(1, 2, 2, 0, 0, 1), ARRAY(10d, 10d, 10d, 10d), 1, 10d) as rast)
@@ -975,7 +975,7 @@ Format: `RS_BandPixelType(rast: Raster, band: Integer = 1)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_BandPixelType(RS_MakeEmptyRaster(2, "D", 5, 5, 53, 51, 1, 1, 0, 0, 0), 2);
@@ -1028,7 +1028,7 @@ Format:
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Count(RS_MakeEmptyRaster(2, 5, 5, 0, 0, 1, -1, 0, 0, 0), 1, false)
@@ -1040,7 +1040,7 @@ Output:
 25
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Count(RS_MakeEmptyRaster(2, 5, 5, 0, 0, 1, -1, 0, 0, 0), 1)
@@ -1071,7 +1071,7 @@ Introduction: Returns summary stats consisting of count, sum, mean, stddev, min,
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_SummaryStats(RS_MakeEmptyRaster(2, 5, 5, 0, 0, 1, -1, 0, 0, 0), 1, false)
@@ -1083,7 +1083,7 @@ Output:
 25.0, 204.0, 8.16, 9.4678403028357, 0.0, 25.0
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_SummaryStats(RS_MakeEmptyRaster(2, 5, 5, 0, 0, 1, -1, 0, 0, 0), 1)
@@ -1139,7 +1139,7 @@ RS_ZonalStats(raster: Raster, zone: Geometry, statType: String)
 
 Since: `v1.5.1`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 RS_ZonalStats(rast1, geom1, 1, 'sum', false)
@@ -1151,7 +1151,7 @@ Output:
 10690406
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 RS_ZonalStats(rast2, geom2, 1, 'mean', true)
@@ -1207,7 +1207,7 @@ RS_ZonalStatsAll(raster: Raster, zone: Geometry)
 
 Since: `v1.5.1`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 RS_ZonalStatsAll(rast1, geom1, 1, false)
@@ -1219,7 +1219,7 @@ Output:
 [184792.0, 1.0690406E7, 57.851021689230684, 0.0, 0.0, 92.13277429243035, 8488.448098819916, 0.0, 255.0]
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 RS_ZonalStatsAll(rast2, geom2, 1, true)
@@ -1250,7 +1250,7 @@ Format:
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Contains(RS_MakeEmptyRaster(1, 20, 20, 2, 22, 1), ST_GeomFromWKT('POLYGON ((5 5, 5 10, 10 10, 10 5, 5 5))')) rast_geom,
@@ -1287,7 +1287,7 @@ Format:
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Intersects(RS_MakeEmptyRaster(1, 20, 20, 2, 22, 1), ST_SetSRID(ST_PolygonFromEnvelope(0, 0, 10, 10), 4326)) rast_geom,
@@ -1319,7 +1319,7 @@ Format: `RS_Within(raster0: Raster, raster1: Raster)`
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Within(RS_MakeEmptyRaster(1, 20, 20, 2, 22, 1), ST_GeomFromWKT('POLYGON ((0 0, 0 50, 100 50, 100 0, 0 0))')) rast_geom,
@@ -1365,7 +1365,7 @@ RS_AddBand(toRaster: Raster, fromRaster: Raster)
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_AddBand(raster1, raster2, 2, 1) FROM rasters
@@ -1406,7 +1406,7 @@ Original Raster:
 
 <img alt="Original raster" src="../../../image/original-raster-clip.png" width="400"/>
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Clip(
@@ -1420,7 +1420,7 @@ Output:
 
 <img alt="Cropped raster" src="../../../image/cropped-raster.png" width="400"/>
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Clip(
@@ -1453,7 +1453,7 @@ Format: `RS_MetaData (raster: Raster)`
 
 Since: `v1.4.1`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_MetaData(raster) FROM raster_table
@@ -1502,7 +1502,7 @@ RS_NormalizeAll (raster: Raster, minLim: Double, maxLim: Double, normalizeAcross
 
 Since: `v1.6.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_NormalizeAll(raster, 0, 1)
@@ -1516,7 +1516,7 @@ Format: `RS_NumBands (raster: Raster)`
 
 Since: `v1.4.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_NumBands(raster) FROM raster_table
@@ -1568,7 +1568,7 @@ RS_Resample(raster: Raster, referenceRaster: Raster, useScale: Boolean, algorith
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 WITH INPUT_RASTER AS (
@@ -1594,7 +1594,7 @@ Output:
 (-0.33333333333333326,0.19999999999999996,6,5,1.388888888888889,-1.24,0,0,0,1)
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
  WITH INPUT_RASTER AS (
@@ -1620,7 +1620,7 @@ Output:
 (0.0, 0.0, 7.0, 5.0, 1.2, -1.4, 0.0, 0.0, 0.0, 1.0)
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 WITH INPUT_RASTER AS (
@@ -1672,7 +1672,7 @@ RS_SetBandNoDataValue(raster: Raster, bandIndex: Integer = 1, noDataValue: Doubl
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_BandNoDataValue(
@@ -1720,7 +1720,7 @@ ScaleX SkewY SkewX ScaleY UpperLeftX UpperLeftY
 ScaleX SkewY SkewX ScaleY (UpperLeftX + ScaleX * 0.5) (UpperLeftY + ScaleY * 0.5)
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_GeoReference(
@@ -1742,7 +1742,7 @@ Output:
 3.000000
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_GeoReference(
@@ -1764,7 +1764,7 @@ Output:
 2.000000
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_GeoReference(
@@ -1798,7 +1798,7 @@ RS_SetValue(raster: Raster, bandIndex: Integer = 1, colX: Integer, rowY: Integer
 
 Since: `v1.5.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_BandAsArray(
@@ -1851,7 +1851,7 @@ The geometry variant of this function accepts all types of Geometries and it set
 !!!Note
     If the mentioned `bandIndex` doesn't exist, this will throw an `IllegalArgumentException`.
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_BandAsArray(
@@ -1871,7 +1871,7 @@ Output:
 Array(1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 11.0, 12.0, 13.0, 3.0, 5.0, 14.0, 15.0, 16.0, 0.0, 3.0, 17.0, 18.0, 19.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 ```
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_BandAsArray(
@@ -1899,7 +1899,7 @@ Format: `RS_SetSRID (raster: Raster, srid: Integer)`
 
 Since: `v1.4.1`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_SetSRID(raster, 4326)
@@ -1914,7 +1914,7 @@ Format: `RS_SRID (raster: Raster)`
 
 Since: `v1.4.1`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_SRID(raster) FROM raster_table
@@ -1985,7 +1985,7 @@ RS_Values (raster: Raster, xCoordinates: ARRAY[Integer], yCoordinates: ARRAY[Int
 
 Since: `v1.4.0`
 
-Spark SQL Example:
+SQL Example
 
 - For Array of Point geometries:
 
@@ -2198,7 +2198,7 @@ Since: `v1.4.1`
 
 BandIndex is 1-based and must be between 1 and RS_NumBands(raster). It returns null if the bandIndex is out of range or the raster is null.
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_BandAsArray(raster, 1) FROM raster_table
@@ -2245,7 +2245,7 @@ Note that: `bandIndex == RS_NumBands(raster) + 1` is an experimental feature and
 !!!Note
     RS_AddBandFromArray typecasts the double band values to the given datatype of the raster. This can lead to overflow values if values beyond the range of the raster's datatype are provided.
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_AddBandFromArray(raster, RS_MultiplyFactor(RS_BandAsArray(RS_FromGeoTiff(content), 1), 2)) AS raster FROM raster_table
@@ -2285,7 +2285,7 @@ Since: `v1.5.0`
 `RS_MapAlgebra` runs a script on a raster. The script is written in a map algebra language called [Jiffle](https://github.com/geosolutions-it/jai-ext/wiki/Jiffle). The script takes a raster
 as input and returns a raster of the same size as output. The script can be used to apply a map algebra expression on a raster. The input raster is named `rast` in the Jiffle script, and the output raster is named `out`.
 
-Spark SQL Example:
+SQL Example
 
 Calculate the NDVI of a raster with 4 bands (R, G, B, NIR):
 
@@ -2325,7 +2325,7 @@ Format: `RS_Add (Band1: ARRAY[Double], Band2: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val sumDF = spark.sql("select RS_Add(band1, band2) as sumOfBands from dataframe")
@@ -2339,7 +2339,7 @@ Format: `RS_Array(length: Integer, value: Double)`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 SELECT RS_Array(height * width, 0.0)
@@ -2353,7 +2353,7 @@ Format: `RS_BitwiseAND (Band1: ARRAY[Double], Band2: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val biwiseandDF = spark.sql("select RS_BitwiseAND(band1, band2) as andvalue from dataframe")
@@ -2367,7 +2367,7 @@ Format: `RS_BitwiseOR (Band1: ARRAY[Double], Band2: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val biwiseorDF = spark.sql("select RS_BitwiseOR(band1, band2) as or from dataframe")
@@ -2381,7 +2381,7 @@ Format: `RS_CountValue (Band1: ARRAY[Double], Target: Double)`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val countDF = spark.sql("select RS_CountValue(band1, target) as count from dataframe")
@@ -2395,7 +2395,7 @@ Format: `RS_Divide (Band1: ARRAY[Double], Band2: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val multiplyDF = spark.sql("select RS_Divide(band1, band2) as divideBands from dataframe")
@@ -2413,7 +2413,7 @@ RS_FetchRegion (Band: ARRAY[Double], coordinates: ARRAY[Integer], dimensions: AR
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val region = spark.sql("select RS_FetchRegion(Band,Array(0, 0, 1, 2),Array(3, 3)) as Region from dataframe")
@@ -2427,7 +2427,7 @@ Format: `RS_GreaterThan (Band: ARRAY[Double], Target: Double)`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val greaterDF = spark.sql("select RS_GreaterThan(band, target) as maskedvalues from dataframe")
@@ -2441,7 +2441,7 @@ Format: `RS_GreaterThanEqual (Band: ARRAY[Double], Target: Double)`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val greaterEqualDF = spark.sql("select RS_GreaterThanEqual(band, target) as maskedvalues from dataframe")
@@ -2455,7 +2455,7 @@ Format: `RS_LessThan (Band: ARRAY[Double], Target: Double)`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val lessDF = spark.sql("select RS_LessThan(band, target) as maskedvalues from dataframe")
@@ -2469,7 +2469,7 @@ Format: `RS_LessThanEqual (Band: ARRAY[Double], Target: Double)`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val lessEqualDF = spark.sql("select RS_LessThanEqual(band, target) as maskedvalues from dataframe")
@@ -2483,7 +2483,7 @@ Format: `RS_LogicalDifference (Band1: ARRAY[Double], Band2: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val logicalDifference = spark.sql("select RS_LogicalDifference(band1, band2) as logdifference from dataframe")
@@ -2497,7 +2497,7 @@ Format: `RS_LogicalOver (Band1: ARRAY[Double], Band2: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val logicalOver = spark.sql("select RS_LogicalOver(band1, band2) as logover from dataframe")
@@ -2511,7 +2511,7 @@ Format: `RS_Mean (Band: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val meanDF = spark.sql("select RS_Mean(band) as mean from dataframe")
@@ -2525,7 +2525,7 @@ Format: `RS_Mode (Band: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val modeDF = spark.sql("select RS_Mode(band) as mode from dataframe")
@@ -2539,7 +2539,7 @@ Format: `RS_Modulo (Band: ARRAY[Double], Target: Double)`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val moduloDF = spark.sql("select RS_Modulo(band, target) as modulo from dataframe")
@@ -2553,7 +2553,7 @@ Format: `RS_Multiply (Band1: ARRAY[Double], Band2: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val multiplyDF = spark.sql("select RS_Multiply(band1, band2) as multiplyBands from dataframe")
@@ -2567,7 +2567,7 @@ Format: `RS_MultiplyFactor (Band1: ARRAY[Double], Factor: Double)`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val multiplyFactorDF = spark.sql("select RS_MultiplyFactor(band1, 2) as multiplyfactor from dataframe")
@@ -2583,7 +2583,7 @@ Format: `RS_Normalize (Band: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```sql
 SELECT RS_Normalize(band)
@@ -2597,7 +2597,7 @@ Format: `RS_NormalizedDifference (Band1: ARRAY[Double], Band2: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val normalizedDF = spark.sql("select RS_NormalizedDifference(band1, band2) as normdifference from dataframe")
@@ -2611,7 +2611,7 @@ Format: `RS_SquareRoot (Band: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val rootDF = spark.sql("select RS_SquareRoot(band) as squareroot from dataframe")
@@ -2625,7 +2625,7 @@ Format: `RS_Subtract (Band1: ARRAY[Double], Band2: ARRAY[Double])`
 
 Since: `v1.1.0`
 
-Spark SQL Example:
+SQL Example
 
 ```scala
 val subtractDF = spark.sql("select RS_Subtract(band1, band2) as differenceOfOfBands from dataframe")
