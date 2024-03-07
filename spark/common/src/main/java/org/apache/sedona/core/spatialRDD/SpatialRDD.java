@@ -667,8 +667,9 @@ public class SpatialRDD<T extends Geometry>
     @SuppressWarnings("unchecked")
     public boolean advancedAnalyze() {
         // Resolve parameters for collecting the statistics of the raw spatial RDD
+        int numPartitions = this.rawSpatialRDD.getNumPartitions();
         SedonaConf conf = SedonaConf.fromActiveSession();
-        long minSamples = conf.getMinSamplesPerPartition();
+        long minSamples = numPartitions > 0? Math.max(conf.getMinSamplesForSpatialPartitioning() / numPartitions, 1): 0;
         long maxSamples = conf.getMaxSamplesForSpatialPartitioning();
         double minSamplingRate = conf.getMinSamplingRate();
         double sizeEstimationSampleGrowthRate = conf.getSizeEstimationSampleGrowthRate();

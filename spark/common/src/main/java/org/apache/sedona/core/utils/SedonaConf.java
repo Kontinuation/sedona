@@ -67,7 +67,7 @@ public class SedonaConf
 
     // Internal parameters for self-driving optimized spatial join
     private long maxSamplesForSpatialPartitioning;
-    private long minSamplesPerPartition;
+    private long minSamplesForSpatialPartitioning;
     private double minSamplingRate;
     private double sizeEstimationSampleGrowthRate;
     private long expectedPerPartitionCount;
@@ -109,9 +109,8 @@ public class SedonaConf
         this.maxSamplesForSpatialPartitioning = Long.parseLong(
                 runtimeConfig.get("sedona.join.maxSamplesForSpatialPartitioning",
                         Long.toString(AdvancedStatCollector.DEFAULT_MAX_SAMPLES)));
-        this.minSamplesPerPartition = Long.parseLong(
-                runtimeConfig.get("sedona.join.minSamplesPerPartition",
-                        Long.toString(AdvancedStatCollector.DEFAULT_MIN_SAMPLES)));
+        this.minSamplesForSpatialPartitioning = Long.parseLong(
+                runtimeConfig.get("spark.sedona.join.minSamplesForSpatialPartitioning", "10000"));
         this.minSamplingRate = Double.parseDouble(
             runtimeConfig.get("sedona.join.minSamplingRate",
                     Double.toString(AdvancedStatCollector.DEFAULT_MIN_SAMPLING_RATE)));
@@ -220,8 +219,8 @@ public class SedonaConf
         return maxSamplesForSpatialPartitioning;
     }
 
-    public long getMinSamplesPerPartition() {
-        return minSamplesPerPartition;
+    public long getMinSamplesForSpatialPartitioning() {
+        return minSamplesForSpatialPartitioning;
     }
 
     public double getMinSamplingRate() {
