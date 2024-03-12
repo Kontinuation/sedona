@@ -211,6 +211,7 @@ object Catalog {
     function[RS_FromPath](null, false),
     function[RS_MakeEmptyRaster](),
     function[RS_MakeRasterForTesting](),
+    function[RS_MakeRaster](),
     function[RS_Tile](),
     function[RS_TileExplode](),
     function[RS_Envelope](),

@@ -126,6 +126,13 @@ case class RS_MakeRasterForTesting(inputExpressions: Seq[Expression])
   }
 }
 
+case class RS_MakeRaster(inputExpressions: Seq[Expression])
+  extends InferredExpression(inferrableFunction3(RasterConstructors.makeNonEmptyRaster)) {
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
 case class RS_Tile(inputExpressions: Seq[Expression])
   extends InferredExpression(
     nullTolerantInferrableFunction3(RasterConstructors.rsTile),
