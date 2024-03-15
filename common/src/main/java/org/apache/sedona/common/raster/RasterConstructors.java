@@ -52,7 +52,6 @@ import ucar.nc2.NetcdfFiles;
 
 import javax.media.jai.RasterFactory;
 import java.awt.Rectangle;
-import java.awt.image.DataBuffer;
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
@@ -454,8 +453,8 @@ public class RasterConstructors
      */
     public static GridCoverage2D asInDbRaster(GridCoverage2D gridCoverage2D) {
         if (!(gridCoverage2D instanceof OutDbGridCoverage2D)) {
-            // Already an in-db raster, simply return a new instance
-            return new GridCoverage2D(gridCoverage2D.getName(), gridCoverage2D);
+            // Already an in-db raster, simply return the input
+            return gridCoverage2D;
         }
         OutDbGridCoverage2D outDbGridCoverage2D = (OutDbGridCoverage2D) gridCoverage2D;
         RenderedImage renderedImage = outDbGridCoverage2D.getRenderedImage();

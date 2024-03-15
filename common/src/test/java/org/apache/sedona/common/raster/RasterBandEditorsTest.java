@@ -18,12 +18,19 @@
  */
 package org.apache.sedona.common.raster;
 
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.Constructors;
+import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
+import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.raster.serde.Serde;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.geometry.DirectPosition2D;
+import org.geotools.geometry.jts.JTS;
 import org.junit.Test;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.ParseException;
+import org.opengis.geometry.DirectPosition;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.operation.TransformException;
 
@@ -203,6 +210,60 @@ public class RasterBandEditorsTest extends RasterTestBase{
         actualValues = PixelFunctions.values(croppedRaster, points, 1).toArray(new Double[0]);
         expectedValues = new Double[] {0.0, 0.0, 0.0, 0.0, null};
         assertTrue(Arrays.equals(expectedValues, actualValues));
+    }
+
+    @Test
+    public void testClipOutDb() throws FactoryException, ParseException, TransformException {
+        Configuration conf = new Configuration();
+        Path path = new Path(resourceFolder + "raster/raster_with_no_data/test5.tiff");
+        GridCoverage2D raster = new LazyLoadOutDbGridCoverage2D("test", path, conf);
+        String polygon = "POLYGON ((-115.026855 31.353637, -115.026855 36.985003, -109.006348 36.985003, -109.006348 31.353637, -115.026855 31.353637))";
+        Geometry geom = Constructors.geomFromWKT(polygon, RasterAccessors.srid(raster));
+        GridCoverage2D clipped = RasterBandEditors.clip(raster, 1, geom);
+        assertTrue(clipped instanceof OutDbGridCoverage2D);
+        assertEquals(-115.026855, clipped.getEnvelope2D().x, 0.3);
+        assertEquals(31.353637, clipped.getEnvelope2D().y, 0.3);
+        assertEquals(6.020507, clipped.getEnvelope2D().width, 0.3);
+        assertEquals(5.631366, clipped.getEnvelope2D().height, 0.3);
+        assertTrue(JTS.toEnvelope(clipped.getEnvelope2D()).covers(geom.getEnvelopeInternal()));
+        for (double y = 32; y < 37; y += 0.1) {
+            for (double x = -115; x < -109; x += 0.1) {
+                double[] actualValues = new double[1];
+                double[] expectedValues = new double[1];
+                DirectPosition position = new DirectPosition2D(x, y);
+                clipped.evaluate(position, actualValues);
+                raster.evaluate(position, expectedValues);
+                assertEquals(expectedValues[0], actualValues[0], 0.01);
+            }
+        }
+    }
+
+    @Test
+    public void testClipOutDbMultiBand() throws FactoryException, ParseException, TransformException {
+        Configuration conf = new Configuration();
+        Path path = new Path(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif");
+        GridCoverage2D raster = new LazyLoadOutDbGridCoverage2D("test", path, conf);
+        String polygon = "POLYGON ((244681.58821481006 4195978.562618917, 251286.4284402896 4195978.562618917, 251286.4284402896 4201401.355792973, 244681.58821481006 4201401.355792973, 244681.58821481006 4195978.562618917))";
+        Geometry geom = Constructors.geomFromWKT(polygon, RasterAccessors.srid(raster));
+        GridCoverage2D clipped = RasterBandEditors.clip(raster, 1, geom);
+        assertTrue(clipped instanceof OutDbGridCoverage2D);
+        assertTrue(JTS.toEnvelope(clipped.getEnvelope2D()).covers(geom.getEnvelopeInternal()));
+        GridCoverage2D clipped2 = RasterBandEditors.clip(raster, 2, geom);
+        GridCoverage2D clipped3 = RasterBandEditors.clip(raster, 3, geom);
+        for (double y = 4196146.9; y < 4201271.1; y += 100) {
+            for (double x = 244774.5; x < 251190.5; x += 100) {
+                double[] actualValues = new double[1];
+                double[] expectedValues = new double[3];
+                DirectPosition position = new DirectPosition2D(x, y);
+                clipped.evaluate(position, actualValues);
+                raster.evaluate(position, expectedValues);
+                assertEquals(expectedValues[0], actualValues[0], 0.01);
+                clipped2.evaluate(position, actualValues);
+                assertEquals(expectedValues[1], actualValues[0], 0.01);
+                clipped3.evaluate(position, actualValues);
+                assertEquals(expectedValues[2], actualValues[0], 0.01);
+            }
+        }
     }
 
     @Test

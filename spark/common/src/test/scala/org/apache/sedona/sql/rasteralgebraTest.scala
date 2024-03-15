@@ -25,7 +25,7 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.functions.{col, collect_list, expr, lit, row_number}
 import org.geotools.coverage.grid.GridCoverage2D
-import org.junit.Assert.{assertEquals, assertNotNull, assertNull, assertTrue}
+import org.junit.Assert.{assertEquals, assertFalse, assertNotNull, assertNull, assertTrue}
 import org.locationtech.jts.geom.{Coordinate, Geometry}
 import org.scalatest.{BeforeAndAfter, GivenWhenThen}
 
@@ -738,7 +738,19 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       ).first().get(0)
       expectedValues = Seq(0.0, 0.0, 0.0, 0.0, null)
       assertTrue(expectedValues.equals(actualValues))
+    }
 
+    it("Passed RS_Clip with out-db raster") {
+      val path = resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif"
+      val rectWkt = "POLYGON ((244681.58821481006 4195978.562618917, 251286.4284402896 4195978.562618917, 251286.4284402896 4201401.355792973, 244681.58821481006 4201401.355792973, 244681.58821481006 4195978.562618917))"
+      val df = sparkSession.sql(s"SELECT RS_Clip(RS_FromPath('$path'), 2, ST_GeomFromWKT('$rectWkt', 26918)) AS rast")
+      val rast = df.first().get(0)
+      assertTrue(rast.isInstanceOf[OutDbGridCoverage2D])
+
+      val dfInDb = sparkSession.sql(s"SELECT RS_AsInDb(RS_Clip(RS_FromPath('$path'), 2, ST_GeomFromWKT('$rectWkt', 26918))) AS rast")
+      val rastInDb = dfInDb.first().get(0)
+      assertTrue(rastInDb.isInstanceOf[GridCoverage2D])
+      assertFalse(rastInDb.isInstanceOf[OutDbGridCoverage2D])
     }
 
     it("Passed RS_AsGeoTiff") {
@@ -1485,6 +1497,13 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
         assert(!inDb.isInstanceOf[OutDbGridCoverage2D])
         assert(outDb.isInstanceOf[OutDbGridCoverage2D])
       }
+    }
+
+    it("Passed RS_AsInDB on in-db raster") {
+      val df = sparkSession.read.format("binaryFile").load(resourceFolder + "raster/raster_with_no_data/test5.tiff")
+        .selectExpr("RS_BandAsArray(RS_AsInDb(RS_FromGeoTiff(content)), 1) as band_data")
+      val bandData = df.first().get(0).asInstanceOf[mutable.WrappedArray[Double]]
+      assert(bandData.exists(x => x > 0 && x < 255))
     }
 
     it("Passed RS_AsInDb on tiled out-db rasters") {

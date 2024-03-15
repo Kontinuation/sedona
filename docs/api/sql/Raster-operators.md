@@ -1386,6 +1386,16 @@ If `crop` is not specified then it will default to `true`, meaning it will make 
 !!!Note
     Since `v1.5.1`, if the coordinate reference system (CRS) of the input `geom` geometry differs from that of the `raster`, then `geom` will be transformed to match the CRS of the `raster`. If the `raster` or `geom` doesn't have a CRS then it will default to `4326/WGS84`.
 
+Since `v1.6.0`, RS_Clip has a special mode for cropping out-db rasters efficiently. The following conditions must be met for this mode to be used:
+
+1. The `raster` is an out-db raster with no skew
+2. The geometry is a rectangle and is in the same CRS with the raster
+3. `noDataValue` and `crop` are not specified
+
+The result of `RS_Clip` will be an out-db raster in this mode. Otherwise, the result will be an in-db raster. This mode
+enables cropping out-db rasters using simple windows without reading and processing any pixel data of the out-db raster.
+If you always want to get an in-db raster, you can use the `RS_AsInDb` function to convert the result to an in-db raster.
+
 Format:
 
 ```

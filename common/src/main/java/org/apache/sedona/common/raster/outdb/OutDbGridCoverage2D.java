@@ -503,7 +503,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         int widthInPixel = gridGeometry.getGridRange2D().width;
         int heightInPixel = gridGeometry.getGridRange2D().height;
 
-        GridSampleDimension band = bands[bandIndices[0]];
+        GridSampleDimension band = bands[0];
 
         if (dataType < 0) {
             dataType = TypeMap.getDataBufferType(band.getSampleDimensionType());

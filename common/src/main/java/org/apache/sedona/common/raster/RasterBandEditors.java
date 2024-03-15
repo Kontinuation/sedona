@@ -20,13 +20,21 @@ package org.apache.sedona.common.raster;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.sedona.common.Functions;
+import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.coverage.grid.GridEnvelope2D;
+import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.coverage.processing.operation.Crop;
+import org.geotools.referencing.operation.transform.AffineTransform2D;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
+import org.opengis.metadata.spatial.PixelOrientation;
 import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.datum.PixelInCell;
 import org.opengis.referencing.operation.TransformException;
 
 import javax.media.jai.RasterFactory;
@@ -192,6 +200,46 @@ public class RasterBandEditors {
      * @return A clip Raster with defined ROI by the geometry
      */
     public static GridCoverage2D clip(GridCoverage2D raster, int band, Geometry geometry, double noDataValue, boolean crop) throws FactoryException, TransformException {
+        if (raster instanceof OutDbGridCoverage2D && crop) {
+            // Test if no-data value is left unspecified
+            boolean specifiedNoDataValue;
+            boolean isDataTypeIntegral = RasterUtils.isDataTypeIntegral(RasterUtils.getDataTypeCode(RasterBandAccessors.getBandType(raster, band)));
+            if (isDataTypeIntegral) {
+                specifiedNoDataValue = (Double.compare(noDataValue, Integer.MIN_VALUE) != 0);
+            } else {
+                specifiedNoDataValue = (Double.compare(noDataValue, Double.MIN_VALUE) != 0);
+            }
+
+            // Test if the geometry is in the same CRS as the raster, and it is a rectangle.
+            int rasterSRID = RasterAccessors.srid(raster);
+            if (rasterSRID == 0) {
+                rasterSRID = 4326;
+            }
+            int geomSRID = Functions.getSRID(geometry);
+            if (geomSRID == 0) {
+                geomSRID = 4326;
+            }
+            boolean geometryIsRectangle = (geomSRID == rasterSRID && geometry.isRectangle());
+
+            // Test if the raster has no skew.
+            AffineTransform2D affine = RasterUtils.getAffineTransform(raster, PixelOrientation.CENTER);
+            boolean isNoSkew = (affine.getShearX() == 0 && affine.getShearY() == 0);
+
+            if (!specifiedNoDataValue && geometryIsRectangle && isNoSkew) {
+                // We can create a clipped out-db raster, without even touching the pixel data.
+                Envelope env = geometry.getEnvelopeInternal();
+                double x0 = env.getMinX();
+                double y0 = env.getMaxY();
+                double regionWidth = env.getWidth();
+                double regionHeight = env.getHeight();
+                int[] bands = {band};
+                return clipOutDb((OutDbGridCoverage2D) raster, bands, x0, y0, regionWidth, regionHeight);
+            }
+        }
+        return clipInDB(raster, band, geometry, noDataValue, crop);
+    }
+
+    public static GridCoverage2D clipInDB(GridCoverage2D raster, int band, Geometry geometry, double noDataValue, boolean crop) throws FactoryException, TransformException {
 
         // Selecting the band from original raster
         RasterUtils.ensureBand(raster, band);
@@ -271,6 +319,64 @@ public class RasterBandEditors {
         }
 
         return newRaster;
+    }
+
+    public static GridCoverage2D clipOutDb(OutDbGridCoverage2D raster, int[] bandIndices, double x0, double y0, double regionWidth, double regionHeight) {
+        int[] outDbBandIndices = raster.getOutDbBandIndices();
+        int[] newBandIndices = new int[bandIndices.length];
+        for (int i = 0; i < bandIndices.length; i++) {
+            int bandIndex = bandIndices[i] - 1;
+            newBandIndices[i] = outDbBandIndices[bandIndex];
+        }
+
+        RenderedImage renderedImage = raster.getRenderedImage();
+        int imageWidth = renderedImage.getWidth();
+        int imageHeight = renderedImage.getHeight();
+
+        AffineTransform2D affine = RasterUtils.getAffineTransform(raster, PixelOrientation.CENTER);
+        double scaleX = affine.getScaleX();
+        double scaleY = affine.getScaleY();
+        double ipX = affine.getTranslateX();
+        double ipY = affine.getTranslateY();
+
+        // Derive affine transformation and crop region of the cropped out-db raster
+        int endpointX0 = (int) ((x0 - (ipX - 0.5 * scaleX)) / scaleX);
+        int endpointX1 = (int) ((x0 + regionWidth - (ipX - 0.5 * scaleX)) / scaleX);
+        int offsetX = Math.min(endpointX0, endpointX1);
+        int endX = Math.max(endpointX0, endpointX1);
+        offsetX = Math.min(Math.max(offsetX, 0), imageWidth);
+        endX = Math.min(Math.max(endX, 0), imageWidth);
+        double newIpX = ipX + offsetX * scaleX;
+
+        int endpointY0 = (int) ((y0 - (ipY - 0.5 * scaleY)) / scaleY);
+        int endpointY1 = (int) ((y0 - regionHeight - (ipY - 0.5 * scaleY)) / scaleY);
+        int offsetY = Math.min(endpointY0, endpointY1);
+        int endY = Math.max(endpointY0, endpointY1);
+        offsetY = Math.min(Math.max(offsetY, 0), imageHeight);
+        endY = Math.min(Math.max(endY, 0), imageHeight);
+        double newIpY = ipY + offsetY * scaleY;
+
+        // Derive the size of the cropped region in pixels
+        int newImageWidth = endX - offsetX + 1;
+        int newImageHeight = endY - offsetY + 1;
+        if (newImageWidth <= 0 || newImageHeight <= 0) {
+            throw new IllegalArgumentException("The cropped region is empty");
+        }
+
+        // Construct the cropped out-db raster
+        AffineTransform2D affineNew = new AffineTransform2D(scaleX, 0, 0, scaleY, newIpX, newIpY);
+        GridGeometry2D gridGeometry2D = new GridGeometry2D(
+                new GridEnvelope2D(0, 0, newImageWidth, newImageHeight),
+                PixelInCell.CELL_CENTER,
+                affineNew, raster.getCoordinateReferenceSystem(), null);
+        GridSampleDimension[] sampleDimensions = new GridSampleDimension[newBandIndices.length];
+        for (int k = 0; k < newBandIndices.length; k++) {
+            int bandIndex = newBandIndices[k];
+            sampleDimensions[k] = raster.getSampleDimension(bandIndex);
+        }
+        return OutDbGridCoverage2D.create(raster.getName(), gridGeometry2D,
+                sampleDimensions, newBandIndices,
+                raster.getOutDbPath(), raster.getSerializedConfiguration(), raster.getOutDbParams());
     }
 
     /**

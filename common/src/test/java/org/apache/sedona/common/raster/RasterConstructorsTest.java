@@ -328,8 +328,7 @@ public class RasterConstructorsTest
             GeoTiffReader reader = new GeoTiffReader(new File(testFilePath));
             GridCoverage2D raster = reader.read(null);
             GridCoverage2D inDbRaster = RasterConstructors.asInDbRaster(raster);
-            Assert.assertNotSame(inDbRaster, raster);
-            assertSameCoverage(raster, inDbRaster);
+            Assert.assertSame(inDbRaster, raster);
         }
 
         // Test using in-db raster constructed from scratch
@@ -337,8 +336,7 @@ public class RasterConstructorsTest
         for (int dataType : dataTypes) {
             GridCoverage2D raster = createRandomRaster(dataType, 100, 100, 1000, 1010, 10, 1, "EPSG:3857");
             GridCoverage2D inDbRaster = RasterConstructors.asInDbRaster(raster);
-            Assert.assertNotSame(inDbRaster, raster);
-            assertSameCoverage(raster, inDbRaster);
+            Assert.assertSame(inDbRaster, raster);
         }
     }
 

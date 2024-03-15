@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.expressions.{Expression, ImplicitCastInputT
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
 import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.sedona_sql.UDT.{GeometryUDT, RasterUDT}
-import org.apache.spark.sql.types.{AbstractDataType, BinaryType, BooleanType, DataType, DataTypes, DoubleType, IntegerType, LongType, StringType}
+import org.apache.spark.sql.types.{AbstractDataType, ArrayType, BinaryType, BooleanType, DataType, DataTypes, DoubleType, IntegerType, LongType, StringType}
 import org.apache.spark.unsafe.types.UTF8String
 import org.locationtech.jts.geom.Geometry
 import org.apache.spark.sql.sedona_sql.expressions.implicits._
@@ -105,13 +105,42 @@ abstract class InferredExpression(fSeq: InferrableFunction *)
     if (inputTypes.exists(_.acceptsType(RasterUDT))) {
       // Need to dispose input raster arguments after evaluation. Input raster arguments will be saved into
       // inputRasters during argument extraction. Please see buildExtractors for details.
-      (input: InternalRow) => {
-        inputRasters.clear()
-        try {
-          evaluator(input)
-        } finally {
-          inputRasters.foreach(gridCoverage2D => Try(gridCoverage2D.dispose(true)))
+      if (dataType.sameType(RasterUDT) || dataType.sameType(ArrayType(RasterUDT))) {
+        // If the return type of the expression is a raster, we need to check if the return raster is the same
+        // as any of the input rasters, and only dispose the input rasters that are not the same as the returned
+        // raster.
+        (input: InternalRow) => {
           inputRasters.clear()
+          var result: Any = null
+          try {
+            result = evaluator(input)
+            result
+          } finally {
+            result match {
+              case result: GridCoverage2D =>
+                inputRasters.foreach { gridCoverage2D =>
+                  if (gridCoverage2D ne result) Try(gridCoverage2D.dispose(true))
+                }
+              case results: Array[GridCoverage2D] =>
+                inputRasters.foreach { gridCoverage2D =>
+                  if (!results.exists(_ eq gridCoverage2D)) Try(gridCoverage2D.dispose(true))
+                }
+              case _ =>
+                inputRasters.foreach(gridCoverage2D => Try(gridCoverage2D.dispose(true)))
+            }
+            inputRasters.clear()
+          }
+        }
+      } else {
+        // No need to check if the return value is the same as any of the input rasters, just dispose all inputs
+        (input: InternalRow) => {
+          inputRasters.clear()
+          try {
+            evaluator(input)
+          } finally {
+            inputRasters.foreach(gridCoverage2D => Try(gridCoverage2D.dispose(true)))
+            inputRasters.clear()
+          }
         }
       }
     } else {
