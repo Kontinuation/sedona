@@ -28,6 +28,7 @@ import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.jts.JTS;
 import org.junit.Test;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.ParseException;
 import org.opengis.geometry.DirectPosition;
@@ -289,6 +290,27 @@ public class RasterBandEditorsTest extends RasterTestBase{
                 assertEquals(expectedValues[2], actualValues[0], 0.01);
             }
         }
+    }
+
+    @Test
+    public void testClipOutDbOutOfRange() throws FactoryException, TransformException {
+        Configuration conf = new Configuration();
+        Path path = new Path(resourceFolder + "raster/test1.tiff");
+        GridCoverage2D raster = new LazyLoadOutDbGridCoverage2D("test", path, conf);
+        Geometry geom = Constructors.polygonFromEnvelope(-13068718, 3980589, -13051431, 3993680);
+        geom.setSRID(3857);
+        GridCoverage2D clipped = RasterBandEditors.clip(raster, 1, geom);
+        Envelope rasterEnv = JTS.toEnvelope(raster.getEnvelope2D());
+        Envelope clippedEnv = rasterEnv.intersection(geom.getEnvelopeInternal());
+        assertTrue(JTS.toEnvelope(clipped.getEnvelope2D()).covers(clippedEnv));
+        assertTrue(clipped instanceof OutDbGridCoverage2D);
+        RasterConstructors.asInDbRaster(clipped);
+
+        assertThrows(IllegalArgumentException.class, () -> {
+            Geometry geom2 = Constructors.polygonFromEnvelope(-13050398, 4013378, -13025157, 4025967);
+            geom2.setSRID(3857);
+            RasterBandEditors.clip(raster, 1, geom2);
+        });
     }
 
     @Test

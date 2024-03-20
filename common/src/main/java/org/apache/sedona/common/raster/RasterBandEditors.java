@@ -28,6 +28,7 @@ import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.coverage.processing.operation.Crop;
+import org.geotools.geometry.Envelope2D;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -322,6 +323,11 @@ public class RasterBandEditors {
     }
 
     public static GridCoverage2D clipOutDb(OutDbGridCoverage2D raster, int[] bandIndices, double x0, double y0, double regionWidth, double regionHeight) {
+        Envelope2D rasterEnvelope = raster.getEnvelope2D();
+        if (!rasterEnvelope.intersects(x0, y0 - regionHeight, regionWidth, regionHeight)) {
+            throw new IllegalArgumentException("The region to clip is outside the raster bounds");
+        }
+
         int[] outDbBandIndices = raster.getOutDbBandIndices();
         int[] newBandIndices = new int[bandIndices.length];
         for (int i = 0; i < bandIndices.length; i++) {
@@ -344,24 +350,21 @@ public class RasterBandEditors {
         int endpointX1 = (int) ((x0 + regionWidth - (ipX - 0.5 * scaleX)) / scaleX);
         int offsetX = Math.min(endpointX0, endpointX1);
         int endX = Math.max(endpointX0, endpointX1);
-        offsetX = Math.min(Math.max(offsetX, 0), imageWidth);
-        endX = Math.min(Math.max(endX, 0), imageWidth);
+        offsetX = Math.min(Math.max(offsetX, 0), imageWidth - 1);
+        endX = Math.min(Math.max(endX, 0), imageWidth - 1);
         double newIpX = ipX + offsetX * scaleX;
 
         int endpointY0 = (int) ((y0 - (ipY - 0.5 * scaleY)) / scaleY);
         int endpointY1 = (int) ((y0 - regionHeight - (ipY - 0.5 * scaleY)) / scaleY);
         int offsetY = Math.min(endpointY0, endpointY1);
         int endY = Math.max(endpointY0, endpointY1);
-        offsetY = Math.min(Math.max(offsetY, 0), imageHeight);
-        endY = Math.min(Math.max(endY, 0), imageHeight);
+        offsetY = Math.min(Math.max(offsetY, 0), imageHeight - 1);
+        endY = Math.min(Math.max(endY, 0), imageHeight - 1);
         double newIpY = ipY + offsetY * scaleY;
 
         // Derive the size of the cropped region in pixels
         int newImageWidth = endX - offsetX + 1;
         int newImageHeight = endY - offsetY + 1;
-        if (newImageWidth <= 0 || newImageHeight <= 0) {
-            throw new IllegalArgumentException("The cropped region is empty");
-        }
 
         // Construct the cropped out-db raster
         AffineTransform2D affineNew = new AffineTransform2D(scaleX, 0, 0, scaleY, newIpX, newIpY);

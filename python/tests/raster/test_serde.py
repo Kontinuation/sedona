@@ -127,38 +127,40 @@ class TestRasterSerde(TestBase):
         r_orig.close()
 
     def test_outdb_tiled_raster(self):
-        raster_path = world_map_raster_input_location
-        r_orig = rasterio.open(raster_path)
-        band = r_orig.read(1)
-        r_orig.close()
-        df = TestRasterSerde.spark.sql("SELECT RS_TileExplode(RS_FromPath('{}'), 1, 256, 256) AS (x, y, rast)".format(raster_path))
-        df = df.withColumn("meta", expr("RS_Metadata(rast)"))
-        rows = df.collect()
-        for row in rows:
-            ip_x, ip_y, width, height, scale_x, scale_y, skew_x, skew_y, srid, num_bands = row['meta']
-            r_tile = row['rast']
-            assert width == r_tile.width
-            assert height == r_tile.height
-            assert ip_x == r_tile.affine_trans.ip_x
-            assert ip_y == r_tile.affine_trans.ip_y
-            assert scale_x == r_tile.affine_trans.scale_x
-            assert scale_y == r_tile.affine_trans.scale_y
-            assert skew_x == r_tile.affine_trans.skew_x
-            assert skew_y == r_tile.affine_trans.skew_y
-            start_x = row['x'] * 256
-            end_x = (row['x'] + 1) * 256
-            start_y = row['y'] * 256
-            end_y = (row['y'] + 1) * 256
+        for raster_path in [world_map_raster_input_location,
+                            'file:' + world_map_raster_input_location,
+                            'file://' + world_map_raster_input_location]:
+            r_orig = rasterio.open(raster_path)
+            band = r_orig.read(1)
+            r_orig.close()
+            df = TestRasterSerde.spark.sql("SELECT RS_TileExplode(RS_FromPath('{}'), 1, 256, 256) AS (x, y, rast)".format(raster_path))
+            df = df.withColumn("meta", expr("RS_Metadata(rast)"))
+            rows = df.collect()
+            for row in rows:
+                ip_x, ip_y, width, height, scale_x, scale_y, skew_x, skew_y, srid, num_bands = row['meta']
+                r_tile = row['rast']
+                assert width == r_tile.width
+                assert height == r_tile.height
+                assert ip_x == r_tile.affine_trans.ip_x
+                assert ip_y == r_tile.affine_trans.ip_y
+                assert scale_x == r_tile.affine_trans.scale_x
+                assert scale_y == r_tile.affine_trans.scale_y
+                assert skew_x == r_tile.affine_trans.skew_x
+                assert skew_y == r_tile.affine_trans.skew_y
+                start_x = row['x'] * 256
+                end_x = (row['x'] + 1) * 256
+                start_y = row['y'] * 256
+                end_y = (row['y'] + 1) * 256
 
-            # test as_numpy
-            assert (band[start_y:end_y, start_x:end_x] == r_tile.as_numpy()).all()
+                # test as_numpy
+                assert (band[start_y:end_y, start_x:end_x] == r_tile.as_numpy()).all()
 
-            # test as_rasterio
-            ds = r_tile.as_rasterio()
-            assert ds.crs is not None
-            assert (band[start_y:end_y, start_x:end_x] == ds.read(1)).all()
+                # test as_rasterio
+                ds = r_tile.as_rasterio()
+                assert ds.crs is not None
+                assert (band[start_y:end_y, start_x:end_x] == ds.read(1)).all()
 
-            r_tile.close()
+                r_tile.close()
 
     def test_to_pandas(self):
         spark = TestRasterSerde.spark

@@ -54,6 +54,18 @@ def _rasterio_open(fp, driver=None):
         return rasterio.open(fp, mode="r", driver=driver)
 
 
+def _normalize_path(src_path: str) -> str:
+    """Normalize an url to conform to GDAL convention
+
+    """
+    if src_path.startswith("s3a://"):
+        src_path = src_path.replace("s3a://", "s3://")
+    elif src_path.startswith("file:"):
+        src_path = src_path[5:]
+    src_path = src_path.replace("s3://", "/vsis3/")
+    return src_path
+
+
 class SedonaRaster(ABC):
     _width: int
     _height: int
@@ -261,10 +273,7 @@ class OutDbSedonaRaster(OutDbSedonaRasterBase):
             # panDstBands options of GDAL's GDALWarpOptions, so we cannot use
             # WarpedVRT directly. As a workaround we construct an in-memory VRT
             # XML file and open it using the VRT driver.
-            src_path = self._outdb_meta.path
-            if src_path.startswith("s3a://"):
-                src_path = src_path.replace("s3a://", "s3://")
-            src_path = src_path.replace("s3://", "/vsis3/")
+            src_path = _normalize_path(self._outdb_meta.path)
             with _rasterio_open(src_path) as src:
                 ip_x, scale_x, skew_x, ip_y, skew_y, scale_y = src.get_transform()
                 crs_wkt = src.crs.wkt if src.crs is not None else None
@@ -361,10 +370,7 @@ class LazyLoadOutDbSedonaRaster(OutDbSedonaRasterBase):
             return
 
         # Load the raster file and extract its metadata
-        src_path = self.path
-        if src_path.startswith("s3a://"):
-            src_path = src_path.replace("s3a://", "s3://")
-        src_path = src_path.replace("s3://", "/vsis3/")
+        src_path = _normalize_path(self.path)
         ds = _rasterio_open(src_path)
         ip_x, scale_x, skew_x, ip_y, skew_y, scale_y = ds.get_transform()
         crs_wkt = ds.crs.wkt if ds.crs is not None else None
