@@ -1,5 +1,8 @@
 # Work with GeoPandas and Shapely
 
+!!!danger
+	Sedona < 1.6.0 only works with Shapely 1.x and GeoPandas <= `0.11.1`. If you want to use the latest Shapely and GeoPandas, please use Sedona >= 1.6.0.
+
 ## Interoperate with GeoPandas
 
 Sedona Python has implemented serializers and deserializers which allows to convert Sedona Geometry objects into Shapely BaseGeometry objects. Based on that it is possible to load the data with geopandas from file (look at Fiona possible drivers) and create Spark DataFrame based on GeoDataFrame object.
@@ -94,14 +97,15 @@ gdf.plot(
 
 ### Supported Shapely objects
 
-| shapely object  | Available          |
-|-----------------|--------------------|
-| Point           | :heavy_check_mark: |
-| MultiPoint      | :heavy_check_mark: |
-| LineString      | :heavy_check_mark: |
-| MultiLinestring | :heavy_check_mark: |
-| Polygon         | :heavy_check_mark: |
-| MultiPolygon    | :heavy_check_mark: |
+| shapely object     | Available          |
+|--------------------|--------------------|
+| Point              | :heavy_check_mark: |
+| MultiPoint         | :heavy_check_mark: |
+| LineString         | :heavy_check_mark: |
+| MultiLinestring    | :heavy_check_mark: |
+| Polygon            | :heavy_check_mark: |
+| MultiPolygon       | :heavy_check_mark: |
+| GeometryCollection | :heavy_check_mark: |
 
 To create Spark DataFrame based on mentioned Geometry types, please use <b> GeometryType </b> from  <b> sedona.sql.types </b> module. Converting works for list or tuple with shapely objects.
 
@@ -331,5 +335,43 @@ gdf.show(1, False)
 +---+----------------------------------------------------------------------------------------------------------+
 |1  |MULTIPOLYGON (((0 0, 0 2, 2 2, 2 0, 0 0), (1 1, 1.5 1, 1.5 1.5, 1 1.5, 1 1)), ((0 0, 0 1, 1 1, 1 0, 0 0)))|
 +---+----------------------------------------------------------------------------------------------------------+
+
+```
+
+### GeomeryCollection example
+
+```python3
+
+from shapely.geometry import GeometryCollection, Point, LineString, Polygon
+
+exterior_p1 = [(0, 0), (0, 2), (2, 2), (2, 0), (0, 0)]
+interior_p1 = [(1, 1), (1, 1.5), (1.5, 1.5), (1.5, 1), (1, 1)]
+exterior_p2 = [(0, 0), (1, 0), (1, 1), (0, 1), (0, 0)]
+
+geoms = [
+    Polygon(exterior_p1, [interior_p1]),
+    Polygon(exterior_p2),
+    Point(1, 1),
+    LineString([(0, 0), (1, 1), (2, 2)])
+]
+
+data = [
+    [1, GeometryCollection(geoms)]
+]
+
+gdf = sedona.createDataFrame(
+    data,
+    schema
+)
+
+gdf.show(1, False)
+```
+
+```
++---+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|id |geom                                                                                                                                                                     |
++---+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+|1  |GEOMETRYCOLLECTION (POLYGON ((0 0, 0 2, 2 2, 2 0, 0 0), (1 1, 1 1.5, 1.5 1.5, 1.5 1, 1 1)), POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0)), POINT (1 1), LINESTRING (0 0, 1 1, 2 2))|
++---+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------+
 
 ```
