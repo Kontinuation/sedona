@@ -96,6 +96,7 @@ __all__ = [
     "ST_NDims",
     "ST_NumGeometries",
     "ST_NumInteriorRings",
+    "ST_NumInteriorRing",
     "ST_PointN",
     "ST_PointOnSurface",
     "ST_ReducePrecision",
@@ -1123,6 +1124,17 @@ def ST_NumInteriorRings(geometry: ColumnOrName) -> Column:
     :rtype: Column
     """
     return _call_st_function("ST_NumInteriorRings", geometry)
+
+@validate_argument_types
+def ST_NumInteriorRing(geometry: ColumnOrName) -> Column:
+    """Return the number of interior rings contained in a polygon geometry.
+
+    :param geometry: Polygon geometry column to return for.
+    :type geometry: ColumnOrName
+    :return: Number of interior rings polygons contain as an integer column.
+    :rtype: Column
+    """
+    return _call_st_function("ST_NumInteriorRing", geometry)
 
 
 @validate_argument_types
