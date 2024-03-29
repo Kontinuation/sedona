@@ -46,6 +46,7 @@ import org.locationtech.jts.operation.valid.IsValidOp;
 import org.locationtech.jts.operation.valid.TopologyValidationError;
 import org.locationtech.jts.precision.GeometryPrecisionReducer;
 import org.locationtech.jts.simplify.TopologyPreservingSimplifier;
+import org.locationtech.jts.triangulate.polygon.ConstrainedDelaunayTriangulator;
 import org.wololo.jts2geojson.GeoJSONWriter;
 
 import java.util.*;
@@ -890,6 +891,10 @@ public class Functions {
         }
 
         return isExteriorRingCW && isInteriorRingCW;
+    }
+
+    public static Geometry triangulatePolygon(Geometry geom) {
+        return ConstrainedDelaunayTriangulator.triangulate(geom);
     }
 
     public static double lineLocatePoint(Geometry geom, Geometry point)

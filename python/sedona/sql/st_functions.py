@@ -116,6 +116,7 @@ __all__ = [
     "ST_IsPolygonCCW",
     "ST_ForcePolygonCCW",
     "ST_Transform",
+    "ST_TriangulatePolygon",
     "ST_Union",
     "ST_X",
     "ST_XMax",
@@ -1414,6 +1415,17 @@ def ST_Transform(geometry: ColumnOrName, source_crs: ColumnOrName, target_crs: O
     else:
         args = (geometry, source_crs, target_crs, disable_error)
     return _call_st_function("ST_Transform", args)
+
+@validate_argument_types
+def ST_TriangulatePolygon(geom: ColumnOrName) -> Column:
+    """Computes the constrained Delaunay triangulation of polygons. Holes and Multipolygons are supported.
+
+    :param geom: (Multi)Polygon to be triangulated.
+    :type geom: ColumnOrName
+    :return: Triangulated Polygon as GeometryCollection of Polygons
+    :rtype: Column
+    """
+    return _call_st_function("ST_TriangulatePolygon", geom)
 
 
 @validate_argument_types
