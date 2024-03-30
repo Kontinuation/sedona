@@ -84,6 +84,7 @@ __all__ = [
     "ST_LineLocatePoint",
     "ST_LineMerge",
     "ST_LineSubstring",
+    "ST_M",
     "ST_MakeLine",
     "ST_Polygon"
     "ST_MakePolygon",
@@ -969,6 +970,18 @@ def ST_LineSubstring(line_string: ColumnOrName, start_fraction: ColumnOrNameOrNu
     :rtype: Column
     """
     return _call_st_function("ST_LineSubstring", (line_string, start_fraction, end_fraction))
+
+
+@validate_argument_types
+def ST_M(geom: ColumnOrName) -> Column:
+    """Return the M coordinate of a point geometry.
+
+    :param point: Point geometry column to get the coordinate for.
+    :type point: ColumnOrName
+    :return: M coordinate of the point geometry as a double column.
+    :rtype: Column
+    """
+    return _call_st_function("ST_M", geom)
 
 
 @validate_argument_types
