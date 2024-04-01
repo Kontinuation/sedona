@@ -45,6 +45,7 @@ test_configurations = [
     (stc.ST_LineFromText, ("wkt",), "linestring_wkt", "", "LINESTRING (1 2, 3 4)"),
     (stc.ST_LineStringFromText, ("multiple_point", lambda: f.lit(',')), "constructor", "", "LINESTRING (0 0, 1 0, 1 1, 0 0)"),
     (stc.ST_Point, ("x", "y"), "constructor", "", "POINT (0 1)"),
+    (stc.ST_PointM, ("x", "y", "m", "srid"), "x_y_z_m_srid", "ST_AsEWKT(geom)", "SRID=4326;POINT ZM(1 2 0 100.9)"),
     (stc.ST_PointZM, ("x", "y", "z", "m", "srid"), "x_y_z_m_srid", "", "POINT Z (1 2 3)"),
     (stc.ST_PointFromText, ("single_point", lambda: f.lit(',')), "constructor", "", "POINT (0 1)"),
     (stc.ST_MakePoint, ("x", "y", "z"), "constructor", "", "POINT Z (0 1 2)"),
