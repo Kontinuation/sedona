@@ -6,7 +6,7 @@ See: https://sedona.apache.org/latest/setup/compile/
 
 ## Develop
 
-See: https://sedona.apache.org/1.5.1/community/develop/
+See: https://sedona.apache.org/latest/community/develop/
 
 ## Release
 
