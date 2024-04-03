@@ -32,7 +32,8 @@ repos:
       - id: check-vcs-permalinks
         exclude: ^docs/archive
       - id: check-xml
-      # - id: check-yaml
+      - id: check-yaml
+        exclude: ^mkdocs\.yml$
       - id: detect-aws-credentials
         args: [--allow-missing-credentials]
       - id: detect-private-key
