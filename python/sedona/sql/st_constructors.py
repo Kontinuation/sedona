@@ -34,6 +34,7 @@ __all__ = [
     "ST_GeomFromWKT",
     "ST_GeomFromEWKT",
     "ST_LineFromText",
+    "ST_LineFromWKB",
     "ST_LineStringFromText",
     "ST_Point",
     "ST_PointFromText",
@@ -282,6 +283,20 @@ def ST_PointFromWKB(wkb: ColumnOrName, srid: Optional[ColumnOrNameOrNumber] = No
     """
     args = (wkb) if srid is None else (wkb, srid)
     return _call_constructor_function("ST_PointFromWKB", args)
+
+@validate_argument_types
+def ST_LineFromWKB(wkb: ColumnOrName, srid: Optional[ColumnOrNameOrNumber] = None) -> Column:
+    """Generate a Line geometry column from a Well-Known Binary (WKB) binary column.
+
+    :param wkb: WKB binary column to generate from.
+    :type wkb: ColumnOrName
+    :param srid: SRID to be set for the geometry.
+    :type srid: ColumnOrNameOrNumber
+    :return: Geometry column representing the WKB binary.
+    :rtype: Column
+    """
+    args = (wkb) if srid is None else (wkb, srid)
+    return _call_constructor_function("ST_LineFromWKB", args)
 
 @validate_argument_types
 def ST_MakePoint(x: ColumnOrNameOrNumber, y: ColumnOrNameOrNumber, z: Optional[ColumnOrNameOrNumber] = None, m: Optional[ColumnOrNameOrNumber] = None) -> Column:
