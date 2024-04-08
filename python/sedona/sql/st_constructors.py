@@ -29,6 +29,7 @@ __all__ = [
     "ST_GeomFromGML",
     "ST_GeomFromKML",
     "ST_GeomFromText",
+    "ST_GeometryFromText",
     "ST_GeomFromWKB",
     "ST_GeomFromEWKB",
     "ST_GeomFromWKT",
@@ -111,6 +112,20 @@ def ST_GeomFromText(wkt: ColumnOrName) -> Column:
     :rtype: Column
     """
     return _call_constructor_function("ST_GeomFromText", wkt)
+
+@validate_argument_types
+def ST_GeometryFromText(wkt: ColumnOrName, srid: Optional[ColumnOrNameOrNumber] = None) -> Column:
+    """Generate a geometry column from a Well-Known Text (WKT) string column.
+    This is an alias of ST_GeomFromWKT.
+
+    :param wkt: WKT string column to generate from.
+    :type wkt: ColumnOrName
+    :return: Geometry column representing the WKT string.
+    :rtype: Column
+    """
+    args = (wkt) if srid is None else (wkt, srid)
+
+    return _call_constructor_function("ST_GeometryFromText", args)
 
 
 @validate_argument_types
