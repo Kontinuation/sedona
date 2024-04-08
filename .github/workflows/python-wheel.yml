@@ -19,6 +19,7 @@ on:
       - 'spark-shaded/**'
       - 'pom.xml'
       - 'python/**'
+  workflow_call:
 
 jobs:
   build:
@@ -49,4 +50,5 @@ jobs:
         package-dir: python
     - uses: actions/upload-artifact@v3
       with:
+        name: wheels
         path: ./wheelhouse/*.whl

@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Release name (use v{version} if left blank)'
+        required: false
+      overwrite:
+        description: 'Overwrite existing release'
+        type: boolean
+        required: true
+        default: false
+      prerelease:
+        description: 'Set as a pre-release'
+        required: true
+        type: boolean
+        default: false
+      make_latest:
+        description: 'Set as the latest release'
+        required: true
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "placeholder"
