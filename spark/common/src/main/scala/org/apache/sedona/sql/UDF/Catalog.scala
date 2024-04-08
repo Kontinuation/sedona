@@ -56,6 +56,7 @@ object Catalog {
     function[ST_GeomFromKML](),
     function[ST_CoordDim](),
     function[ST_Point](),
+    function[ST_Points](),
     function[ST_MakePoint](null, null),
     function[ST_PointZ](0),
     function[ST_PointM](0),
