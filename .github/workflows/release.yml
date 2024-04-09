@@ -45,7 +45,7 @@ jobs:
       - name: Resolve version number
         id: resolve-version
         run: |
-          export VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
+          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
           echo "Project version number: $VERSION"
           if [ -z "$VERSION" ]; then
             echo "::error title=Resolve version number failed::Failed to obtain version number of this maven project"
@@ -83,14 +83,11 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
-      - name: Delete existing maven package
+      - name: Find maven packages
+        id: find-packages
         if: ${{ github.event.inputs.overwrite != 'false' }}
-        env:
-          VERSION: ${{ needs.prepare.outputs.version }}
-          TAG: ${{ needs.prepare.outputs.tag }}
-          GITHUB_TOKEN: ${{ secrets.GH_PKG_GITHUB_TOKEN }}
         run: |
-          export GROUP_ID=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)
+          GROUP_ID=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)
           echo "Finding all artifact IDs"
           find . -name pom.xml -execdir sh -c 'echo "$(mvn help:evaluate -Dexpression=project.artifactId -Dscala=2.12 -Dspark=3.0 -q -DforceStdout)"' \; > artifact-list.txt
           find . -name pom.xml -execdir sh -c 'echo "$(mvn help:evaluate -Dexpression=project.artifactId -Dscala=2.12 -Dspark=3.4 -q -DforceStdout)"' \; >> artifact-list.txt
@@ -98,8 +95,16 @@ jobs:
           sort artifact-list.txt | uniq | sed "s/^/${GROUP_ID}./" > package-list.txt
           echo "Packages to be deleted:"
           cat package-list.txt
-          echo "Deleting package version $VERSION"
-          python3 .github/workflows/scripts/delete_gh_packages.py --owner wherobots --repo packages --package-type maven --package-list package-list.txt --version $VERSION
+          PACKAGES=$(tr '\n' ',' < package-list.txt | sed 's/,$//')
+          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
+      - name: Delete existing maven packages
+        if: ${{ github.event.inputs.overwrite != 'false' }}
+        uses: wherobots/delete-package-versions@v1.0.0
+        with:
+          package_type: maven
+          packages: ${{ steps.find-packages.outputs.packages }}
+          versions: ${{ needs.prepare.outputs.version }}
+          github_token: ${{ secrets.GH_PKG_GITHUB_TOKEN }}
       - name: Build and publish to Maven repository
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PKG_GITHUB_TOKEN }}
@@ -134,31 +139,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-      - name: Install python dependencies
-        run: python3 -m pip install requests
       - name: Delete existing release if exists
+        uses: dev-drprasad/delete-tag-and-release@v1.1
         if: ${{ github.event.inputs.overwrite != 'false' }}
-        env:
-          VERSION: ${{ needs.prepare.outputs.version }}
-          TAG: ${{ needs.prepare.outputs.tag }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set +e
-
-          echo "Deleting release $TAG"
-          python3 .github/workflows/scripts/delete_gh_release.py --tag $TAG
-          if [ $? -ne 0 ]; then
-            echo "::error title=Delete release failed::Failed to delete existing release"
-            exit 1
-          fi
-
-          echo "Deleting tag $TAG"
-          git tag -d $TAG || true
-          git push --delete origin $TAG || true
-
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          delete_release: true
+          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Prepare artifacts directory
         run: mkdir -p artifacts
       - name: Download jars
