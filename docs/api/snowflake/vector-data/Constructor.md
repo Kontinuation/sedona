@@ -519,6 +519,24 @@ Output:
 POINT Z(1.2345 2.3456 3.4567)
 ```
 
+## ST_PointFromGeoHash
+
+Introduction: Generates a Point geometry representing the center of the GeoHash cell defined by the input string. If `precision` is not specified, the full GeoHash precision is used. Providing a `precision` value limits the GeoHash characters used to determine the Point coordinates.
+
+Format: `ST_PointFromGeoHash(geoHash: String, precision: Integer)`
+
+SQL Example
+
+```sql
+SELECT ST_PointFromGeoHash('s00twy01mt', 4)
+```
+
+Output:
+
+```
+POINT (0.87890625 0.966796875)
+```
+
 ## ST_PolygonFromEnvelope
 
 Introduction: Construct a Polygon from MinX, MinY, MaxX, MaxY.
