@@ -1200,6 +1200,15 @@ case class ST_Force3D(inputExpressions: Seq[Expression])
   }
 }
 
+case class ST_ForceCollection(inputExpressions: Seq[Expression])
+  extends InferredExpression(Functions.forceCollection _) {
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
+
 case class ST_ForcePolygonCW(inputExpressions: Seq[Expression])
   extends InferredExpression(Functions.forcePolygonCW _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
