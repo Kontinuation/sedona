@@ -1,6 +1,28 @@
 !!!note
     Please always keep the schema name `SEDONA` (e.g., `SEDONA.ST_GeomFromWKT`) when you use Sedona functions to avoid conflicting with Snowflake's built-in functions.
 
+## ST_GeomCollFromText
+
+Introduction: Constructs a GeometryCollection from the WKT with the given SRID. If SRID is not provided then it defaults to 0. It returns `null` if the WKT is not a `GEOMETRYCOLLECTION`.
+
+Format:
+
+`ST_GeomCollFromText (Wkt: String)`
+
+`ST_GeomCollFromText (Wkt: String, srid: Integer)`
+
+SQL Example:
+
+```sql
+SELECT ST_GeomCollFromText('GEOMETRYCOLLECTION (POINT (50 50), LINESTRING (20 30, 40 60, 80 90), POLYGON ((30 10, 40 20, 30 20, 30 10), (35 15, 45 15, 40 25, 35 15)))')
+```
+
+Output:
+
+```
+GEOMETRYCOLLECTION (POINT (50 50), LINESTRING (20 30, 40 60, 80 90), POLYGON ((30 10, 40 20, 30 20, 30 10), (35 15, 45 15, 40 25, 35 15)))
+```
+
 ## ST_GeomFromEWKB
 
 Introduction: Construct a Geometry from EWKB string or Binary. This function is an alias of [ST_GeomFromWKB](#st_geomfromwkb).

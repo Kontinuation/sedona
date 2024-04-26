@@ -184,6 +184,7 @@ object Catalog {
     function[ST_LineFromMultiPoint](),
     function[ST_MPolyFromText](0),
     function[ST_MLineFromText](0),
+    function[ST_GeomCollFromText](0),
     function[ST_Split](),
     function[ST_S2CellIDs](),
     function[ST_S2ToGeom](),
