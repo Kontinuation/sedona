@@ -54,6 +54,7 @@ object GeoJSONUtils {
 
   def handleArray(row: InternalRow, index: Int, elementType: DataType, toGeometry: Boolean): ArrayData = {
     val arrayData = row.getArray(index)
+    if (arrayData == null || arrayData.numElements() == 0) return new GenericArrayData(Seq.empty[Any])
 
     elementType match {
       case structType: StructType =>

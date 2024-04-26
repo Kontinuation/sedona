@@ -27,7 +27,7 @@ import org.scalatest.BeforeAndAfterAll
 import java.io.File
 
 class geojsonIOTests extends TestBaseScala with BeforeAndAfterAll {
-  val geojsondatalocation1: String = resourceFolder + "geojson/test1.json"
+  val geojsondatalocation1: String = resourceFolder + "geojson/test1*"
   val geojsondatalocation2: String = resourceFolder + "geojson/geojson_feature-collection.json"
   val geojsondatalocation3: String = resourceFolder + "geojson/core-item.json"
   val geojsondatalocation4: String = resourceFolder + "geojson/test2.json"
@@ -39,6 +39,8 @@ class geojsonIOTests extends TestBaseScala with BeforeAndAfterAll {
     it("GeoJSON Test - Read and Write multiline GeoJSON file") {
       val dfR = sparkSession.read.format("geojson").option("multiLine", true).load(geojsondatalocation1)
       val rowsR = dfR.collect()(0)
+
+      assert((rowsR.getAs[GenericRowWithSchema]("assets") != null) == true)
       assert(rowsR.getAs[String]("type") == "Feature")
       assert(rowsR.getAs[GenericRowWithSchema]("properties").getString(0) == "2020-12-12T01:48:13.725Z")
       assert(rowsR.getAs[GenericRowWithSchema]("properties").getString(1) == "A sample STAC Item that includes examples of all common metadata")
