@@ -46,7 +46,10 @@ test_configurations = [
     (stc.ST_GeometryFromText, ("wkt", 4326), "linestring_wkt", "", "LINESTRING (1 2, 3 4)"),
     (stc.ST_GeomFromWKB, ("wkbLine",), "constructor", "ST_ReducePrecision(geom, 2)", "LINESTRING (-2.1 -0.35, -1.5 -0.67)"),
     (stc.ST_GeomFromEWKB, ("wkbLine",), "constructor", "ST_ReducePrecision(geom, 2)", "LINESTRING (-2.1 -0.35, -1.5 -0.67)"),
+    (stc.ST_GeomFromText, ("wkt",4326), "linestring_wkt", "", "LINESTRING (1 2, 3 4)"),
+    (stc.ST_GeomFromWKB, ("wkb",), "constructor", "ST_ReducePrecision(geom, 2)", "LINESTRING (-2.1 -0.35, -1.5 -0.67)"),
     (stc.ST_GeomFromWKT, ("wkt",), "linestring_wkt", "", "LINESTRING (1 2, 3 4)"),
+    (stc.ST_GeomFromWKT, ("wkt",4326), "linestring_wkt", "", "LINESTRING (1 2, 3 4)"),
     (stc.ST_GeomFromEWKT, ("ewkt",), "linestring_ewkt", "", "LINESTRING (1 2, 3 4)"),
     (stc.ST_LineFromText, ("wkt",), "linestring_wkt", "", "LINESTRING (1 2, 3 4)"),
     (stc.ST_LineFromWKB, ("wkbLine",), "constructor", "ST_ReducePrecision(geom, 2)", "LINESTRING (-2.1 -0.35, -1.5 -0.67)"),
@@ -56,6 +59,12 @@ test_configurations = [
     (stc.ST_PointZM, ("x", "y", "z", "m", "srid"), "x_y_z_m_srid", "", "POINT Z (1 2 3)"),
     (stc.ST_PointFromGeoHash, ("geohash", 4), "constructor", "ST_ReducePrecision(geom, 2)", "POINT (0.88 0.97)"),
     (stc.ST_PointFromGeoHash, ("geohash",), "constructor", "ST_ReducePrecision(geom, 2)", "POINT (1 1)"),
+    (stc.ST_PointZ, ("x", "y", "z", 4326), "constructor", "", "POINT Z (0 1 2)"),
+    (stc.ST_PointZ, ("x", "y", "z"), "constructor", "", "POINT Z (0 1 2)"),
+    (stc.ST_MPolyFromText, ("mpoly",), "constructor", "" , "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), (5 5, 5 7, 7 7, 7 5, 5 5)))"),
+    (stc.ST_MPolyFromText, ("mpoly", 4326), "constructor", "" , "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), (5 5, 5 7, 7 7, 7 5, 5 5)))"),
+    (stc.ST_MLineFromText, ("mline", ), "constructor", "" , "MULTILINESTRING ((1 2, 3 4), (4 5, 6 7))"),
+    (stc.ST_MLineFromText, ("mline", 4326), "constructor", "" , "MULTILINESTRING ((1 2, 3 4), (4 5, 6 7))"),
     (stc.ST_PointFromText, ("single_point", lambda: f.lit(',')), "constructor", "", "POINT (0 1)"),
     (stc.ST_PointFromWKB, ("wkbPoint",), "constructor", "", "POINT (10 15)"),
     (stc.ST_MakePoint, ("x", "y", "z"), "constructor", "", "POINT Z (0 1 2)"),
@@ -443,6 +452,9 @@ class TestDataFrameAPI(TestBase):
     def base_df(self, request):
         wkbLine = '0102000000020000000000000084d600c00000000080b5d6bf00000060e1eff7bf00000080075de5bf'
         wkbPoint = '010100000000000000000024400000000000002e40'
+        wkb = '0102000000020000000000000084d600c00000000080b5d6bf00000060e1eff7bf00000080075de5bf'
+        mpoly = 'MULTIPOLYGON(((0 0 ,20 0 ,20 20 ,0 20 ,0 0 ),(5 5 ,5 7 ,7 7 ,7 5 ,5 5)))'
+        mline = 'MULTILINESTRING((1 2, 3 4), (4 5, 6 7))'
         geojson = "{ \"type\": \"Feature\", \"properties\": { \"prop\": \"01\" }, \"geometry\": { \"type\": \"Point\", \"coordinates\": [ 0.0, 1.0 ] }},"
         gml_string = "<gml:LineString srsName=\"EPSG:4269\"><gml:coordinates>-71.16,42.25 -71.17,42.25 -71.18,42.25</gml:coordinates></gml:LineString>"
         kml_string = "<LineString><coordinates>-71.16,42.26 -71.17,42.26</coordinates></LineString>"
@@ -457,6 +469,9 @@ class TestDataFrameAPI(TestBase):
                 "'0.0,0.0,1.0,0.0,1.0,1.0,0.0,0.0' AS multiple_point",
                 f"X'{wkbLine}' AS wkbLine",
                 f"X'{wkbPoint}' AS wkbPoint",
+                f"X'{wkb}' AS wkb",
+                f"'{mpoly}' AS mpoly",
+                f"'{mline}' AS mline",
                 f"'{geojson}' AS geojson",
                 "'s00twy01mt' AS geohash",
                 f"'{gml_string}' AS gml",

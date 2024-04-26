@@ -99,7 +99,7 @@ def ST_GeomFromKML(kml_string: ColumnOrName) -> Column:
 
 
 @validate_argument_types
-def ST_GeomFromText(wkt: ColumnOrName) -> Column:
+def ST_GeomFromText(wkt: ColumnOrName, srid: Optional[ColumnOrNameOrNumber] = None) -> Column:
     """Generate a geometry column from a Well-Known Text (WKT) string column.
     This is an alias of ST_GeomFromWKT.
 
@@ -108,7 +108,9 @@ def ST_GeomFromText(wkt: ColumnOrName) -> Column:
     :return: Geometry column representing the WKT string.
     :rtype: Column
     """
-    return _call_constructor_function("ST_GeomFromText", wkt)
+    args = (wkt) if srid is None else (wkt, srid)
+
+    return _call_constructor_function("ST_GeomFromText", args)
 
 @validate_argument_types
 def ST_GeometryFromText(wkt: ColumnOrName, srid: Optional[ColumnOrNameOrNumber] = None) -> Column:
@@ -149,7 +151,7 @@ def ST_GeomFromEWKB(wkb: ColumnOrName) -> Column:
 
 
 @validate_argument_types
-def ST_GeomFromWKT(wkt: ColumnOrName) -> Column:
+def ST_GeomFromWKT(wkt: ColumnOrName, srid: Optional[ColumnOrNameOrNumber] = None) -> Column:
     """Generate a geometry column from a Well-Known Text (WKT) string column.
     This is an alias of ST_GeomFromText.
 
@@ -158,7 +160,9 @@ def ST_GeomFromWKT(wkt: ColumnOrName) -> Column:
     :return: Geometry column representing the WKT string.
     :rtype: Column
     """
-    return _call_constructor_function("ST_GeomFromWKT", wkt)
+    args = (wkt) if srid is None else (wkt, srid)
+
+    return _call_constructor_function("ST_GeomFromWKT", args)
 
 @validate_argument_types
 def ST_GeomFromEWKT(ewkt: ColumnOrName) -> Column:
@@ -367,7 +371,7 @@ def ST_PolygonFromText(coords: ColumnOrName, delimiter: ColumnOrName) -> Column:
     return _call_constructor_function("ST_PolygonFromText", (coords, delimiter))
 
 @validate_argument_types
-def ST_MPolyFromText(wkt: ColumnOrName) -> Column:
+def ST_MPolyFromText(wkt: ColumnOrName, srid: Optional[ColumnOrNameOrNumber] = None) -> Column:
     """Generate multiPolygon geometry from a multiPolygon WKT representation.
 
     :param wkt: multiPolygon WKT string column to generate from.
@@ -375,10 +379,12 @@ def ST_MPolyFromText(wkt: ColumnOrName) -> Column:
     :return: multiPolygon geometry generated from the wkt column.
     :rtype: Column
     """
-    return _call_constructor_function("ST_MPolyFromText", wkt)
+    args = (wkt) if srid is None else (wkt, srid)
+
+    return _call_constructor_function("ST_MPolyFromText", args)
 
 @validate_argument_types
-def ST_MLineFromText(wkt: ColumnOrName) -> Column:
+def ST_MLineFromText(wkt: ColumnOrName, srid: Optional[ColumnOrNameOrNumber] = None) -> Column:
     """Generate multiLineString geometry from a multiLineString WKT representation.
 
     :param wkt: multiLineString WKT string column to generate from.
