@@ -1059,7 +1059,7 @@ public class Functions {
     }
 
     public static Geometry longestLine(Geometry geom1, Geometry geom2) {
-        double maxLength = 0;
+        double maxLength = - Double.MAX_VALUE;
         Coordinate longestStart = null;
         Coordinate longestEnd = null;
 
