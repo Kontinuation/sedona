@@ -25,15 +25,23 @@ import org.apache.spark.sql.{SQLContext, SparkSession}
 
 @deprecated("Use SedonaContext instead", "1.1.0")
 object SedonaSQLRegistrator {
-  def registerAll(sqlContext: SQLContext): Unit = {
-    registerAll(sqlContext.sparkSession)
-  }
   @deprecated("Use SedonaContext.create instead", "1.1.0")
-  def registerAll(sparkSession: SparkSession): Unit = {
-    SedonaContext.create(sparkSession)
+  def registerAll(sqlContext: SQLContext): Unit = {
+    registerAll(sqlContext, "java")
   }
 
   @deprecated("Use SedonaContext.create instead", "1.1.0")
+  def registerAll(sparkSession: SparkSession): Unit =
+    registerAll(sparkSession, "java")
+
+  @deprecated("Use SedonaContext.create instead", "1.1.0")
+  def registerAll(sqlContext: SQLContext, language: String): Unit = {
+    SedonaContext.create(sqlContext.sparkSession, language)
+  }
+
+  @deprecated("Use SedonaContext.create instead", "1.1.0")
+  def registerAll(sparkSession: SparkSession, language: String): Unit =
+    SedonaContext.create(sparkSession, language)
   def dropAll(sparkSession: SparkSession): Unit = {
     UdfRegistrator.dropAll(sparkSession)
     ListenerRegistrator.unregisterAll(sparkSession)
