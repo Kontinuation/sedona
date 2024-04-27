@@ -354,11 +354,13 @@ Format: `RS_BandPath(raster: Raster)`
 Since: `v1.5.0`
 
 Spark SQL example:
+
 ```sql
 SELECT RS_BandPath(RS_FromPath("s3a://bucket/path/to/raster.tif"))
 ```
 
 Output:
+
 ```
 s3a://bucket/path/to/raster.tif
 ```

@@ -1,6 +1,7 @@
 # This package is for integration test on Snowflake
 
 To execute the test locally, copy the following template and replace the values with your own credentials.
+
 ``` bash
 export SNOWFLAKE_AUTH_METHOD=BASIC
 export SNOWFLAKE_USER=""
