@@ -204,6 +204,7 @@ public class TestConstructors extends TestBase{
     @Test
     public void test_ST_GeomCollFromText() {
         registerUDF("ST_GeomCollFromText", String.class);
+        registerUDF("ST_SRID", byte[].class);
         verifySqlSingleRes(
                 "select sedona.ST_AsText(sedona.ST_GeomCollFromText('GEOMETRYCOLLECTION (POINT (50 50), LINESTRING (20 30, 40 60, 80 90), POLYGON ((30 10, 40 20, 30 20, 30 10), (35 15, 45 15, 40 25, 35 15)))'))",
                 "GEOMETRYCOLLECTION (POINT (50 50), LINESTRING (20 30, 40 60, 80 90), POLYGON ((30 10, 40 20, 30 20, 30 10), (35 15, 45 15, 40 25, 35 15)))"
