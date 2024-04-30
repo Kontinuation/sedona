@@ -23,18 +23,18 @@ import com.esotericsoftware.kryo.io.UnsafeOutput;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.raster.serde.KryoUtil;
+import org.geotools.api.geometry.Bounds;
+import org.geotools.api.geometry.Position;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridGeometry2D;
-import org.geotools.geometry.Envelope2D;
-import org.opengis.coverage.CannotEvaluateException;
-import org.opengis.coverage.grid.GridCoverage;
-import org.opengis.coverage.grid.GridGeometry;
-import org.opengis.geometry.DirectPosition;
-import org.opengis.geometry.Envelope;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opengis.util.Record;
-import org.opengis.util.RecordType;
+import org.geotools.api.coverage.CannotEvaluateException;
+import org.geotools.api.coverage.grid.GridCoverage;
+import org.geotools.api.coverage.grid.GridGeometry;
+import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
+import org.geotools.api.util.Record;
+import org.geotools.api.util.RecordType;
+import org.geotools.geometry.jts.ReferencedEnvelope;
 
 import javax.media.jai.Interpolation;
 import java.awt.geom.Point2D;
@@ -163,13 +163,13 @@ public class LazyLoadOutDbGridCoverage2D extends OutDbGridCoverage2D {
     }
 
     @Override
-    public Envelope getEnvelope() {
+    public Bounds getEnvelope() {
         ensureWrappedLoaded();
         return wrapped.getEnvelope();
     }
 
     @Override
-    public Envelope2D getEnvelope2D() {
+    public ReferencedEnvelope getEnvelope2D() {
         ensureWrappedLoaded();
         return wrapped.getEnvelope2D();
     }
@@ -205,31 +205,31 @@ public class LazyLoadOutDbGridCoverage2D extends OutDbGridCoverage2D {
     }
 
     @Override
-    public Object evaluate(DirectPosition point) throws CannotEvaluateException {
+    public Object evaluate(Position point) throws CannotEvaluateException {
         ensureWrappedLoaded();
         return wrapped.evaluate(point);
     }
 
     @Override
-    public byte[] evaluate(DirectPosition coord, byte[] dest) throws CannotEvaluateException {
+    public byte[] evaluate(Position coord, byte[] dest) throws CannotEvaluateException {
         ensureWrappedLoaded();
         return wrapped.evaluate(coord, dest);
     }
 
     @Override
-    public int[] evaluate(DirectPosition coord, int[] dest) throws CannotEvaluateException {
+    public int[] evaluate(Position coord, int[] dest) throws CannotEvaluateException {
         ensureWrappedLoaded();
         return wrapped.evaluate(coord, dest);
     }
 
     @Override
-    public float[] evaluate(DirectPosition coord, float[] dest) throws CannotEvaluateException {
+    public float[] evaluate(Position coord, float[] dest) throws CannotEvaluateException {
         ensureWrappedLoaded();
         return wrapped.evaluate(coord, dest);
     }
 
     @Override
-    public double[] evaluate(DirectPosition coord, double[] dest) throws CannotEvaluateException {
+    public double[] evaluate(Position coord, double[] dest) throws CannotEvaluateException {
         ensureWrappedLoaded();
         return wrapped.evaluate(coord, dest);
     }
@@ -271,7 +271,7 @@ public class LazyLoadOutDbGridCoverage2D extends OutDbGridCoverage2D {
     }
 
     @Override
-    public synchronized String getDebugString(DirectPosition coord) {
+    public synchronized String getDebugString(Position coord) {
         ensureWrappedLoaded();
         return wrapped.getDebugString(coord);
     }
@@ -355,13 +355,13 @@ public class LazyLoadOutDbGridCoverage2D extends OutDbGridCoverage2D {
     }
 
     @Override
-    public Set<Record> evaluate(DirectPosition p, Collection<String> list) {
+    public Set<Record> evaluate(Position p, Collection<String> list) {
         ensureWrappedLoaded();
         return wrapped.evaluate(p, list);
     }
 
     @Override
-    public boolean[] evaluate(DirectPosition coord, boolean[] dest) throws CannotEvaluateException {
+    public boolean[] evaluate(Position coord, boolean[] dest) throws CannotEvaluateException {
         ensureWrappedLoaded();
         return wrapped.evaluate(coord, dest);
     }

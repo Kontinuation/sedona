@@ -62,7 +62,7 @@
         <maven.compiler.plugin.version>3.10.1</maven.compiler.plugin.version>
 
         <cdm.version>5.4.2</cdm.version>
-        <geotools.version>28.2</geotools.version>
+        <geotools.version>31.0</geotools.version>
         <hadoop.version>3.2.4</hadoop.version>
         <jackson.version>2.13.4</jackson.version>
         <jts.version>1.19.0</jts.version>
@@ -109,6 +109,7 @@
             --add-opens=java.base/sun.security.action=ALL-UNNAMED
             --add-opens=java.base/sun.util.calendar=ALL-UNNAMED
             -Djdk.reflect.useDirectMethodHandle=false
+            -Dio.netty.tryReflectionSetAccessible=true
         </extraJavaTestArgs>
     </properties>
     <distributionManagement>

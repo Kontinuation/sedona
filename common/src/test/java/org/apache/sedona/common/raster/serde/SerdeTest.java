@@ -34,9 +34,9 @@ import org.geotools.gce.geotiff.GeoTiffReader;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opengis.coverage.grid.GridEnvelope;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
+import org.geotools.api.coverage.grid.GridEnvelope;
+import org.geotools.api.referencing.FactoryException;
+import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
 
 import java.io.File;
 import java.io.IOException;
