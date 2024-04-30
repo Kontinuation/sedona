@@ -133,6 +133,7 @@ test_that("Passed RS_NumBands with raster", {
   ## Load
   sdf_name <- random_string("spatial_sdf")
   binary_sdf <- spark_read_binary(sc, dir = test_data("raster"), name = sdf_name)
+  print(binary_sdf %>% collect())
 
   a <-
     binary_sdf %>%
