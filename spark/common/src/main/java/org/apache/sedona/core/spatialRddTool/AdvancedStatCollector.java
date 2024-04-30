@@ -23,6 +23,7 @@ import org.apache.spark.util.random.XORShiftRandom;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Lineal;
+import org.locationtech.jts.geom.MultiPoint;
 import org.locationtech.jts.geom.Polygonal;
 import org.locationtech.jts.geom.Puntal;
 
@@ -100,6 +101,7 @@ public class AdvancedStatCollector implements Serializable {
     private long linealCount = 0;  // number linestring and multi linestring
     private long polygonalCount = 0;  // number of polygon and multi polygon
     private long geometryCollectionCount = 0;  // number of geometry collection
+    private long multiPointCount = 0; // number of multipoint. We count it specially for subdividing.
 
     /**
      * The total number of points in sampled geometries.
@@ -114,9 +116,16 @@ public class AdvancedStatCollector implements Serializable {
     private double totalEnvelopeArea = 0;
 
     /**
-     * The total size of sampled geometries in bytes. The number of sampled geometries is numEstimatedGeometries
+     * The total size (including user data) of sampled geometries in bytes. The number of sampled geometries is
+     * numEstimatedGeometries
      */
     private long totalEstimatedSizeInBytes = 0;
+
+    /**
+     * The total size of user data in sampled geometries in bytes. The number of sampled geometries is
+     * numEstimatedGeometries
+     */
+    private long totalEstimatedUserDataSizeInBytes = 0;
 
     /**
      * The number of geometries sampled for estimating size. Please note that this is not the same as the number of
@@ -166,6 +175,9 @@ public class AdvancedStatCollector implements Serializable {
 
         if (geom instanceof Puntal) {
             puntalCount += 1;
+            if (geom instanceof MultiPoint) {
+                multiPointCount += 1;
+            }
         } else if (geom instanceof Lineal) {
             linealCount += 1;
         } else if (geom instanceof Polygonal) {
@@ -208,7 +220,11 @@ public class AdvancedStatCollector implements Serializable {
 
         if (count == nextEstimateNum) {
             // Estimate size in bytes
-            totalEstimatedSizeInBytes += GeometrySizeEstimator.estimateSize(geom, numPoints);
+            long geomSizeWithoutUserData = GeometrySizeEstimator.estimateSizeWithoutUserData(geom, numPoints);
+            long userDataSize = GeometrySizeEstimator.estimateUserDataSize(geom.getUserData());
+            long geomSize = geomSizeWithoutUserData + userDataSize;
+            totalEstimatedSizeInBytes += geomSize;
+            totalEstimatedUserDataSizeInBytes += userDataSize;
 
             // Update the number of sampled geometries, and set up a marker for the next estimation
             numEstimatedGeometries += 1;
@@ -281,11 +297,13 @@ public class AdvancedStatCollector implements Serializable {
         linealCount += other.linealCount;
         polygonalCount += other.polygonalCount;
         geometryCollectionCount += other.geometryCollectionCount;
+        multiPointCount += other.multiPointCount;
         totalNumPoints += other.totalNumPoints;
         totalEnvelopeWidth += other.totalEnvelopeWidth;
         totalEnvelopeHeight += other.totalEnvelopeHeight;
         totalEnvelopeArea += other.totalEnvelopeArea;
         totalEstimatedSizeInBytes += other.totalEstimatedSizeInBytes;
+        totalEstimatedUserDataSizeInBytes += other.totalEstimatedUserDataSizeInBytes;
         numEstimatedGeometries += other.numEstimatedGeometries;
     }
 
@@ -318,6 +336,10 @@ public class AdvancedStatCollector implements Serializable {
         return geometryCollectionCount;
     }
 
+    public long getMultiPointCount() {
+        return multiPointCount;
+    }
+
     public long getNumEstimatedGeometries() {
         return numEstimatedGeometries;
     }
@@ -327,6 +349,13 @@ public class AdvancedStatCollector implements Serializable {
             return 0;
         }
         return totalEstimatedSizeInBytes / numEstimatedGeometries;
+    }
+
+    public long getEstimatedUserDataSizeInBytes() {
+        if (numEstimatedGeometries == 0) {
+            return 0;
+        }
+        return totalEstimatedUserDataSizeInBytes / numEstimatedGeometries;
     }
 
     public double getMeanNumPoints() {

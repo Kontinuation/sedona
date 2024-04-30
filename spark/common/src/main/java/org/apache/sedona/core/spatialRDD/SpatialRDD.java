@@ -26,21 +26,24 @@ import org.apache.sedona.common.FunctionsGeoTools;
 import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
+import org.apache.sedona.core.monitoring.Metrics;
 import org.apache.sedona.core.spatialPartitioning.*;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitionerBuilder.SpatialPartitionBuildingStrategy;
 import org.apache.sedona.core.spatialPartitioning.quadtree.StandardQuadTree;
 import org.apache.sedona.core.spatialRddTool.IndexBuilder;
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector;
+import org.apache.sedona.core.spatialRddTool.PlaceGeometryWithMetricsIterator;
 import org.apache.sedona.core.spatialRddTool.StatCalculator;
 import org.apache.sedona.core.utils.RDDSampleUtils;
 import org.apache.sedona.core.utils.SedonaConf;
 import org.apache.spark.SparkContext;
+import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.Function2;
-import org.apache.spark.api.java.function.PairFlatMapFunction;
 import org.apache.spark.storage.StorageLevel;
+import org.apache.spark.util.LongAccumulator;
 import org.apache.spark.util.random.SamplingUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
@@ -318,7 +321,8 @@ public class SpatialRDD<T extends Geometry>
             int otherPartitions = determineNumPartitions(otherRdd, otherSamplesInBoundary, conf);
             numPartitions = Math.max(thisPartitions, otherPartitions);
         }
-        spatialPartitioning(gridType, strategy, otherRdd, numPartitions, thisSamplesInBoundary, otherSamplesInBoundary);
+        spatialPartitioning(gridType, strategy, otherRdd, numPartitions, thisSamplesInBoundary, otherSamplesInBoundary,
+                conf);
     }
 
     /**
@@ -374,15 +378,17 @@ public class SpatialRDD<T extends Geometry>
      * @param numPartitions Number of partitions
      * @param thisSamplesInBoundary Sampled envelopes within join extent of this spatial RDD
      * @param otherSamplesInBoundary Sampled envelopes within join extent of the other spatial RDD
+     * @param conf Sedona configuration
      * @param <U> Geometry type of the other spatial RDD
      */
     private <U extends Geometry> void spatialPartitioning(
             GridType gridType, SpatialPartitionBuildingStrategy strategy,
             SpatialRDD<U> otherRdd, int numPartitions,
-            SampledEnvelopesInBoundary thisSamplesInBoundary, SampledEnvelopesInBoundary otherSamplesInBoundary) {
+            SampledEnvelopesInBoundary thisSamplesInBoundary, SampledEnvelopesInBoundary otherSamplesInBoundary,
+            SedonaConf conf) {
         this.partitioner = calc_partitioner(gridType, strategy, numPartitions, thisSamplesInBoundary, otherSamplesInBoundary);
-        this.spatialPartitionedRDD = partition(this.partitioner);
-        otherRdd.spatialPartitioning(this.partitioner);
+        this.spatialPartitionedRDD = partition(this.partitioner, conf);
+        otherRdd.spatialPartitioning(this.partitioner, conf);
     }
 
     private SpatialPartitioner calc_partitioner(
@@ -450,8 +456,12 @@ public class SpatialRDD<T extends Geometry>
 
     public void spatialPartitioning(SpatialPartitioner partitioner)
     {
+        spatialPartitioning(partitioner, null);
+    }
+
+    public void spatialPartitioning(SpatialPartitioner partitioner, SedonaConf conf) {
         this.partitioner = partitioner;
-        this.spatialPartitionedRDD = partition(partitioner);
+        this.spatialPartitionedRDD = partition(partitioner, conf);
     }
 
     /**
@@ -476,19 +486,26 @@ public class SpatialRDD<T extends Geometry>
         return true;
     }
 
-    private JavaRDD<T> partition(final SpatialPartitioner partitioner)
+    private JavaRDD<T> partition(final SpatialPartitioner partitioner) {
+        return partition(partitioner, null);
+    }
+
+    private JavaRDD<T> partition(final SpatialPartitioner partitioner, SedonaConf conf)
     {
-        return this.rawSpatialRDD.flatMapToPair(
-                new PairFlatMapFunction<T, Integer, T>()
-                {
-                    @Override
-                    public Iterator<Tuple2<Integer, T>> call(T spatialObject)
-                            throws Exception
-                    {
-                        return partitioner.placeObject(spatialObject);
-                    }
-                }
-        ).partitionBy(partitioner)
+        JavaPairRDD<Integer, T> geometryWithPartId;
+        if (conf != null && conf.metricsForSpatialPartitioningEnabled()) {
+            // Update metrics when iterating over partitioned geometries
+            SparkContext sc = rawSpatialRDD.context();
+            LongAccumulator accInputCount = Metrics.createMetric(sc, "inputCount");
+            LongAccumulator accOutputCount = Metrics.createMetric(sc, "outputCount");
+            LongAccumulator accMaxDuplicates = Metrics.createMetric(sc, "maxDuplicates");
+            geometryWithPartId = this.rawSpatialRDD.mapPartitionsToPair((iterator) ->
+                    new PlaceGeometryWithMetricsIterator<>(
+                            iterator, partitioner, accInputCount, accOutputCount, accMaxDuplicates));
+        } else {
+            geometryWithPartId = this.rawSpatialRDD.flatMapToPair(partitioner::placeObject);
+        }
+        return geometryWithPartId.partitionBy(partitioner)
                 .mapPartitions(new FlatMapFunction<Iterator<Tuple2<Integer, T>>, T>()
                 {
                     @Override
@@ -697,10 +714,27 @@ public class SpatialRDD<T extends Geometry>
         return true;
     }
 
+    /**
+     * Retrieve advanced statistics of the spatial RDD
+     * @return Advanced statistics of this spatial RDD
+     */
     public AdvancedStatCollector getStatistics() {
         return this.stat;
     }
 
+    /**
+     * Set advanced statistics of the spatial RDD. This method is only for internal use, and should not be called
+     * directly by users.
+     * @param stat Advanced statistics of this spatial RDD
+     */
+    public void setStatistics(AdvancedStatCollector stat) {
+        this.stat = stat;
+    }
+
+    /**
+     * Free up memory used by the statistics data, especially sampled envelopes on both sides. This can be done
+     * after using the statistics data to build spatial partitioning.
+     */
     public void forgetStatistics() {
         this.stat = null;
     }

@@ -45,6 +45,7 @@ import org.locationtech.jts.geom.Geometry
  * @param distance - ST_Distance(left, right) <= distance. Distance can be literal or a computation over 'left' or 'right'.
  * @param distanceBoundToLeft whether distance expression references attributes from left relation or right relation
  * @param spatialPredicate spatial predicate as join condition
+ * @param condition full join condition
  * @param extraCondition extra join condition other than spatialPredicate
  */
 case class DistanceJoinExec(left: SparkPlan,
@@ -55,6 +56,7 @@ case class DistanceJoinExec(left: SparkPlan,
                             distanceBoundToLeft: Boolean,
                             spatialPredicate: SpatialPredicate,
                             isGeography: Boolean,
+                            condition: Expression,
                             extraCondition: Option[Expression] = None)
   extends SedonaBinaryExecNode
     with TraitAdvancedJoinQueryExec
@@ -70,15 +72,31 @@ case class DistanceJoinExec(left: SparkPlan,
                                 leftShapeExpr: Expression,
                                 rightRdd: RDD[UnsafeRow],
                                 rightShapeExpr: Expression): (SpatialRDD[Geometry], SpatialRDD[Geometry]) = {
+    if (isRasterJoin(leftShapeExpr, rightShapeExpr)) {
+      throw new UnsupportedOperationException("Raster join is not supported by DistanceJoinExec.")
+    }
+    (leftToSpatialRDD(leftRdd, leftShapeExpr), rightToSpatialRDD(rightRdd, rightShapeExpr))
+  }
+
+  override def leftToSpatialRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression,
+    projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
     if (distanceBoundToLeft) {
-      (toExpandedEnvelopeRDD(leftRdd, leftShapeExpr, boundRadius, isGeography), toSpatialRDD(rightRdd, rightShapeExpr))
+      toExpandedEnvelopeRDD(rdd, shapeExpression, boundRadius, isGeography, projection)
     } else {
-      (toSpatialRDD(leftRdd, leftShapeExpr), toExpandedEnvelopeRDD(rightRdd, rightShapeExpr, boundRadius, isGeography))
+      toSpatialRDD(rdd, shapeExpression, projection)
+    }
+  }
+
+  override def rightToSpatialRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression,
+    projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
+    if (distanceBoundToLeft) {
+      toSpatialRDD(rdd, shapeExpression, projection)
+    } else {
+      toExpandedEnvelopeRDD(rdd, shapeExpression, boundRadius, isGeography, projection)
     }
   }
 
   protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): SparkPlan = {
     copy(left = newLeft, right = newRight)
   }
-
 }

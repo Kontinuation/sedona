@@ -16,22 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.sedona.core.enums;
 
-package org.apache.sedona.core.monitoring
+public enum JoinSubdivideMode {
+    /**
+     * Never subdivide the geometries before running spatial join.
+     */
+    NEVER,
 
-import org.apache.spark.SparkContext
-import org.apache.spark.util.{DoubleAccumulator, LongAccumulator}
+    /**
+     * Always subdivide the geometries using subdivide options defined in SedonaConf before running spatial join.
+     */
+    ALWAYS,
 
-object Metrics {
-  def createMetric(sc: SparkContext, name: String): LongAccumulator = {
-    val acc = new LongAccumulator()
-    sc.register(acc, "sedona.spatialjoin." + name)
-    acc
-  }
+    /**
+     * Automatically decide whether to subdivide the geometries before running spatial join.
+     */
+    AUTO;
 
-  def createDoubleMetric(sc: SparkContext, name: String): DoubleAccumulator = {
-    val acc = new DoubleAccumulator()
-    sc.register(acc, "sedona.spatialjoin." + name)
-    acc
-  }
+    public static JoinSubdivideMode getJoinSubdivideMode(String str) {
+        for (JoinSubdivideMode me : JoinSubdivideMode.values()) {
+            if (me.name().equalsIgnoreCase(str)) { return me; }
+        }
+        return null;
+    }
 }

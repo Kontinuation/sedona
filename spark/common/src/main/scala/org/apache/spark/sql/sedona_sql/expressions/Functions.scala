@@ -22,8 +22,7 @@ import org.apache.sedona.common.{Functions, FunctionsGeoTools}
 import org.apache.sedona.common.sphere.{Haversine, Spheroid}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.catalyst.expressions.{Expression, Generator}
-import org.apache.spark.sql.catalyst.util.ArrayData
+import org.apache.spark.sql.catalyst.expressions.{Expression, Generator, ImplicitCastInputTypes}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.sedona_sql.expressions.implicits._
 import org.apache.spark.sql.types._
@@ -798,9 +797,7 @@ case class ST_SubDivideExplode(children: Seq[Expression])
     val geometryRaw = children.head
     val maxVerticesRaw = children(1)
     geometryRaw.toGeometry(input) match {
-      case geom: Geometry => ArrayData.toArrayData(
-        Functions.subDivide(geom, maxVerticesRaw.toInt(input)).map(_.toGenericArrayData)
-      )
+      case geom: Geometry =>
         Functions.subDivide(geom, maxVerticesRaw.toInt(input)).map(_.toGenericArrayData).map(InternalRow(_))
       case _ => new Array[InternalRow](0)
     }
@@ -808,6 +805,71 @@ case class ST_SubDivideExplode(children: Seq[Expression])
   override def elementSchema: StructType = {
     new StructType()
       .add("geom", GeometryUDT, true)
+  }
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(children = newChildren)
+  }
+}
+
+case class ST_ExtentBasedSubDivide(inputExpressions: Seq[Expression])
+  extends InferredExpression(
+    inferrableFunction3(Functions.extentBasedSubDivide),
+    inferrableFunction4(Functions.extentBasedSubDivide),
+    inferrableFunction6(Functions.extentBasedSubDivide)
+  ) {
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
+case class ST_ExtentBasedSubDivideExplode(children: Seq[Expression])
+  extends Generator with ImplicitCastInputTypes with CodegenFallback {
+
+  private val nArgs = children.length
+
+  override def inputTypes: Seq[AbstractDataType] = {
+    if (nArgs == 3) {
+      Seq(GeometryUDT, DoubleType, DoubleType)
+    } else if (nArgs == 4) {
+      Seq(GeometryUDT, DoubleType, DoubleType, StringType)
+    } else if (nArgs == 6) {
+      Seq(GeometryUDT, DoubleType, DoubleType, IntegerType, IntegerType, StringType)
+    } else {
+      throw new IllegalArgumentException(s"Invalid number of arguments: $nArgs")
+    }
+  }
+
+  override def eval(input: InternalRow): TraversableOnce[InternalRow] = {
+    val geometryExpr = children.head
+    val maxWidthExpr = children(1)
+    val maxHeightExpr = children(2)
+    geometryExpr.toGeometry(input) match {
+      case geom: Geometry =>
+        val maxWidth = maxWidthExpr.eval(input).asInstanceOf[Double]
+        val maxHeight = maxHeightExpr.eval(input).asInstanceOf[Double]
+        if (nArgs == 3) {
+          Functions.extentBasedSubDivide(geom, maxWidth, maxHeight)
+            .map(_.toGenericArrayData).map(InternalRow(_))
+        } else if (nArgs == 4) {
+          val algorithms = children(3).asString(input)
+          Functions.extentBasedSubDivide(geom, maxWidth, maxHeight, algorithms)
+            .map(_.toGenericArrayData).map(InternalRow(_))
+        } else if (nArgs == 6) {
+          val maxVertices = children(3).eval(input).asInstanceOf[Int]
+          val maxDepth = children(4).eval(input).asInstanceOf[Int]
+          val algorithms = children(5).asString(input)
+          Functions.extentBasedSubDivide(geom, maxWidth, maxHeight, maxVertices, maxDepth, algorithms)
+            .map(_.toGenericArrayData).map(InternalRow(_))
+        } else {
+          throw new IllegalStateException(s"Invalid number of arguments: $nArgs")
+        }
+      case _ => new Array[InternalRow](0)
+    }
+  }
+
+  override def elementSchema: StructType = {
+    new StructType().add("geom", GeometryUDT, nullable = true)
   }
 
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {

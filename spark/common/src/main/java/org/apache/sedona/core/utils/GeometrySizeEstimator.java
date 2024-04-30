@@ -18,6 +18,7 @@
  */
 package org.apache.sedona.core.utils;
 
+import org.apache.sedona.core.spatialOperator.Subdivide;
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow;
 import org.apache.spark.util.SizeEstimator;
 import org.locationtech.jts.geom.Geometry;
@@ -45,26 +46,38 @@ public class GeometrySizeEstimator {
      */
     public static long estimateSize(Geometry geom, int numPoints) {
         long geomSize = estimateSizeWithoutUserData(geom, numPoints);
-        Object userData = geom.getUserData();
-        long userDataSize;
-        if (userData instanceof UnsafeRow) {
+        long userDataSize = estimateUserDataSize(geom.getUserData());
+        return geomSize + userDataSize;
+    }
+
+    public static long estimateUserDataSize(Object userData) {
+        if (userData == null) {
+            return 0;
+        } else if (userData instanceof UnsafeRow) {
             // We can use a fast estimation if the user data is an UnsafeRow, which is the case when we run spatial join
             // on DataFrame. 64 is an estimated overhead of UnsafeRow object.
-            userDataSize = ((UnsafeRow) userData).getSizeInBytes() + 64;
+            return ((UnsafeRow) userData).getSizeInBytes() + 64;
         } else if (userData instanceof String) {
             // We can use a fast estimation if the user data is a String, which is usually the case when using the
             // RDD API. 64 is an estimated overhead of String object.
             // We multiply the length of the string by 2 for conservative estimation (assuming internal usage of
             // UTF-16 encoding)
-            userDataSize = ((String) userData).length() * 2L + 64;
+            return ((String) userData).length() * 2L + 64;
         } else if (userData instanceof byte[]) {
-            userDataSize = ((byte[]) userData).length + 16;
+            return ((byte[]) userData).length + 16;
+        } else if (userData instanceof Subdivide.SubdividedPart) {
+            long size = 64;  // Overhead of the SubdividedPart object
+            Subdivide.SubdividedPart part = (Subdivide.SubdividedPart) userData;
+            if (part.origGeomWithoutUserData != null) {
+                size += estimateSize(part.origGeomWithoutUserData);
+            }
+            size += estimateUserDataSize(part.userData);
+            return size;
         } else {
             // Here we use the SizeEstimator from Spark to estimate the size of the geometry. This is very expensive
             // since it involves lots of reflection, unless the user has implemented the KnownSizeEstimation trait.
-            userDataSize = SizeEstimator.estimate(userData);
+            return SizeEstimator.estimate(userData);
         }
-        return geomSize + userDataSize;
     }
 
     /**

@@ -1533,6 +1533,51 @@ class functionTestScala extends TestBaseScala with Matchers with GeometrySample 
 
   }
 
+  it("should pass ST_ExtentBasedSubDivide") {
+    Given("dataframe with 100 huge polygons")
+    val polygonWktDf = sparkSession
+      .read
+      .format("csv")
+      .option("delimiter", "\t")
+      .option("header", "false").load(mixedWktGeometryInputLocation)
+      .selectExpr("ST_GeomFromText(_c0) AS geom", "_c3 as id")
+
+    When("running extent based subdivide")
+    var subDivisionExplode = polygonWktDf.selectExpr("id", "ST_ExtentBasedSubDivideExplode(geom, 0.1, 0.1) as divided")
+    var subDivision = polygonWktDf.selectExpr("id", "ST_ExtentBasedSubDivide(geom, 0.1, 0.1) as divided")
+
+    Then("result should be appropriate")
+    var inputCount = polygonWktDf.count
+    var subdividedCount = subDivisionExplode.count()
+    subDivision.count shouldBe inputCount
+    subdividedCount shouldBe > (inputCount)
+    subDivision.select(explode(col("divided"))).count() shouldBe subdividedCount
+
+    When("running extent based subdivide with algorithms")
+    subDivisionExplode = polygonWktDf.selectExpr("id", "ST_ExtentBasedSubDivideExplode(geom, 0.1, 0.1, 'packing/preserve_segments/box_approx') as divided")
+    subDivision = polygonWktDf.selectExpr("id", "ST_ExtentBasedSubDivide(geom, 0.1, 0.1, 'packing/preserve_segments/box_approx') as divided")
+
+    Then("result should be appropriate")
+    inputCount = polygonWktDf.count
+    subdividedCount = subDivisionExplode.count()
+    subDivision.count shouldBe inputCount
+    subdividedCount shouldBe > (inputCount)
+    subDivision.select(explode(col("divided"))).count() shouldBe subdividedCount
+
+    When("running extent based subdivide with all params")
+    subDivisionExplode = polygonWktDf.selectExpr("id",
+      "ST_ExtentBasedSubDivideExplode(geom, 0.1, 0.1, 1000, 50, 'packing/preserve_segments/box_approx') as divided")
+    subDivision = polygonWktDf.selectExpr("id",
+      "ST_ExtentBasedSubDivide(geom, 0.1, 0.1, 1000, 50, 'packing/preserve_segments/box_approx') as divided")
+
+    Then("result should be appropriate")
+    inputCount = polygonWktDf.count
+    subdividedCount = subDivisionExplode.count()
+    subDivision.count shouldBe inputCount
+    subdividedCount shouldBe > (inputCount)
+    subDivision.select(explode(col("divided"))).count() shouldBe subdividedCount
+  }
+
   private val expectedStartingPoints = List(
     "POINT (-112.506968 45.98186)",
     "POINT (-112.519856 45.983586)",
@@ -2070,6 +2115,10 @@ class functionTestScala extends TestBaseScala with Matchers with GeometrySample 
     functionDf = sparkSession.sql("select ST_SubDivide(null, 0)")
     assert(functionDf.first().get(0) == null)
     functionDf = sparkSession.sql("select ST_SubDivideExplode(null, 0)")
+    assert(functionDf.count() == 0)
+    functionDf = sparkSession.sql("select ST_ExtentBasedSubDivide(null, 1, 1)")
+    assert(functionDf.first().get(0) == null)
+    functionDf = sparkSession.sql("select ST_ExtentBasedSubDivideExplode(null, 1, 1)")
     assert(functionDf.count() == 0)
     functionDf = sparkSession.sql("select ST_MakePolygon(null)")
     assert(functionDf.first().get(0) == null)

@@ -31,6 +31,7 @@ import org.apache.sedona.core.monitoring.Metrics;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner;
 import org.apache.sedona.core.spatialRDD.CircleRDD;
 import org.apache.sedona.core.spatialRDD.SpatialRDD;
+import org.apache.sedona.core.utils.SedonaConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -39,6 +40,7 @@ import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.rdd.RDDExtension;
 import org.apache.spark.sql.execution.metric.SQLMetric;
+import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
@@ -570,15 +572,21 @@ public class JoinQuery
                     LongAccumulator buildRightTasks = Metrics.createMetric(sparkContext, "buildRightTasks");
                     LongAccumulator prepareBuildTasks = Metrics.createMetric(sparkContext, "prepareBuildTasks");
                     LongAccumulator prepareStreamTasks = Metrics.createMetric(sparkContext, "prepareStreamTasks");
+                    DoubleAccumulator partitionMinX = Metrics.createDoubleMetric(sparkContext, "partitionMinX");
+                    DoubleAccumulator partitionMinY = Metrics.createDoubleMetric(sparkContext, "partitionMinY");
+                    DoubleAccumulator partitionMaxX = Metrics.createDoubleMetric(sparkContext, "partitionMaxX");
+                    DoubleAccumulator partitionMaxY = Metrics.createDoubleMetric(sparkContext, "partitionMaxY");
                     AdaptiveIndexLookupJudgement<U, T> judgement =
                             new AdaptiveIndexLookupJudgement<>(
                                     joinParams.spatialPredicate,
                                     leftRDD.getStatistics(),
                                     rightRDD.getStatistics(),
                                     leftRDD.getPartitioner(),
+                                    SedonaConf.fromActiveSession(),
                                     buildCount, streamCount, resultCount, candidateCount, buildTime,
                                     buildLeftTasks, buildRightTasks,
                                     prepareBuildTasks, prepareStreamTasks,
+                                    partitionMinX, partitionMinY, partitionMaxX, partitionMaxY,
                                     joinParams.buildCount, joinParams.streamCount, joinParams.resultCount,
                                     joinParams.candidateCount, joinParams.buildTime, joinParams.buildLeftTasks,
                                     joinParams.buildRightTasks, joinParams.prepareBuildTasks,

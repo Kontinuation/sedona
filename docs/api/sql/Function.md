@@ -1158,6 +1158,132 @@ Output:
 POLYGON ((0 0, 0 3, 1 3, 1 0, 0 0))
 ```
 
+## ST_ExtentBasedSubDivide
+
+Introduction: Return a list of geometries divided based of given extent limit.
+
+Format:
+
+```
+ST_ExtentBasedSubDivide(geom: Geometry, maxWidth: Double, maxHeight: Double)
+```
+
+Subdivided geometries using default subdividing algorithms, subdivided
+geometries should be smaller than specified extent. The default algorithms for subdividing geometries are:
+
+- **algMultiPoint**: `decompose`
+- **algLineString**: `cut_segments`
+- **algPolygon**: `box_approx`
+
+```
+ST_ExtentBasedSubDivide(geom: Geometry, maxWidth: Double, maxHeight: Double, algorithms: String)
+```
+
+Subdivided geometries using specified subdividing algorithms. This is similar
+to the 6-parameter version, the omitted value for `maxVertices` is 1000, and the omitted value for `maxDepths` is 50.
+
+```
+ST_ExtentBasedSubDivide(geom: Geometry, maxWidth: Double, maxHeight: Double, maxVertices: Integer, maxDepths, algorithms: String)
+```
+
+Subdivided geometries using specified subdividing algorithms. `algorithms` is a
+string with 3 components: `<algMultiPoint>/<algLineString>/<algPolygon>`. The possible values for each components are:
+
+**algMultiPoint**: Subdividing algorithm for MultiPoint
+
+- `decompose`: Simply decompose the MultiPoint to multiple Points. The number of subdivided geometries is determined by the number of points in the MultiPoint.
+- `packing`: Use a simple heuristics to pack near by points together as smaller MultiPoints.
+
+**algLineString**: Subdividing algorithm for LineString
+
+- `cut_segments`: Cut the line segment to make sure that each subdivided LineString is no longer than a given threshold.
+- `preserve_segments`: Don’t cut the segments, only split at the nodes of the LineString. The subdivided LineString could be a bit longer than the given threshold.
+
+**algPolygon**: Subdividing algorithm for Polygon
+
+- `box_approx`:  Approximate the polygon with lots of boxes.
+- `overlay`: Using the old JTS overlay implementation to clip polygons. Same as `ST_SubDivide`.
+- `overlay_2`: Using JTS overlay NG to clip polygons.
+- `triangulation`: Using JTS triangulation algorithms to subdivide polygons.
+
+Since: `v1.3.0`
+
+SQL Example
+
+```sql
+SELECT ST_ExtentBasedSubDivide(ST_GeomFromText("POLYGON((35 10, 45 45, 15 40, 10 20, 35 10), (20 30, 35 35, 30 20, 20 30))"), 10, 10)
+```
+
+Output:
+
+```
+[
+  POLYGON ((10 10, 10 18.75, 18.75 18.75, 18.75 10, 10 10)),
+  POLYGON ((18.75 10, 18.75 18.75, 27.5 18.75, 27.5 10, 18.75 10)),
+  POLYGON ((10 18.75, 10 27.5, 18.75 27.5, 18.75 18.75, 10 18.75)),
+  POLYGON ((18.75 18.75, 18.75 27.5, 27.5 27.5, 27.5 18.75, 18.75 18.75)),
+  POLYGON ((27.5 10, 27.5 18.75, 36.25 18.75, 36.25 10, 27.5 10)),
+  POLYGON ((36.25 10, 36.25 18.75, 45 18.75, 45 10, 36.25 10)),
+  POLYGON ((27.5 18.75, 27.5 27.5, 36.25 27.5, 36.25 18.75, 27.5 18.75)),
+  POLYGON ((36.25 18.75, 36.25 27.5, 45 27.5, 45 18.75, 36.25 18.75)),
+  POLYGON ((10 27.5, 10 36.25, 18.75 36.25, 18.75 27.5, 10 27.5)),
+  POLYGON ((18.75 27.5, 18.75 36.25, 27.5 36.25, 27.5 27.5, 18.75 27.5)),
+  POLYGON ((10 36.25, 10 45, 18.75 45, 18.75 36.25, 10 36.25)),
+  POLYGON ((18.75 36.25, 18.75 45, 27.5 45, 27.5 36.25, 18.75 36.25)),
+  POLYGON ((27.5 27.5, 27.5 36.25, 36.25 36.25, 36.25 27.5, 27.5 27.5)),
+  POLYGON ((36.25 27.5, 36.25 36.25, 45 36.25, 45 27.5, 36.25 27.5)),
+  POLYGON ((27.5 36.25, 27.5 45, 36.25 45, 36.25 36.25, 27.5 36.25)),
+  POLYGON ((36.25 36.25, 36.25 45, 45 45, 45 36.25, 36.25 36.25))
+]
+```
+
+## ST_ExtentBasedSubDivideExplode
+
+Introduction: It works the same as ST_ExtentBasedSubDivide but returns new rows with geometries instead of list.
+
+Format:
+
+```
+ST_ExtentBasedSubDivideExplode(geom: Geometry, maxWidth: Double, maxHeight: Double)
+```
+
+```
+ST_ExtentBasedSubDivideExplode(geom: Geometry, maxWidth: Double, maxHeight: Double, algorithms: String)
+```
+
+```
+ST_ExtentBasedSubDivideExplode(geom: Geometry, maxWidth: Double, maxHeight: Double, maxVertices: Integer, maxDepths, algorithms: String)
+```
+
+Since: `v1.3.0`
+
+SQL Example
+
+```sql
+SELECT ST_ExtentBasedSubDivideExplode(ST_GeomFromText("LINESTRING(0 0, 85 85, 100 100, 120 120, 21 21, 10 10, 5 5)"), 30, 30)
+```
+
+Output:
+
+```
++-----------------------------------------------------------------------------------------------------+
+|geom                                                                                                 |
++-----------------------------------------------------------------------------------------------------+
+|LINESTRING (0 0, 21.213203435596427 21.213203435596427)                                              |
+|LINESTRING (21.213203435596427 21.213203435596427, 42.42640687119285 42.42640687119285)              |
+|LINESTRING (42.42640687119285 42.42640687119285, 63.63961030678928 63.63961030678928)                |
+|LINESTRING (63.63961030678928 63.63961030678928, 84.8528137423857 84.8528137423857)                  |
+|LINESTRING (84.8528137423857 84.8528137423857, 85 85, 100 100, 106.06601717798213 106.06601717798213)|
+|LINESTRING (106.06601717798213 106.06601717798213, 120 120, 112.72077938642144 112.72077938642144)   |
+|LINESTRING (112.72077938642144 112.72077938642144, 91.50757595082501 91.50757595082501)              |
+|LINESTRING (91.50757595082501 91.50757595082501, 70.29437251522859 70.29437251522859)                |
+|LINESTRING (70.29437251522859 70.29437251522859, 49.08116907963216 49.08116907963216)                |
+|LINESTRING (49.08116907963216 49.08116907963216, 27.86796564403574 27.86796564403574)                |
+|LINESTRING (27.86796564403574 27.86796564403574, 21 21, 10 10, 6.654762208439314 6.654762208439314)  |
+|LINESTRING (6.654762208439314 6.654762208439314, 5 5)                                                |
++-----------------------------------------------------------------------------------------------------+
+```
+
 ## ST_ExteriorRing
 
 Introduction: Returns a line string representing the exterior ring of the POLYGON geometry. Return NULL if the geometry is not a polygon.

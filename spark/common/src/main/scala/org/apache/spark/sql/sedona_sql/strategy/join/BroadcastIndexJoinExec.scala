@@ -37,7 +37,7 @@ import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
 import org.locationtech.jts.index.SpatialIndex
 
-import scala.collection.mutable
+import java.util
 
 case class BroadcastIndexJoinExec(
   left: SparkPlan,
@@ -323,12 +323,16 @@ object BroadcastIndexJoinExec {
   private class PrepareBuildSideRefiner(predicate: SpatialPredicate) extends Refiner {
     private val evaluator = SpatialPredicateEvaluators.create(predicate)
     private val factory = new PreparedGeometryFactory()
-    private val preparedGeometries = new mutable.HashMap[Geometry, PreparedGeometry]
+    private val preparedGeometries = new util.IdentityHashMap[Geometry, PreparedGeometry]()
     override def refine(buildSide: java.util.List[Geometry], streamSide: Geometry): Iterator[Geometry] =
       buildSide.iterator.asScala.filter { candidate =>
-        val preparedGeom = preparedGeometries.getOrElseUpdate(candidate, {
-          factory.create(candidate)
-        })
+        val preparedGeom = preparedGeometries.get(candidate) match {
+          case null =>
+            val preparedGeom = factory.create(candidate)
+            preparedGeometries.put(candidate, preparedGeom)
+            preparedGeom
+          case g: PreparedGeometry => g
+        }
         evaluator.eval(preparedGeom, streamSide)
       }
   }

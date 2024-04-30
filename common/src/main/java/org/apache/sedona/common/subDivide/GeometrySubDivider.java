@@ -17,13 +17,33 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.sedona.common.simplify.GeometrySimplifier;
 import org.geotools.geometry.jts.JTS;
 import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.util.GeometryCollectionMapper;
+import org.locationtech.jts.operation.overlay.OverlayOp;
+import org.locationtech.jts.operation.overlay.snap.SnapIfNeededOverlayOp;
+import org.locationtech.jts.operation.overlayng.OverlayNGRobust;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 public class GeometrySubDivider {
-    private static GeometryFactory geometryFactory = new GeometryFactory();
+    /**
+     * The JTS overlay algorithm to use.
+     */
+    public enum OverlayAlgorithm {
+        /**
+         * Use the default JTS overlay algorithm. It is tunable by the {@code jts.overlay} java system property.
+         */
+        Default,
+        /**
+         * Use the old JTS overlay algorithm with the Overlay class.
+         */
+        OverlayOld,
+        /**
+         * Use the new JTS overlay algorithm with the OverlayNG class.
+         */
+        OverlayNG
+    }
 
     private static final double FP_TOLERANCE = 1e-12;
 
@@ -40,6 +60,7 @@ public class GeometrySubDivider {
             int dimension,
             int maxVertices,
             int depth,
+            OverlayAlgorithm overlayAlgorithm,
             Geometry[] geometries
     ) {
         if (geom == null) {
@@ -93,6 +114,7 @@ public class GeometrySubDivider {
                                         dimension,
                                         maxVertices,
                                         depth,
+                                        overlayAlgorithm,
                                         geometries
                                 )
                         )
@@ -112,18 +134,23 @@ public class GeometrySubDivider {
                         (geometryBboxAligned.getMinX() + geometryBboxAligned.getMaxX()) / 2;
                 double pivot = PivotFinder.findPivot(geom, splitOrdinate, center, numberOfVertices);
                 SubBoxes subBoxes = getSubBoxes(splitOrdinate, new SubDivideExtent(geometryBboxAligned), pivot, center);
-                Geometry intersectedSimplified = getIntersectionGeometries(subBoxes.getSubBox(), geom);
-                Geometry intersectedIter2Simplified = getIntersectionGeometries(subBoxes.getSubBox2(), geom);
+                Geometry intersectedSimplified = getIntersectionGeometries(subBoxes.getSubBox(), geom, overlayAlgorithm);
+                Geometry intersectedIter2Simplified = getIntersectionGeometries(subBoxes.getSubBox2(), geom, overlayAlgorithm);
 
-                if (intersectedSimplified != null && !intersectedSimplified.isEmpty() && intersectedIter2Simplified != null && !intersectedIter2Simplified.isEmpty()) {
+                if (intersectedSimplified != null && !intersectedSimplified.isEmpty() &&
+                        intersectedIter2Simplified != null && !intersectedIter2Simplified.isEmpty()) {
                     return ArrayUtils.addAll(
-                            subDivideRecursive(intersectedSimplified, dimension, maxVertices, depth + 1, geometries),
-                            subDivideRecursive(intersectedIter2Simplified, dimension, maxVertices, depth + 1, geometries)
+                            subDivideRecursive(intersectedSimplified, dimension, maxVertices, depth + 1,
+                                    overlayAlgorithm, geometries),
+                            subDivideRecursive(intersectedIter2Simplified, dimension, maxVertices, depth + 1,
+                                    overlayAlgorithm, geometries)
                     );
                 } else if (intersectedSimplified != null && !intersectedSimplified.isEmpty()) {
-                    return subDivideRecursive(intersectedSimplified, dimension, maxVertices, depth + 1, geometries);
+                    return subDivideRecursive(intersectedSimplified, dimension, maxVertices, depth + 1,
+                            overlayAlgorithm, geometries);
                 } else if (intersectedIter2Simplified != null && !intersectedIter2Simplified.isEmpty()) {
-                    return subDivideRecursive(intersectedIter2Simplified, dimension, maxVertices, depth + 1, geometries);
+                    return subDivideRecursive(intersectedIter2Simplified, dimension, maxVertices, depth + 1,
+                            overlayAlgorithm, geometries);
                 } else {
                     return geometries;
                 }
@@ -150,23 +177,63 @@ public class GeometrySubDivider {
         }
     }
 
-    private static Geometry getIntersectionGeometries(SubDivideExtent extent, Geometry geom) {
+    private static Geometry getIntersectionGeometries(SubDivideExtent extent, Geometry geom, OverlayAlgorithm overlayAlgorithm) {
         Envelope subBox = new Envelope(
                 extent.getxMin(),
                 extent.getxMax(),
                 extent.getyMin(),
                 extent.getyMax()
         );
-        Geometry intersected = geom.intersection(JTS.toGeometry(subBox));
-        Geometry res = GeometrySimplifier.simplify(intersected, true, 0.0);
-        return res;
+        Geometry subBoxGeom = JTS.toGeometry(subBox);
+        Geometry intersected;
+        switch (overlayAlgorithm) {
+            case OverlayOld:
+            case OverlayNG:
+                intersected = intersection(geom, subBoxGeom, overlayAlgorithm);
+                break;
+            default:
+                intersected = geom.intersection(subBoxGeom);
+                break;
+        }
+        return GeometrySimplifier.simplify(intersected, true, 0.0);
     }
 
-    public static Geometry[] subDivide(Geometry geom, int maxVertices) {
+    /**
+     * This method is mostly taken from {@code GeometryOverlay.intersection} in JTS.
+     * @param a first geometry
+     * @param b second geometry
+     * @param overlayAlgorithm the overlay algorithm to use
+     * @return the intersection of the two geometries
+     */
+    private static Geometry intersection(Geometry a, Geometry b, OverlayAlgorithm overlayAlgorithm) {
+        // special case: if one input is empty ==> empty
+        if (a.isEmpty() || b.isEmpty())
+            return OverlayOp.createEmptyResult(OverlayOp.INTERSECTION, a, b, a.getFactory());
+
+        // compute for GCs
+        if (a.getGeometryType().equals(Geometry.TYPENAME_GEOMETRYCOLLECTION)) {
+            final Geometry g2 = b;
+            return GeometryCollectionMapper.map(
+                    (GeometryCollection) a,
+                    g -> g.intersection(g2));
+        }
+
+        if (overlayAlgorithm == OverlayAlgorithm.OverlayNG) {
+            return OverlayNGRobust.overlay(a, b, OverlayOp.INTERSECTION);
+        } else {
+            return SnapIfNeededOverlayOp.overlayOp(a, b, OverlayOp.INTERSECTION);
+        }
+    }
+
+    public static Geometry[] subDivide(Geometry geom, int maxVertices, OverlayAlgorithm overlayAlgorithm) {
         if (geom == null || maxVertices < minMaxVertices) {
             return new Geometry[0];
         }
-        return subDivideRecursive(geom, geom.getDimension(), maxVertices, 0, new Geometry[0]);
+        return subDivideRecursive(geom, geom.getDimension(), maxVertices, 0, overlayAlgorithm, new Geometry[0]);
+    }
+
+    public static Geometry[] subDivide(Geometry geom, int maxVertices) {
+        return subDivide(geom, maxVertices, OverlayAlgorithm.Default);
     }
 
 }

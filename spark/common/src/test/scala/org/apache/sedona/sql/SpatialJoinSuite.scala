@@ -108,6 +108,18 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           verifyResult(expected, result)
         }
       }
+      it(s"should join two dataframes with $joinCondition, using subdivided join") {
+        withConf(Map(
+          advancedSpatialJoinConfKey -> "true",
+          "sedona.join.subdivideLeft" -> "always",
+          "sedona.join.subdivideRight" -> "always",
+          "sedona.join.subdivideLeftInLocalJoin" -> "always",
+          "sedona.join.subdivideRightInLocalJoin" -> "always")) {
+          val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+          val expected = buildExpectedResult(joinCondition)
+          verifyResult(expected, result)
+        }
+      }
     }
   }
 
@@ -189,7 +201,6 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
   describe("Spatial join optimizer should work with complex join conditions") {
     it("Optimize spatial join with complex join conditions") {
       withOptimizationMode("all") {
-        prepareTempViewsForTestData()
         val df = sparkSession.sql(
           """
             |SELECT df1.id, df2.id FROM df1 JOIN df2 ON
@@ -198,6 +209,47 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         val expectedResult = buildExpectedResult("ST_Intersects(df1.geom, df2.geom)")
           .filter { case (id1, id2) => id1 > id2 && id1 < id2 + 100 }
         verifyResult(expectedResult, df)
+      }
+    }
+  }
+
+  describe("Spatial join should produce results with correct geometry values") {
+    it("Should produce correct geometry values") {
+      val configs = Seq(
+        Map(advancedSpatialJoinConfKey -> "true",
+          "sedona.join.subdivideLeft" -> "never",
+          "sedona.join.subdivideRight" -> "never"),
+        Map(advancedSpatialJoinConfKey -> "true",
+          "sedona.join.subdivideLeft" -> "always",
+          "sedona.join.subdivideRight" -> "always",
+          "sedona.join.subdivideLeft.keepRowData" -> "true",
+          "sedona.join.subdivideRight.keepRowData" -> "true"),
+        Map(advancedSpatialJoinConfKey -> "true",
+          "sedona.join.subdivideLeft" -> "always",
+          "sedona.join.subdivideRight" -> "always",
+          "sedona.join.subdivideLeft.keepRowData" -> "false",
+          "sedona.join.subdivideRight.keepRowData" -> "false"))
+      configs.foreach { conf =>
+        withConf(conf) {
+          val result = sparkSession.sql(
+            "SELECT df1.id, df2.id, df1.geom AS geom1, df2.geom AS geom2 " +
+              "FROM df1 JOIN df2 ON ST_Intersects(df1.geom, df2.geom)")
+          val expected = buildExpectedResult("ST_Intersects(df1.geom, df2.geom)")
+          verifyResult(expected, result)
+          val resultRows = result.collect()
+          val leftRows = sparkSession.sql("SELECT id, geom FROM df1").collect()
+          val rightRows = sparkSession.sql("SELECT id, geom FROM df2").collect()
+          val leftGeomMap = leftRows.map(row => (row.getInt(0), row.getAs[Geometry](1))).toMap
+          val rightGeomMap = rightRows.map(row => (row.getInt(0), row.getAs[Geometry](1))).toMap
+          resultRows.foreach { row =>
+            val id1 = row.getInt(0)
+            val id2 = row.getInt(1)
+            val geom1 = row.getAs[Geometry](2)
+            val geom2 = row.getAs[Geometry](3)
+            assert(geom1.equals(leftGeomMap(id1)))
+            assert(geom2.equals(rightGeomMap(id2)))
+          }
+        }
       }
     }
   }

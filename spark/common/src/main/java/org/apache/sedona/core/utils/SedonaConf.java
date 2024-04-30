@@ -19,11 +19,14 @@
 
 package org.apache.sedona.core.utils;
 
+import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.enums.JoinBuildSide;
 import org.apache.sedona.core.enums.JoinSparitionDominantSide;
+import org.apache.sedona.core.enums.JoinSubdivideMode;
 import org.apache.sedona.core.enums.SpatialJoinOptimizationMode;
+import org.apache.sedona.core.spatialOperator.Subdivide;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitionerBuilder.SpatialPartitionBuildingStrategy;
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector;
 import org.apache.spark.sql.RuntimeConfig;
@@ -74,6 +77,21 @@ public class SedonaConf
     private int maxGuessedPartitionNumber;
     private SpatialPartitionBuildingStrategy spatialPartitionBuildingStrategy;
 
+    // Parameters for enabling auto-subdividing when running spatial joins
+    private JoinSubdivideMode spatialJoinSubdivideLeft;
+    private JoinSubdivideMode spatialJoinSubdivideRight;
+    private Subdivide.SubdivideRDDOptions leftSubdivideRDDOptions;
+    private Subdivide.SubdivideRDDOptions rightSubdivideRDDOptions;
+    private JoinSubdivideMode localJoinSubdivideLeft;
+    private JoinSubdivideMode localJoinSubdivideRight;
+    private SubdivideOptions leftLocalJoinSubdivideOptions;
+    private SubdivideOptions rightLocalJoinSubdivideOptions;
+
+    // Parameters for debugging spatial partitioning
+    private boolean enableMetricsForSpatialPartitioning;
+    private String spatialPartitionerSavePath;
+
+
     public static SedonaConf fromActiveSession() {
         return new SedonaConf(SparkSession.active().conf());
     }
@@ -88,7 +106,8 @@ public class SedonaConf
                 Double.parseDouble(boundaryString[2]), Double.parseDouble(boundaryString[3]));
         this.joinGridType = GridType.getGridType(runtimeConfig.get("sedona.join.gridtype", "kdbtree"));
         this.joinBuildSide = JoinBuildSide.getBuildSide(runtimeConfig.get("sedona.join.indexbuildside", "left"));
-        this.joinSparitionDominantSide = JoinSparitionDominantSide.getJoinSparitionDominantSide(runtimeConfig.get("sedona.join.spatitionside", "left"));
+        this.joinSparitionDominantSide = JoinSparitionDominantSide.getJoinSparitionDominantSide(
+                runtimeConfig.get("sedona.join.spatitionside", "left"));
         this.fallbackPartitionNum = Integer.parseInt(runtimeConfig.get("sedona.join.numpartition", "-1"));
         this.autoBroadcastJoinThreshold = bytesFromString(
                 runtimeConfig.get("sedona.join.autoBroadcastJoinThreshold",
@@ -131,6 +150,49 @@ public class SedonaConf
                 SpatialPartitionBuildingStrategy.valueOf(
                         runtimeConfig.get("sedona.join.spatialPartitionBuildingStrategy", "subsampling")
                                 .toUpperCase(Locale.ROOT));
+
+        // Parameters for enabling auto-subdividing when running spatial joins
+        this.spatialJoinSubdivideLeft = JoinSubdivideMode.getJoinSubdivideMode(
+                runtimeConfig.get("sedona.join.subdivideLeft", "never"));
+        boolean keepRowData = Boolean.parseBoolean(runtimeConfig.get("sedona.join.subdivideLeft.keepRowData", "false"));
+        // Options for pre-spatial-partitioning subdivide
+        SubdivideOptions options = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideLeft");
+        this.leftSubdivideRDDOptions = new Subdivide.SubdivideRDDOptions(options, false, keepRowData);
+        // Options for local join subdivide
+        this.localJoinSubdivideLeft = JoinSubdivideMode.getJoinSubdivideMode(
+                runtimeConfig.get("sedona.join.subdivideLeftInLocalJoin", "never"));
+        this.leftLocalJoinSubdivideOptions = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideLeftInLocalJoin");
+
+        this.spatialJoinSubdivideRight = JoinSubdivideMode.getJoinSubdivideMode(
+                runtimeConfig.get("sedona.join.subdivideRight", "never"));
+        keepRowData = Boolean.parseBoolean(runtimeConfig.get("sedona.join.subdivideRight.keepRowData", "false"));
+        // Options for pre-spatial-partitioning subdivide
+        options = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideRight");
+        this.rightSubdivideRDDOptions = new Subdivide.SubdivideRDDOptions(options, false, keepRowData);
+        // Options for local join subdivide
+        this.localJoinSubdivideRight = JoinSubdivideMode.getJoinSubdivideMode(
+                runtimeConfig.get("sedona.join.subdivideRightInLocalJoin", "never"));
+        this.rightLocalJoinSubdivideOptions = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideRightInLocalJoin");
+
+        // Parameters for debugging
+        this.enableMetricsForSpatialPartitioning = Boolean.parseBoolean(
+                runtimeConfig.get("sedona.join.debug.enableMetricsForSpatialPartitioning", "false"));
+        this.spatialPartitionerSavePath = runtimeConfig.get("sedona.join.debug.spatialPartitionerSavePath", "");
+    }
+
+    private SubdivideOptions readSubdivideOptions(RuntimeConfig runtimeConfig, String prefix) {
+        int maxCoordinates = Integer.parseInt(runtimeConfig.get(prefix + ".maxCoordinates", "1000"));
+        double maxWidth = Double.parseDouble(runtimeConfig.get(prefix + ".maxWidth", "0.1"));
+        double maxHeight = Double.parseDouble(runtimeConfig.get(prefix + ".maxHeight", "0.1"));
+        int maxDepth = Integer.parseInt(runtimeConfig.get(prefix + ".maxDepth", "50"));
+        SubdivideOptions.MultiPointSubDivider multiPointSubDivider = SubdivideOptions.MultiPointSubDivider.valueOf(
+                runtimeConfig.get(prefix + ".multiPointSubDivider", "decompose").toUpperCase(Locale.ROOT));
+        SubdivideOptions.LineStringSubDivider lineStringSubDivider = SubdivideOptions.LineStringSubDivider.valueOf(
+                runtimeConfig.get(prefix + ".lineStringSubDivider", "cut_segments").toUpperCase(Locale.ROOT));
+        SubdivideOptions.PolygonSubDivider polygonSubDivider = SubdivideOptions.PolygonSubDivider.valueOf(
+                runtimeConfig.get(prefix + ".polygonSubDivider", "box_approx").toUpperCase(Locale.ROOT));
+        return new SubdivideOptions(maxCoordinates, maxWidth, maxHeight, maxDepth, multiPointSubDivider,
+                lineStringSubDivider, polygonSubDivider);
     }
 
     public boolean getUseIndex()
@@ -241,5 +303,45 @@ public class SedonaConf
 
     public SpatialPartitionBuildingStrategy getSpatialPartitionBuildingStrategy() {
         return spatialPartitionBuildingStrategy;
+    }
+
+    public JoinSubdivideMode getSpatialJoinSubdivideLeft() {
+        return spatialJoinSubdivideLeft;
+    }
+
+    public JoinSubdivideMode getSpatialJoinSubdivideRight() {
+        return spatialJoinSubdivideRight;
+    }
+
+    public Subdivide.SubdivideRDDOptions getLeftSubdivideRDDOptions() {
+        return leftSubdivideRDDOptions;
+    }
+
+    public Subdivide.SubdivideRDDOptions getRightSubdivideRDDOptions() {
+        return rightSubdivideRDDOptions;
+    }
+
+    public JoinSubdivideMode getLocalJoinSubdivideLeft() {
+        return localJoinSubdivideLeft;
+    }
+
+    public JoinSubdivideMode getLocalJoinSubdivideRight() {
+        return localJoinSubdivideRight;
+    }
+
+    public SubdivideOptions getLeftLocalJoinSubdivideOptions() {
+        return leftLocalJoinSubdivideOptions;
+    }
+
+    public SubdivideOptions getRightLocalJoinSubdivideOptions() {
+        return rightLocalJoinSubdivideOptions;
+    }
+
+    public boolean metricsForSpatialPartitioningEnabled() {
+        return enableMetricsForSpatialPartitioning;
+    }
+
+    public String getSpatialPartitionerSavePath() {
+        return spatialPartitionerSavePath;
     }
 }

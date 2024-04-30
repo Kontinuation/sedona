@@ -19,15 +19,19 @@
 package org.apache.spark.sql.sedona_sql.strategy.join
 
 import org.apache.sedona.core.enums.JoinSparitionDominantSide
-import org.apache.sedona.core.spatialOperator.{JoinQuery, SpatialPredicate}
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
+import org.apache.sedona.core.spatialOperator.{JoinQuery, SpatialPredicate}
+import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, Predicate, UnsafeRow}
-import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.{SQLExecution, SparkPlan}
 import org.locationtech.jts.geom.Geometry
+
+import java.io.PrintWriter
+import java.nio.file.Paths
 
 trait TraitJoinQueryExec extends TraitJoinQueryBase {
   self: SparkPlan =>
@@ -37,6 +41,7 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
   val leftShape: Expression
   val rightShape: Expression
   val spatialPredicate: SpatialPredicate
+  val condition: Expression
   val extraCondition: Option[Expression]
 
   override def output: Seq[Attribute] = left.output ++ right.output
@@ -104,6 +109,10 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
       }
     }
 
+    if (sedonaConf.getSpatialPartitionerSavePath.nonEmpty) {
+      saveSpatialPartitionerToFile(leftShapes.getPartitioner, sedonaConf.getSpatialPartitionerSavePath)
+    }
+
     val joinParams = new JoinParams(sedonaConf.getUseIndex, spatialPredicate, sedonaConf.getIndexType, sedonaConf.getJoinBuildSide)
 
     val matchesRDD: RDD[(Geometry, Geometry)] = (leftShapes.spatialPartitionedRDD, rightShapes.spatialPartitionedRDD) match {
@@ -158,5 +167,24 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
     }
     else numPartition = dominantSidePartNum
     return numPartition
+  }
+
+  protected def saveSpatialPartitionerToFile(partitioner: SpatialPartitioner, savePath: String): Unit = {
+    partitioner match {
+      case null => log.warn("[SedonaSQL] Spatial partitioner is null. Skip saving to file.")
+      case _ =>
+        val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
+        Paths.get(savePath).toFile.mkdirs()
+        val filePath = Paths.get(savePath, s"partitioner-$executionId-${System.currentTimeMillis()}")
+        log.info(s"[SedonaSQL] Saving spatial partitioner to file: $filePath")
+        val writer = new PrintWriter(filePath.toString)
+        try {
+          partitioner.getGrids.forEach { grid =>
+            writer.write(s"${grid.getMinX},${grid.getMinY},${grid.getMaxX},${grid.getMaxY}\n")
+          }
+        } finally {
+          writer.close()
+        }
+    }
   }
 }

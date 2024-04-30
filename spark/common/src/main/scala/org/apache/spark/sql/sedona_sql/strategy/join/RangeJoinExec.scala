@@ -20,7 +20,7 @@ package org.apache.spark.sql.sedona_sql.strategy.join
 
 import org.apache.sedona.core.spatialOperator.SpatialPredicate
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression}
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sedona_sql.execution.SedonaBinaryExecNode
 
@@ -34,14 +34,20 @@ import org.apache.spark.sql.sedona_sql.execution.SedonaBinaryExecNode
   * @param leftShape  expression for the first argument of spatialPredicate
   * @param rightShape expression for the second argument of spatialPredicate
   * @param spatialPredicate spatial predicate as join condition
+  * @param condition full join condition
   * @param extraCondition extra join condition other than spatialPredicate
+  * @param unneededLeftAttributes unneeded left attributes after joining
+  * @param unneededRightAttributes unneeded right attributes after joining
   */
 case class RangeJoinExec(left: SparkPlan,
                          right: SparkPlan,
                          leftShape: Expression,
                          rightShape: Expression,
                          spatialPredicate: SpatialPredicate,
-                         extraCondition: Option[Expression] = None)
+                         condition: Expression,
+                         extraCondition: Option[Expression],
+                         override val unneededLeftAttributes: Seq[Attribute],
+                         override val unneededRightAttributes: Seq[Attribute])
   extends SedonaBinaryExecNode
     with TraitAdvancedJoinQueryExec
     with Logging {

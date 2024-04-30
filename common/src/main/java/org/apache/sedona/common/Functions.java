@@ -17,11 +17,21 @@ import com.google.common.geometry.S2CellId;
 import com.uber.h3core.exceptions.H3Exception;
 
 import com.uber.h3core.util.LatLng;
+import org.apache.commons.collections.IteratorUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.common.geometryObjects.Circle;
 import org.apache.sedona.common.sphere.Spheroid;
+import org.apache.sedona.common.subDivide.ExtentBasedGeometrySubDivider;
 import org.apache.sedona.common.subDivide.GeometrySubDivider;
-import org.apache.sedona.common.utils.*;
+import org.apache.sedona.common.subDivide.SubdivideOptions;
+import org.apache.sedona.common.utils.GeomUtils;
+import org.apache.sedona.common.utils.GeometryForce3DMTransformer;
+import org.apache.sedona.common.utils.GeometryForce4DTransformer;
+import org.apache.sedona.common.utils.GeometryGeoHashEncoder;
+import org.apache.sedona.common.utils.GeometrySplitter;
+import org.apache.sedona.common.utils.H3Utils;
+import org.apache.sedona.common.utils.S2Utils;
 import org.locationtech.jts.algorithm.MinimumBoundingCircle;
 import org.locationtech.jts.algorithm.Orientation;
 import org.locationtech.jts.algorithm.hull.ConcaveHull;
@@ -1318,6 +1328,44 @@ public class Functions {
 
     public static Geometry[] subDivide(Geometry geometry, int maxVertices) {
         return GeometrySubDivider.subDivide(geometry, maxVertices);
+    }
+
+    public static Geometry[] extentBasedSubDivide(Geometry geometry, double maxWidth, double maxHeight) {
+        return extentBasedSubDivide(geometry, maxWidth, maxHeight, "//");
+    }
+
+    public static Geometry[] extentBasedSubDivide(Geometry geometry, double maxWidth, double maxHeight, String algorithms) {
+        return extentBasedSubDivide(geometry, maxWidth, maxHeight, 1000, 50, algorithms);
+    }
+
+    public static Geometry[] extentBasedSubDivide(Geometry geometry, double maxWidth, double maxHeight, int maxCoordinates, int maxDepth, String algorithms) {
+        String[] algorithmsArray = StringUtils.splitByWholeSeparatorPreserveAllTokens(algorithms, "/");
+        if (algorithmsArray.length != 3) {
+            throw new IllegalArgumentException("algorithms is not in the correct format (should be <algMultiPoint>/<algLineString>/<algPolygon>)");
+        }
+        SubdivideOptions.MultiPointSubDivider algMultiPoint;
+        if (algorithmsArray[0].isEmpty()) {
+            algMultiPoint = SubdivideOptions.MultiPointSubDivider.DECOMPOSE;
+        } else {
+            algMultiPoint = SubdivideOptions.MultiPointSubDivider.valueOf(algorithmsArray[0].toUpperCase(Locale.ROOT));
+        }
+        SubdivideOptions.LineStringSubDivider algLineString;
+        if (algorithmsArray[1].isEmpty()) {
+            algLineString = SubdivideOptions.LineStringSubDivider.CUT_SEGMENTS;
+        } else {
+            algLineString = SubdivideOptions.LineStringSubDivider.valueOf(algorithmsArray[1].toUpperCase(Locale.ROOT));
+        }
+        SubdivideOptions.PolygonSubDivider algPolygon;
+        if (algorithmsArray[2].isEmpty()) {
+            algPolygon = SubdivideOptions.PolygonSubDivider.BOX_APPROX;
+        } else {
+            algPolygon = SubdivideOptions.PolygonSubDivider.valueOf(algorithmsArray[2].toUpperCase(Locale.ROOT));
+        }
+        SubdivideOptions options = new SubdivideOptions(maxCoordinates, maxWidth, maxHeight, maxDepth,
+                algMultiPoint, algLineString, algPolygon);
+        ExtentBasedGeometrySubDivider subDivider = new ExtentBasedGeometrySubDivider(options);
+        Iterator<Geometry> subdivided = subDivider.subdivide(geometry);
+        return (Geometry[]) IteratorUtils.toArray(subdivided, Geometry.class);
     }
 
     public static Geometry snap(Geometry input, Geometry reference, double tolerance) {

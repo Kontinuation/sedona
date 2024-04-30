@@ -22,34 +22,74 @@ import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.sedona.sql.utils.{GeometrySerializer, RasterSerializer}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnsafeRow}
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.projectUnsafeRow
 import org.locationtech.jts.geom.Geometry
 
 trait TraitJoinQueryBase {
   self: SparkPlan =>
 
+  def isRasterJoin(leftShapeExpr: Expression, rightShapeExpr: Expression): Boolean =
+    leftShapeExpr.dataType.acceptsType(RasterUDT) || rightShapeExpr.dataType.acceptsType(RasterUDT)
+
   def toSpatialRddPair(leftRdd: RDD[UnsafeRow],
                        leftShapeExpr: Expression,
                        rightRdd: RDD[UnsafeRow],
                        rightShapeExpr: Expression): (SpatialRDD[Geometry], SpatialRDD[Geometry]) = {
-    if (leftShapeExpr.dataType.acceptsType(RasterUDT) || rightShapeExpr.dataType.acceptsType(RasterUDT)) {
+    if (isRasterJoin(leftShapeExpr, rightShapeExpr)) {
       (toWGS84EnvelopeRDD(leftRdd, leftShapeExpr),
         toWGS84EnvelopeRDD(rightRdd, rightShapeExpr))
     } else {
-      (toSpatialRDD(leftRdd, leftShapeExpr), toSpatialRDD(rightRdd, rightShapeExpr))
+      (leftToSpatialRDD(leftRdd, leftShapeExpr), rightToSpatialRDD(rightRdd, rightShapeExpr))
     }
   }
 
-  def toSpatialRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression): SpatialRDD[Geometry] = {
+  def toSpatialRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression,
+    projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
     val spatialRdd = new SpatialRDD[Geometry]
     spatialRdd.setRawSpatialRDD(
       rdd
-        .map { x =>
-          val shape = GeometrySerializer.deserialize(shapeExpression.eval(x).asInstanceOf[Array[Byte]])
-          shape.setUserData(x.copy)
-          shape
+        .mapPartitions { iter =>
+          val toUserData = projectUnsafeRow(projection)
+          iter.map { row =>
+            val shape = GeometrySerializer.deserialize(shapeExpression.eval(row).asInstanceOf[Array[Byte]])
+            val userData = toUserData(row)
+            shape.setUserData(userData)
+            shape
+          }
+        }
+        .toJavaRDD())
+    spatialRdd
+  }
+
+  def leftToSpatialRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression,
+    projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
+    toSpatialRDD(rdd, shapeExpression, projection)
+  }
+
+  def rightToSpatialRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression,
+    projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
+    toSpatialRDD(rdd, shapeExpression, projection)
+  }
+
+  def toExpandedEnvelopeRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression, boundRadius: Expression,
+    isGeography: Boolean, projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
+    val spatialRdd = new SpatialRDD[Geometry]
+    spatialRdd.setRawSpatialRDD(
+      rdd
+        .mapPartitions { iter =>
+          val toUserData = projectUnsafeRow(projection)
+          iter.map { row =>
+            val shape = GeometrySerializer.deserialize(shapeExpression.eval(row).asInstanceOf[Array[Byte]])
+            val distance = boundRadius.eval(row).asInstanceOf[Double]
+            val expandedEnvelope = JoinedGeometry.geometryToExpandedEnvelope(shape, distance, isGeography)
+            val userData = toUserData(row)
+            expandedEnvelope.setUserData(userData)
+            expandedEnvelope
+          }
         }
         .toJavaRDD())
     spatialRdd
@@ -79,19 +119,25 @@ trait TraitJoinQueryBase {
     spatialRdd
   }
 
-  def toExpandedEnvelopeRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression, boundRadius: Expression, isGeography: Boolean): SpatialRDD[Geometry] = {
-    val spatialRdd = new SpatialRDD[Geometry]
-    spatialRdd.setRawSpatialRDD(
-      rdd
-        .map { x =>
-          val shape = GeometrySerializer.deserialize(shapeExpression.eval(x).asInstanceOf[Array[Byte]])
-          val distance = boundRadius.eval(x).asInstanceOf[Double]
-          val expandedEnvelope = JoinedGeometry.geometryToExpandedEnvelope(shape, distance, isGeography)
-          expandedEnvelope.setUserData(x.copy)
-          expandedEnvelope
+  def projectSpatialRDD(spatialRDD: SpatialRDD[Geometry],
+    projection: Option[Seq[Expression]]): SpatialRDD[Geometry] = {
+    projection match {
+      case Some(_) =>
+        val rawSpatialRDD = spatialRDD.rawSpatialRDD.rdd.mapPartitions { shapes =>
+          val toUserData = projectUnsafeRow(projection)
+          shapes.map { shape =>
+            val rowData = shape.getUserData.asInstanceOf[UnsafeRow]
+            val newUserData = toUserData(rowData)
+            shape.setUserData(newUserData)
+            shape
+          }
         }
-        .toJavaRDD())
-    spatialRdd
+        val newSpatialRDD = new SpatialRDD[Geometry]
+        newSpatialRDD.setRawSpatialRDD(rawSpatialRDD)
+        newSpatialRDD.setStatistics(spatialRDD.getStatistics)
+        newSpatialRDD
+      case None => spatialRDD
+    }
   }
 
   def doSpatialPartitioning(dominantShapes: SpatialRDD[Geometry], followerShapes: SpatialRDD[Geometry],
@@ -99,6 +145,17 @@ trait TraitJoinQueryBase {
     if (dominantShapes.approximateTotalCount > 0) {
       dominantShapes.spatialPartitioning(sedonaConf.getJoinGridType, numPartitions)
       followerShapes.spatialPartitioning(dominantShapes.getPartitioner)
+    }
+  }
+}
+
+object TraitJoinQueryBase {
+  def projectUnsafeRow(projection: Option[Seq[Expression]]): UnsafeRow => UnsafeRow = {
+    projection match {
+      case Some(attrs) =>
+        val projection = GenerateUnsafeProjection.generate(attrs)
+        (row: UnsafeRow) => projection(row).copy
+      case None => (row: UnsafeRow) => row.copy
     }
   }
 }

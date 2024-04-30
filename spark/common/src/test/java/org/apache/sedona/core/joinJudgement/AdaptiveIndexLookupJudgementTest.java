@@ -20,6 +20,7 @@ package org.apache.sedona.core.joinJudgement;
 
 import org.apache.commons.collections.iterators.SingletonIterator;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.joinJudgement.AdaptiveIndexLookupJudgement.ExecutionMode;
 import org.apache.sedona.core.joinJudgement.AdaptiveIndexLookupJudgement.IndexBuildSide;
@@ -89,6 +90,24 @@ public class AdaptiveIndexLookupJudgementTest {
         testExecutionMode(ExecutionMode.PREPARE_NONE);
     }
 
+    @Test
+    public void testSubdividing() {
+        SubdivideOptions subdivideOptions = new SubdivideOptions(0.2, 0.2);
+        ExecutionMode[] executionModes = {
+                ExecutionMode.PREPARE_BUILD,
+                ExecutionMode.PREPARE_STREAM,
+                ExecutionMode.PREPARE_NONE
+        };
+        for (ExecutionMode executionMode : executionModes) {
+            testExecutionMode(executionMode, SpatialPredicate.INTERSECTS, IndexType.RTREE, IndexBuildSide.LEFT,
+                    subdivideOptions, null);
+            testExecutionMode(executionMode, SpatialPredicate.INTERSECTS, IndexType.RTREE, IndexBuildSide.LEFT,
+                    null, subdivideOptions);
+            testExecutionMode(executionMode, SpatialPredicate.INTERSECTS, IndexType.RTREE, IndexBuildSide.LEFT,
+                    subdivideOptions, subdivideOptions);
+        }
+    }
+
     private void testExecutionMode(ExecutionMode executionMode) {
         SpatialPredicate[] predicates = new SpatialPredicate[]{
                 SpatialPredicate.CONTAINS,
@@ -107,16 +126,17 @@ public class AdaptiveIndexLookupJudgementTest {
         for (SpatialPredicate predicate : predicates) {
             for (IndexType indexType : indexTypes) {
                 for (IndexBuildSide indexBuildSide : indexBuildSides) {
-                    testExecutionMode(executionMode, predicate, indexType, indexBuildSide);
+                    testExecutionMode(executionMode, predicate, indexType, indexBuildSide, null, null);
                 }
             }
         }
     }
 
     private void testExecutionMode(ExecutionMode executionMode, SpatialPredicate predicate, IndexType indexType,
-            IndexBuildSide indexBuildSide) {
+                                   IndexBuildSide indexBuildSide, SubdivideOptions subdivideBuildOptions,
+                                   SubdivideOptions subdivideStreamOptions) {
         LocalSpatialJoinExecParams param = new LocalSpatialJoinExecParams(
-                indexType, indexBuildSide, executionMode, null);
+                indexType, indexBuildSide, executionMode, null, subdivideBuildOptions, subdivideStreamOptions);
         AdaptiveIndexLookupJudgement<Geometry, Geometry> judgement = new AdaptiveIndexLookupJudgement<>(
                 predicate, Collections.singletonList(param));
         Iterator<Pair<Geometry, Geometry>> resultIterator =
@@ -134,8 +154,15 @@ public class AdaptiveIndexLookupJudgementTest {
             double minY = random.nextDouble() * 10;
             double width = random.nextDouble();
             double height = random.nextDouble();
-            Envelope env = new Envelope(minX, minX + width, minY, minY + height);
-            geoms.add(factory.toGeometry(env));
+            if (random.nextBoolean()) {
+                Envelope env = new Envelope(minX, minX + width, minY, minY + height);
+                geoms.add(factory.toGeometry(env));
+            } else {
+                double centerX = minX + width / 2;
+                double centerY = minY + height / 2;
+                double radius = 0.5 * (width + height);
+                geoms.add(factory.createPoint(new Coordinate(centerX, centerY)).buffer(radius, 2));
+            }
         }
         return geoms;
     }

@@ -83,6 +83,17 @@ class SphereDistanceJoinSuite extends TestBaseScala with TableDrivenPropertyChec
           verifyResult(expected, result)
         }
       }
+      it(s"sphere distance on $joinCondition, using subdivided join") {
+        withConf(Map(
+          advancedSpatialJoinConfKey -> "true",
+          "sedona.join.subdivideLeft" -> "always",
+          "sedona.join.subdivideRight" -> "always",
+          "sedona.join.subdivideLeftInLocalJoin" -> "always",
+          "sedona.join.subdivideRightInLocalJoin" -> "always")) {
+          val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+          verifyResult(expected, result)
+        }
+      }
     }
   }
 

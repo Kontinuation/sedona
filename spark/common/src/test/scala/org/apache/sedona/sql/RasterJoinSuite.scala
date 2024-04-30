@@ -206,6 +206,16 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           verifyResult(expected, result)
         }
       }
+      it(s"$joinClause ON $joinCondition, using subdivided join") {
+        withConf(Map(advancedSpatialJoinConfKey -> "true",
+          "sedona.join.subdivideLeft" -> "always",
+          "sedona.join.subdivideRight" -> "always",
+          "sedona.join.subdivideLeftInLocalJoin" -> "always",
+          "sedona.join.subdivideRightInLocalJoin" -> "always")) {
+          val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM $joinClause ON $joinCondition")
+          verifyResult(expected, result)
+        }
+      }
     }
   }
 
@@ -237,6 +247,16 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     }
     it("raster-raster join, using advanced spatial join") {
       withConf(Map(advancedSpatialJoinConfKey -> "true")) {
+        val result = sparkSession.sql("SELECT df1.id, df3.id FROM df1 JOIN df3 ON RS_Intersects(df1.rast, df3.rast)")
+        verifyResult(expected, result)
+      }
+    }
+    it("raster-raster join, using subdivided join") {
+      withConf(Map(advancedSpatialJoinConfKey -> "true",
+        "sedona.join.subdivideLeft" -> "always",
+        "sedona.join.subdivideRight" -> "always",
+        "sedona.join.subdivideLeftInLocalJoin" -> "always",
+        "sedona.join.subdivideRightInLocalJoin" -> "always")) {
         val result = sparkSession.sql("SELECT df1.id, df3.id FROM df1 JOIN df3 ON RS_Intersects(df1.rast, df3.rast)")
         verifyResult(expected, result)
       }
