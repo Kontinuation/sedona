@@ -65,6 +65,8 @@ test_configurations = [
     (stc.ST_MPolyFromText, ("mpoly", 4326), "constructor", "" , "MULTIPOLYGON (((0 0, 20 0, 20 20, 0 20, 0 0), (5 5, 5 7, 7 7, 7 5, 5 5)))"),
     (stc.ST_MLineFromText, ("mline", ), "constructor", "" , "MULTILINESTRING ((1 2, 3 4), (4 5, 6 7))"),
     (stc.ST_MLineFromText, ("mline", 4326), "constructor", "" , "MULTILINESTRING ((1 2, 3 4), (4 5, 6 7))"),
+    (stc.ST_MPointFromText, ("mpoint", ), "constructor", "" , "MULTIPOINT (10 10, 20 20, 30 30)"),
+    (stc.ST_MPointFromText, ("mpoint", 4326), "constructor", "" , "MULTIPOINT (10 10, 20 20, 30 30)"),
     (stc.ST_PointFromText, ("single_point", lambda: f.lit(',')), "constructor", "", "POINT (0 1)"),
     (stc.ST_PointFromWKB, ("wkbPoint",), "constructor", "", "POINT (10 15)"),
     (stc.ST_MakePoint, ("x", "y", "z"), "constructor", "", "POINT Z (0 1 2)"),
@@ -269,6 +271,7 @@ wrong_type_configurations = [
     (stc.ST_PointFromText, (None, "")),
     (stc.ST_PointFromText, ("", None)),
     (stc.ST_PointFromWKB, (None,)),
+    (stc.ST_MPointFromText, (None,)),
     (stc.ST_PolygonFromEnvelope, (None, "", "", "")),
     (stc.ST_PolygonFromEnvelope, ("", None, "", "")),
     (stc.ST_PolygonFromEnvelope, ("", "", None, "")),
@@ -455,6 +458,7 @@ class TestDataFrameAPI(TestBase):
         wkb = '0102000000020000000000000084d600c00000000080b5d6bf00000060e1eff7bf00000080075de5bf'
         mpoly = 'MULTIPOLYGON(((0 0 ,20 0 ,20 20 ,0 20 ,0 0 ),(5 5 ,5 7 ,7 7 ,7 5 ,5 5)))'
         mline = 'MULTILINESTRING((1 2, 3 4), (4 5, 6 7))'
+        mpoint = 'MULTIPOINT ((10 10), (20 20), (30 30))'
         geojson = "{ \"type\": \"Feature\", \"properties\": { \"prop\": \"01\" }, \"geometry\": { \"type\": \"Point\", \"coordinates\": [ 0.0, 1.0 ] }},"
         gml_string = "<gml:LineString srsName=\"EPSG:4269\"><gml:coordinates>-71.16,42.25 -71.17,42.25 -71.18,42.25</gml:coordinates></gml:LineString>"
         kml_string = "<LineString><coordinates>-71.16,42.26 -71.17,42.26</coordinates></LineString>"
@@ -472,6 +476,7 @@ class TestDataFrameAPI(TestBase):
                 f"X'{wkb}' AS wkb",
                 f"'{mpoly}' AS mpoly",
                 f"'{mline}' AS mline",
+                f"'{mpoint}' AS mpoint",
                 f"'{geojson}' AS geojson",
                 "'s00twy01mt' AS geohash",
                 f"'{gml_string}' AS gml",
