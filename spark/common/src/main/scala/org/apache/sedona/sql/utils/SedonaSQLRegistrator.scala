@@ -19,6 +19,7 @@
 package org.apache.sedona.sql.utils
 
 import org.apache.sedona.spark.SedonaContext
+import org.apache.sedona.sql.RasterRegistrator
 import org.apache.sedona.sql.UDF.UdfRegistrator
 import org.apache.spark.sql.monitoring.ListenerRegistrator
 import org.apache.spark.sql.{SQLContext, SparkSession}
@@ -45,5 +46,6 @@ object SedonaSQLRegistrator {
   def dropAll(sparkSession: SparkSession): Unit = {
     UdfRegistrator.dropAll(sparkSession)
     ListenerRegistrator.unregisterAll(sparkSession)
+    RasterRegistrator.dropAll(sparkSession)
   }
 }
