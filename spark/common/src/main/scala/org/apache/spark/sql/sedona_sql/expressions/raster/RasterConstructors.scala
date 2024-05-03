@@ -26,6 +26,8 @@ import org.apache.spark.sql.catalyst.expressions.{CreateArray, ExpectsInputTypes
 import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
 import org.apache.spark.sql.sedona_sql.expressions.InferrableFunctionConverter._
+import org.apache.spark.sql.sedona_sql.expressions.InferrableRasterTypes._
+import org.apache.spark.sql.sedona_sql.expressions.InferredExpression
 import org.apache.spark.sql.sedona_sql.expressions.raster.implicits.{RasterEnhancer, RasterInputExpressionEnhancer}
 import org.apache.spark.sql.sedona_sql.expressions.{InferredExpression, SerdeAware}
 import org.apache.spark.sql.types._

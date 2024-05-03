@@ -33,7 +33,7 @@ trait TraitJoinQueryBase {
   self: SparkPlan =>
 
   def isRasterJoin(leftShapeExpr: Expression, rightShapeExpr: Expression): Boolean =
-    leftShapeExpr.dataType.acceptsType(RasterUDT) || rightShapeExpr.dataType.acceptsType(RasterUDT)
+    leftShapeExpr.dataType.isInstanceOf[RasterUDT] || rightShapeExpr.dataType.isInstanceOf[RasterUDT]
 
   def toSpatialRddPair(leftRdd: RDD[UnsafeRow],
                        leftShapeExpr: Expression,
@@ -100,7 +100,7 @@ trait TraitJoinQueryBase {
     // transformation for both sides. We use expanded WGS84 envelope as the joined geometries and perform a
     // coarse-grained spatial join.
     val spatialRdd = new SpatialRDD[Geometry]
-    val wgs84EnvelopeRdd = if (shapeExpression.dataType.acceptsType(RasterUDT)) {
+    val wgs84EnvelopeRdd = if (shapeExpression.dataType.isInstanceOf[RasterUDT]) {
       rdd.map { row =>
         val raster = RasterSerializer.deserialize(shapeExpression.eval(row).asInstanceOf[Array[Byte]])
         val shape = JoinedGeometryRaster.rasterToWGS84Envelope(raster)

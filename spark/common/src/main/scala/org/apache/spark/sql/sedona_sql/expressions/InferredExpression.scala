@@ -23,19 +23,16 @@ import org.apache.spark.sql.catalyst.expressions.{Expression, ImplicitCastInputT
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
 import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.sedona_sql.UDT.{GeometryUDT, RasterUDT}
-import org.apache.spark.sql.types.{AbstractDataType, ArrayType, BinaryType, BooleanType, DataType, DataTypes, DoubleType, IntegerType, LongType, StringType}
+import org.apache.spark.sql.types.{AbstractDataType, BinaryType, BooleanType, DataType, DataTypes, DoubleType, IntegerType, LongType, StringType}
 import org.apache.spark.unsafe.types.UTF8String
 import org.locationtech.jts.geom.Geometry
 import org.apache.spark.sql.sedona_sql.expressions.implicits._
-import org.apache.spark.sql.sedona_sql.expressions.raster.implicits._
-import org.geotools.coverage.grid.GridCoverage2D
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.convert.ImplicitConversions.`collection AsScalaIterable`
 import scala.reflect.runtime.universe.TypeTag
 import scala.reflect.runtime.universe.Type
 import scala.reflect.runtime.universe.typeOf
-import scala.util.Try
 
 /**
  * This is the base class for wrapping Java/Scala functions as a catalyst expression in Spark SQL.
@@ -77,18 +74,18 @@ abstract class InferredExpression(fSeq: InferrableFunction *)
   // Please note that if there are multiple cores per spark executor, the expression object will be
   // copied to each core. Therefore, each core will have its own inputRasters ArrayBuffer. There is
   // no need to worry about contention and thread safety here.
-  private val inputRasters: ArrayBuffer[GridCoverage2D] = ArrayBuffer.empty[GridCoverage2D]
+  private val inputRasters: ArrayBuffer[AnyRef] = ArrayBuffer.empty[AnyRef]
 
   private def buildExtractors(expressions: Seq[Expression]): Array[InternalRow => Any] = {
     f.argExtractorBuilders.zipAll(expressions, null, null).flatMap {
       case (null, _) => None
       case (builder, expr) =>
         val extractor = builder(expr)
-        if (expr.dataType.acceptsType(RasterUDT)) {
+        if (expr.dataType.isInstanceOf[RasterUDT]) {
           // Save input raster arguments into inputRasters for disposal after evaluation. The disposal
           // will be done in the evaluator. Please see buildEvaluator for details.
           Some((input: InternalRow) => {
-            val raster = extractor(input).asInstanceOf[GridCoverage2D]
+            val raster = extractor(input).asInstanceOf[AnyRef]
             if (raster != null) {
               inputRasters += raster
             }
@@ -102,10 +99,10 @@ abstract class InferredExpression(fSeq: InferrableFunction *)
 
   private def buildEvaluator(): InternalRow => Any = {
     val evaluator = f.evaluatorBuilder(argExtractors)
-    if (inputTypes.exists(_.acceptsType(RasterUDT))) {
+    if (inputTypes.exists(_.isInstanceOf[RasterUDT])) {
       // Need to dispose input raster arguments after evaluation. Input raster arguments will be saved into
       // inputRasters during argument extraction. Please see buildExtractors for details.
-      if (dataType.sameType(RasterUDT) || dataType.sameType(ArrayType(RasterUDT))) {
+      if (dataType.isInstanceOf[RasterUDT] || dataType.isInstanceOf[RasterUDT]) {
         // If the return type of the expression is a raster, we need to check if the return raster is the same
         // as any of the input rasters, and only dispose the input rasters that are not the same as the returned
         // raster.
@@ -116,18 +113,7 @@ abstract class InferredExpression(fSeq: InferrableFunction *)
             result = evaluator(input)
             result
           } finally {
-            result match {
-              case result: GridCoverage2D =>
-                inputRasters.foreach { gridCoverage2D =>
-                  if (gridCoverage2D ne result) Try(gridCoverage2D.dispose(true))
-                }
-              case results: Array[GridCoverage2D] =>
-                inputRasters.foreach { gridCoverage2D =>
-                  if (!results.exists(_ eq gridCoverage2D)) Try(gridCoverage2D.dispose(true))
-                }
-              case _ =>
-                inputRasters.foreach(gridCoverage2D => Try(gridCoverage2D.dispose(true)))
-            }
+            InferredRasterExpression.disposeInputRasters(inputRasters.toArray, result)
             inputRasters.clear()
           }
         }
@@ -138,7 +124,7 @@ abstract class InferredExpression(fSeq: InferrableFunction *)
           try {
             evaluator(input)
           } finally {
-            inputRasters.foreach(gridCoverage2D => Try(gridCoverage2D.dispose(true)))
+            InferredRasterExpression.disposeInputRasters(inputRasters.toArray)
             inputRasters.clear()
           }
         }
@@ -158,14 +144,10 @@ abstract class InferredExpression(fSeq: InferrableFunction *)
 // This is a compile time type shield for the types we are able to infer. Anything
 // other than these types will cause a compilation error. This is the Scala
 // 2 way of making a union type.
-sealed class InferrableType[T: TypeTag]
+class InferrableType[T: TypeTag]
 object InferrableType {
   implicit val geometryInstance: InferrableType[Geometry] =
     new InferrableType[Geometry] {}
-  implicit val gridCoverage2DInstance: InferrableType[GridCoverage2D] =
-    new InferrableType[GridCoverage2D] {}
-  implicit val gridCoverage2DArrayInstance: InferrableType[Array[GridCoverage2D]] =
-    new InferrableType[Array[GridCoverage2D]] {}
   implicit val geometryArrayInstance: InferrableType[Array[Geometry]] =
     new InferrableType[Array[Geometry]] {}
   implicit val javaDoubleInstance: InferrableType[java.lang.Double] =
@@ -210,8 +192,8 @@ object InferredTypes {
       expr => input => expr.toGeometry(input)
     } else if (t =:= typeOf[Array[Geometry]]) {
       expr => input => expr.toGeometryArray(input)
-    } else if (t =:= typeOf[GridCoverage2D]) {
-      expr => input => expr.toRaster(input)
+    } else if (InferredRasterExpression.isRasterType(t)) {
+      InferredRasterExpression.rasterExtractor
     } else if (t =:= typeOf[Array[Double]]) {
       expr => input => expr.eval(input).asInstanceOf[ArrayData].toDoubleArray()
     } else if (t =:= typeOf[String]) {
@@ -240,17 +222,8 @@ object InferredTypes {
         } else {
           null
         }
-    } else if (t =:= typeOf[GridCoverage2D]) {
-      output => {
-        if (output != null) {
-          val raster = output.asInstanceOf[GridCoverage2D]
-          val serialized = raster.serialize
-          raster.dispose(true)
-          serialized
-        } else {
-          null
-        }
-      }
+    } else if (InferredRasterExpression.isRasterType(t)) {
+      InferredRasterExpression.rasterSerializer
     } else if (t =:= typeOf[String]) {
       output =>
         if (output != null) {
@@ -281,19 +254,8 @@ object InferredTypes {
         } else {
           null
         }
-    } else if (t =:= typeOf[Array[GridCoverage2D]]) {
-      output =>
-        if (output != null) {
-          val rasters = output.asInstanceOf[Array[GridCoverage2D]]
-          val serialized = rasters.map { raster =>
-            val serialized = raster.serialize
-            raster.dispose(true)
-            serialized
-          }
-          ArrayData.toArrayData(serialized)
-        } else {
-          null
-        }
+    } else if (InferredRasterExpression.isRasterArrayType(t)) {
+      InferredRasterExpression.rasterArraySerializer
     } else if (t =:= typeOf[Option[Boolean]]) {
       output =>
         if (output != null) {
@@ -311,10 +273,10 @@ object InferredTypes {
       GeometryUDT
     } else if (t =:= typeOf[Array[Geometry]] || t =:= typeOf[java.util.List[Geometry]]) {
       DataTypes.createArrayType(GeometryUDT)
-    } else if (t =:= typeOf[GridCoverage2D]) {
-      RasterUDT
-    } else if (t =:= typeOf[Array[GridCoverage2D]]) {
-      DataTypes.createArrayType(RasterUDT)
+    } else if (InferredRasterExpression.isRasterType(t)) {
+      InferredRasterExpression.rasterUDT
+    } else if (InferredRasterExpression.isRasterArrayType(t)) {
+      InferredRasterExpression.rasterUDTArray
     } else if (t =:= typeOf[java.lang.Double]) {
       DoubleType
     } else if (t =:= typeOf[java.lang.Integer]) {
