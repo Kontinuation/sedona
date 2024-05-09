@@ -78,17 +78,17 @@ object SedonaContext {
     try {
       val pythonRunnerInputs = ListBuffer.empty[String]
       // This is the path to the Python entrance. It should contain the main() method. This is a mandatory configuration.
-      val pythonEntrancePath = sparkSession.conf.get("sedonaai.entrance")
+      val pythonEntrancePath = sparkSession.conf.get("spark.sedonaai.entrance")
       pythonRunnerInputs += pythonEntrancePath
       // This is the path to the Python files. This is an optional configuration.
       // If no dependencies are provided, this will use the Python entrance path.
-      var pythonFilesPath = sparkSession.conf.get("sedonaai.files", "")
+      var pythonFilesPath = sparkSession.conf.get("spark.sedonaai.files", "")
       if (pythonFilesPath == "") {
         pythonFilesPath = pythonEntrancePath
       }
       pythonRunnerInputs += pythonFilesPath
       // This is a list of comma separated arguments to be passed to the Python entrance. This is an optional configuration.
-      val pythonFilesArgs = sparkSession.conf.get("sedonaai.args", "")
+      val pythonFilesArgs = sparkSession.conf.get("spark.sedonaai.args", "")
       if (pythonFilesArgs != "") {
         pythonFilesArgs.split(",").foreach(arg => pythonRunnerInputs += arg)
       }
