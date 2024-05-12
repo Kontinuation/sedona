@@ -15,7 +15,7 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from abc import ABC, abstractmethod
 from xml.etree.ElementTree import Element, SubElement, tostring
 
@@ -25,33 +25,48 @@ import rasterio.env                   # type: ignore
 from rasterio.transform import Affine # type: ignore
 from rasterio.io import MemoryFile    # type: ignore
 from rasterio.io import DatasetReader # type: ignore
-
-try:
-    # for rasterio >= 1.3.0
-    from rasterio._path import _parse_path as parse_path # type: ignore
-except:
-    # for rasterio >= 1.2.0
-    from rasterio.path import parse_path # type: ignore
+from rasterio.windows import Window   # type: ignore
 
 from .awt_raster import AWTRaster
 from .data_buffer import DataBuffer
 from .meta import AffineTransform, PixelAnchor
 from .meta import SampleDimension
 from .meta import OutDbMeta
+from .gdal_conf import get_rasterio_aws_session
 
 
 def _rasterio_open(fp, driver=None):
-    """A variant of rasterio.open. This function skip setting up a new GDAL env
-    when there is already an environment. This saves us lots of overhead
-    introduced by GDAL env initialization.
-
-    """
-    if rasterio.env.hasenv():
-        # There is already an env, so we can get rid of the overhead of
-        # GDAL env initialization in rasterio.open().
-        return DatasetReader(parse_path(fp), driver=driver)
+    session = get_rasterio_aws_session(fp)
+    if session:
+        aws_no_sign_request = 'YES' if session.unsigned else 'NO'
+        with rasterio.Env(session=session, AWS_NO_SIGN_REQUEST=aws_no_sign_request):
+            return rasterio.open(fp, mode="r", driver=driver)
     else:
         return rasterio.open(fp, mode="r", driver=driver)
+
+
+def _rasterio_open_memfile(path, memfile: MemoryFile, driver=None, band_indices=None):
+    session = get_rasterio_aws_session(path)
+    if session:
+        aws_no_sign_request = 'YES' if session.unsigned else 'NO'
+        with rasterio.Env(session=session, AWS_NO_SIGN_REQUEST=aws_no_sign_request):
+            ds = memfile.open(driver=driver)
+            arr = None
+            # We need to perform a read to initialize the VSI file handles here
+            # within current environment. Otherwise VSI file handles may not be
+            # correctly created due to GDAL configuration changes.
+            if band_indices:
+                # Invoked by as_numpy, we need to read band data after loading
+                # the DatasetReader
+                arr = ds.read(band_indices)
+            else:
+                if driver == 'VRT':
+                    # Read a small portion to initialize all VSI file handles in
+                    # current environment
+                    ds.read(window=Window(0, 0, 1, 1))
+            return ds, arr
+    else:
+        return memfile.open(driver=driver), None
 
 
 def _normalize_path(src_path: str) -> str:
@@ -264,16 +279,26 @@ class OutDbSedonaRaster(OutDbSedonaRasterBase):
         self.rasterio_memfile = None
         self.rasterio_dataset_reader = None
 
-    def as_rasterio(self) -> DatasetReader:
-        if self.rasterio_dataset_reader is not None:
-            return self.rasterio_dataset_reader
+    def as_numpy(self) -> np.ndarray:
+        band_indices = [b + 1 for b in self._outdb_meta.band_indices]
+        ds, arr = self._as_rasterio(band_indices)
+        if arr is None:
+            arr = ds.read(band_indices)
+        return arr
 
+    def as_rasterio(self) -> DatasetReader:
+        return self._as_rasterio(None)[0]
+
+    def _as_rasterio(self, load_bands: Optional[List[int]]) -> Tuple[DatasetReader, Optional[np.ndarray]]:
+        if self.rasterio_dataset_reader is not None:
+            return self.rasterio_dataset_reader, None
+
+        src_path = _normalize_path(self._outdb_meta.path)
         if self.rasterio_memfile is None:
             # XXX: WarpedVRT does not support specifying panSrcBands and
             # panDstBands options of GDAL's GDALWarpOptions, so we cannot use
             # WarpedVRT directly. As a workaround we construct an in-memory VRT
             # XML file and open it using the VRT driver.
-            src_path = _normalize_path(self._outdb_meta.path)
             with _rasterio_open(src_path) as src:
                 ip_x, scale_x, skew_x, ip_y, skew_y, scale_y = src.get_transform()
                 crs_wkt = src.crs.wkt if src.crs is not None else None
@@ -305,8 +330,9 @@ class OutDbSedonaRaster(OutDbSedonaRasterBase):
             vrt_xml = self.generate_vrt_xml(src_path, data_type, width, height, geo_transform, crs_wkt, off_x, off_y, band_indices)
             self.rasterio_memfile = MemoryFile(vrt_xml, ext='.vrt')
 
-        self.rasterio_dataset_reader = self.rasterio_memfile.open(driver='VRT')
-        return self.rasterio_dataset_reader
+        ds, arr = _rasterio_open_memfile(src_path, self.rasterio_memfile, driver='VRT', band_indices=load_bands)
+        self.rasterio_dataset_reader = ds
+        return ds, arr
 
     def close(self):
         if self.rasterio_dataset_reader is not None:
