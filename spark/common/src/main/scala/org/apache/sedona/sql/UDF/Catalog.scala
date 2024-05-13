@@ -319,7 +319,9 @@ object Catalog {
     function[RS_Resample](),
     function[RS_ReprojectMatch]("nearestneighbor"),
     function[RS_FromNetCDF](),
-    function[RS_NetCDFInfo]()
+    function[RS_NetCDFInfo](),
+    // Expression for raster AI
+    function[RS_SEGMENT_TO_GEOMS]()
   )
 
   val aggregateExpressions: Seq[Aggregator[Geometry, _, _]] = Seq(
