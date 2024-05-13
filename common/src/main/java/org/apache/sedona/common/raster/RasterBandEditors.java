@@ -23,20 +23,20 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.common.Functions;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.utils.RasterUtils;
-import org.geotools.api.metadata.spatial.PixelOrientation;
-import org.geotools.api.referencing.datum.PixelInCell;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.coverage.processing.operation.Crop;
-import org.geotools.geometry.jts.ReferencedEnvelope;
+import org.geotools.geometry.Envelope2D;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
-import org.geotools.api.parameter.ParameterValueGroup;
-import org.geotools.api.referencing.FactoryException;
-import org.geotools.api.referencing.operation.TransformException;
+import org.opengis.metadata.spatial.PixelOrientation;
+import org.opengis.parameter.ParameterValueGroup;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.datum.PixelInCell;
+import org.opengis.referencing.operation.TransformException;
 
 import javax.media.jai.RasterFactory;
 import java.awt.geom.Point2D;
@@ -360,9 +360,8 @@ public class RasterBandEditors {
     }
 
     public static GridCoverage2D clipOutDb(OutDbGridCoverage2D raster, int[] bandIndices, double x0, double y0, double regionWidth, double regionHeight) {
-        ReferencedEnvelope rasterEnvelope = raster.getEnvelope2D();
-        ReferencedEnvelope clipEnvelope = ReferencedEnvelope.rect(x0, y0 - regionHeight, regionWidth, regionHeight, rasterEnvelope.getCoordinateReferenceSystem());
-        if (!rasterEnvelope.intersects((Envelope) clipEnvelope)) {
+        Envelope2D rasterEnvelope = raster.getEnvelope2D();
+        if (!rasterEnvelope.intersects(x0, y0 - regionHeight, regionWidth, regionHeight)) {
             throw new IllegalArgumentException("The region to clip is outside the raster bounds");
         }
 

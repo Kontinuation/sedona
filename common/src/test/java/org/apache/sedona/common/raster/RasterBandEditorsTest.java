@@ -24,15 +24,16 @@ import org.apache.sedona.common.Constructors;
 import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.raster.serde.Serde;
-import org.geotools.api.geometry.Position;
 import org.geotools.coverage.grid.GridCoverage2D;
-import org.geotools.geometry.Position2D;
+import org.geotools.geometry.DirectPosition2D;
+import org.geotools.geometry.jts.JTS;
 import org.junit.Test;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.ParseException;
-import org.geotools.api.referencing.FactoryException;
-import org.geotools.api.referencing.operation.TransformException;
+import org.opengis.geometry.DirectPosition;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.operation.TransformException;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
@@ -247,16 +248,16 @@ public class RasterBandEditorsTest extends RasterTestBase{
         Geometry geom = Constructors.geomFromWKT(polygon, RasterAccessors.srid(raster));
         GridCoverage2D clipped = RasterBandEditors.clip(raster, 1, geom);
         assertTrue(clipped instanceof OutDbGridCoverage2D);
-        assertEquals(-115.026855, clipped.getEnvelope2D().getMinX(), 0.3);
-        assertEquals(31.353637, clipped.getEnvelope2D().getMinY(), 0.3);
-        assertEquals(6.020507, clipped.getEnvelope2D().getWidth(), 0.3);
-        assertEquals(5.631366, clipped.getEnvelope2D().getHeight(), 0.3);
-        assertTrue(clipped.getEnvelope2D().covers(geom.getEnvelopeInternal()));
+        assertEquals(-115.026855, clipped.getEnvelope2D().x, 0.3);
+        assertEquals(31.353637, clipped.getEnvelope2D().y, 0.3);
+        assertEquals(6.020507, clipped.getEnvelope2D().width, 0.3);
+        assertEquals(5.631366, clipped.getEnvelope2D().height, 0.3);
+        assertTrue(JTS.toEnvelope(clipped.getEnvelope2D()).covers(geom.getEnvelopeInternal()));
         for (double y = 32; y < 37; y += 0.1) {
             for (double x = -115; x < -109; x += 0.1) {
                 double[] actualValues = new double[1];
                 double[] expectedValues = new double[1];
-                Position position = new Position2D(x, y);
+                DirectPosition position = new DirectPosition2D(x, y);
                 clipped.evaluate(position, actualValues);
                 raster.evaluate(position, expectedValues);
                 assertEquals(expectedValues[0], actualValues[0], 0.01);
@@ -273,14 +274,14 @@ public class RasterBandEditorsTest extends RasterTestBase{
         Geometry geom = Constructors.geomFromWKT(polygon, RasterAccessors.srid(raster));
         GridCoverage2D clipped = RasterBandEditors.clip(raster, 1, geom);
         assertTrue(clipped instanceof OutDbGridCoverage2D);
-        assertTrue(clipped.getEnvelope2D().covers(geom.getEnvelopeInternal()));
+        assertTrue(JTS.toEnvelope(clipped.getEnvelope2D()).covers(geom.getEnvelopeInternal()));
         GridCoverage2D clipped2 = RasterBandEditors.clip(raster, 2, geom);
         GridCoverage2D clipped3 = RasterBandEditors.clip(raster, 3, geom);
         for (double y = 4196146.9; y < 4201271.1; y += 100) {
             for (double x = 244774.5; x < 251190.5; x += 100) {
                 double[] actualValues = new double[1];
                 double[] expectedValues = new double[3];
-                Position position = new Position2D(x, y);
+                DirectPosition position = new DirectPosition2D(x, y);
                 clipped.evaluate(position, actualValues);
                 raster.evaluate(position, expectedValues);
                 assertEquals(expectedValues[0], actualValues[0], 0.01);
@@ -300,9 +301,9 @@ public class RasterBandEditorsTest extends RasterTestBase{
         Geometry geom = Constructors.polygonFromEnvelope(-13068718, 3980589, -13051431, 3993680);
         geom.setSRID(3857);
         GridCoverage2D clipped = RasterBandEditors.clip(raster, 1, geom);
-        Envelope rasterEnv = raster.getEnvelope2D();
+        Envelope rasterEnv = JTS.toEnvelope(raster.getEnvelope2D());
         Envelope clippedEnv = rasterEnv.intersection(geom.getEnvelopeInternal());
-        assertTrue(clipped.getEnvelope2D().covers(clippedEnv));
+        assertTrue(JTS.toEnvelope(clipped.getEnvelope2D()).covers(clippedEnv));
         assertTrue(clipped instanceof OutDbGridCoverage2D);
         RasterConstructors.asInDbRaster(clipped);
 

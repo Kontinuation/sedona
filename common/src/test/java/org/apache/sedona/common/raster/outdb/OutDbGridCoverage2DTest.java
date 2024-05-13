@@ -28,15 +28,15 @@ import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.gce.geotiff.GeoTiffReader;
-import org.geotools.geometry.Position2D;
+import org.geotools.geometry.DirectPosition2D;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
-import org.geotools.api.coverage.grid.GridEnvelope;
-import org.geotools.api.geometry.Position;
-import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
+import org.opengis.coverage.grid.GridEnvelope;
+import org.opengis.geometry.DirectPosition;
+import org.opengis.referencing.crs.CoordinateReferenceSystem;
 
 import java.io.File;
 import java.io.IOException;
@@ -150,7 +150,7 @@ public class OutDbGridCoverage2DTest extends RasterTestBase {
                 for (int x = 0; x < outDbWidth; x += 10) {
                     double worldX = ipX + x * scaleX;
                     double worldY = ipY + y * scaleY;
-                    Position worldPos = new Position2D(worldX, worldY);
+                    DirectPosition worldPos = new DirectPosition2D(worldX, worldY);
                     outDbGridCoverage2D.evaluate(worldPos, outDbValues);
                     gridCoverage2D.evaluate(worldPos, values);
                     for (int k = 0; k < bands.length; k++) {
