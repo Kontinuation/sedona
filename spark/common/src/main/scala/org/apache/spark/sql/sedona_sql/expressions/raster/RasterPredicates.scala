@@ -61,18 +61,34 @@ abstract class RS_Predicate extends Expression
     case Seq(RasterUDT, GeometryUDT) =>
       (leftArray: Array[Byte], rightArray: Array[Byte]) =>
         val leftRaster = RasterSerializer.deserialize(leftArray)
-        val rightGeometry = GeometrySerializer.deserialize(rightArray)
-        evalRasterGeom(leftRaster, rightGeometry)
+        try {
+          val rightGeometry = GeometrySerializer.deserialize(rightArray)
+          evalRasterGeom(leftRaster, rightGeometry)
+        } finally {
+          leftRaster.dispose(true)
+        }
     case Seq(GeometryUDT, RasterUDT) =>
       (leftArray: Array[Byte], rightArray: Array[Byte]) =>
         val leftGeometry = GeometrySerializer.deserialize(leftArray)
         val rightRaster = RasterSerializer.deserialize(rightArray)
-        evalGeomRaster(leftGeometry, rightRaster)
+        try {
+          evalGeomRaster(leftGeometry, rightRaster)
+        } finally {
+          rightRaster.dispose(true)
+        }
     case Seq(RasterUDT, RasterUDT) =>
       (leftArray: Array[Byte], rightArray: Array[Byte]) =>
         val leftRaster = RasterSerializer.deserialize(leftArray)
-        val rightRaster = RasterSerializer.deserialize(rightArray)
-        evalRasters(leftRaster, rightRaster)
+        try {
+          val rightRaster = RasterSerializer.deserialize(rightArray)
+          try {
+            evalRasters(leftRaster, rightRaster)
+          } finally {
+            rightRaster.dispose(true)
+          }
+        } finally {
+          leftRaster.dispose(true)
+        }
     case _ => throw new IllegalArgumentException(s"Unsupported input types: $inputTypes")
   }
 

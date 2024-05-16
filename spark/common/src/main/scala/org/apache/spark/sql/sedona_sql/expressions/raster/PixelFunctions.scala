@@ -65,13 +65,17 @@ case class RS_PixelAsPoints(inputExpressions: Seq[Expression])
     if (rasterGeom == null) {
       null
     } else {
-      val pixelRecords = PixelFunctions.getPixelAsPoints(rasterGeom, band)
-      val rows = pixelRecords.map { pixelRecord =>
-        val serializedGeom = GeometrySerializer.serialize(pixelRecord.geom)
-        val rowArray = Array[Any](serializedGeom, pixelRecord.value, pixelRecord.colX, pixelRecord.rowY)
-        InternalRow.fromSeq(rowArray)
+      try {
+        val pixelRecords = PixelFunctions.getPixelAsPoints(rasterGeom, band)
+        val rows = pixelRecords.map { pixelRecord =>
+          val serializedGeom = GeometrySerializer.serialize(pixelRecord.geom)
+          val rowArray = Array[Any](serializedGeom, pixelRecord.value, pixelRecord.colX, pixelRecord.rowY)
+          InternalRow.fromSeq(rowArray)
+        }
+        new GenericArrayData(rows.toArray)
+      } finally {
+        rasterGeom.dispose(true)
       }
-      new GenericArrayData(rows.toArray)
     }
   }
 
@@ -110,13 +114,17 @@ case class RS_PixelAsPolygons(inputExpressions: Seq[Expression])
     if (rasterGeom == null) {
       null
     } else {
-      val pixelRecords = PixelFunctions.getPixelAsPolygons(rasterGeom, band)
-      val rows = pixelRecords.map { pixelRecord =>
-        val serializedGeom = GeometrySerializer.serialize(pixelRecord.geom)
-        val rowArray = Array[Any](serializedGeom, pixelRecord.value, pixelRecord.colX, pixelRecord.rowY)
-        InternalRow.fromSeq(rowArray)
+      try {
+        val pixelRecords = PixelFunctions.getPixelAsPolygons(rasterGeom, band)
+        val rows = pixelRecords.map { pixelRecord =>
+          val serializedGeom = GeometrySerializer.serialize(pixelRecord.geom)
+          val rowArray = Array[Any](serializedGeom, pixelRecord.value, pixelRecord.colX, pixelRecord.rowY)
+          InternalRow.fromSeq(rowArray)
+        }
+        new GenericArrayData(rows.toArray)
+      } finally {
+        rasterGeom.dispose(true)
       }
-      new GenericArrayData(rows.toArray)
     }
   }
 
@@ -153,13 +161,17 @@ case class RS_PixelAsCentroids(inputExpressions: Seq[Expression])
     if (rasterGeom == null) {
       null
     } else {
-      val pixelRecords = PixelFunctions.getPixelAsCentroids(rasterGeom, band)
-      val rows = pixelRecords.map { pixelRecord =>
-        val serializedGeom = GeometrySerializer.serialize(pixelRecord.geom)
-        val rowArray = Array[Any](serializedGeom, pixelRecord.value, pixelRecord.colX, pixelRecord.rowY)
-        InternalRow.fromSeq(rowArray)
+      try {
+        val pixelRecords = PixelFunctions.getPixelAsCentroids(rasterGeom, band)
+        val rows = pixelRecords.map { pixelRecord =>
+          val serializedGeom = GeometrySerializer.serialize(pixelRecord.geom)
+          val rowArray = Array[Any](serializedGeom, pixelRecord.value, pixelRecord.colX, pixelRecord.rowY)
+          InternalRow.fromSeq(rowArray)
+        }
+        new GenericArrayData(rows.toArray)
+      } finally {
+        rasterGeom.dispose(true)
       }
-      new GenericArrayData(rows.toArray)
     }
   }
 

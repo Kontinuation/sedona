@@ -346,8 +346,15 @@ public class OutDbResourcePool {
 
     private void drainReferenceQueue() {
         WeakOutDbResource ref;
+        int count = 0;
         while ((ref = (WeakOutDbResource) referenceQueue.poll()) != null) {
-            allResources.remove(ref.resourceKey);
+            if (allResources.remove(ref.resourceKey) != null) {
+                count += 1;
+            }
+        }
+        if (count > 0) {
+            logger.debug("Removed {} garbage collected OutDbResource objects for thread {}. Pool stats: {}/{}",
+                    count, threadId, freeResourceCount, allResources.size());
         }
     }
 

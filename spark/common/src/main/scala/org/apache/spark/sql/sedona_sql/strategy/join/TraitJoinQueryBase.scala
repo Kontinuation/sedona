@@ -103,9 +103,13 @@ trait TraitJoinQueryBase {
     val wgs84EnvelopeRdd = if (shapeExpression.dataType.isInstanceOf[RasterUDT]) {
       rdd.map { row =>
         val raster = RasterSerializer.deserialize(shapeExpression.eval(row).asInstanceOf[Array[Byte]])
-        val shape = JoinedGeometryRaster.rasterToWGS84Envelope(raster)
-        shape.setUserData(row.copy)
-        shape
+        try {
+          val shape = JoinedGeometryRaster.rasterToWGS84Envelope(raster)
+          shape.setUserData(row.copy)
+          shape
+        } finally {
+          raster.dispose(true)
+        }
       }
     } else {
       rdd.map { row =>

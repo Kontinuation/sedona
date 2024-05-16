@@ -274,7 +274,11 @@ case class BroadcastIndexJoinExec(
             val shape = if (isRasterPredicate) {
               if (boundStreamShape.dataType.isInstanceOf[RasterUDT]) {
                 val raster = RasterSerializer.deserialize(serializedObject)
-                JoinedGeometryRaster.rasterToWGS84Envelope(raster)
+                try {
+                  JoinedGeometryRaster.rasterToWGS84Envelope(raster)
+                } finally {
+                  raster.dispose(true)
+                }
               } else {
                 val geom = GeometrySerializer.deserialize(serializedObject)
                 JoinedGeometryRaster.geometryToWGS84Envelope(geom)
