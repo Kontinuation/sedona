@@ -47,10 +47,10 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
     // We need to be explicit about broadcasting in tests.
     .config("sedona.join.autoBroadcastJoinThreshold", "-1")
     .config("spark.kryoserializer.buffer.max", "64m")
-    .config("spark.sedonaai.entrance", resourceFolder + "python/udfEntrance.py")
-    .config("spark.sedonaai.files", resourceFolder + "python/udfDefinition.py")
+    .config("spark.wherobots.inference.entrance", resourceFolder + "python/udfEntrance.py")
+    .config("spark.wherobots.inference.files", resourceFolder + "python/udfDefinition.py")
     // This arg is for the batch parameter used in the Python Pandas UDF test.
-    .config("spark.sedonaai.args", "3")
+    .config("spark.wherobots.inference.args", "3")
     //    .config("spark.metrics.conf.*.sink.console.class", "org.apache.spark.metrics.sink.ConsoleSink")
     .getOrCreate()
 
