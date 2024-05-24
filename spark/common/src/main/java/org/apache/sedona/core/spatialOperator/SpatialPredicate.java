@@ -16,13 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialOperator;
 
 /**
- * Spatial predicates for range queries and join queries.
- * Please refer to <a href="https://en.wikipedia.org/wiki/DE-9IM#Spatial_predicates">Spatial predicates</a>
- * for the semantics of these spatial predicates.
+ * Spatial predicates for range queries and join queries. Please refer to <a
+ * href="https://en.wikipedia.org/wiki/DE-9IM#Spatial_predicates">Spatial predicates</a> for the
+ * semantics of these spatial predicates.
  */
 public enum SpatialPredicate {
     CONTAINS,
@@ -37,6 +36,7 @@ public enum SpatialPredicate {
 
     /**
      * Get inverse predicate of given spatial predicate
+     *
      * @param predicate spatial predicate
      * @return inverse predicate
      */

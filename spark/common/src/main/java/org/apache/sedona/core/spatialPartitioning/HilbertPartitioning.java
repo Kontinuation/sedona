@@ -16,31 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
-
-import org.locationtech.jts.geom.Envelope;
 
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import org.locationtech.jts.geom.Envelope;
 
-public class HilbertPartitioning
-        implements Serializable
-{
+public class HilbertPartitioning implements Serializable {
 
     private static final int GRID_RESOLUTION = Short.MAX_VALUE;
 
-    /**
-     * The splits.
-     */
-    //Partition ID
+    /** The splits. */
+    // Partition ID
     protected int[] splits;
 
-    /**
-     * The grids.
-     */
+    /** The grids. */
     List<Envelope> grids = new ArrayList<>();
 
     /**
@@ -52,9 +44,8 @@ public class HilbertPartitioning
      * @throws Exception the exception
      */
     public HilbertPartitioning(List<Envelope> samples, Envelope boundary, int partitions)
-            throws Exception
-    {
-        //this.boundary=boundary;
+            throws Exception {
+        // this.boundary=boundary;
         int[] hValues = new int[samples.size()];
         for (int i = 0; i < samples.size(); i++) {
             hValues[i] = computeHValue(boundary, samples.get(i));
@@ -69,8 +60,7 @@ public class HilbertPartitioning
             Envelope current = gridWithoutID[partitionID];
             if (current == null) {
                 gridWithoutID[partitionID] = sample;
-            }
-            else {
+            } else {
                 gridWithoutID[partitionID] = updateEnvelope(current, sample);
             }
         }
@@ -88,8 +78,7 @@ public class HilbertPartitioning
      * @param y the y
      * @return the int
      */
-    public static int computeHValue(int n, int x, int y)
-    {
+    public static int computeHValue(int n, int x, int y) {
         int h = 0;
         for (int s = n / 2; s > 0; s /= 2) {
             int rx = (x & s) > 0 ? 1 : 0;
@@ -103,7 +92,7 @@ public class HilbertPartitioning
                     y = n - 1 - y;
                 }
 
-                //Swap x and y
+                // Swap x and y
                 int t = x;
                 x = y;
                 y = t;
@@ -120,8 +109,7 @@ public class HilbertPartitioning
      * @param axisMax the axis max
      * @return the int
      */
-    public static int locationMapping(double axisMin, double axisLocation, double axisMax)
-    {
+    public static int locationMapping(double axisMin, double axisLocation, double axisMax) {
         Double gridLocation = (axisLocation - axisMin) * GRID_RESOLUTION / (axisMax - axisMin);
         return gridLocation.intValue();
     }
@@ -136,8 +124,7 @@ public class HilbertPartitioning
      * @throws Exception the exception
      */
     public static int gridID(Envelope boundary, Envelope spatialObject, int[] partitionBounds)
-            throws Exception
-    {
+            throws Exception {
         int hValue = computeHValue(boundary, spatialObject);
         int partition = Arrays.binarySearch(partitionBounds, hValue);
         if (partition < 0) {
@@ -146,10 +133,17 @@ public class HilbertPartitioning
         return partition;
     }
 
-    private static int computeHValue(Envelope boundary, Envelope spatialObject)
-    {
-        int x = locationMapping(boundary.getMinX(), boundary.getMaxX(), (spatialObject.getMinX() + spatialObject.getMaxX()) / 2.0);
-        int y = locationMapping(boundary.getMinY(), boundary.getMaxY(), (spatialObject.getMinY() + spatialObject.getMaxY()) / 2.0);
+    private static int computeHValue(Envelope boundary, Envelope spatialObject) {
+        int x =
+                locationMapping(
+                        boundary.getMinX(),
+                        boundary.getMaxX(),
+                        (spatialObject.getMinX() + spatialObject.getMaxX()) / 2.0);
+        int y =
+                locationMapping(
+                        boundary.getMinY(),
+                        boundary.getMaxY(),
+                        (spatialObject.getMinY() + spatialObject.getMaxY()) / 2.0);
         return computeHValue(GRID_RESOLUTION + 1, x, y);
     }
 
@@ -162,8 +156,7 @@ public class HilbertPartitioning
      * @throws Exception the exception
      */
     public static Envelope updateEnvelope(Envelope envelope, Envelope spatialObject)
-            throws Exception
-    {
+            throws Exception {
         double minX = Math.min(envelope.getMinX(), spatialObject.getMinX());
         double maxX = Math.max(envelope.getMaxX(), spatialObject.getMaxX());
         double minY = Math.min(envelope.getMinY(), spatialObject.getMinY());
@@ -178,8 +171,7 @@ public class HilbertPartitioning
      * @param hValues the h values
      * @param partitions the partitions
      */
-    protected void createFromHValues(int[] hValues, int partitions)
-    {
+    protected void createFromHValues(int[] hValues, int partitions) {
         Arrays.sort(hValues);
 
         this.splits = new int[partitions];
@@ -195,8 +187,7 @@ public class HilbertPartitioning
      *
      * @return the partition bounds
      */
-    public int[] getPartitionBounds()
-    {
+    public int[] getPartitionBounds() {
         return splits;
     }
 
@@ -205,8 +196,7 @@ public class HilbertPartitioning
      *
      * @return the grids
      */
-    public List<Envelope> getGrids()
-    {
+    public List<Envelope> getGrids() {
         return this.grids;
     }
 }

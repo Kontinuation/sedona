@@ -1,18 +1,25 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.common;
 
+import java.io.IOException;
+import javax.xml.parsers.ParserConfigurationException;
 import org.apache.sedona.common.enums.FileDataSplitter;
 import org.apache.sedona.common.enums.GeometryType;
 import org.apache.sedona.common.utils.FormatUtils;
@@ -28,9 +35,6 @@ import org.locationtech.jts.io.WKTReader;
 import org.locationtech.jts.io.gml2.GMLReader;
 import org.locationtech.jts.io.kml.KMLReader;
 import org.xml.sax.SAXException;
-
-import javax.xml.parsers.ParserConfigurationException;
-import java.io.IOException;
 
 public class Constructors {
 
@@ -57,8 +61,7 @@ public class Constructors {
             if (semicolonIndex != -1) {
                 SRID = Integer.parseInt(ewkt.substring(index + 5, semicolonIndex));
                 wkt = ewkt.substring(semicolonIndex + 1);
-            }
-            else {
+            } else {
                 throw new ParseException("Invalid EWKT string");
             }
         }
@@ -86,14 +89,13 @@ public class Constructors {
         return new WKTReader(geometryFactory).read(wkt);
     }
 
-
     /**
-     * Creates a point from the given coordinate.
-     * ST_Point in Sedona Spark API took an optional z value before v1.4.0.
-     * This was removed to avoid confusion with other GIS implementations where the optional third argument is srid.
+     * Creates a point from the given coordinate. ST_Point in Sedona Spark API took an optional z
+     * value before v1.4.0. This was removed to avoid confusion with other GIS implementations where
+     * the optional third argument is srid.
      *
-     * A future version of Sedona will add a srid parameter once enough users have upgraded and hence are forced
-     * to use ST_PointZ for 3D points.
+     * <p>A future version of Sedona will add a srid parameter once enough users have upgraded and
+     * hence are forced to use ST_PointZ for 3D points.
      *
      * @param x the x value
      * @param y the y value
@@ -105,7 +107,7 @@ public class Constructors {
         return geometryFactory.createPoint(new Coordinate(x, y));
     }
 
-    public static Geometry makePoint(Double x, Double y, Double z, Double m){
+    public static Geometry makePoint(Double x, Double y, Double z, Double m) {
         GeometryFactory geometryFactory = new GeometryFactory();
         if (x == null || y == null) {
             return null;
@@ -136,9 +138,11 @@ public class Constructors {
         return geometryFactory.createPoint(new Coordinate(x, y, z));
     }
 
-    public static Geometry geomFromText(String geomString, String geomFormat, GeometryType geometryType) {
+    public static Geometry geomFromText(
+            String geomString, String geomFormat, GeometryType geometryType) {
         FileDataSplitter fileDataSplitter = FileDataSplitter.getFileDataSplitter(geomFormat);
-        FormatUtils<Geometry> formatMapper = new FormatUtils<>(fileDataSplitter, false, geometryType);
+        FormatUtils<Geometry> formatMapper =
+                new FormatUtils<>(fileDataSplitter, false, geometryType);
         try {
             return formatMapper.readGeometry(geomString);
         } catch (ParseException e) {
@@ -170,7 +174,7 @@ public class Constructors {
     public static Geometry lineFromText(String geomString) {
         FileDataSplitter fileDataSplitter = FileDataSplitter.WKT;
         Geometry geometry = Constructors.geomFromText(geomString, fileDataSplitter);
-        if(geometry.getGeometryType().contains("LineString")) {
+        if (geometry.getGeometryType().contains("LineString")) {
             return geometry;
         } else {
             return null;
@@ -195,13 +199,12 @@ public class Constructors {
         }
     }
 
-    public static Geometry geomFromGML(String gml) throws IOException, ParserConfigurationException, SAXException {
+    public static Geometry geomFromGML(String gml)
+            throws IOException, ParserConfigurationException, SAXException {
         return new GMLReader().read(gml, GEOMETRY_FACTORY);
     }
 
     public static Geometry geomFromKML(String kml) throws ParseException {
         return new KMLReader().read(kml);
     }
-
-
 }

@@ -16,30 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
 
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.index.strtree.AbstractNode;
 import org.locationtech.jts.index.strtree.Boundable;
 import org.locationtech.jts.index.strtree.STRtree;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class RtreePartitioning.
- */
-public class RtreePartitioning
-        implements Serializable
-{
+/** The Class RtreePartitioning. */
+public class RtreePartitioning implements Serializable {
 
-    /**
-     * The grids.
-     */
+    /** The grids. */
     final List<Envelope> grids = new ArrayList<>();
 
     /**
@@ -49,9 +41,7 @@ public class RtreePartitioning
      * @param partitions the partitions
      * @throws Exception the exception
      */
-    public RtreePartitioning(List<Envelope> samples, int partitions)
-            throws Exception
-    {
+    public RtreePartitioning(List<Envelope> samples, int partitions) throws Exception {
         STRtree strtree = new STRtree(samples.size() / partitions);
         for (Envelope sample : samples) {
             strtree.insert(sample, sample);
@@ -67,24 +57,24 @@ public class RtreePartitioning
      *
      * @return the grids
      */
-    public List<Envelope> getGrids()
-    {
+    public List<Envelope> getGrids() {
 
         return this.grids;
     }
 
     /**
-     * This function traverses the boundaries of all leaf nodes.
-     * This function should be called after all insertions.
+     * This function traverses the boundaries of all leaf nodes. This function should be called
+     * after all insertions.
+     *
      * @param stRtree
      * @return The list of leaf nodes boundaries
      */
-    private List findLeafBounds(STRtree stRtree){
+    private List findLeafBounds(STRtree stRtree) {
         stRtree.build();
         List boundaries = new ArrayList();
         if (stRtree.isEmpty()) {
-            //Assert.isTrue(root.getBounds() == null);
-            //If the root is empty, we stop traversing. This should not happen.
+            // Assert.isTrue(root.getBounds() == null);
+            // If the root is empty, we stop traversing. This should not happen.
             return boundaries;
         }
         findLeafBounds(stRtree.getRoot(), boundaries);
@@ -93,21 +83,18 @@ public class RtreePartitioning
 
     private void findLeafBounds(AbstractNode node, List boundaries) {
         List childBoundables = node.getChildBoundables();
-        boolean flagLeafnode=true;
+        boolean flagLeafnode = true;
         for (Object boundable : childBoundables) {
             Boundable childBoundable = (Boundable) boundable;
             if (childBoundable instanceof AbstractNode) {
-                //We find this is not a leaf node.
+                // We find this is not a leaf node.
                 flagLeafnode = false;
                 break;
             }
         }
-        if(flagLeafnode)
-        {
+        if (flagLeafnode) {
             boundaries.add(node.getBounds());
-        }
-        else
-        {
+        } else {
             for (Object boundable : childBoundables) {
                 Boundable childBoundable = (Boundable) boundable;
                 if (childBoundable instanceof AbstractNode) {

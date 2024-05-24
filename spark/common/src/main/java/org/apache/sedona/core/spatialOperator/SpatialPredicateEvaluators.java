@@ -16,20 +16,16 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialOperator;
 
+import java.io.Serializable;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
-
-import java.io.Serializable;
 
 public class SpatialPredicateEvaluators {
     private SpatialPredicateEvaluators() {}
 
-    /**
-     * SpatialPredicateEvaluator for evaluating spatial predicates.
-     */
+    /** SpatialPredicateEvaluator for evaluating spatial predicates. */
     public interface SpatialPredicateEvaluator extends Serializable {
         boolean eval(Geometry left, Geometry right);
 
@@ -64,7 +60,6 @@ public class SpatialPredicateEvaluators {
         default boolean eval(PreparedGeometry left, Geometry right) {
             return left.within(right);
         }
-
     }
 
     public interface CoversEvaluator extends SpatialPredicateEvaluator {
@@ -128,13 +123,21 @@ public class SpatialPredicateEvaluators {
     }
 
     private static class ConcreteContainsEvaluator implements ContainsEvaluator {}
+
     private static class ConcreteIntersectsEvaluator implements IntersectsEvaluator {}
+
     private static class ConcreteWithinEvaluator implements WithinEvaluator {}
+
     private static class ConcreteCoversEvaluator implements CoversEvaluator {}
+
     private static class ConcreteCoveredByEvaluator implements CoveredByEvaluator {}
+
     private static class ConcreteTouchesEvaluator implements TouchesEvaluator {}
+
     private static class ConcreteOverlapsEvaluator implements OverlapsEvaluator {}
+
     private static class ConcreteCrossesEvaluator implements CrossesEvaluator {}
+
     private static class ConcreteEqualsEvaluator implements EqualsEvaluator {}
 
     public static SpatialPredicateEvaluator create(SpatialPredicate predicate) {

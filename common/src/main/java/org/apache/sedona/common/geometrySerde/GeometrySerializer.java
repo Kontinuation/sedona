@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.geometrySerde;
 
 import org.locationtech.jts.geom.Coordinate;
@@ -100,19 +99,22 @@ public class GeometrySerializer {
                 return deserializeGeometryCollection(buffer, srid);
             default:
                 throw new IllegalArgumentException(
-                        "Cannot deserialize buffer containing unknown geometry type ID: " + wkbType);
+                        "Cannot deserialize buffer containing unknown geometry type ID: "
+                                + wkbType);
         }
     }
 
     private static GeometryBuffer serializePoint(Point point) {
         Coordinate coordinate = point.getCoordinate();
         if (coordinate == null) {
-            return createGeometryBuffer(WKBConstants.wkbPoint, CoordinateType.XY, point.getSRID(), 8, 0);
+            return createGeometryBuffer(
+                    WKBConstants.wkbPoint, CoordinateType.XY, point.getSRID(), 8, 0);
         }
         CoordinateType coordType = getCoordinateType(coordinate);
         int bufferSize = 8 + coordType.bytes;
         GeometryBuffer buffer =
-                createGeometryBuffer(WKBConstants.wkbPoint, coordType, point.getSRID(), bufferSize, 1);
+                createGeometryBuffer(
+                        WKBConstants.wkbPoint, coordType, point.getSRID(), bufferSize, 1);
         buffer.putCoordinate(8, coordinate);
         return buffer;
     }
@@ -145,7 +147,11 @@ public class GeometrySerializer {
         int bufferSize = 8 + numPoints * coordType.bytes;
         GeometryBuffer buffer =
                 createGeometryBuffer(
-                        WKBConstants.wkbMultiPoint, coordType, multiPoint.getSRID(), bufferSize, numPoints);
+                        WKBConstants.wkbMultiPoint,
+                        coordType,
+                        multiPoint.getSRID(),
+                        bufferSize,
+                        numPoints);
         for (int k = 0; k < numPoints; k++) {
             Point point = (Point) multiPoint.getGeometryN(k);
             Coordinate coordinate = point.getCoordinate();
@@ -272,8 +278,13 @@ public class GeometrySerializer {
         int bufferSize = numRingsOffset + 4 + 4 * (numInteriorRings + 1);
         GeometryBuffer buffer =
                 createGeometryBuffer(
-                        WKBConstants.wkbPolygon, coordType, polygon.getSRID(), bufferSize, numCoordinates);
-        GeomPartSerializer serializer = new GeomPartSerializer(buffer, coordsOffset, numRingsOffset);
+                        WKBConstants.wkbPolygon,
+                        coordType,
+                        polygon.getSRID(),
+                        bufferSize,
+                        numCoordinates);
+        GeomPartSerializer serializer =
+                new GeomPartSerializer(buffer, coordsOffset, numRingsOffset);
         serializer.write(polygon);
         assert bufferSize == serializer.intsOffset;
         return buffer;
@@ -290,7 +301,8 @@ public class GeometrySerializer {
         }
         int coordsOffset = 8;
         int numRingsOffset = 8 + numCoordinates * coordType.bytes;
-        GeomPartSerializer serializer = new GeomPartSerializer(buffer, coordsOffset, numRingsOffset);
+        GeomPartSerializer serializer =
+                new GeomPartSerializer(buffer, coordsOffset, numRingsOffset);
         Polygon polygon = serializer.readPolygon();
         serializer.markEndOfBuffer();
         polygon.setSRID(srid);
@@ -320,7 +332,8 @@ public class GeometrySerializer {
                         multiPolygon.getSRID(),
                         bufferSize,
                         numCoordinates);
-        GeomPartSerializer serializer = new GeomPartSerializer(buffer, coordsOffset, numPolygonsOffset);
+        GeomPartSerializer serializer =
+                new GeomPartSerializer(buffer, coordsOffset, numPolygonsOffset);
         serializer.writeInt(numPolygons);
         for (int k = 0; k < numPolygons; k++) {
             Polygon polygon = (Polygon) multiPolygon.getGeometryN(k);
@@ -335,7 +348,8 @@ public class GeometrySerializer {
         int numCoordinates = getBoundedInt(buffer, 4);
         int coordsOffset = 8;
         int numPolygonsOffset = 8 + numCoordinates * coordType.bytes;
-        GeomPartSerializer serializer = new GeomPartSerializer(buffer, coordsOffset, numPolygonsOffset);
+        GeomPartSerializer serializer =
+                new GeomPartSerializer(buffer, coordsOffset, numPolygonsOffset);
         int numPolygons = serializer.checkedReadBoundedInt();
         Polygon[] polygons = new Polygon[numPolygons];
         for (int k = 0; k < numPolygons; k++) {
@@ -349,7 +363,8 @@ public class GeometrySerializer {
         return multiPolygon;
     }
 
-    private static GeometryBuffer serializeGeometryCollection(GeometryCollection geometryCollection) {
+    private static GeometryBuffer serializeGeometryCollection(
+            GeometryCollection geometryCollection) {
         int numGeometries = geometryCollection.getNumGeometries();
         if (numGeometries == 0) {
             return createGeometryBuffer(
@@ -384,7 +399,8 @@ public class GeometrySerializer {
         return buffer;
     }
 
-    private static GeometryCollection deserializeGeometryCollection(GeometryBuffer buffer, int srid) {
+    private static GeometryCollection deserializeGeometryCollection(
+            GeometryBuffer buffer, int srid) {
         int numGeometries = getBoundedInt(buffer, 4);
         if (numGeometries == 0) {
             buffer.mark(8);

@@ -29,14 +29,14 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Exp
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sedona_sql.execution.SedonaUnaryExecNode
 
-
-case class SpatialIndexExec(child: SparkPlan,
-                            shape: Expression,
-                            indexType: IndexType,
-                            isRasterPredicate: Boolean,
-                            isGeography: Boolean,
-                            distance: Option[Expression] = None)
-  extends SedonaUnaryExecNode
+case class SpatialIndexExec(
+    child: SparkPlan,
+    shape: Expression,
+    indexType: IndexType,
+    isRasterPredicate: Boolean,
+    isGeography: Boolean,
+    distance: Option[Expression] = None)
+    extends SedonaUnaryExecNode
     with TraitJoinQueryBase
     with Logging {
 
@@ -51,16 +51,24 @@ case class SpatialIndexExec(child: SparkPlan,
     val boundShape = BindReferences.bindReference(shape, child.output)
     val resultRaw = child.execute().asInstanceOf[RDD[UnsafeRow]].coalesce(1)
     val spatialRDD = distance match {
-      case Some(distanceExpression) => toExpandedEnvelopeRDD(resultRaw, boundShape, BindReferences.bindReference(distanceExpression, child.output), isGeography)
-      case None => if (isRasterPredicate) {
-        toWGS84EnvelopeRDD(resultRaw, boundShape)
-      } else {
-        toSpatialRDD(resultRaw, boundShape)
-      }
+      case Some(distanceExpression) =>
+        toExpandedEnvelopeRDD(
+          resultRaw,
+          boundShape,
+          BindReferences.bindReference(distanceExpression, child.output),
+          isGeography)
+      case None =>
+        if (isRasterPredicate) {
+          toWGS84EnvelopeRDD(resultRaw, boundShape)
+        } else {
+          toSpatialRDD(resultRaw, boundShape)
+        }
     }
 
     spatialRDD.buildIndex(indexType, false)
-    sparkContext.broadcast(spatialRDD.indexedRawRDD.take(1).asScala.head).asInstanceOf[Broadcast[T]]
+    sparkContext
+      .broadcast(spatialRDD.indexedRawRDD.take(1).asScala.head)
+      .asInstanceOf[Broadcast[T]]
   }
 
   protected def withNewChildInternal(newChild: SparkPlan): SparkPlan = {

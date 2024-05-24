@@ -18,20 +18,16 @@
  */
 package org.apache.sedona.core.utils;
 
-import org.junit.Test;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.fail;
 
-public class RDDSampleUtilsTest
-{
+import org.junit.Test;
 
-    /**
-     * Test get sample numbers.
-     */
+public class RDDSampleUtilsTest {
+
+    /** Test get sample numbers. */
     @Test
-    public void testGetSampleNumbers()
-    {
+    public void testGetSampleNumbers() {
         assertEquals(10, RDDSampleUtils.getSampleNumbers(2, 10, -1));
         assertEquals(100, RDDSampleUtils.getSampleNumbers(2, 100, -1));
         assertEquals(10, RDDSampleUtils.getSampleNumbers(5, 1000, -1));
@@ -44,30 +40,25 @@ public class RDDSampleUtilsTest
         assertEquals(1, RDDSampleUtils.getSampleNumbers(1, 1, -1));
     }
 
-    /**
-     * Test too many partitions.
-     */
+    /** Test too many partitions. */
     @Test
-    public void testTooManyPartitions()
-    {
+    public void testTooManyPartitions() {
         assertFailure(505, 999);
         assertFailure(505, 1000);
         assertFailure(10, 1000, 2100);
         assertFailure(2, 1, -1);
     }
 
-    private void assertFailure(int numPartitions, long totalNumberOfRecords)
-    {
+    private void assertFailure(int numPartitions, long totalNumberOfRecords) {
         assertFailure(numPartitions, totalNumberOfRecords, -1);
     }
 
-    private void assertFailure(int numPartitions, long totalNumberOfRecords, int givenSampleNumber)
-    {
+    private void assertFailure(
+            int numPartitions, long totalNumberOfRecords, int givenSampleNumber) {
         try {
             RDDSampleUtils.getSampleNumbers(numPartitions, totalNumberOfRecords, givenSampleNumber);
             fail("Expected IllegalArgumentException");
-        }
-        catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException e) {
             // expected
         }
     }

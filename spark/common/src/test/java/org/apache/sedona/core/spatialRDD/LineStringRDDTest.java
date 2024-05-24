@@ -18,6 +18,9 @@
  */
 package org.apache.sedona.core.spatialRDD;
 
+import static org.junit.Assert.assertEquals;
+
+import java.util.List;
 import org.apache.sedona.core.enums.IndexType;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -25,34 +28,20 @@ import org.junit.Test;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.index.strtree.STRtree;
 
-import java.util.List;
-
-import static org.junit.Assert.assertEquals;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class LineStringRDDTest.
- */
-public class LineStringRDDTest
-        extends SpatialRDDTestBase
-{
+/** The Class LineStringRDDTest. */
+public class LineStringRDDTest extends SpatialRDDTestBase {
 
-    /**
-     * Once executed before all.
-     */
+    /** Once executed before all. */
     @BeforeClass
-    public static void onceExecutedBeforeAll()
-    {
+    public static void onceExecutedBeforeAll() {
         initialize(LineStringRDDTest.class.getSimpleName(), "linestring.test.properties");
     }
 
-    /**
-     * Tear down.
-     */
+    /** Tear down. */
     @AfterClass
-    public static void TearDown()
-    {
+    public static void TearDown() {
         sc.stop();
     }
 
@@ -62,20 +51,18 @@ public class LineStringRDDTest
      * @throws Exception the exception
      */
     @Test
-    public void testConstructor()
-            throws Exception
-    {
-        LineStringRDD spatialRDD = new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
+    public void testConstructor() throws Exception {
+        LineStringRDD spatialRDD =
+                new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
         spatialRDD.analyze();
         assertEquals(inputCount, spatialRDD.approximateTotalCount);
         assertEquals(inputBoundary, spatialRDD.boundaryEnvelope);
     }
 
     @Test
-    public void testEmptyConstructor()
-            throws Exception
-    {
-        LineStringRDD spatialRDD = new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
+    public void testEmptyConstructor() throws Exception {
+        LineStringRDD spatialRDD =
+                new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
         spatialRDD.analyze();
         spatialRDD.spatialPartitioning(gridType);
         spatialRDD.buildIndex(IndexType.RTREE, true);
@@ -92,10 +79,9 @@ public class LineStringRDDTest
      * @throws Exception the exception
      */
     @Test
-    public void testBuildIndexWithoutSetGrid()
-            throws Exception
-    {
-        LineStringRDD spatialRDD = new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
+    public void testBuildIndexWithoutSetGrid() throws Exception {
+        LineStringRDD spatialRDD =
+                new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
         spatialRDD.buildIndex(IndexType.RTREE, false);
     }
 
@@ -105,18 +91,18 @@ public class LineStringRDDTest
      * @throws Exception the exception
      */
     @Test
-    public void testBuildRtreeIndex()
-            throws Exception
-    {
-        LineStringRDD spatialRDD = new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
+    public void testBuildRtreeIndex() throws Exception {
+        LineStringRDD spatialRDD =
+                new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
         spatialRDD.analyze();
         spatialRDD.spatialPartitioning(gridType);
         spatialRDD.buildIndex(IndexType.RTREE, true);
         if (spatialRDD.indexedRDD.take(1).get(0) instanceof STRtree) {
-            List<Polygon> result = spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
-        }
-        else {
-            List<Polygon> result = spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
+            List<Polygon> result =
+                    spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
+        } else {
+            List<Polygon> result =
+                    spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
         }
     }
 
@@ -126,18 +112,18 @@ public class LineStringRDDTest
      * @throws Exception the exception
      */
     @Test
-    public void testBuildQuadtreeIndex()
-            throws Exception
-    {
-        LineStringRDD spatialRDD = new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
+    public void testBuildQuadtreeIndex() throws Exception {
+        LineStringRDD spatialRDD =
+                new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
         spatialRDD.analyze();
         spatialRDD.spatialPartitioning(gridType);
         spatialRDD.buildIndex(IndexType.QUADTREE, true);
         if (spatialRDD.indexedRDD.take(1).get(0) instanceof STRtree) {
-            List<Polygon> result = spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
-        }
-        else {
-            List<Polygon> result = spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
+            List<Polygon> result =
+                    spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
+        } else {
+            List<Polygon> result =
+                    spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
         }
     }
 
@@ -156,10 +142,9 @@ public class LineStringRDDTest
      * @throws Exception the exception
      */
     @Test
-    public void testMBR()
-            throws Exception
-    {
-        LineStringRDD lineStringRDD = new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
+    public void testMBR() throws Exception {
+        LineStringRDD lineStringRDD =
+                new LineStringRDD(sc, InputLocation, splitter, true, numPartitions);
         RectangleRDD rectangleRDD = lineStringRDD.MinimumBoundingRectangle();
         List<Polygon> result = rectangleRDD.rawSpatialRDD.collect();
         assert result.size() > -1;

@@ -1,15 +1,20 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.flink.expressions;
 
@@ -23,7 +28,8 @@ import org.locationtech.jts.geom.GeometryFactory;
 public class Aggregators {
     // Compute the rectangular boundary of a number of geometries
     @DataTypeHint(value = "RAW", bridgedTo = Geometry.class)
-    public static class ST_Envelope_Aggr extends AggregateFunction<Geometry, Accumulators.Envelope> {
+    public static class ST_Envelope_Aggr
+            extends AggregateFunction<Geometry, Accumulators.Envelope> {
 
         Geometry createPolygon(double minX, double minY, double maxX, double maxY) {
             Coordinate[] coords = new Coordinate[5];
@@ -47,8 +53,9 @@ public class Aggregators {
             return createPolygon(acc.minX, acc.minY, acc.maxX, acc.maxY);
         }
 
-        public void accumulate(Accumulators.Envelope acc,
-                               @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
+        public void accumulate(
+                Accumulators.Envelope acc,
+                @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
             Envelope envelope = ((Geometry) o).getEnvelopeInternal();
             acc.minX = Math.min(acc.minX, envelope.getMinX());
             acc.minY = Math.min(acc.minY, envelope.getMinY());
@@ -57,15 +64,17 @@ public class Aggregators {
         }
 
         /**
-         * TODO: find an efficient algorithm to incrementally and decrementally update the accumulator
+         * TODO: find an efficient algorithm to incrementally and decrementally update the
+         * accumulator
          *
          * @param acc
          * @param o
          */
-        public void retract(Accumulators.Envelope acc,
-                            @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
+        public void retract(
+                Accumulators.Envelope acc,
+                @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
             Geometry geometry = (Geometry) o;
-            assert(false);
+            assert (false);
         }
 
         public void merge(Accumulators.Envelope acc, Iterable<Accumulators.Envelope> it) {
@@ -82,11 +91,11 @@ public class Aggregators {
         }
     }
 
-
     // Compute the Union boundary of numbers of geometries
     //
     @DataTypeHint(value = "RAW", bridgedTo = Geometry.class)
-    public static class ST_Intersection_Aggr extends AggregateFunction<Geometry, Accumulators.AccGeometry> {
+    public static class ST_Intersection_Aggr
+            extends AggregateFunction<Geometry, Accumulators.AccGeometry> {
 
         @Override
         public Accumulators.AccGeometry createAccumulator() {
@@ -99,9 +108,10 @@ public class Aggregators {
             return acc.geom;
         }
 
-        public void accumulate(Accumulators.AccGeometry acc,
-                               @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
-            if (acc.geom == null){
+        public void accumulate(
+                Accumulators.AccGeometry acc,
+                @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
+            if (acc.geom == null) {
                 acc.geom = (Geometry) o;
             } else {
                 acc.geom = acc.geom.intersection((Geometry) o);
@@ -109,38 +119,40 @@ public class Aggregators {
         }
 
         /**
-         * TODO: find an efficient algorithm to incrementally and decrementally update the accumulator
+         * TODO: find an efficient algorithm to incrementally and decrementally update the
+         * accumulator
          *
          * @param acc
          * @param o
          */
-        public void retract(Accumulators.AccGeometry acc,
-                            @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
+        public void retract(
+                Accumulators.AccGeometry acc,
+                @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
             Geometry geometry = (Geometry) o;
             assert (false);
         }
 
-        public void merge (Accumulators.AccGeometry acc, Iterable < Accumulators.AccGeometry > it){
+        public void merge(Accumulators.AccGeometry acc, Iterable<Accumulators.AccGeometry> it) {
             for (Accumulators.AccGeometry a : it) {
-                    if (acc.geom == null){
-    //      make accumulate equal to acc
-                        acc.geom = a.geom;
-                    } else {
-                        acc.geom = acc.geom.intersection(a.geom);
-                    }
+                if (acc.geom == null) {
+                    //      make accumulate equal to acc
+                    acc.geom = a.geom;
+                } else {
+                    acc.geom = acc.geom.intersection(a.geom);
                 }
+            }
         }
 
-        public void resetAccumulator (Accumulators.AccGeometry acc){
+        public void resetAccumulator(Accumulators.AccGeometry acc) {
             acc.geom = null;
         }
     }
 
-
     // Compute the Union boundary of numbers of geometries
     //
     @DataTypeHint(value = "RAW", bridgedTo = Geometry.class)
-    public static class ST_Union_Aggr extends AggregateFunction<Geometry, Accumulators.AccGeometry> {
+    public static class ST_Union_Aggr
+            extends AggregateFunction<Geometry, Accumulators.AccGeometry> {
 
         @Override
         public Accumulators.AccGeometry createAccumulator() {
@@ -153,9 +165,10 @@ public class Aggregators {
             return acc.geom;
         }
 
-        public void accumulate(Accumulators.AccGeometry acc,
-                               @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
-            if (acc.geom == null){
+        public void accumulate(
+                Accumulators.AccGeometry acc,
+                @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
+            if (acc.geom == null) {
                 acc.geom = (Geometry) o;
             } else {
                 acc.geom = acc.geom.union((Geometry) o);
@@ -163,29 +176,31 @@ public class Aggregators {
         }
 
         /**
-         * TODO: find an efficient algorithm to incrementally and decrementally update the accumulator
+         * TODO: find an efficient algorithm to incrementally and decrementally update the
+         * accumulator
          *
          * @param acc
          * @param o
          */
-        public void retract(Accumulators.AccGeometry acc,
-                            @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
+        public void retract(
+                Accumulators.AccGeometry acc,
+                @DataTypeHint(value = "RAW", bridgedTo = Geometry.class) Object o) {
             Geometry geometry = (Geometry) o;
             assert (false);
         }
 
-        public void merge (Accumulators.AccGeometry acc, Iterable < Accumulators.AccGeometry > it){
+        public void merge(Accumulators.AccGeometry acc, Iterable<Accumulators.AccGeometry> it) {
             for (Accumulators.AccGeometry a : it) {
-                    if (acc.geom == null){
-    //      make accumulate equal to acc
-                        acc.geom = a.geom;
-                    } else {
-                        acc.geom = acc.geom.union(a.geom);
-                    }
+                if (acc.geom == null) {
+                    //      make accumulate equal to acc
+                    acc.geom = a.geom;
+                } else {
+                    acc.geom = acc.geom.union(a.geom);
                 }
+            }
         }
 
-        public void resetAccumulator (Accumulators.AccGeometry acc){
+        public void resetAccumulator(Accumulators.AccGeometry acc) {
             acc.geom = null;
         }
     }

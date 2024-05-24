@@ -16,68 +16,57 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
 
+import java.util.Iterator;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
-import javax.annotation.Nullable;
-
-import java.util.Iterator;
-import java.util.List;
-
-public class FlatGridPartitioner
-        extends SpatialPartitioner
-{
-    public FlatGridPartitioner(GridType gridType, List<Envelope> grids)
-    {
+public class FlatGridPartitioner extends SpatialPartitioner {
+    public FlatGridPartitioner(GridType gridType, List<Envelope> grids) {
         super(gridType, grids);
     }
 
     // For backwards compatibility (see SpatialRDD.spatialPartitioning(otherGrids))
-    public FlatGridPartitioner(List<Envelope> grids)
-    {
+    public FlatGridPartitioner(List<Envelope> grids) {
         super(null, grids);
     }
 
     @Override
     public Iterator<Tuple2<Integer, Geometry>> placeObject(Geometry spatialObject)
-            throws Exception
-    {
+            throws Exception {
         EqualPartitioning partitioning = new EqualPartitioning(grids);
         return partitioning.placeObject(spatialObject);
     }
 
     @Nullable
-    public DedupParams getDedupParams()
-    {
+    public DedupParams getDedupParams() {
         /**
-         * Equal and Hilbert partitioning methods have necessary properties to support de-dup.
-         * These methods provide non-overlapping partition extents and not require overflow
-         * partition as they cover full extent of the RDD. However, legacy
-         * SpatialRDD.spatialPartitioning(otherGrids) method doesn't preserve the grid type
-         * making it impossible to reliably detect whether partitioning allows efficient de-dup or not.
+         * Equal and Hilbert partitioning methods have necessary properties to support de-dup. These
+         * methods provide non-overlapping partition extents and not require overflow partition as
+         * they cover full extent of the RDD. However, legacy
+         * SpatialRDD.spatialPartitioning(otherGrids) method doesn't preserve the grid type making
+         * it impossible to reliably detect whether partitioning allows efficient de-dup or not.
          *
-         * TODO Figure out how to remove SpatialRDD.spatialPartitioning(otherGrids) API. Perhaps,
-         * make the implementation no-op and fold the logic into JoinQuery, RangeQuery and KNNQuery APIs.
+         * <p>TODO Figure out how to remove SpatialRDD.spatialPartitioning(otherGrids) API. Perhaps,
+         * make the implementation no-op and fold the logic into JoinQuery, RangeQuery and KNNQuery
+         * APIs.
          */
-
         return null;
     }
 
     @Override
-    public int numPartitions()
-    {
+    public int numPartitions() {
         return grids.size() + 1 /* overflow partition */;
     }
 
     @Override
-    public boolean equals(Object o)
-    {
+    public boolean equals(Object o) {
         if (o == null || !(o instanceof FlatGridPartitioner)) {
             return false;
         }

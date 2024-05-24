@@ -16,9 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.showcase;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
@@ -29,64 +32,37 @@ import org.locationtech.jts.geom.MultiLineString;
 import org.locationtech.jts.geom.MultiPolygon;
 import org.locationtech.jts.io.WKTReader;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class UserSuppliedLineStringMapper.
- */
-public class UserSuppliedLineStringMapper
-        implements FlatMapFunction<Iterator<String>, Object>
-{
+/** The Class UserSuppliedLineStringMapper. */
+public class UserSuppliedLineStringMapper implements FlatMapFunction<Iterator<String>, Object> {
 
-    /**
-     * The spatial object.
-     */
+    /** The spatial object. */
     Geometry spatialObject = null;
 
-    /**
-     * The multi spatial objects.
-     */
+    /** The multi spatial objects. */
     MultiPolygon multiSpatialObjects = null;
 
-    /**
-     * The fact.
-     */
+    /** The fact. */
     GeometryFactory fact = new GeometryFactory();
 
-    /**
-     * The line split list.
-     */
+    /** The line split list. */
     List<String> lineSplitList;
 
-    /**
-     * The coordinates list.
-     */
+    /** The coordinates list. */
     ArrayList<Coordinate> coordinatesList;
 
-    /**
-     * The coordinates.
-     */
+    /** The coordinates. */
     Coordinate[] coordinates;
 
-    /**
-     * The linear.
-     */
+    /** The linear. */
     LinearRing linear;
 
-    /**
-     * The actual end offset.
-     */
+    /** The actual end offset. */
     int actualEndOffset;
 
     @Override
-    public Iterator<Object> call(Iterator<String> stringIterator)
-            throws Exception
-    {
+    public Iterator<Object> call(Iterator<String> stringIterator) throws Exception {
         List result = new ArrayList<LineString>();
         while (stringIterator.hasNext()) {
             String line = stringIterator.next();
@@ -103,8 +79,7 @@ public class UserSuppliedLineStringMapper
                     spatialObject = multiSpatialObjects.getGeometryN(i);
                     result.add(spatialObject);
                 }
-            }
-            else {
+            } else {
                 result.add(spatialObject);
             }
         }

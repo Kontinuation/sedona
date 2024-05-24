@@ -18,14 +18,8 @@
  */
 package org.apache.sedona.common.raster;
 
-import org.apache.sedona.common.Constructors;
-import org.apache.sedona.common.raster.serde.Serde;
-import org.geotools.coverage.grid.GridCoverage2D;
-import org.junit.Test;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.io.ParseException;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.operation.TransformException;
+import static org.apache.sedona.common.raster.RasterBandEditors.rasterUnion;
+import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.text.DecimalFormat;
@@ -35,32 +29,38 @@ import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.sedona.common.Constructors;
+import org.apache.sedona.common.raster.serde.Serde;
+import org.geotools.coverage.grid.GridCoverage2D;
+import org.junit.Test;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.io.ParseException;
+import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.operation.TransformException;
 
-import static org.apache.sedona.common.raster.RasterBandEditors.rasterUnion;
-import static org.junit.Assert.*;
-
-public class RasterBandEditorsTest extends RasterTestBase{
+public class RasterBandEditorsTest extends RasterTestBase {
 
     @Test
     public void testSetBandNoDataValueWithRaster() throws IOException {
         GridCoverage2D raster = rasterFromGeoTiff(resourceFolder + "raster/test1.tiff");
-        GridCoverage2D grid = RasterBandEditors.setBandNoDataValue(raster, 1,3d);
+        GridCoverage2D grid = RasterBandEditors.setBandNoDataValue(raster, 1, 3d);
         double actual = RasterBandAccessors.getBandNoDataValue(grid);
         double expected = 3;
         assertEquals(expected, actual, 0.1d);
-        assert(Arrays.equals(MapAlgebra.bandAsArray(raster, 1), MapAlgebra.bandAsArray(grid, 1)));
+        assert (Arrays.equals(MapAlgebra.bandAsArray(raster, 1), MapAlgebra.bandAsArray(grid, 1)));
 
         grid = RasterBandEditors.setBandNoDataValue(raster, -999d);
         actual = RasterBandAccessors.getBandNoDataValue(grid);
         expected = -999;
         assertEquals(expected, actual, 0.1d);
-        assert(Arrays.equals(MapAlgebra.bandAsArray(raster, 1), MapAlgebra.bandAsArray(grid, 1)));
+        assert (Arrays.equals(MapAlgebra.bandAsArray(raster, 1), MapAlgebra.bandAsArray(grid, 1)));
     }
 
     @Test
     public void testSetBandNoDataValueWithNull() throws IOException {
-        GridCoverage2D raster = rasterFromGeoTiff(resourceFolder + "raster/raster_with_no_data/test5.tiff");
-        GridCoverage2D grid = RasterBandEditors.setBandNoDataValue(raster, 1,null);
+        GridCoverage2D raster =
+                rasterFromGeoTiff(resourceFolder + "raster/raster_with_no_data/test5.tiff");
+        GridCoverage2D grid = RasterBandEditors.setBandNoDataValue(raster, 1, null);
         String actual = Arrays.toString(grid.getSampleDimensions());
         String expected = "[RenderedSampleDimension[\"PALETTE_INDEX\"]]";
         assertEquals(expected, actual);
@@ -68,7 +68,8 @@ public class RasterBandEditorsTest extends RasterTestBase{
 
     @Test
     public void testGetSummaryStats() throws IOException {
-        GridCoverage2D raster = rasterFromGeoTiff(resourceFolder + "raster/raster_with_no_data/test5.tiff");
+        GridCoverage2D raster =
+                rasterFromGeoTiff(resourceFolder + "raster/raster_with_no_data/test5.tiff");
         raster = RasterBandEditors.setBandNoDataValue(raster, 1, 10.0, true);
 
         // Test single output
@@ -93,7 +94,8 @@ public class RasterBandEditorsTest extends RasterTestBase{
 
     @Test
     public void testSetBandNoDataValueWithReplaceOptionRaster() throws IOException {
-        GridCoverage2D raster = rasterFromGeoTiff(resourceFolder + "raster/raster_with_no_data/test5.tiff");
+        GridCoverage2D raster =
+                rasterFromGeoTiff(resourceFolder + "raster/raster_with_no_data/test5.tiff");
         double[] originalSummary = RasterBandAccessors.getSummaryStatsAll(raster, 1, false);
         int sumOG = (int) originalSummary[1];
 
@@ -134,20 +136,23 @@ public class RasterBandEditorsTest extends RasterTestBase{
         GridCoverage2D result = RasterBandEditors.setBandNoDataValue(raster, 1, 20.0, true);
         double[] resultBand = MapAlgebra.bandAsArray(result, 1);
 
-        Map<Double, Long> resultMap = Arrays.stream(resultBand)
-                .boxed()
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+        Map<Double, Long> resultMap =
+                Arrays.stream(resultBand)
+                        .boxed()
+                        .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
 
-        Map<Double, Long> actualMap = Arrays.stream(band1)
-                .boxed()
-                .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
+        Map<Double, Long> actualMap =
+                Arrays.stream(band1)
+                        .boxed()
+                        .collect(Collectors.groupingBy(Function.identity(), Collectors.counting()));
 
         assertEquals(actualMap.get(15.0), resultMap.get(20.0));
     }
 
     @Test
     public void testSetBandNoDataValueWithEmptyRaster() throws FactoryException {
-        GridCoverage2D emptyRaster = RasterConstructors.makeEmptyRaster(1, 20, 20, 0, 0, 8, 8, 0.1, 0.1, 4326);
+        GridCoverage2D emptyRaster =
+                RasterConstructors.makeEmptyRaster(1, 20, 20, 0, 0, 8, 8, 0.1, 0.1, 4326);
         GridCoverage2D grid = RasterBandEditors.setBandNoDataValue(emptyRaster, 1, 999d);
         double actual = RasterBandAccessors.getBandNoDataValue(grid);
         double expected = 999;
@@ -161,7 +166,8 @@ public class RasterBandEditorsTest extends RasterTestBase{
 
     @Test
     public void testSetBandNoDataValueWithEmptyRasterMultipleBand() throws FactoryException {
-        GridCoverage2D emptyRaster = RasterConstructors.makeEmptyRaster(2, 20, 20, 0, 0, 8, 8, 0.1, 0.1, 0);
+        GridCoverage2D emptyRaster =
+                RasterConstructors.makeEmptyRaster(2, 20, 20, 0, 0, 8, 8, 0.1, 0.1, 0);
         GridCoverage2D grid = RasterBandEditors.setBandNoDataValue(emptyRaster, -9999d);
         grid = RasterBandEditors.setBandNoDataValue(grid, 2, 444d);
         assertEquals(-9999, (double) RasterBandAccessors.getBandNoDataValue(grid), 0.1d);
@@ -169,13 +175,20 @@ public class RasterBandEditorsTest extends RasterTestBase{
     }
 
     @Test
-    public void testClipWithGeometryTransform() throws FactoryException, IOException, ParseException, TransformException {
-        GridCoverage2D raster = rasterFromGeoTiff(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif");
-        String polygon = "POLYGON ((-8682522.873537656 4572703.890837922, -8673439.664183248 4572993.532747675, -8673155.57366801 4563873.2099182755, -8701890.325907696 4562931.7093397, -8682522.873537656 4572703.890837922))";
+    public void testClipWithGeometryTransform()
+            throws FactoryException, IOException, ParseException, TransformException {
+        GridCoverage2D raster =
+                rasterFromGeoTiff(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif");
+        String polygon =
+                "POLYGON ((-8682522.873537656 4572703.890837922, -8673439.664183248"
+                        + " 4572993.532747675, -8673155.57366801 4563873.2099182755,"
+                        + " -8701890.325907696 4562931.7093397, -8682522.873537656"
+                        + " 4572703.890837922))";
         Geometry geom = Constructors.geomFromWKT(polygon, 3857);
 
         GridCoverage2D clippedRaster = RasterBandEditors.clip(raster, 1, geom, 200, false);
-        double[] clippedMetadata = Arrays.stream(RasterAccessors.metadata(clippedRaster), 0, 9).toArray();
+        double[] clippedMetadata =
+                Arrays.stream(RasterAccessors.metadata(clippedRaster), 0, 9).toArray();
         double[] originalMetadata = Arrays.stream(RasterAccessors.metadata(raster), 0, 9).toArray();
         assertArrayEquals(originalMetadata, clippedMetadata, 0.01d);
 
@@ -185,24 +198,33 @@ public class RasterBandEditorsTest extends RasterTestBase{
         points.add(Constructors.geomFromWKT("POINT(237201 4.20429e+06)", 26918));
         points.add(Constructors.geomFromWKT("POINT(237919 4.20357e+06)", 26918));
         points.add(Constructors.geomFromWKT("POINT(254668 4.21769e+06)", 26918));
-        Double[] actualValues = PixelFunctions.values(clippedRaster, points, 1).toArray(new Double[0]);
+        Double[] actualValues =
+                PixelFunctions.values(clippedRaster, points, 1).toArray(new Double[0]);
         Double[] expectedValues = new Double[] {null, null, 0.0, 0.0, null};
         assertTrue(Arrays.equals(expectedValues, actualValues));
     }
 
     @Test
-    public void testClip() throws IOException, FactoryException, TransformException, ParseException, ClassNotFoundException {
-        GridCoverage2D raster = rasterFromGeoTiff(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif");
-        String polygon = "POLYGON ((236722 4204770, 243900 4204770, 243900 4197590, 221170 4197590, 236722 4204770))";
+    public void testClip()
+            throws IOException, FactoryException, TransformException, ParseException,
+                    ClassNotFoundException {
+        GridCoverage2D raster =
+                rasterFromGeoTiff(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif");
+        String polygon =
+                "POLYGON ((236722 4204770, 243900 4204770, 243900 4197590, 221170 4197590, 236722"
+                        + " 4204770))";
         Geometry geom = Constructors.geomFromWKT(polygon, RasterAccessors.srid(raster));
 
         GridCoverage2D clippedRaster = RasterBandEditors.clip(raster, 1, geom, 200, false);
-        double[] clippedMetadata = Arrays.stream(RasterAccessors.metadata(clippedRaster), 0, 9).toArray();
+        double[] clippedMetadata =
+                Arrays.stream(RasterAccessors.metadata(clippedRaster), 0, 9).toArray();
         double[] originalMetadata = Arrays.stream(RasterAccessors.metadata(raster), 0, 9).toArray();
         assertArrayEquals(originalMetadata, clippedMetadata, 0.01d);
 
         String actual = String.valueOf(clippedRaster.getSampleDimensions()[0]);
-        String expected = "RenderedSampleDimension(\"RED_BAND\":[200.0 ... 200.0])\n  ‣ Category(\"No data\":[200...200])\n";
+        String expected =
+                "RenderedSampleDimension(\"RED_BAND\":[200.0 ... 200.0])\n"
+                        + "  ‣ Category(\"No data\":[200...200])\n";
         assertEquals(expected, actual);
 
         List<Geometry> points = new ArrayList<>();
@@ -211,7 +233,8 @@ public class RasterBandEditorsTest extends RasterTestBase{
         points.add(Constructors.geomFromWKT("POINT(237201 4.20429e+06)", 26918));
         points.add(Constructors.geomFromWKT("POINT(237919 4.20357e+06)", 26918));
         points.add(Constructors.geomFromWKT("POINT(254668 4.21769e+06)", 26918));
-        Double[] actualValues = PixelFunctions.values(clippedRaster, points, 1).toArray(new Double[0]);
+        Double[] actualValues =
+                PixelFunctions.values(clippedRaster, points, 1).toArray(new Double[0]);
         Double[] expectedValues = new Double[] {null, null, 0.0, 0.0, null};
         assertTrue(Arrays.equals(expectedValues, actualValues));
 
@@ -233,18 +256,39 @@ public class RasterBandEditorsTest extends RasterTestBase{
 
     @Test
     public void testRasterUnion() throws FactoryException {
-        double[][] rasterData1 = new double[][] {
-                {13, 80, 49, 15, 4, 46, 47, 94, 58, 37, 6, 22, 98, 26, 78, 66, 86, 79, 5, 65, 7, 12, 89, 67},
-                {37, 4, 5, 15, 60, 83, 24, 19, 23, 87, 98, 89, 59, 71, 42, 46, 0, 80, 27, 73, 66, 100, 78, 64},
-                {73, 39, 50, 13, 45, 21, 87, 38, 63, 22, 44, 6, 8, 24, 19, 10, 89, 3, 48, 28, 0, 71, 59, 11}
-        };
-        GridCoverage2D raster1 = RasterConstructors.makeNonEmptyRaster(3, "i", 4, 6, 1, -1, 1, -1, 0, 0, 0, rasterData1);
+        double[][] rasterData1 =
+                new double[][] {
+                    {
+                        13, 80, 49, 15, 4, 46, 47, 94, 58, 37, 6, 22, 98, 26, 78, 66, 86, 79, 5, 65,
+                        7, 12, 89, 67
+                    },
+                    {
+                        37, 4, 5, 15, 60, 83, 24, 19, 23, 87, 98, 89, 59, 71, 42, 46, 0, 80, 27, 73,
+                        66, 100, 78, 64
+                    },
+                    {
+                        73, 39, 50, 13, 45, 21, 87, 38, 63, 22, 44, 6, 8, 24, 19, 10, 89, 3, 48, 28,
+                        0, 71, 59, 11
+                    }
+                };
+        GridCoverage2D raster1 =
+                RasterConstructors.makeNonEmptyRaster(
+                        3, "i", 4, 6, 1, -1, 1, -1, 0, 0, 0, rasterData1);
 
-        double[][] rasterData2 = new double[][] {
-                {35, 68, 56, 87, 49, 20, 73, 90, 45, 96, 52, 98, 2, 82, 88, 74, 77, 60, 5, 61, 81, 32, 9, 15},
-                {55, 49, 72, 10, 63, 94, 100, 83, 61, 47, 20, 15, 34, 46, 52, 11, 23, 98, 70, 67, 18, 39, 53, 91}
-        };
-        GridCoverage2D raster2 = RasterConstructors.makeNonEmptyRaster(2, "d", 4, 6, 1, -1, 1, -1, 0, 0, 0, rasterData2);
+        double[][] rasterData2 =
+                new double[][] {
+                    {
+                        35, 68, 56, 87, 49, 20, 73, 90, 45, 96, 52, 98, 2, 82, 88, 74, 77, 60, 5,
+                        61, 81, 32, 9, 15
+                    },
+                    {
+                        55, 49, 72, 10, 63, 94, 100, 83, 61, 47, 20, 15, 34, 46, 52, 11, 23, 98, 70,
+                        67, 18, 39, 53, 91
+                    }
+                };
+        GridCoverage2D raster2 =
+                RasterConstructors.makeNonEmptyRaster(
+                        2, "d", 4, 6, 1, -1, 1, -1, 0, 0, 0, rasterData2);
 
         GridCoverage2D result = rasterUnion(raster1, raster2);
         int actualNumBands = RasterAccessors.numBands(result);
@@ -256,7 +300,8 @@ public class RasterBandEditorsTest extends RasterTestBase{
         assertArrayEquals(expectedBandValues, actualBandValues, 0.1d);
 
         double[] actualMetadata = Arrays.stream(RasterAccessors.metadata(result), 0, 9).toArray();
-        double[] expectedMetadata = Arrays.stream(RasterAccessors.metadata(raster2), 0, 9).toArray();
+        double[] expectedMetadata =
+                Arrays.stream(RasterAccessors.metadata(raster2), 0, 9).toArray();
         assertArrayEquals(expectedMetadata, actualMetadata, 0.1d);
 
         result = rasterUnion(raster1, raster2, raster1);
@@ -314,19 +359,40 @@ public class RasterBandEditorsTest extends RasterTestBase{
 
     @Test
     public void testAddBandWithEmptyRaster() throws FactoryException {
-        double[][] rasterData1 = new double[][] {
-                {13, 80, 49, 15, 4, 46, 47, 94, 58, 37, 6, 22, 98, 26, 78, 66, 86, 79, 5, 65, 7, 12, 89, 67},
-                {37, 4, 5, 15, 60, 83, 24, 19, 23, 87, 98, 89, 59, 71, 42, 46, 0, 80, 27, 73, 66, 100, 78, 64},
-                {73, 39, 50, 13, 45, 21, 87, 38, 63, 22, 44, 6, 8, 24, 19, 10, 89, 3, 48, 28, 0, 71, 59, 11}
-        };
-        GridCoverage2D toRaster = RasterConstructors.makeNonEmptyRaster(3, "i", 4, 6, 1, -1, 1, 1, 0, 0, 0, rasterData1);
+        double[][] rasterData1 =
+                new double[][] {
+                    {
+                        13, 80, 49, 15, 4, 46, 47, 94, 58, 37, 6, 22, 98, 26, 78, 66, 86, 79, 5, 65,
+                        7, 12, 89, 67
+                    },
+                    {
+                        37, 4, 5, 15, 60, 83, 24, 19, 23, 87, 98, 89, 59, 71, 42, 46, 0, 80, 27, 73,
+                        66, 100, 78, 64
+                    },
+                    {
+                        73, 39, 50, 13, 45, 21, 87, 38, 63, 22, 44, 6, 8, 24, 19, 10, 89, 3, 48, 28,
+                        0, 71, 59, 11
+                    }
+                };
+        GridCoverage2D toRaster =
+                RasterConstructors.makeNonEmptyRaster(
+                        3, "i", 4, 6, 1, -1, 1, 1, 0, 0, 0, rasterData1);
 
         // fromRaster's data type is Double to test the preservation of data type
-        double[][] rasterData2 = new double[][] {
-                {35, 68, 56, 87, 49, 20, 73, 90, 45, 96, 52, 98, 2, 82, 88, 74, 77, 60, 5, 61, 81, 32, 9, 15},
-                {55, 49, 72, 10, 63, 94, 100, 83, 61, 47, 20, 15, 34, 46, 52, 11, 23, 98, 70, 67, 18, 39, 53, 91}
-        };
-        GridCoverage2D fromRaster = RasterConstructors.makeNonEmptyRaster(2, "d", 4, 6, 10, -10, 1, -1, 0, 0, 0, rasterData2);
+        double[][] rasterData2 =
+                new double[][] {
+                    {
+                        35, 68, 56, 87, 49, 20, 73, 90, 45, 96, 52, 98, 2, 82, 88, 74, 77, 60, 5,
+                        61, 81, 32, 9, 15
+                    },
+                    {
+                        55, 49, 72, 10, 63, 94, 100, 83, 61, 47, 20, 15, 34, 46, 52, 11, 23, 98, 70,
+                        67, 18, 39, 53, 91
+                    }
+                };
+        GridCoverage2D fromRaster =
+                RasterConstructors.makeNonEmptyRaster(
+                        2, "d", 4, 6, 10, -10, 1, -1, 0, 0, 0, rasterData2);
 
         // test 4 parameter variant
         testAddBand4Param(fromRaster, toRaster);
@@ -338,7 +404,8 @@ public class RasterBandEditorsTest extends RasterTestBase{
         testAddBand2Param(fromRaster, toRaster);
     }
 
-    public static void testAddBand4Param(GridCoverage2D fromRaster, GridCoverage2D toRaster) throws FactoryException {
+    public static void testAddBand4Param(GridCoverage2D fromRaster, GridCoverage2D toRaster)
+            throws FactoryException {
         GridCoverage2D actualRaster = RasterBandEditors.addBand(toRaster, fromRaster, 1, 4);
 
         // test numBands
@@ -358,12 +425,15 @@ public class RasterBandEditorsTest extends RasterTestBase{
 
         // test preservation of original raster
         // remove last index as that's number of bands and they wouldn't be equal
-        double[] actualMetadata = Arrays.stream(RasterAccessors.metadata(actualRaster), 0, 9).toArray();
-        double[] expectedMetadata = Arrays.stream(RasterAccessors.metadata(toRaster), 0, 9).toArray();
+        double[] actualMetadata =
+                Arrays.stream(RasterAccessors.metadata(actualRaster), 0, 9).toArray();
+        double[] expectedMetadata =
+                Arrays.stream(RasterAccessors.metadata(toRaster), 0, 9).toArray();
         assertArrayEquals(expectedMetadata, actualMetadata, 0.1d);
     }
 
-    public static void testAddBand3Param(GridCoverage2D fromRaster, GridCoverage2D toRaster) throws FactoryException {
+    public static void testAddBand3Param(GridCoverage2D fromRaster, GridCoverage2D toRaster)
+            throws FactoryException {
         GridCoverage2D actualRaster = RasterBandEditors.addBand(toRaster, fromRaster, 2);
 
         // test numBands
@@ -383,12 +453,15 @@ public class RasterBandEditorsTest extends RasterTestBase{
 
         // test preservation of original raster
         // remove last index as that's number of bands and they wouldn't be equal
-        double[] actualMetadata = Arrays.stream(RasterAccessors.metadata(actualRaster), 0, 9).toArray();
-        double[] expectedMetadata = Arrays.stream(RasterAccessors.metadata(toRaster), 0, 9).toArray();
+        double[] actualMetadata =
+                Arrays.stream(RasterAccessors.metadata(actualRaster), 0, 9).toArray();
+        double[] expectedMetadata =
+                Arrays.stream(RasterAccessors.metadata(toRaster), 0, 9).toArray();
         assertArrayEquals(expectedMetadata, actualMetadata, 0.1d);
     }
 
-    public static void testAddBand2Param(GridCoverage2D fromRaster, GridCoverage2D toRaster) throws FactoryException {
+    public static void testAddBand2Param(GridCoverage2D fromRaster, GridCoverage2D toRaster)
+            throws FactoryException {
         GridCoverage2D actualRaster = RasterBandEditors.addBand(toRaster, fromRaster);
 
         // test numBands
@@ -408,9 +481,10 @@ public class RasterBandEditorsTest extends RasterTestBase{
 
         // test preservation of original raster
         // remove last index as that's number of bands and they wouldn't be equal
-        double[] actualMetadata = Arrays.stream(RasterAccessors.metadata(actualRaster), 0, 9).toArray();
-        double[] expectedMetadata = Arrays.stream(RasterAccessors.metadata(toRaster), 0, 9).toArray();
+        double[] actualMetadata =
+                Arrays.stream(RasterAccessors.metadata(actualRaster), 0, 9).toArray();
+        double[] expectedMetadata =
+                Arrays.stream(RasterAccessors.metadata(toRaster), 0, 9).toArray();
         assertArrayEquals(expectedMetadata, actualMetadata, 0.1d);
     }
-
 }

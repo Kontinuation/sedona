@@ -22,19 +22,18 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-
-import javax.media.jai.ComponentSampleModelJAI;
-import javax.media.jai.RasterFactory;
 import java.awt.image.BandedSampleModel;
 import java.awt.image.ComponentSampleModel;
 import java.awt.image.MultiPixelPackedSampleModel;
 import java.awt.image.PixelInterleavedSampleModel;
 import java.awt.image.SampleModel;
 import java.awt.image.SinglePixelPackedSampleModel;
+import javax.media.jai.ComponentSampleModelJAI;
+import javax.media.jai.RasterFactory;
 
 /**
- * Serializer for SampleModelState using Kryo. This is translated from the original JAI implementation
- * of writeObject and readObject.
+ * Serializer for SampleModelState using Kryo. This is translated from the original JAI
+ * implementation of writeObject and readObject.
  */
 public class SampleModelSerializer extends Serializer<SampleModel> {
 
@@ -62,7 +61,8 @@ public class SampleModelSerializer extends Serializer<SampleModel> {
         } else if (sampleModel instanceof MultiPixelPackedSampleModel) {
             return TYPE_MULTI_PIXEL_PACKED;
         } else {
-            throw new UnsupportedOperationException("Unsupported SampleModel type: " + sampleModel.getClass().getName());
+            throw new UnsupportedOperationException(
+                    "Unsupported SampleModel type: " + sampleModel.getClass().getName());
         }
     }
 
@@ -75,48 +75,54 @@ public class SampleModelSerializer extends Serializer<SampleModel> {
         output.writeInt(sampleModel.getHeight());
 
         switch (sampleModelType) {
-            case TYPE_BANDED: {
-                BandedSampleModel sm = (BandedSampleModel)sampleModel;
-                KryoUtil.writeIntArray(output, sm.getBankIndices());
-                KryoUtil.writeIntArray(output, sm.getBandOffsets());
-                break;
-            }
+            case TYPE_BANDED:
+                {
+                    BandedSampleModel sm = (BandedSampleModel) sampleModel;
+                    KryoUtil.writeIntArray(output, sm.getBankIndices());
+                    KryoUtil.writeIntArray(output, sm.getBandOffsets());
+                    break;
+                }
 
-            case TYPE_PIXEL_INTERLEAVED: {
-                PixelInterleavedSampleModel sm = (PixelInterleavedSampleModel)sampleModel;
-                output.writeInt(sm.getPixelStride());
-                output.writeInt(sm.getScanlineStride());
-                KryoUtil.writeIntArray(output, sm.getBandOffsets());
-                break;
-            }
+            case TYPE_PIXEL_INTERLEAVED:
+                {
+                    PixelInterleavedSampleModel sm = (PixelInterleavedSampleModel) sampleModel;
+                    output.writeInt(sm.getPixelStride());
+                    output.writeInt(sm.getScanlineStride());
+                    KryoUtil.writeIntArray(output, sm.getBandOffsets());
+                    break;
+                }
 
             case TYPE_COMPONENT:
-            case TYPE_COMPONENT_JAI: {
-                ComponentSampleModel sm = (ComponentSampleModel)sampleModel;
-                output.writeInt(sm.getPixelStride());
-                output.writeInt(sm.getScanlineStride());
-                KryoUtil.writeIntArray(output, sm.getBankIndices());
-                KryoUtil.writeIntArray(output, sm.getBandOffsets());
-                break;
-            }
+            case TYPE_COMPONENT_JAI:
+                {
+                    ComponentSampleModel sm = (ComponentSampleModel) sampleModel;
+                    output.writeInt(sm.getPixelStride());
+                    output.writeInt(sm.getScanlineStride());
+                    KryoUtil.writeIntArray(output, sm.getBankIndices());
+                    KryoUtil.writeIntArray(output, sm.getBandOffsets());
+                    break;
+                }
 
-            case TYPE_SINGLE_PIXEL_PACKED: {
-                SinglePixelPackedSampleModel sm = (SinglePixelPackedSampleModel)sampleModel;
-                output.writeInt(sm.getScanlineStride());
-                KryoUtil.writeIntArray(output, sm.getBitMasks());
-                break;
-            }
+            case TYPE_SINGLE_PIXEL_PACKED:
+                {
+                    SinglePixelPackedSampleModel sm = (SinglePixelPackedSampleModel) sampleModel;
+                    output.writeInt(sm.getScanlineStride());
+                    KryoUtil.writeIntArray(output, sm.getBitMasks());
+                    break;
+                }
 
-            case TYPE_MULTI_PIXEL_PACKED: {
-                MultiPixelPackedSampleModel sm = (MultiPixelPackedSampleModel)sampleModel;
-                output.writeInt(sm.getPixelBitStride());
-                output.writeInt(sm.getScanlineStride());
-                output.writeInt(sm.getDataBitOffset());
-                break;
-            }
+            case TYPE_MULTI_PIXEL_PACKED:
+                {
+                    MultiPixelPackedSampleModel sm = (MultiPixelPackedSampleModel) sampleModel;
+                    output.writeInt(sm.getPixelBitStride());
+                    output.writeInt(sm.getScanlineStride());
+                    output.writeInt(sm.getDataBitOffset());
+                    break;
+                }
 
             default:
-                throw new UnsupportedOperationException("Unknown SampleModel type: " + sampleModel.getClass().getName());
+                throw new UnsupportedOperationException(
+                        "Unknown SampleModel type: " + sampleModel.getClass().getName());
         }
     }
 
@@ -128,47 +134,81 @@ public class SampleModelSerializer extends Serializer<SampleModel> {
         int height = input.readInt();
 
         switch (sampleModelType) {
-            case TYPE_BANDED: {
-                int[] bankIndices = KryoUtil.readIntArray(input);
-                int[] bandOffsets = KryoUtil.readIntArray(input);
-                return RasterFactory.createBandedSampleModel(transferType, width, height, bankIndices.length, bankIndices, bandOffsets);
-            }
+            case TYPE_BANDED:
+                {
+                    int[] bankIndices = KryoUtil.readIntArray(input);
+                    int[] bandOffsets = KryoUtil.readIntArray(input);
+                    return RasterFactory.createBandedSampleModel(
+                            transferType,
+                            width,
+                            height,
+                            bankIndices.length,
+                            bankIndices,
+                            bandOffsets);
+                }
 
-            case TYPE_PIXEL_INTERLEAVED: {
-                int pixelStride = input.readInt();
-                int scanLineStride = input.readInt();
-                int[] bandOffsets = KryoUtil.readIntArray(input);
-                return RasterFactory.createPixelInterleavedSampleModel(transferType, width, height, pixelStride, scanLineStride, bandOffsets);
-            }
+            case TYPE_PIXEL_INTERLEAVED:
+                {
+                    int pixelStride = input.readInt();
+                    int scanLineStride = input.readInt();
+                    int[] bandOffsets = KryoUtil.readIntArray(input);
+                    return RasterFactory.createPixelInterleavedSampleModel(
+                            transferType, width, height, pixelStride, scanLineStride, bandOffsets);
+                }
 
             case TYPE_COMPONENT_JAI:
-            case TYPE_COMPONENT: {
-                int pixelStride = input.readInt();
-                int scanLineStride = input.readInt();
-                int[] bankIndices = KryoUtil.readIntArray(input);
-                int[] bandOffsets = KryoUtil.readIntArray(input);
-                if (sampleModelType == TYPE_COMPONENT_JAI) {
-                    return new ComponentSampleModelJAI(transferType, width, height, pixelStride, scanLineStride, bankIndices, bandOffsets);
-                } else {
-                    return new ComponentSampleModel(transferType, width, height, pixelStride, scanLineStride, bankIndices, bandOffsets);
+            case TYPE_COMPONENT:
+                {
+                    int pixelStride = input.readInt();
+                    int scanLineStride = input.readInt();
+                    int[] bankIndices = KryoUtil.readIntArray(input);
+                    int[] bandOffsets = KryoUtil.readIntArray(input);
+                    if (sampleModelType == TYPE_COMPONENT_JAI) {
+                        return new ComponentSampleModelJAI(
+                                transferType,
+                                width,
+                                height,
+                                pixelStride,
+                                scanLineStride,
+                                bankIndices,
+                                bandOffsets);
+                    } else {
+                        return new ComponentSampleModel(
+                                transferType,
+                                width,
+                                height,
+                                pixelStride,
+                                scanLineStride,
+                                bankIndices,
+                                bandOffsets);
+                    }
                 }
-            }
 
-            case TYPE_SINGLE_PIXEL_PACKED: {
-                int scanLineStride = input.readInt();
-                int[] bitMasks = KryoUtil.readIntArray(input);
-                return new SinglePixelPackedSampleModel(transferType, width, height, scanLineStride, bitMasks);
-            }
+            case TYPE_SINGLE_PIXEL_PACKED:
+                {
+                    int scanLineStride = input.readInt();
+                    int[] bitMasks = KryoUtil.readIntArray(input);
+                    return new SinglePixelPackedSampleModel(
+                            transferType, width, height, scanLineStride, bitMasks);
+                }
 
-            case TYPE_MULTI_PIXEL_PACKED: {
-                int pixelStride = input.readInt();
-                int scanLineStride = input.readInt();
-                int dataBitOffset = input.readInt();
-                return new MultiPixelPackedSampleModel(transferType, width, height, pixelStride, scanLineStride, dataBitOffset);
-            }
+            case TYPE_MULTI_PIXEL_PACKED:
+                {
+                    int pixelStride = input.readInt();
+                    int scanLineStride = input.readInt();
+                    int dataBitOffset = input.readInt();
+                    return new MultiPixelPackedSampleModel(
+                            transferType,
+                            width,
+                            height,
+                            pixelStride,
+                            scanLineStride,
+                            dataBitOffset);
+                }
 
             default:
-                throw new UnsupportedOperationException("Unsupported SampleModel type: " + sampleModelType);
+                throw new UnsupportedOperationException(
+                        "Unsupported SampleModel type: " + sampleModelType);
         }
     }
 }

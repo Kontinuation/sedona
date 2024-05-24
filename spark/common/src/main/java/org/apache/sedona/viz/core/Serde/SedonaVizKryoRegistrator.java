@@ -25,14 +25,11 @@ import org.apache.sedona.viz.core.ImageSerializableWrapper;
 import org.apache.sedona.viz.utils.Pixel;
 import org.apache.spark.serializer.KryoRegistrator;
 
-public class SedonaVizKryoRegistrator
-        implements KryoRegistrator
-{
-    final static Logger log = Logger.getLogger(SedonaVizKryoRegistrator.class);
+public class SedonaVizKryoRegistrator implements KryoRegistrator {
+    static final Logger log = Logger.getLogger(SedonaVizKryoRegistrator.class);
 
     @Override
-    public void registerClasses(Kryo kryo)
-    {
+    public void registerClasses(Kryo kryo) {
         SedonaKryoRegistrator sedonaKryoRegistrator = new SedonaKryoRegistrator();
         ImageWrapperSerializer imageWrapperSerializer = new ImageWrapperSerializer();
         PixelSerializer pixelSerializer = new PixelSerializer();

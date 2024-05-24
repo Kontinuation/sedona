@@ -18,6 +18,10 @@
  */
 package org.apache.sedona.core.spatialOperator;
 
+import java.io.IOException;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.spatialRDD.SpatialRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -30,11 +34,6 @@ import org.junit.runners.Parameterized;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
-
-import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @RunWith(Parameterized.class)
 public class RangeQueryTest extends SpatialQueryTestBase {
@@ -65,9 +64,13 @@ public class RangeQueryTest extends SpatialQueryTestBase {
         Assert.assertFalse("expected results should not be empty", expectedResults.isEmpty());
     }
 
-    private static List<Integer> buildExpectedResults(SpatialPredicate spatialPredicate, Geometry queryWindow) {
+    private static List<Integer> buildExpectedResults(
+            SpatialPredicate spatialPredicate, Geometry queryWindow) {
         return testDataset.entrySet().stream()
-                .filter(entry -> evaluateSpatialPredicate(spatialPredicate, entry.getValue(), queryWindow))
+                .filter(
+                        entry ->
+                                evaluateSpatialPredicate(
+                                        spatialPredicate, entry.getValue(), queryWindow))
                 .map(Map.Entry::getKey)
                 .collect(Collectors.toList());
     }
@@ -88,7 +91,8 @@ public class RangeQueryTest extends SpatialQueryTestBase {
             case EQUALS:
                 return wktReader.read("POLYGON ((0 10, 1 10, 1 11, 0 11, 0 10))");
             default:
-                throw new IllegalArgumentException("Unsupported spatial predicate: " + spatialPredicate);
+                throw new IllegalArgumentException(
+                        "Unsupported spatial predicate: " + spatialPredicate);
         }
     }
 
@@ -96,7 +100,8 @@ public class RangeQueryTest extends SpatialQueryTestBase {
     public void testRangeQueryRaw() throws Exception {
         SpatialRDD<Geometry> spatialRDD = new SpatialRDD<>();
         spatialRDD.rawSpatialRDD = inputRdd;
-        JavaRDD<Geometry> queryResultRdd = RangeQuery.SpatialRangeQuery(spatialRDD, queryWindow, spatialPredicate, false);
+        JavaRDD<Geometry> queryResultRdd =
+                RangeQuery.SpatialRangeQuery(spatialRDD, queryWindow, spatialPredicate, false);
         verifyQueryResult(queryResultRdd);
     }
 
@@ -105,26 +110,39 @@ public class RangeQueryTest extends SpatialQueryTestBase {
         SpatialRDD<Geometry> spatialRDD = new SpatialRDD<>();
         spatialRDD.rawSpatialRDD = inputRdd;
         spatialRDD.buildIndex(IndexType.RTREE, false);
-        JavaRDD<Geometry> queryResultRdd = RangeQuery.SpatialRangeQuery(spatialRDD, queryWindow, spatialPredicate, true);
+        JavaRDD<Geometry> queryResultRdd =
+                RangeQuery.SpatialRangeQuery(spatialRDD, queryWindow, spatialPredicate, true);
         verifyQueryResult(queryResultRdd);
     }
 
     @Test
     public void testRangeQueryWithConsiderBoundaryIntersection() throws Exception {
-        if (spatialPredicate == SpatialPredicate.INTERSECTS || spatialPredicate == SpatialPredicate.COVERED_BY) {
+        if (spatialPredicate == SpatialPredicate.INTERSECTS
+                || spatialPredicate == SpatialPredicate.COVERED_BY) {
             boolean considerBoundaryIntersection = spatialPredicate == SpatialPredicate.INTERSECTS;
             SpatialRDD<Geometry> spatialRDD = new SpatialRDD<>();
             spatialRDD.rawSpatialRDD = inputRdd;
-            JavaRDD<Geometry> queryResultRdd = RangeQuery.SpatialRangeQuery(spatialRDD, queryWindow, considerBoundaryIntersection, false);
+            JavaRDD<Geometry> queryResultRdd =
+                    RangeQuery.SpatialRangeQuery(
+                            spatialRDD, queryWindow, considerBoundaryIntersection, false);
             verifyQueryResult(queryResultRdd);
         }
     }
 
     private void verifyQueryResult(JavaRDD<Geometry> resultRdd) {
-        List<Integer> actualResults = resultRdd.map(geom -> ((UserData) geom.getUserData()).getId()).collect();
-        Assert.assertEquals("Number of results should match with expected results", expectedResults.size(), actualResults.size());
-        List<Integer> sortedActualResults = actualResults.stream().sorted(Integer::compareTo).collect(Collectors.toList());
-        List<Integer> sortedExpectedResults = expectedResults.stream().sorted(Integer::compareTo).collect(Collectors.toList());
-        Assert.assertEquals("Actual range query result should match with expected results", sortedExpectedResults, sortedActualResults);
+        List<Integer> actualResults =
+                resultRdd.map(geom -> ((UserData) geom.getUserData()).getId()).collect();
+        Assert.assertEquals(
+                "Number of results should match with expected results",
+                expectedResults.size(),
+                actualResults.size());
+        List<Integer> sortedActualResults =
+                actualResults.stream().sorted(Integer::compareTo).collect(Collectors.toList());
+        List<Integer> sortedExpectedResults =
+                expectedResults.stream().sorted(Integer::compareTo).collect(Collectors.toList());
+        Assert.assertEquals(
+                "Actual range query result should match with expected results",
+                sortedExpectedResults,
+                sortedActualResults);
     }
 }

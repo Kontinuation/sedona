@@ -16,9 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.joinJudgement;
 
+import java.io.Serializable;
+import java.util.Collections;
+import java.util.Iterator;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.enums.JoinBuildSide;
@@ -32,20 +34,13 @@ import org.locationtech.jts.index.SpatialIndex;
 import org.locationtech.jts.index.quadtree.Quadtree;
 import org.locationtech.jts.index.strtree.STRtree;
 
-import java.io.Serializable;
-import java.util.Collections;
-import java.util.Iterator;
-
 public class DynamicIndexLookupJudgement<T extends Geometry, U extends Geometry>
         extends JudgementBase<T, U>
-        implements FlatMapFunction2<Iterator<U>, Iterator<T>, Pair<U, T>>, Serializable
-{
+        implements FlatMapFunction2<Iterator<U>, Iterator<T>, Pair<U, T>>, Serializable {
     private final IndexType indexType;
     private final JoinBuildSide joinBuildSide;
 
-    /**
-     * @see JudgementBase
-     */
+    /** @see JudgementBase */
     public DynamicIndexLookupJudgement(
             SpatialPredicate spatialPredicate,
             IndexType indexType,
@@ -53,8 +48,7 @@ public class DynamicIndexLookupJudgement<T extends Geometry, U extends Geometry>
             LongAccumulator buildCount,
             LongAccumulator streamCount,
             LongAccumulator resultCount,
-            LongAccumulator candidateCount)
-    {
+            LongAccumulator candidateCount) {
         super(spatialPredicate, buildCount, streamCount, resultCount, candidateCount);
         this.indexType = indexType;
         this.joinBuildSide = joinBuildSide;
@@ -62,8 +56,7 @@ public class DynamicIndexLookupJudgement<T extends Geometry, U extends Geometry>
 
     @Override
     public Iterator<Pair<U, T>> call(final Iterator<U> leftShapes, final Iterator<T> rightShapes)
-            throws Exception
-    {
+            throws Exception {
 
         if (!leftShapes.hasNext() || !rightShapes.hasNext()) {
             buildCount.add(0);
@@ -82,38 +75,32 @@ public class DynamicIndexLookupJudgement<T extends Geometry, U extends Geometry>
         if (buildLeft) {
             buildShapes = leftShapes;
             streamShapes = rightShapes;
-        }
-        else {
+        } else {
             buildShapes = rightShapes;
             streamShapes = leftShapes;
         }
 
         final SpatialIndex spatialIndex = buildIndex(buildShapes);
 
-        return new Iterator<Pair<U, T>>()
-        {
+        return new Iterator<Pair<U, T>>() {
             @Override
-            public boolean hasNext()
-            {
+            public boolean hasNext() {
                 return hasNextBase(spatialIndex, streamShapes, buildLeft);
             }
 
             @Override
-            public Pair<U, T> next()
-            {
+            public Pair<U, T> next() {
                 return nextBase(spatialIndex, streamShapes, buildLeft);
             }
 
             @Override
-            public void remove()
-            {
+            public void remove() {
                 throw new UnsupportedOperationException();
             }
         };
     }
 
-    private SpatialIndex buildIndex(Iterator<? extends Geometry> geometries)
-    {
+    private SpatialIndex buildIndex(Iterator<? extends Geometry> geometries) {
         long startTime = System.currentTimeMillis();
         long count = 0;
         final SpatialIndex index = newIndex();
@@ -128,8 +115,7 @@ public class DynamicIndexLookupJudgement<T extends Geometry, U extends Geometry>
         return index;
     }
 
-    private SpatialIndex newIndex()
-    {
+    private SpatialIndex newIndex() {
         switch (indexType) {
             case RTREE:
                 return new STRtree();

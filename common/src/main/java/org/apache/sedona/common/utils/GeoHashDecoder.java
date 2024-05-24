@@ -1,15 +1,20 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.common.utils;
 
@@ -25,7 +30,8 @@ public class GeoHashDecoder {
         }
     }
 
-    public static Geometry decode(String geohash, Integer precision) throws InvalidGeoHashException {
+    public static Geometry decode(String geohash, Integer precision)
+            throws InvalidGeoHashException {
         return decodeGeoHashBBox(geohash, precision).getBbox().toPolygon();
     }
 
@@ -40,16 +46,12 @@ public class GeoHashDecoder {
         }
 
         BBox getBbox() {
-            return new BBox(
-                    lons[0],
-                    lons[1],
-                    lats[0],
-                    lats[1]
-            );
+            return new BBox(lons[0], lons[1], lats[0], lats[1]);
         }
     }
 
-    private static LatLon decodeGeoHashBBox(String geohash, Integer precision) throws InvalidGeoHashException {
+    private static LatLon decodeGeoHashBBox(String geohash, Integer precision)
+            throws InvalidGeoHashException {
         LatLon latLon = new LatLon(new Double[] {-180.0, 180.0}, new Double[] {-90.0, 90.0});
         String geoHashLowered = geohash.toLowerCase();
         int geoHashLength = geohash.length();
@@ -60,19 +62,19 @@ public class GeoHashDecoder {
         }
         boolean isEven = true;
 
-        for (int i = 0; i < targetPrecision ; i++){
+        for (int i = 0; i < targetPrecision; i++) {
             char c = geoHashLowered.charAt(i);
             byte cd = (byte) base32.indexOf(c);
-            if (cd == -1){
-                throw new InvalidGeoHashException(String.format("Invalid character '%s' found at index %d", c, i));
+            if (cd == -1) {
+                throw new InvalidGeoHashException(
+                        String.format("Invalid character '%s' found at index %d", c, i));
             }
-            for (int j = 0;j < 5; j++){
+            for (int j = 0; j < 5; j++) {
                 byte mask = (byte) bits[j];
                 int index = (mask & cd) == 0 ? 1 : 0;
-                if (isEven){
+                if (isEven) {
                     latLon.lons[index] = (latLon.lons[0] + latLon.lons[1]) / 2;
-                }
-                else {
+                } else {
                     latLon.lats[index] = (latLon.lats[0] + latLon.lats[1]) / 2;
                 }
                 isEven = !isEven;
@@ -80,5 +82,4 @@ public class GeoHashDecoder {
         }
         return latLon;
     }
-
 }

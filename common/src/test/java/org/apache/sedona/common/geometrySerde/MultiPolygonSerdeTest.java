@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.geometrySerde;
 
-import org.junit.Test;
 import org.junit.Assert;
+import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -46,36 +45,38 @@ public class MultiPolygonSerdeTest {
     public void testMultiPolygon() {
         LinearRing shell =
                 gf.createLinearRing(
-                        new Coordinate[]{
-                                new Coordinate(0, 0),
-                                new Coordinate(0, 1),
-                                new Coordinate(1, 1),
-                                new Coordinate(1, 0),
-                                new Coordinate(0, 0)
+                        new Coordinate[] {
+                            new Coordinate(0, 0),
+                            new Coordinate(0, 1),
+                            new Coordinate(1, 1),
+                            new Coordinate(1, 0),
+                            new Coordinate(0, 0)
                         });
         LinearRing hole1 =
                 gf.createLinearRing(
-                        new Coordinate[]{
-                                new Coordinate(0.1, 0.1),
-                                new Coordinate(0.1, 0.2),
-                                new Coordinate(0.2, 0.2),
-                                new Coordinate(0.2, 0.1),
-                                new Coordinate(0.1, 0.1)
+                        new Coordinate[] {
+                            new Coordinate(0.1, 0.1),
+                            new Coordinate(0.1, 0.2),
+                            new Coordinate(0.2, 0.2),
+                            new Coordinate(0.2, 0.1),
+                            new Coordinate(0.1, 0.1)
                         });
         LinearRing hole2 =
                 gf.createLinearRing(
-                        new Coordinate[]{
-                                new Coordinate(0.3, 0.3),
-                                new Coordinate(0.3, 0.4),
-                                new Coordinate(0.4, 0.4),
-                                new Coordinate(0.4, 0.3),
-                                new Coordinate(0.3, 0.3)
+                        new Coordinate[] {
+                            new Coordinate(0.3, 0.3),
+                            new Coordinate(0.3, 0.4),
+                            new Coordinate(0.4, 0.4),
+                            new Coordinate(0.4, 0.3),
+                            new Coordinate(0.3, 0.3)
                         });
-        LinearRing[] holes = new LinearRing[]{hole1, hole2};
+        LinearRing[] holes = new LinearRing[] {hole1, hole2};
         MultiPolygon multiPolygon =
                 gf.createMultiPolygon(
-                        new Polygon[]{
-                                gf.createPolygon(shell), gf.createPolygon(), gf.createPolygon(shell, holes)
+                        new Polygon[] {
+                            gf.createPolygon(shell),
+                            gf.createPolygon(),
+                            gf.createPolygon(shell, holes)
                         });
         multiPolygon.setSRID(4326);
         byte[] bytes = GeometrySerializer.serialize(multiPolygon);
@@ -90,11 +91,7 @@ public class MultiPolygonSerdeTest {
     @Test
     public void testMultiPolygonContainingEmptyPolygons() {
         MultiPolygon multiPolygon =
-                gf.createMultiPolygon(
-                        new Polygon[]{
-                                gf.createPolygon(),
-                                gf.createPolygon()
-                        });
+                gf.createMultiPolygon(new Polygon[] {gf.createPolygon(), gf.createPolygon()});
         multiPolygon.setSRID(4326);
         byte[] bytes = GeometrySerializer.serialize(multiPolygon);
         Geometry geom = GeometrySerializer.deserialize(bytes);

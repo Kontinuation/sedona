@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper;
 
 import org.apache.sedona.common.enums.FileDataSplitter;
@@ -25,9 +24,7 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.locationtech.jts.geom.Geometry;
 
-public class GeoJsonReader
-        extends RddReader
-{
+public class GeoJsonReader extends RddReader {
 
     /**
      * Read a SpatialRDD from a file.
@@ -36,8 +33,7 @@ public class GeoJsonReader
      * @param inputPath
      * @return
      */
-    public static SpatialRDD<Geometry> readToGeometryRDD(JavaSparkContext sc, String inputPath)
-    {
+    public static SpatialRDD<Geometry> readToGeometryRDD(JavaSparkContext sc, String inputPath) {
         return readToGeometryRDD(sc, inputPath, true, false);
     }
 
@@ -46,14 +42,20 @@ public class GeoJsonReader
      *
      * @param sc
      * @param inputPath
-     * @param allowInvalidGeometries whether allows topology-invalid geometries exist in the generated RDD
-     * @param skipSyntacticallyInvalidGeometries whether allows Sedona to automatically skip syntax-invalid geometries, rather than throw errors
+     * @param allowInvalidGeometries whether allows topology-invalid geometries exist in the
+     *     generated RDD
+     * @param skipSyntacticallyInvalidGeometries whether allows Sedona to automatically skip
+     *     syntax-invalid geometries, rather than throw errors
      * @return
      */
-    public static SpatialRDD<Geometry> readToGeometryRDD(JavaSparkContext sc, String inputPath, boolean allowInvalidGeometries, boolean skipSyntacticallyInvalidGeometries)
-    {
+    public static SpatialRDD<Geometry> readToGeometryRDD(
+            JavaSparkContext sc,
+            String inputPath,
+            boolean allowInvalidGeometries,
+            boolean skipSyntacticallyInvalidGeometries) {
         JavaRDD rawTextRDD = sc.textFile(inputPath);
-        FormatMapper<Geometry> formatMapper = new FormatMapper<Geometry>(FileDataSplitter.GEOJSON, true);
+        FormatMapper<Geometry> formatMapper =
+                new FormatMapper<Geometry>(FileDataSplitter.GEOJSON, true);
         formatMapper.allowTopologicallyInvalidGeometries = allowInvalidGeometries;
         formatMapper.skipSyntacticallyInvalidGeometries = skipSyntacticallyInvalidGeometries;
         return createSpatialRDD(rawTextRDD, formatMapper);
@@ -65,8 +67,7 @@ public class GeoJsonReader
      * @param rawTextRDD a string type RDD
      * @return
      */
-    public static SpatialRDD<Geometry> readToGeometryRDD(JavaRDD rawTextRDD)
-    {
+    public static SpatialRDD<Geometry> readToGeometryRDD(JavaRDD rawTextRDD) {
         return readToGeometryRDD(rawTextRDD, true, false);
     }
 
@@ -74,13 +75,18 @@ public class GeoJsonReader
      * Read a SpatialRDD from a string type rdd.
      *
      * @param rawTextRDD a string type RDD
-     * @param allowInvalidGeometries whether allows topology-invalid geometries exist in the generated RDD
-     * @param skipSyntacticallyInvalidGeometries whether allows Sedona to automatically skip syntax-invalid geometries, rather than throw errors
+     * @param allowInvalidGeometries whether allows topology-invalid geometries exist in the
+     *     generated RDD
+     * @param skipSyntacticallyInvalidGeometries whether allows Sedona to automatically skip
+     *     syntax-invalid geometries, rather than throw errors
      * @return
      */
-    public static SpatialRDD<Geometry> readToGeometryRDD(JavaRDD rawTextRDD, boolean allowInvalidGeometries, boolean skipSyntacticallyInvalidGeometries)
-    {
-        FormatMapper<Geometry> formatMapper = new FormatMapper<Geometry>(FileDataSplitter.GEOJSON, true);
+    public static SpatialRDD<Geometry> readToGeometryRDD(
+            JavaRDD rawTextRDD,
+            boolean allowInvalidGeometries,
+            boolean skipSyntacticallyInvalidGeometries) {
+        FormatMapper<Geometry> formatMapper =
+                new FormatMapper<Geometry>(FileDataSplitter.GEOJSON, true);
         formatMapper.allowTopologicallyInvalidGeometries = allowInvalidGeometries;
         formatMapper.skipSyntacticallyInvalidGeometries = skipSyntacticallyInvalidGeometries;
         return createSpatialRDD(rawTextRDD, formatMapper);

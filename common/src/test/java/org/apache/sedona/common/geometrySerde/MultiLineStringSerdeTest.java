@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.geometrySerde;
 
-import org.junit.Test;
 import org.junit.Assert;
+import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -45,16 +44,20 @@ public class MultiLineStringSerdeTest {
     public void testMultiLineString() {
         MultiLineString multiLineString =
                 gf.createMultiLineString(
-                        new LineString[]{
-                                gf.createLineString(
-                                        new Coordinate[]{
-                                                new Coordinate(1, 2), new Coordinate(3, 4), new Coordinate(5, 6),
-                                        }),
-                                gf.createLineString(),
-                                gf.createLineString(
-                                        new Coordinate[]{
-                                                new Coordinate(7, 8), new Coordinate(9, 10), new Coordinate(11, 12),
-                                        }),
+                        new LineString[] {
+                            gf.createLineString(
+                                    new Coordinate[] {
+                                        new Coordinate(1, 2),
+                                        new Coordinate(3, 4),
+                                        new Coordinate(5, 6),
+                                    }),
+                            gf.createLineString(),
+                            gf.createLineString(
+                                    new Coordinate[] {
+                                        new Coordinate(7, 8),
+                                        new Coordinate(9, 10),
+                                        new Coordinate(11, 12),
+                                    }),
                         });
         multiLineString.setSRID(4326);
         byte[] bytes = GeometrySerializer.serialize(multiLineString);
@@ -68,13 +71,11 @@ public class MultiLineStringSerdeTest {
 
     @Test
     public void testMultiLineStringContainingEmptyLineStrings() {
-        MultiLineString multiLineString = gf.createMultiLineString(
-                new LineString[] {
-                        gf.createLineString(),
-                        gf.createLineString(),
-                        gf.createLineString()
-                }
-        );
+        MultiLineString multiLineString =
+                gf.createMultiLineString(
+                        new LineString[] {
+                            gf.createLineString(), gf.createLineString(), gf.createLineString()
+                        });
         multiLineString.setSRID(4326);
         byte[] bytes = GeometrySerializer.serialize(multiLineString);
         Geometry geom = GeometrySerializer.deserialize(bytes);

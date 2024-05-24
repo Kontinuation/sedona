@@ -16,37 +16,30 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper;
 
+import static org.junit.Assert.assertEquals;
+
+import java.io.IOException;
 import org.apache.sedona.core.TestBase;
 import org.apache.sedona.core.spatialRDD.SpatialRDD;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.io.IOException;
-
-import static org.junit.Assert.assertEquals;
-
-public class WktReaderTest
-        extends TestBase
-{
+public class WktReaderTest extends TestBase {
 
     public static String wktGeometries = null;
 
     @BeforeClass
-    public static void onceExecutedBeforeAll()
-            throws IOException
-    {
+    public static void onceExecutedBeforeAll() throws IOException {
         initialize(WktReaderTest.class.getName());
-        wktGeometries = WktReaderTest.class.getClassLoader().getResource("county_small.tsv").getPath();
+        wktGeometries =
+                WktReaderTest.class.getClassLoader().getResource("county_small.tsv").getPath();
     }
 
     @AfterClass
-    public static void tearDown()
-            throws Exception
-    {
+    public static void tearDown() throws Exception {
         sc.stop();
     }
 
@@ -56,9 +49,7 @@ public class WktReaderTest
      * @throws IOException
      */
     @Test
-    public void testReadToGeometryRDD()
-            throws IOException
-    {
+    public void testReadToGeometryRDD() throws IOException {
         // load geojson with our tool
         SpatialRDD wktRDD = WktReader.readToGeometryRDD(sc, wktGeometries, 0, true, false);
         assertEquals(wktRDD.rawSpatialRDD.count(), 103);

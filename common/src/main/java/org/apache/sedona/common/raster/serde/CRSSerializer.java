@@ -20,6 +20,14 @@ package org.apache.sedona.common.raster.serde;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.LoadingCache;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.zip.DeflaterOutputStream;
+import java.util.zip.InflaterInputStream;
+import javax.measure.IncommensurableException;
 import org.apache.commons.io.IOUtils;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.wkt.Formattable;
@@ -28,21 +36,12 @@ import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import si.uom.NonSI;
 import si.uom.SI;
 
-import javax.measure.IncommensurableException;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterInputStream;
-
 /**
- * There won't be too many distinct CRSes in a typical application, so we can cache the serialized form
- * of CRS objects to speed up the serialization/deserialization process. The serialized CRS is also compressed
- * to reduce the memory footprint. Typical serialized CRS size is around 50KB, and the compressed size is around 10KB.
- * According to our assumption, each distinct CRS will only be serialized once, so the computation cost to compress
- * the serialized CRS is negligible.
+ * There won't be too many distinct CRSes in a typical application, so we can cache the serialized
+ * form of CRS objects to speed up the serialization/deserialization process. The serialized CRS is
+ * also compressed to reduce the memory footprint. Typical serialized CRS size is around 50KB, and
+ * the compressed size is around 10KB. According to our assumption, each distinct CRS will only be
+ * serialized once, so the computation cost to compress the serialized CRS is negligible.
  */
 public class CRSSerializer {
     private CRSSerializer() {}
@@ -85,13 +84,12 @@ public class CRSSerializer {
         }
     }
 
-    private static final LoadingCache<CRSKey, byte[]> crsSerializationCache = Caffeine.newBuilder()
-            .maximumSize(100)
-            .build(CRSSerializer::doSerializeCRS);
+    private static final LoadingCache<CRSKey, byte[]> crsSerializationCache =
+            Caffeine.newBuilder().maximumSize(100).build(CRSSerializer::doSerializeCRS);
 
-    private static final LoadingCache<ByteBuffer, CoordinateReferenceSystem> crsDeserializationCache = Caffeine.newBuilder()
-            .maximumSize(100)
-            .build(CRSSerializer::doDeserializeCRS);
+    private static final LoadingCache<ByteBuffer, CoordinateReferenceSystem>
+            crsDeserializationCache =
+                    Caffeine.newBuilder().maximumSize(100).build(CRSSerializer::doDeserializeCRS);
 
     public static byte[] serialize(CoordinateReferenceSystem crs) {
         return crsSerializationCache.get(new CRSKey(crs));
@@ -104,10 +102,11 @@ public class CRSSerializer {
     private static byte[] doSerializeCRS(CRSKey crsKey) throws IOException {
         CoordinateReferenceSystem crs = crsKey.crs;
         try (ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            DeflaterOutputStream dos = new DeflaterOutputStream(bos)) {
+                DeflaterOutputStream dos = new DeflaterOutputStream(bos)) {
             String wktString;
             if (crs instanceof Formattable) {
-                // Can specify "strict" as false to get rid of serialization errors in trade of correctness
+                // Can specify "strict" as false to get rid of serialization errors in trade of
+                // correctness
                 wktString = ((Formattable) crs).toWKT(2, false);
             } else {
                 wktString = crs.toWKT();
@@ -120,10 +119,11 @@ public class CRSSerializer {
         }
     }
 
-    private static CoordinateReferenceSystem doDeserializeCRS(ByteBuffer byteBuffer) throws IOException, FactoryException {
+    private static CoordinateReferenceSystem doDeserializeCRS(ByteBuffer byteBuffer)
+            throws IOException, FactoryException {
         byte[] bytes = byteBuffer.array();
         try (ByteArrayInputStream bis = new ByteArrayInputStream(bytes);
-             InflaterInputStream dis = new InflaterInputStream(bis)) {
+                InflaterInputStream dis = new InflaterInputStream(bis)) {
             byte[] wktBytes = IOUtils.toByteArray(dis);
             String wktString = new String(wktBytes, StandardCharsets.UTF_8);
             CoordinateReferenceSystem crs = CRS.parseWKT(wktString);

@@ -113,7 +113,8 @@ public class HaversineEnvelopeTest {
     @Test
     public void testExpandPointCoveringTheGlobe() {
         Envelope env = new Envelope(10, 10, 20, 20);
-        Envelope expandedEnv = Haversine.expandEnvelope(env, 2 * SPHERE_RADIUS * Math.PI, SPHERE_RADIUS);
+        Envelope expandedEnv =
+                Haversine.expandEnvelope(env, 2 * SPHERE_RADIUS * Math.PI, SPHERE_RADIUS);
         Assert.assertTrue(coverTheNorthPole(expandedEnv));
         Assert.assertTrue(coverTheSouthPole(expandedEnv));
     }
@@ -207,7 +208,10 @@ public class HaversineEnvelopeTest {
     }
 
     private void validateExpandedEnv(Envelope env, Envelope expandedEnv, double distance) {
-        if (env.getMinX() >= -180 && env.getMaxX() <= 180 && env.getMinY() >= -90 && env.getMinY() <= 90) {
+        if (env.getMinX() >= -180
+                && env.getMaxX() <= 180
+                && env.getMinY() >= -90
+                && env.getMinY() <= 90) {
             Assert.assertTrue(expandedEnv.contains(env));
         }
 

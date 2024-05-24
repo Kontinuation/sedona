@@ -18,30 +18,35 @@
  */
 package org.apache.sedona.common.raster;
 
+import static org.junit.Assert.*;
+
+import java.awt.image.DataBuffer;
+import java.util.Random;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.junit.Assert;
 import org.junit.Test;
 import org.opengis.referencing.FactoryException;
 
-import java.awt.image.DataBuffer;
-import java.util.Random;
-
-import static org.junit.Assert.*;
-
-public class MapAlgebraTest extends RasterTestBase
-{
+public class MapAlgebraTest extends RasterTestBase {
     @Test
-    public void testAddBandAsArrayAppend()
-            throws FactoryException
-    {
+    public void testAddBandAsArrayAppend() throws FactoryException {
         GridCoverage2D raster = createEmptyRaster(1);
-        double[] band1 = new double[raster.getRenderedImage().getWidth() * raster.getRenderedImage().getHeight()];
+        double[] band1 =
+                new double
+                        [raster.getRenderedImage().getWidth()
+                                * raster.getRenderedImage().getHeight()];
         for (int i = 0; i < band1.length; i++) {
             band1[i] = i;
         }
-        double[] band2 = new double[raster.getRenderedImage().getWidth() * raster.getRenderedImage().getHeight()];
-        double[] band3 = new double[raster.getRenderedImage().getWidth() * raster.getRenderedImage().getHeight()];
+        double[] band2 =
+                new double
+                        [raster.getRenderedImage().getWidth()
+                                * raster.getRenderedImage().getHeight()];
+        double[] band3 =
+                new double
+                        [raster.getRenderedImage().getWidth()
+                                * raster.getRenderedImage().getHeight()];
         for (int i = 0; i < band2.length; i++) {
             band2[i] = i * 2;
             band3[i] = i * 3;
@@ -50,30 +55,39 @@ public class MapAlgebraTest extends RasterTestBase
         GridCoverage2D rasterWithBand1 = MapAlgebra.addBandFromArray(raster, band1, 1);
         assertEquals(1, RasterAccessors.numBands(rasterWithBand1));
         assertEquals(raster.getEnvelope(), rasterWithBand1.getEnvelope());
-        assertEquals(raster.getCoordinateReferenceSystem2D(), rasterWithBand1.getCoordinateReferenceSystem2D());
+        assertEquals(
+                raster.getCoordinateReferenceSystem2D(),
+                rasterWithBand1.getCoordinateReferenceSystem2D());
         assertEquals(RasterAccessors.srid(raster), RasterAccessors.srid(rasterWithBand1));
 
-        //replace the first band with a customNoDataValue
+        // replace the first band with a customNoDataValue
         rasterWithBand1 = MapAlgebra.addBandFromArray(rasterWithBand1, band1, 1, -999d);
         assertEquals(1, RasterAccessors.numBands(rasterWithBand1));
         assertEquals(raster.getEnvelope(), rasterWithBand1.getEnvelope());
-        assertEquals(raster.getCoordinateReferenceSystem2D(), rasterWithBand1.getCoordinateReferenceSystem2D());
+        assertEquals(
+                raster.getCoordinateReferenceSystem2D(),
+                rasterWithBand1.getCoordinateReferenceSystem2D());
         assertEquals(RasterAccessors.srid(raster), RasterAccessors.srid(rasterWithBand1));
         assertEquals(-999, RasterUtils.getNoDataValue(rasterWithBand1.getSampleDimension(0)), 1e-9);
 
-        //replace first band with a different customNoDataValue
+        // replace first band with a different customNoDataValue
         rasterWithBand1 = MapAlgebra.addBandFromArray(rasterWithBand1, band1, 1, -9999d);
         assertEquals(1, RasterAccessors.numBands(rasterWithBand1));
         assertEquals(raster.getEnvelope(), rasterWithBand1.getEnvelope());
-        assertEquals(raster.getCoordinateReferenceSystem2D(), rasterWithBand1.getCoordinateReferenceSystem2D());
+        assertEquals(
+                raster.getCoordinateReferenceSystem2D(),
+                rasterWithBand1.getCoordinateReferenceSystem2D());
         assertEquals(RasterAccessors.srid(raster), RasterAccessors.srid(rasterWithBand1));
-        assertEquals(-9999, RasterUtils.getNoDataValue(rasterWithBand1.getSampleDimension(0)), 1e-9);
+        assertEquals(
+                -9999, RasterUtils.getNoDataValue(rasterWithBand1.getSampleDimension(0)), 1e-9);
 
-        //remove noDataValue from the first band
+        // remove noDataValue from the first band
         rasterWithBand1 = MapAlgebra.addBandFromArray(rasterWithBand1, band1, 1, null);
         assertEquals(1, RasterAccessors.numBands(rasterWithBand1));
         assertEquals(raster.getEnvelope(), rasterWithBand1.getEnvelope());
-        assertEquals(raster.getCoordinateReferenceSystem2D(), rasterWithBand1.getCoordinateReferenceSystem2D());
+        assertEquals(
+                raster.getCoordinateReferenceSystem2D(),
+                rasterWithBand1.getCoordinateReferenceSystem2D());
         assertEquals(RasterAccessors.srid(raster), RasterAccessors.srid(rasterWithBand1));
         assertTrue(Double.isNaN(RasterUtils.getNoDataValue(rasterWithBand1.getSampleDimension(0))));
 
@@ -81,7 +95,9 @@ public class MapAlgebraTest extends RasterTestBase
         GridCoverage2D rasterWithBand2 = MapAlgebra.addBandFromArray(rasterWithBand1, band2);
         assertEquals(2, RasterAccessors.numBands(rasterWithBand2));
         assertEquals(raster.getEnvelope(), rasterWithBand2.getEnvelope());
-        assertEquals(raster.getCoordinateReferenceSystem2D(), rasterWithBand2.getCoordinateReferenceSystem2D());
+        assertEquals(
+                raster.getCoordinateReferenceSystem2D(),
+                rasterWithBand2.getCoordinateReferenceSystem2D());
         assertEquals(RasterAccessors.srid(raster), RasterAccessors.srid(rasterWithBand2));
         assertTrue(Double.isNaN(RasterUtils.getNoDataValue(rasterWithBand2.getSampleDimension(1))));
 
@@ -89,7 +105,9 @@ public class MapAlgebraTest extends RasterTestBase
         GridCoverage2D rasterWithBand3 = MapAlgebra.addBandFromArray(rasterWithBand2, band3, 3, 2d);
         assertEquals(3, RasterAccessors.numBands(rasterWithBand3));
         assertEquals(raster.getEnvelope(), rasterWithBand3.getEnvelope());
-        assertEquals(raster.getCoordinateReferenceSystem2D(), rasterWithBand3.getCoordinateReferenceSystem2D());
+        assertEquals(
+                raster.getCoordinateReferenceSystem2D(),
+                rasterWithBand3.getCoordinateReferenceSystem2D());
         assertEquals(RasterAccessors.srid(raster), RasterAccessors.srid(rasterWithBand3));
         assertEquals(2, RasterUtils.getNoDataValue(rasterWithBand3.getSampleDimension(2)), 1e-9);
 
@@ -100,7 +118,7 @@ public class MapAlgebraTest extends RasterTestBase
         }
         // Check the value of the first band when use the raster with two bands
 
-        //Check the value of the first band when use the raster with three bands
+        // Check the value of the first band when use the raster with three bands
         firstBand = MapAlgebra.bandAsArray(rasterWithBand3, 1);
         for (int i = 0; i < firstBand.length; i++) {
             assertEquals(i, firstBand[i], 0.1);
@@ -119,15 +137,19 @@ public class MapAlgebraTest extends RasterTestBase
     }
 
     @Test
-    public void testAddBandAsArrayReplace()
-            throws FactoryException
-    {
+    public void testAddBandAsArrayReplace() throws FactoryException {
         GridCoverage2D raster = createEmptyRaster(2);
-        double[] band1 = new double[raster.getRenderedImage().getWidth() * raster.getRenderedImage().getHeight()];
+        double[] band1 =
+                new double
+                        [raster.getRenderedImage().getWidth()
+                                * raster.getRenderedImage().getHeight()];
         for (int i = 0; i < band1.length; i++) {
             band1[i] = i;
         }
-        double[] band2 = new double[raster.getRenderedImage().getWidth() * raster.getRenderedImage().getHeight()];
+        double[] band2 =
+                new double
+                        [raster.getRenderedImage().getWidth()
+                                * raster.getRenderedImage().getHeight()];
         for (int i = 0; i < band2.length; i++) {
             band2[i] = i * 2;
         }
@@ -135,14 +157,18 @@ public class MapAlgebraTest extends RasterTestBase
         GridCoverage2D rasterWithBand1 = MapAlgebra.addBandFromArray(raster, band1, 1);
         assertEquals(2, RasterAccessors.numBands(rasterWithBand1));
         assertEquals(raster.getEnvelope(), rasterWithBand1.getEnvelope());
-        assertEquals(raster.getCoordinateReferenceSystem2D(), rasterWithBand1.getCoordinateReferenceSystem2D());
+        assertEquals(
+                raster.getCoordinateReferenceSystem2D(),
+                rasterWithBand1.getCoordinateReferenceSystem2D());
         assertEquals(RasterAccessors.srid(raster), RasterAccessors.srid(rasterWithBand1));
 
         // Replace the second band
         GridCoverage2D rasterWithBand2 = MapAlgebra.addBandFromArray(rasterWithBand1, band2, 2);
         assertEquals(2, RasterAccessors.numBands(rasterWithBand2));
         assertEquals(raster.getEnvelope(), rasterWithBand2.getEnvelope());
-        assertEquals(raster.getCoordinateReferenceSystem2D(), rasterWithBand2.getCoordinateReferenceSystem2D());
+        assertEquals(
+                raster.getCoordinateReferenceSystem2D(),
+                rasterWithBand2.getCoordinateReferenceSystem2D());
         assertEquals(RasterAccessors.srid(raster), RasterAccessors.srid(rasterWithBand2));
 
         // Check the value of the first band when use the raster with only one band
@@ -163,16 +189,16 @@ public class MapAlgebraTest extends RasterTestBase
     }
 
     @Test
-    public void testBandAsArray()
-            throws FactoryException
-    {
+    public void testBandAsArray() throws FactoryException {
         int widthInPixel = 10;
         int heightInPixel = 10;
         double upperLeftX = 0;
         double upperLeftY = 0;
         double cellSize = 1;
         int numbBands = 1;
-        GridCoverage2D raster = RasterConstructors.makeEmptyRaster(numbBands, widthInPixel, heightInPixel, upperLeftX, upperLeftY, cellSize);
+        GridCoverage2D raster =
+                RasterConstructors.makeEmptyRaster(
+                        numbBands, widthInPixel, heightInPixel, upperLeftX, upperLeftY, cellSize);
         // Out of bound index should return null
         double[] band = MapAlgebra.bandAsArray(raster, 0);
         assertNull(band);
@@ -203,7 +229,7 @@ public class MapAlgebraTest extends RasterTestBase
 
         factor = 2;
         actual = MapAlgebra.multiplyFactor(input, factor);
-        expected = new double[]{400.0, 200.0, 290.0, 510.0};
+        expected = new double[] {400.0, 200.0, 290.0, 510.0};
         assertArrayEquals(expected, actual, 0.1d);
     }
 
@@ -282,7 +308,7 @@ public class MapAlgebraTest extends RasterTestBase
         double[] band1 = new double[] {15.0, 25.0, 35.0};
         double[] band2 = new double[] {5.0, 15.0, 25.0};
         double[] actual = MapAlgebra.bitwiseAnd(band1, band2);
-        double[] expected = new double[]{5.0, 9.0, 1.0};
+        double[] expected = new double[] {5.0, 9.0, 1.0};
         assertArrayEquals(expected, actual, 0.1d);
     }
 
@@ -291,7 +317,7 @@ public class MapAlgebraTest extends RasterTestBase
         double[] band1 = new double[] {15.0, 25.0, 35.0};
         double[] band2 = new double[] {5.0, 15.0, 25.0};
         double[] actual = MapAlgebra.bitwiseOr(band1, band2);
-        double[] expected = new double[]{15.0, 31.0, 59.0};
+        double[] expected = new double[] {15.0, 31.0, 59.0};
         assertArrayEquals(expected, actual, 0.1d);
     }
 
@@ -316,15 +342,18 @@ public class MapAlgebraTest extends RasterTestBase
     @Test
     public void testNormalize() {
         double[] band1 = {800.0, 900.0, 0.0, 255.0};
-        double[] band2 = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-        double[] band3 = {16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31};
-        double[] band4 = {-16,-15,-14,-13,-12,-11,-10,-9,-8,-7,-6,-5,-4,-3,-2,-1};
+        double[] band2 = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+        double[] band3 = {16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31};
+        double[] band4 = {-16, -15, -14, -13, -12, -11, -10, -9, -8, -7, -6, -5, -4, -3, -2, -1};
         double[] actual1 = MapAlgebra.normalize(band1);
         double[] actual2 = MapAlgebra.normalize(band2);
         double[] actual3 = MapAlgebra.normalize(band3);
         double[] actual4 = MapAlgebra.normalize(band4);
         double[] expected1 = {226.66666666666666, 255.0, 0.0, 72.25};
-        double[] expected2 = {0.0, 17.0, 34.0, 51.0, 68.0, 85.0, 102.0, 119.0, 136.0, 153.0, 170.0, 187.0, 204.0, 221.0, 238.0, 255.0};
+        double[] expected2 = {
+            0.0, 17.0, 34.0, 51.0, 68.0, 85.0, 102.0, 119.0, 136.0, 153.0, 170.0, 187.0, 204.0,
+            221.0, 238.0, 255.0
+        };
         assertArrayEquals(expected1, actual1, 0.1d);
         assertArrayEquals(expected2, actual2, 0.1d);
         assertArrayEquals(expected2, actual3, 0.1d);
@@ -373,7 +402,8 @@ public class MapAlgebraTest extends RasterTestBase
 
     @Test
     public void testFetchRegion() {
-        double[] band = new double[] {100.0, 260.0, 189.0, 106.0, 230.0, 169.0, 196.0, 200.0, 460.0};
+        double[] band =
+                new double[] {100.0, 260.0, 189.0, 106.0, 230.0, 169.0, 196.0, 200.0, 460.0};
         int[] coordinates = new int[] {0, 0, 1, 2};
         int[] dimension = new int[] {3, 3};
         double[] actual = MapAlgebra.fetchRegion(band, coordinates, dimension);
@@ -460,7 +490,8 @@ public class MapAlgebraTest extends RasterTestBase
         }
     }
 
-    private void testMapAlgebra2RastersMultiBand(int width, int height, String pixelType, Double noDataValue) throws FactoryException {
+    private void testMapAlgebra2RastersMultiBand(
+            int width, int height, String pixelType, Double noDataValue) throws FactoryException {
         GridCoverage2D rast0 = RasterConstructors.makeEmptyRaster(2, "b", width, height, 10, 20, 1);
         GridCoverage2D rast1 = RasterConstructors.makeEmptyRaster(2, "b", width, height, 10, 20, 1);
         double[] band1 = new double[width * height];
@@ -477,7 +508,13 @@ public class MapAlgebraTest extends RasterTestBase
         rast0 = MapAlgebra.addBandFromArray(rast0, band2, 2);
         rast1 = MapAlgebra.addBandFromArray(rast1, band3, 1);
         rast1 = MapAlgebra.addBandFromArray(rast1, band4, 2);
-        GridCoverage2D result = MapAlgebra.mapAlgebra(rast0, rast1, pixelType, "out = (rast0[0] + rast0[1] + rast1[0] + rast1[1]) * 0.4;", noDataValue);
+        GridCoverage2D result =
+                MapAlgebra.mapAlgebra(
+                        rast0,
+                        rast1,
+                        pixelType,
+                        "out = (rast0[0] + rast0[1] + rast1[0] + rast1[1]) * 0.4;",
+                        noDataValue);
         double actualNoDataValue = RasterUtils.getNoDataValue(result.getSampleDimension(0));
         if (noDataValue != null) {
             Assert.assertEquals(noDataValue, actualNoDataValue, 1e-9);
@@ -494,7 +531,9 @@ public class MapAlgebraTest extends RasterTestBase
         }
         Assert.assertEquals(expectedDataType, resultDataType);
 
-        Assert.assertEquals(rast0.getGridGeometry().getGridToCRS2D(), result.getGridGeometry().getGridToCRS2D());
+        Assert.assertEquals(
+                rast0.getGridGeometry().getGridToCRS2D(),
+                result.getGridGeometry().getGridToCRS2D());
         band1 = MapAlgebra.bandAsArray(rast0, 1);
         band2 = MapAlgebra.bandAsArray(rast0, 2);
         band3 = MapAlgebra.bandAsArray(rast1, 1);
@@ -517,7 +556,8 @@ public class MapAlgebraTest extends RasterTestBase
         }
     }
 
-    private void testMapAlgebra2Rasters(int width, int height, String pixelType, Double noDataValue) throws FactoryException {
+    private void testMapAlgebra2Rasters(int width, int height, String pixelType, Double noDataValue)
+            throws FactoryException {
         GridCoverage2D rast0 = RasterConstructors.makeEmptyRaster(1, "b", width, height, 10, 20, 1);
         GridCoverage2D rast1 = RasterConstructors.makeEmptyRaster(1, "b", width, height, 10, 20, 1);
         double[] band1 = new double[width * height];
@@ -528,7 +568,9 @@ public class MapAlgebraTest extends RasterTestBase
         }
         rast0 = MapAlgebra.addBandFromArray(rast0, band1, 1);
         rast1 = MapAlgebra.addBandFromArray(rast1, band2, 1);
-        GridCoverage2D result = MapAlgebra.mapAlgebra(rast0, rast1, pixelType, "out = (rast0[0] + rast1[0]) * 0.4;", noDataValue);
+        GridCoverage2D result =
+                MapAlgebra.mapAlgebra(
+                        rast0, rast1, pixelType, "out = (rast0[0] + rast1[0]) * 0.4;", noDataValue);
         double actualNoDataValue = RasterUtils.getNoDataValue(result.getSampleDimension(0));
         if (noDataValue != null) {
             Assert.assertEquals(noDataValue, actualNoDataValue, 1e-9);
@@ -545,7 +587,9 @@ public class MapAlgebraTest extends RasterTestBase
         }
         Assert.assertEquals(expectedDataType, resultDataType);
 
-        Assert.assertEquals(rast0.getGridGeometry().getGridToCRS2D(), result.getGridGeometry().getGridToCRS2D());
+        Assert.assertEquals(
+                rast0.getGridGeometry().getGridToCRS2D(),
+                result.getGridGeometry().getGridToCRS2D());
         band1 = MapAlgebra.bandAsArray(rast0, 1);
         band2 = MapAlgebra.bandAsArray(rast1, 1);
         double[] bandResult = MapAlgebra.bandAsArray(result, 1);
@@ -578,8 +622,10 @@ public class MapAlgebraTest extends RasterTestBase
         }
     }
 
-    private void testMapAlgebra(int width, int height, String pixelType, Double noDataValue) throws FactoryException {
-        GridCoverage2D raster = RasterConstructors.makeEmptyRaster(2, "b", width, height, 10, 20, 1);
+    private void testMapAlgebra(int width, int height, String pixelType, Double noDataValue)
+            throws FactoryException {
+        GridCoverage2D raster =
+                RasterConstructors.makeEmptyRaster(2, "b", width, height, 10, 20, 1);
         double[] band1 = new double[width * height];
         double[] band2 = new double[width * height];
         for (int i = 0; i < band1.length; i++) {
@@ -588,7 +634,9 @@ public class MapAlgebraTest extends RasterTestBase
         }
         raster = MapAlgebra.addBandFromArray(raster, band1, 1);
         raster = MapAlgebra.addBandFromArray(raster, band2, 2);
-        GridCoverage2D result = MapAlgebra.mapAlgebra(raster, pixelType, "out = (rast[0] + rast[1]) * 0.4;", noDataValue);
+        GridCoverage2D result =
+                MapAlgebra.mapAlgebra(
+                        raster, pixelType, "out = (rast[0] + rast[1]) * 0.4;", noDataValue);
         double actualNoDataValue = RasterUtils.getNoDataValue(result.getSampleDimension(0));
         if (noDataValue != null) {
             Assert.assertEquals(noDataValue, actualNoDataValue, 1e-9);
@@ -605,7 +653,9 @@ public class MapAlgebraTest extends RasterTestBase
         }
         Assert.assertEquals(expectedDataType, resultDataType);
 
-        Assert.assertEquals(raster.getGridGeometry().getGridToCRS2D(), result.getGridGeometry().getGridToCRS2D());
+        Assert.assertEquals(
+                raster.getGridGeometry().getGridToCRS2D(),
+                result.getGridGeometry().getGridToCRS2D());
         band1 = MapAlgebra.bandAsArray(raster, 1);
         band2 = MapAlgebra.bandAsArray(raster, 2);
         double[] bandResult = MapAlgebra.bandAsArray(result, 1);

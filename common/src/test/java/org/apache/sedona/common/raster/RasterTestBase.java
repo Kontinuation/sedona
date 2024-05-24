@@ -1,19 +1,33 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.common.raster;
 
- import org.geotools.coverage.grid.GridCoordinates2D;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.awt.image.WritableRaster;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import javax.media.jai.RasterFactory;
+import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.gce.geotiff.GeoTiffReader;
@@ -32,20 +46,18 @@ import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.TransformException;
 
-import javax.media.jai.RasterFactory;
-import java.awt.*;
-import java.awt.image.BufferedImage;
-import java.awt.image.WritableRaster;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-
 public class RasterTestBase {
-    String arc = "NCOLS 2\nNROWS 2\nXLLCORNER 378922\nYLLCORNER 4072345\nCELLSIZE 30\nNODATA_VALUE 0\n0 1 2 3\n";
+    String arc =
+            "NCOLS 2\n"
+                    + "NROWS 2\n"
+                    + "XLLCORNER 378922\n"
+                    + "YLLCORNER 4072345\n"
+                    + "CELLSIZE 30\n"
+                    + "NODATA_VALUE 0\n"
+                    + "0 1 2 3\n";
 
-    protected static final String resourceFolder = System.getProperty("user.dir") + "/../spark/common/src/test/resources/";
+    protected static final String resourceFolder =
+            System.getProperty("user.dir") + "/../spark/common/src/test/resources/";
 
     protected static final double FP_TOLERANCE = 1E-4;
 
@@ -55,32 +67,37 @@ public class RasterTestBase {
     byte[] testNc;
     String ncFile = resourceFolder + "raster/netcdf/test.nc";
 
-
     @Before
     public void setup() throws IOException {
-        oneBandRaster = RasterConstructors.fromArcInfoAsciiGrid(arc.getBytes(StandardCharsets.UTF_8));
+        oneBandRaster =
+                RasterConstructors.fromArcInfoAsciiGrid(arc.getBytes(StandardCharsets.UTF_8));
         multiBandRaster = createMultibandRaster();
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
-        new GeoTiffWriter(bos).write(multiBandRaster, new GeneralParameterValue[]{});
+        new GeoTiffWriter(bos).write(multiBandRaster, new GeneralParameterValue[] {});
         geoTiff = bos.toByteArray();
         File file = new File(ncFile);
         testNc = Files.readAllBytes(file.toPath());
     }
 
-    GridCoverage2D createEmptyRaster(int numBands)
-            throws FactoryException
-    {
+    GridCoverage2D createEmptyRaster(int numBands) throws FactoryException {
         int widthInPixel = 4;
         int heightInPixel = 5;
         double upperLeftX = 101;
         double upperLeftY = 102;
         double cellSize = 2;
-        return RasterConstructors.makeEmptyRaster(numBands, widthInPixel, heightInPixel, upperLeftX, upperLeftY, cellSize);
+        return RasterConstructors.makeEmptyRaster(
+                numBands, widthInPixel, heightInPixel, upperLeftX, upperLeftY, cellSize);
     }
 
-    GridCoverage2D createRandomRaster(int dataBufferType, int widthInPixel, int heightInPixel,
-                                      double upperLeftX, double upperLeftY, double pixelSize,
-                                      int numBand, String crsCode) {
+    GridCoverage2D createRandomRaster(
+            int dataBufferType,
+            int widthInPixel,
+            int heightInPixel,
+            double upperLeftX,
+            double upperLeftY,
+            double pixelSize,
+            int numBand,
+            String crsCode) {
         WritableRaster raster =
                 RasterFactory.createBandedRaster(
                         dataBufferType, widthInPixel, heightInPixel, numBand, null);
@@ -118,7 +135,8 @@ public class RasterTestBase {
                 image.setRGB(i, j, new Color(color, color, color).getRGB());
             }
         }
-        return factory.create("test", image, new Envelope2D(DefaultGeographicCRS.WGS84, 0, 0, 10, 10));
+        return factory.create(
+                "test", image, new Envelope2D(DefaultGeographicCRS.WGS84, 0, 0, 10, 10));
     }
 
     protected void assertSameCoverage(GridCoverage2D expected, GridCoverage2D actual) {
@@ -158,7 +176,8 @@ public class RasterTestBase {
                 double y = y0 + i * yStep;
                 DirectPosition position = new DirectPosition2D(x, y);
                 try {
-                    GridCoordinates2D gridPosition = expected.getGridGeometry().worldToGrid(position);
+                    GridCoordinates2D gridPosition =
+                            expected.getGridGeometry().worldToGrid(position);
                     if (Double.isNaN(gridPosition.getX()) || Double.isNaN(gridPosition.getY())) {
                         // This position is outside the coverage
                         continue;
@@ -171,7 +190,8 @@ public class RasterTestBase {
                     }
                     sampledPoints += 1;
                 } catch (TransformException e) {
-                    throw new RuntimeException("Failed to convert world coordinate to grid coordinate", e);
+                    throw new RuntimeException(
+                            "Failed to convert world coordinate to grid coordinate", e);
                 }
             }
         }

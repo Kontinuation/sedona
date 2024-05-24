@@ -34,6 +34,7 @@
 
     <properties>
         <maven.deploy.skip>false</maven.deploy.skip>
+        <project.rootdir>${project.basedir}/..</project.rootdir>
     </properties>
 
     <modules>
@@ -115,7 +116,7 @@
                     <groupId>org.scalastyle</groupId>
                     <artifactId>scalastyle-maven-plugin</artifactId>
                     <configuration>
-                        <configLocation>${project.basedir}/../../scalastyle_config.xml</configLocation>
+                        <configLocation>${project.rootdir}/dev/scalastyle_config.xml</configLocation>
                     </configuration>
                 </plugin>
             </plugins>

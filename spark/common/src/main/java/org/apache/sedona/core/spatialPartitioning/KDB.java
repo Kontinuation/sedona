@@ -16,14 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
-
-import org.apache.sedona.common.utils.HalfOpenRectangle;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Point;
-import scala.Tuple2;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -34,13 +27,14 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.sedona.common.utils.HalfOpenRectangle;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
+import scala.Tuple2;
 
-/**
- * see https://en.wikipedia.org/wiki/K-D-B-tree
- */
-public class KDB extends PartitioningUtils
-        implements Serializable
-{
+/** see https://en.wikipedia.org/wiki/K-D-B-tree */
+public class KDB extends PartitioningUtils implements Serializable {
 
     private final int maxItemsPerNode;
     private final int maxLevels;
@@ -50,31 +44,26 @@ public class KDB extends PartitioningUtils
     private KDB[] children;
     private int leafId = 0;
 
-    public KDB(int maxItemsPerNode, int maxLevels, Envelope extent)
-    {
+    public KDB(int maxItemsPerNode, int maxLevels, Envelope extent) {
         this(maxItemsPerNode, maxLevels, 0, extent);
     }
 
-    private KDB(int maxItemsPerNode, int maxLevels, int level, Envelope extent)
-    {
+    private KDB(int maxItemsPerNode, int maxLevels, int level, Envelope extent) {
         this.maxItemsPerNode = maxItemsPerNode;
         this.maxLevels = maxLevels;
         this.level = level;
         this.extent = extent;
     }
 
-    public int getItemCount()
-    {
+    public int getItemCount() {
         return items.size();
     }
 
-    public boolean isLeaf()
-    {
+    public boolean isLeaf() {
         return children == null;
     }
 
-    public int getLeafId()
-    {
+    public int getLeafId() {
         if (!isLeaf()) {
             throw new IllegalStateException();
         }
@@ -82,17 +71,14 @@ public class KDB extends PartitioningUtils
         return leafId;
     }
 
-    public Envelope getExtent()
-    {
+    public Envelope getExtent() {
         return extent;
     }
 
-    public void insert(Envelope envelope)
-    {
+    public void insert(Envelope envelope) {
         if (items.size() < maxItemsPerNode || level >= maxLevels) {
             items.add(envelope);
-        }
-        else {
+        } else {
             if (children == null) {
                 // Split over longer side
                 boolean splitX = extent.getWidth() > extent.getHeight();
@@ -118,53 +104,46 @@ public class KDB extends PartitioningUtils
         }
     }
 
-    public void dropElements()
-    {
-        traverse(new Visitor()
-        {
-            @Override
-            public boolean visit(KDB tree)
-            {
-                tree.items.clear();
-                return true;
-            }
-        });
+    public void dropElements() {
+        traverse(
+                new Visitor() {
+                    @Override
+                    public boolean visit(KDB tree) {
+                        tree.items.clear();
+                        return true;
+                    }
+                });
     }
 
-    public List<KDB> findLeafNodes(final Envelope envelope)
-    {
+    public List<KDB> findLeafNodes(final Envelope envelope) {
         final List<KDB> matches = new ArrayList<>();
-        traverse(new Visitor()
-        {
-            @Override
-            public boolean visit(KDB tree)
-            {
-                if (!disjoint(tree.getExtent(), envelope)) {
-                    if (tree.isLeaf()) {
-                        matches.add(tree);
+        traverse(
+                new Visitor() {
+                    @Override
+                    public boolean visit(KDB tree) {
+                        if (!disjoint(tree.getExtent(), envelope)) {
+                            if (tree.isLeaf()) {
+                                matches.add(tree);
+                            }
+                            return true;
+                        } else {
+                            return false;
+                        }
                     }
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
-        });
+                });
 
         return matches;
     }
 
-    private boolean disjoint(Envelope r1, Envelope r2)
-    {
+    private boolean disjoint(Envelope r1, Envelope r2) {
         return !r1.intersects(r2) && !r1.covers(r2) && !r2.covers(r1);
     }
 
     /**
-     * Traverses the tree top-down breadth-first and calls the visitor
-     * for each node. Stops traversing if a call to Visitor.visit returns false.
+     * Traverses the tree top-down breadth-first and calls the visitor for each node. Stops
+     * traversing if a call to Visitor.visit returns false.
      */
-    public void traverse(Visitor visitor)
-    {
+    public void traverse(Visitor visitor) {
         if (!visitor.visit(this)) {
             return;
         }
@@ -176,26 +155,23 @@ public class KDB extends PartitioningUtils
         }
     }
 
-    public void assignLeafIds()
-    {
-        traverse(new Visitor()
-        {
-            int id = 0;
+    public void assignLeafIds() {
+        traverse(
+                new Visitor() {
+                    int id = 0;
 
-            @Override
-            public boolean visit(KDB tree)
-            {
-                if (tree.isLeaf()) {
-                    tree.leafId = id;
-                    id++;
-                }
-                return true;
-            }
-        });
+                    @Override
+                    public boolean visit(KDB tree) {
+                        if (tree.isLeaf()) {
+                            tree.leafId = id;
+                            id++;
+                        }
+                        return true;
+                    }
+                });
     }
 
-    private boolean split(boolean splitX)
-    {
+    private boolean split(boolean splitX) {
         final Comparator<Envelope> comparator = splitX ? new XComparator() : new YComparator();
         Collections.sort(items, comparator);
 
@@ -207,19 +183,16 @@ public class KDB extends PartitioningUtils
             if (x > extent.getMinX() && x < extent.getMaxX()) {
                 splits = splitAtX(extent, x);
                 splitter = new XSplitter(x);
-            }
-            else {
+            } else {
                 // Too many objects are crowded at the edge of the extent. Can't split.
                 return false;
             }
-        }
-        else {
+        } else {
             double y = middleItem.getMinY();
             if (y > extent.getMinY() && y < extent.getMaxY()) {
                 splits = splitAtY(extent, y);
                 splitter = new YSplitter(y);
-            }
-            else {
+            } else {
                 // Too many objects are crowded at the edge of the extent. Can't split.
                 return false;
             }
@@ -234,15 +207,13 @@ public class KDB extends PartitioningUtils
         return true;
     }
 
-    private void splitItems(Splitter splitter)
-    {
+    private void splitItems(Splitter splitter) {
         for (Envelope item : items) {
             children[splitter.split(item) ? 0 : 1].insert(item);
         }
     }
 
-    private Envelope[] splitAtX(Envelope envelope, double x)
-    {
+    private Envelope[] splitAtX(Envelope envelope, double x) {
         assert (envelope.getMinX() < x);
         assert (envelope.getMaxX() > x);
         Envelope[] splits = new Envelope[2];
@@ -251,8 +222,7 @@ public class KDB extends PartitioningUtils
         return splits;
     }
 
-    private Envelope[] splitAtY(Envelope envelope, double y)
-    {
+    private Envelope[] splitAtY(Envelope envelope, double y) {
         assert (envelope.getMinY() < y);
         assert (envelope.getMaxY() > y);
         Envelope[] splits = new Envelope[2];
@@ -309,22 +279,20 @@ public class KDB extends PartitioningUtils
     @Override
     public List<Envelope> fetchLeafZones() {
         final List<Envelope> leafs = new ArrayList<>();
-        this.traverse(new KDB.Visitor()
-        {
-            @Override
-            public boolean visit(KDB tree)
-            {
-                if (tree.isLeaf()) {
-                    leafs.add(tree.getExtent());
-                }
-                return true;
-            }
-        });
+        this.traverse(
+                new KDB.Visitor() {
+                    @Override
+                    public boolean visit(KDB tree) {
+                        if (tree.isLeaf()) {
+                            leafs.add(tree.getExtent());
+                        }
+                        return true;
+                    }
+                });
         return leafs;
     }
 
-    public interface Visitor
-    {
+    public interface Visitor {
         /**
          * Visits a single node of the tree
          *
@@ -334,66 +302,49 @@ public class KDB extends PartitioningUtils
         boolean visit(KDB tree);
     }
 
-    private interface Splitter
-    {
-        /**
-         * @return true if the specified envelope belongs to the lower split
-         */
+    private interface Splitter {
+        /** @return true if the specified envelope belongs to the lower split */
         boolean split(Envelope envelope);
     }
 
-    private static final class XComparator
-            implements Comparator<Envelope>
-    {
+    private static final class XComparator implements Comparator<Envelope> {
         @Override
-        public int compare(Envelope o1, Envelope o2)
-        {
+        public int compare(Envelope o1, Envelope o2) {
             double deltaX = o1.getMinX() - o2.getMinX();
             return (int) Math.signum(deltaX != 0 ? deltaX : o1.getMinY() - o2.getMinY());
         }
     }
 
-    private static final class YComparator
-            implements Comparator<Envelope>
-    {
+    private static final class YComparator implements Comparator<Envelope> {
         @Override
-        public int compare(Envelope o1, Envelope o2)
-        {
+        public int compare(Envelope o1, Envelope o2) {
             double deltaY = o1.getMinY() - o2.getMinY();
             return (int) Math.signum(deltaY != 0 ? deltaY : o1.getMinX() - o2.getMinX());
         }
     }
 
-    private static final class XSplitter
-            implements Splitter
-    {
+    private static final class XSplitter implements Splitter {
         private final double x;
 
-        private XSplitter(double x)
-        {
+        private XSplitter(double x) {
             this.x = x;
         }
 
         @Override
-        public boolean split(Envelope envelope)
-        {
+        public boolean split(Envelope envelope) {
             return envelope.getMinX() <= x;
         }
     }
 
-    private static final class YSplitter
-            implements Splitter
-    {
+    private static final class YSplitter implements Splitter {
         private final double y;
 
-        private YSplitter(double y)
-        {
+        private YSplitter(double y) {
             this.y = y;
         }
 
         @Override
-        public boolean split(Envelope envelope)
-        {
+        public boolean split(Envelope envelope) {
             return envelope.getMinY() <= y;
         }
     }

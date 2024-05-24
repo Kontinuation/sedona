@@ -22,18 +22,11 @@ import org.apache.sedona.viz.core.PhotoFilter;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class Outline.
- */
-public class Outline
-        extends PhotoFilter
-{
+/** The Class Outline. */
+public class Outline extends PhotoFilter {
 
-    /**
-     * Instantiates a new outline.
-     */
-    public Outline()
-    {
+    /** Instantiates a new outline. */
+    public Outline() {
         super(1);
         this.convolutionMatrix[0][0] = -1.0;
         this.convolutionMatrix[1][0] = -1.0;

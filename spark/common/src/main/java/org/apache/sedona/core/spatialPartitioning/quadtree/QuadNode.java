@@ -16,26 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning.quadtree;
 
 import java.io.Serializable;
 
-public class QuadNode<T>
-        implements Serializable
-{
+public class QuadNode<T> implements Serializable {
     QuadRectangle r;
     T element;
 
-    QuadNode(QuadRectangle r, T element)
-    {
+    QuadNode(QuadRectangle r, T element) {
         this.r = r;
         this.element = element;
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return r.toString();
     }
 }

@@ -30,12 +30,8 @@ import org.junit.Test;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class HeatmapTest.
- */
-public class HeatmapTest
-        extends VizTestBase
-{
+/** The Class HeatmapTest. */
+public class HeatmapTest extends VizTestBase {
 
     /**
      * Test point RDD visualization.
@@ -43,14 +39,20 @@ public class HeatmapTest
      * @throws Exception the exception
      */
     @Test
-    public void testPointRDDVisualization()
-            throws Exception
-    {
-        PointRDD spatialRDD = new PointRDD(sparkContext, PointInputLocation, PointOffset, PointSplitter, false, PointNumPartitions);
+    public void testPointRDDVisualization() throws Exception {
+        PointRDD spatialRDD =
+                new PointRDD(
+                        sparkContext,
+                        PointInputLocation,
+                        PointOffset,
+                        PointSplitter,
+                        false,
+                        PointNumPartitions);
         HeatMap visualizationOperator = new HeatMap(800, 500, USMainLandBoundary, false, 3);
         visualizationOperator.Visualize(sparkContext, spatialRDD);
         ImageGenerator imageGenerator = new ImageGenerator();
-        imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.rasterImage, "./target/heatmap/PointRDD", ImageType.PNG);
+        imageGenerator.SaveRasterImageAsLocalFile(
+                visualizationOperator.rasterImage, "./target/heatmap/PointRDD", ImageType.PNG);
     }
 
     /**
@@ -59,16 +61,28 @@ public class HeatmapTest
      * @throws Exception the exception
      */
     @Test
-    public void testRectangleRDDVisualization()
-            throws Exception
-    {
-        RectangleRDD spatialRDD = new RectangleRDD(sparkContext, RectangleInputLocation, RectangleSplitter, false, RectangleNumPartitions);
-        HeatMap visualizationOperator = new HeatMap(800, 500, USMainLandBoundary, false, 2, 4, 4, false, true);
+    public void testRectangleRDDVisualization() throws Exception {
+        RectangleRDD spatialRDD =
+                new RectangleRDD(
+                        sparkContext,
+                        RectangleInputLocation,
+                        RectangleSplitter,
+                        false,
+                        RectangleNumPartitions);
+        HeatMap visualizationOperator =
+                new HeatMap(800, 500, USMainLandBoundary, false, 2, 4, 4, false, true);
         visualizationOperator.Visualize(sparkContext, spatialRDD);
 
         ImageGenerator imageGenerator = new ImageGenerator();
-        imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.distributedRasterImage, "./target/heatmap/RectangleRDD", ImageType.PNG, 0, 4, 4);
-        ImageStitcher.stitchImagePartitionsFromLocalFile("./target/heatmap/RectangleRDD", 800, 500, 0, 4, 4);
+        imageGenerator.SaveRasterImageAsLocalFile(
+                visualizationOperator.distributedRasterImage,
+                "./target/heatmap/RectangleRDD",
+                ImageType.PNG,
+                0,
+                4,
+                4);
+        ImageStitcher.stitchImagePartitionsFromLocalFile(
+                "./target/heatmap/RectangleRDD", 800, 500, 0, 4, 4);
     }
 
     /**
@@ -77,16 +91,21 @@ public class HeatmapTest
      * @throws Exception the exception
      */
     @Test
-    public void testPolygonRDDVisualization()
-            throws Exception
-    {
-        //UserSuppliedPolygonMapper userSuppliedPolygonMapper = new UserSuppliedPolygonMapper();
-        PolygonRDD spatialRDD = new PolygonRDD(sparkContext, PolygonInputLocation, PolygonSplitter, false, PolygonNumPartitions);
+    public void testPolygonRDDVisualization() throws Exception {
+        // UserSuppliedPolygonMapper userSuppliedPolygonMapper = new UserSuppliedPolygonMapper();
+        PolygonRDD spatialRDD =
+                new PolygonRDD(
+                        sparkContext,
+                        PolygonInputLocation,
+                        PolygonSplitter,
+                        false,
+                        PolygonNumPartitions);
         HeatMap visualizationOperator = new HeatMap(800, 500, USMainLandBoundary, false, 2);
         visualizationOperator.Visualize(sparkContext, spatialRDD);
 
         ImageGenerator imageGenerator = new ImageGenerator();
-        imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.rasterImage, "./target/heatmap/PolygonRDD", ImageType.PNG);
+        imageGenerator.SaveRasterImageAsLocalFile(
+                visualizationOperator.rasterImage, "./target/heatmap/PolygonRDD", ImageType.PNG);
     }
 
     /**
@@ -95,14 +114,19 @@ public class HeatmapTest
      * @throws Exception the exception
      */
     @Test
-    public void testLineStringRDDVisualization()
-            throws Exception
-    {
-        LineStringRDD spatialRDD = new LineStringRDD(sparkContext, LineStringInputLocation, LineStringSplitter, false, LineStringNumPartitions);
+    public void testLineStringRDDVisualization() throws Exception {
+        LineStringRDD spatialRDD =
+                new LineStringRDD(
+                        sparkContext,
+                        LineStringInputLocation,
+                        LineStringSplitter,
+                        false,
+                        LineStringNumPartitions);
         HeatMap visualizationOperator = new HeatMap(800, 500, USMainLandBoundary, false, 2);
         visualizationOperator.Visualize(sparkContext, spatialRDD);
 
         ImageGenerator imageGenerator = new ImageGenerator();
-        imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.rasterImage, "./target/heatmap/LineStringRDD", ImageType.PNG);
+        imageGenerator.SaveRasterImageAsLocalFile(
+                visualizationOperator.rasterImage, "./target/heatmap/LineStringRDD", ImageType.PNG);
     }
 }

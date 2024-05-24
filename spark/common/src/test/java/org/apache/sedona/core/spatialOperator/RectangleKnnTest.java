@@ -18,6 +18,12 @@
  */
 package org.apache.sedona.core.spatialOperator;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Properties;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.enums.FileDataSplitter;
@@ -34,91 +40,65 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class RectangleKnnTest.
- */
-public class RectangleKnnTest
-{
+/** The Class RectangleKnnTest. */
+public class RectangleKnnTest {
 
-    /**
-     * The sc.
-     */
+    /** The sc. */
     public static JavaSparkContext sc;
 
-    /**
-     * The prop.
-     */
+    /** The prop. */
     static Properties prop;
 
-    /**
-     * The input.
-     */
+    /** The input. */
     static InputStream input;
 
-    /**
-     * The Input location.
-     */
+    /** The Input location. */
     static String InputLocation;
 
-    /**
-     * The offset.
-     */
+    /** The offset. */
     static Integer offset;
 
-    /**
-     * The splitter.
-     */
+    /** The splitter. */
     static FileDataSplitter splitter;
 
-    /**
-     * The index type.
-     */
+    /** The index type. */
     static IndexType indexType;
 
-    /**
-     * The num partitions.
-     */
+    /** The num partitions. */
     static Integer numPartitions;
 
-    /**
-     * The loop times.
-     */
+    /** The loop times. */
     static int loopTimes;
 
-    /**
-     * The query point.
-     */
+    /** The query point. */
     static Point queryPoint;
 
-    /**
-     * The top K.
-     */
+    /** The top K. */
     static int topK;
 
-    /**
-     * Once executed before all.
-     */
+    /** Once executed before all. */
     @BeforeClass
-    public static void onceExecutedBeforeAll()
-    {
+    public static void onceExecutedBeforeAll() {
         SparkConf conf = new SparkConf().setAppName("RectangleKnn").setMaster("local[2]");
         sc = new JavaSparkContext(conf);
         Logger.getLogger("org").setLevel(Level.WARN);
         Logger.getLogger("akka").setLevel(Level.WARN);
         prop = new Properties();
-        input = RectangleKnnTest.class.getClassLoader().getResourceAsStream("rectangle.test.properties");
+        input =
+                RectangleKnnTest.class
+                        .getClassLoader()
+                        .getResourceAsStream("rectangle.test.properties");
 
-        //Hard code to a file in resource folder. But you can replace it later in the try-catch field in your hdfs system.
-        InputLocation = "file://" + RectangleKnnTest.class.getClassLoader().getResource("primaryroads.csv").getPath();
+        // Hard code to a file in resource folder. But you can replace it later in the try-catch
+        // field in your hdfs system.
+        InputLocation =
+                "file://"
+                        + RectangleKnnTest.class
+                                .getClassLoader()
+                                .getResource("primaryroads.csv")
+                                .getPath();
 
         offset = 0;
         splitter = null;
@@ -130,22 +110,24 @@ public class RectangleKnnTest
             prop.load(input);
             // There is a field in the property file, you can edit your own file location there.
             // InputLocation = prop.getProperty("inputLocation");
-            InputLocation = "file://" + RectangleKnnTest.class.getClassLoader().getResource(prop.getProperty("inputLocation")).getPath();
+            InputLocation =
+                    "file://"
+                            + RectangleKnnTest.class
+                                    .getClassLoader()
+                                    .getResource(prop.getProperty("inputLocation"))
+                                    .getPath();
             offset = Integer.parseInt(prop.getProperty("offset"));
             splitter = FileDataSplitter.getFileDataSplitter(prop.getProperty("splitter"));
             indexType = IndexType.getIndexType(prop.getProperty("indexType"));
             numPartitions = Integer.parseInt(prop.getProperty("numPartitions"));
             loopTimes = 1;
-        }
-        catch (IOException ex) {
+        } catch (IOException ex) {
             ex.printStackTrace();
-        }
-        finally {
+        } finally {
             if (input != null) {
                 try {
                     input.close();
-                }
-                catch (IOException e) {
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
@@ -154,12 +136,9 @@ public class RectangleKnnTest
         topK = 100;
     }
 
-    /**
-     * Teardown.
-     */
+    /** Teardown. */
     @AfterClass
-    public static void teardown()
-    {
+    public static void teardown() {
         sc.stop();
     }
 
@@ -169,16 +148,14 @@ public class RectangleKnnTest
      * @throws Exception the exception
      */
     @Test
-    public void testSpatialKnnQuery()
-            throws Exception
-    {
+    public void testSpatialKnnQuery() throws Exception {
         RectangleRDD rectangleRDD = new RectangleRDD(sc, InputLocation, offset, splitter, true);
 
         for (int i = 0; i < loopTimes; i++) {
             List<Polygon> result = KNNQuery.SpatialKnnQuery(rectangleRDD, queryPoint, topK, false);
             assert result.size() > -1;
             assert result.get(0).getUserData().toString() != null;
-            //System.out.println(result.get(0).getUserData().toString());
+            // System.out.println(result.get(0).getUserData().toString());
         }
     }
 
@@ -188,16 +165,14 @@ public class RectangleKnnTest
      * @throws Exception the exception
      */
     @Test
-    public void testSpatialKnnQueryUsingIndex()
-            throws Exception
-    {
+    public void testSpatialKnnQueryUsingIndex() throws Exception {
         RectangleRDD rectangleRDD = new RectangleRDD(sc, InputLocation, offset, splitter, true);
         rectangleRDD.buildIndex(IndexType.RTREE, false);
         for (int i = 0; i < loopTimes; i++) {
             List<Polygon> result = KNNQuery.SpatialKnnQuery(rectangleRDD, queryPoint, topK, true);
             assert result.size() > -1;
             assert result.get(0).getUserData().toString() != null;
-            //System.out.println(result.get(0).getUserData().toString());
+            // System.out.println(result.get(0).getUserData().toString());
         }
     }
 
@@ -207,23 +182,26 @@ public class RectangleKnnTest
      * @throws Exception the exception
      */
     @Test
-    public void testSpatialKNNCorrectness()
-            throws Exception
-    {
+    public void testSpatialKNNCorrectness() throws Exception {
         RectangleRDD rectangleRDD = new RectangleRDD(sc, InputLocation, offset, splitter, true);
-        List<Polygon> resultNoIndex = KNNQuery.SpatialKnnQuery(rectangleRDD, queryPoint, topK, false);
+        List<Polygon> resultNoIndex =
+                KNNQuery.SpatialKnnQuery(rectangleRDD, queryPoint, topK, false);
         rectangleRDD.buildIndex(IndexType.RTREE, false);
-        List<Polygon> resultWithIndex = KNNQuery.SpatialKnnQuery(rectangleRDD, queryPoint, topK, true);
+        List<Polygon> resultWithIndex =
+                KNNQuery.SpatialKnnQuery(rectangleRDD, queryPoint, topK, true);
 
         List<Polygon> resultNoIndexModifiable = new ArrayList<Polygon>(resultNoIndex);
         List<Polygon> resultWithIndexModifiable = new ArrayList<Polygon>(resultWithIndex);
 
-        GeometryDistanceComparator rectangleDistanceComparator = new GeometryDistanceComparator(queryPoint, true);
+        GeometryDistanceComparator rectangleDistanceComparator =
+                new GeometryDistanceComparator(queryPoint, true);
         Collections.sort(resultNoIndexModifiable, rectangleDistanceComparator);
         Collections.sort(resultWithIndexModifiable, rectangleDistanceComparator);
         int difference = 0;
         for (int i = 0; i < topK; i++) {
-            if (rectangleDistanceComparator.compare(resultNoIndexModifiable.get(i), resultWithIndexModifiable.get(i)) != 0) {
+            if (rectangleDistanceComparator.compare(
+                            resultNoIndexModifiable.get(i), resultWithIndexModifiable.get(i))
+                    != 0) {
                 difference++;
             }
         }

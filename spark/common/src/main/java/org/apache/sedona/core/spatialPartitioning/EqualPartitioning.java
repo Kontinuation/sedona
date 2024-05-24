@@ -16,12 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
-
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
-import scala.Tuple2;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -30,19 +25,16 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import scala.Tuple2;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class EqualPartitioning.
- */
-public class EqualPartitioning
-        implements Serializable
-{
+/** The Class EqualPartitioning. */
+public class EqualPartitioning implements Serializable {
 
-    /**
-     * The grids.
-     */
+    /** The grids. */
     List<Envelope> grids = new ArrayList<Envelope>();
 
     public EqualPartitioning(List<Envelope> grids) {
@@ -54,26 +46,31 @@ public class EqualPartitioning
      * @param boundary the boundary
      * @param partitions the partitions
      */
-    public EqualPartitioning(Envelope boundary, int partitions)
-    {
-        //Local variable should be declared here
+    public EqualPartitioning(Envelope boundary, int partitions) {
+        // Local variable should be declared here
         Double root = Math.sqrt(partitions);
         int partitionsAxis;
         double intervalX;
         double intervalY;
 
-        //Calculate how many bounds should be on each axis
+        // Calculate how many bounds should be on each axis
         partitionsAxis = root.intValue();
         intervalX = (boundary.getMaxX() - boundary.getMinX()) / partitionsAxis;
         intervalY = (boundary.getMaxY() - boundary.getMinY()) / partitionsAxis;
-        //System.out.println("Boundary: "+boundary+"root: "+root+" interval: "+intervalX+","+intervalY);
+        // System.out.println("Boundary: "+boundary+"root: "+root+" interval:
+        // "+intervalX+","+intervalY);
         for (int i = 0; i < partitionsAxis; i++) {
             for (int j = 0; j < partitionsAxis; j++) {
-                Envelope grid = new Envelope(boundary.getMinX() + intervalX * i, boundary.getMinX() + intervalX * (i + 1), boundary.getMinY() + intervalY * j, boundary.getMinY() + intervalY * (j + 1));
-                //System.out.println("Grid: "+grid);
+                Envelope grid =
+                        new Envelope(
+                                boundary.getMinX() + intervalX * i,
+                                boundary.getMinX() + intervalX * (i + 1),
+                                boundary.getMinY() + intervalY * j,
+                                boundary.getMinY() + intervalY * (j + 1));
+                // System.out.println("Grid: "+grid);
                 grids.add(grid);
             }
-            //System.out.println("Finish one column/one certain x");
+            // System.out.println("Finish one column/one certain x");
         }
     }
 
@@ -82,12 +79,10 @@ public class EqualPartitioning
      *
      * @return the grids
      */
-    public List<Envelope> getGrids()
-    {
+    public List<Envelope> getGrids() {
 
         return this.grids;
     }
-
 
     public Iterator<Tuple2<Integer, Geometry>> placeObject(Geometry geometry) {
         Objects.requireNonNull(geometry, "spatialObject");
@@ -105,8 +100,7 @@ public class EqualPartitioning
             if (grid.covers(envelope)) {
                 result.add(new Tuple2(i, geometry));
                 containFlag = true;
-            }
-            else if (grid.intersects(envelope) || envelope.covers(grid)) {
+            } else if (grid.intersects(envelope) || envelope.covers(grid)) {
                 result.add(new Tuple2<>(i, geometry));
             }
         }
@@ -117,7 +111,6 @@ public class EqualPartitioning
 
         return result.iterator();
     }
-
 
     public Set<Integer> getKeys(Geometry geometry) {
         Objects.requireNonNull(geometry, "spatialObject");
@@ -135,8 +128,7 @@ public class EqualPartitioning
             if (grid.covers(envelope)) {
                 result.add(i);
                 containFlag = true;
-            }
-            else if (grid.intersects(envelope) || envelope.covers(grid)) {
+            } else if (grid.intersects(envelope) || envelope.covers(grid)) {
                 result.add(i);
             }
         }

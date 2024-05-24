@@ -18,28 +18,20 @@
  */
 package org.apache.sedona.viz.core;
 
-import org.apache.log4j.Logger;
-
-import javax.imageio.ImageIO;
-
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.Serializable;
+import javax.imageio.ImageIO;
+import org.apache.log4j.Logger;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class ImageSerializableWrapper.
- */
-public class ImageSerializableWrapper
-        implements Serializable
-{
-    final static Logger log = Logger.getLogger(ImageSerializableWrapper.class);
-    /**
-     * The image.
-     */
+/** The Class ImageSerializableWrapper. */
+public class ImageSerializableWrapper implements Serializable {
+    static final Logger log = Logger.getLogger(ImageSerializableWrapper.class);
+    /** The image. */
     protected transient BufferedImage image;
 
     /**
@@ -47,8 +39,7 @@ public class ImageSerializableWrapper
      *
      * @param image the image
      */
-    public ImageSerializableWrapper(BufferedImage image)
-    {
+    public ImageSerializableWrapper(BufferedImage image) {
         this.image = image;
     }
 
@@ -59,9 +50,7 @@ public class ImageSerializableWrapper
      * @throws IOException Signals that an I/O exception has occurred.
      */
     // Serialization method.
-    private void writeObject(ObjectOutputStream out)
-            throws IOException
-    {
+    private void writeObject(ObjectOutputStream out) throws IOException {
         log.debug("Serializing ImageWrapper");
         out.defaultWriteObject();
         ImageIO.write(image, "png", out);
@@ -75,9 +64,7 @@ public class ImageSerializableWrapper
      * @throws ClassNotFoundException the class not found exception
      */
     // Deserialization method.
-    private void readObject(ObjectInputStream in)
-            throws IOException, ClassNotFoundException
-    {
+    private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
         log.debug("De-serializing ImageWrapper");
         in.defaultReadObject();
         image = ImageIO.read(in);
@@ -91,17 +78,12 @@ public class ImageSerializableWrapper
      *
      * @return the image
      */
-    public BufferedImage getImage()
-    {
+    public BufferedImage getImage() {
         return this.image;
     }
 
     @Override
-    public String toString()
-    {
-        return "Image(" +
-                "width=" + image.getWidth() +
-                "height=" + image.getHeight() +
-                ')';
+    public String toString() {
+        return "Image(" + "width=" + image.getWidth() + "height=" + image.getHeight() + ')';
     }
 }

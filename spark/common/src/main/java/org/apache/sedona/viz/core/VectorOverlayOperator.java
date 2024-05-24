@@ -18,37 +18,25 @@
  */
 package org.apache.sedona.viz.core;
 
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.log4j.Logger;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.function.Function;
 import scala.Tuple2;
 
-import java.util.ArrayList;
-import java.util.List;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class VectorOverlayOperator.
- */
-public class VectorOverlayOperator
-{
+/** The Class VectorOverlayOperator. */
+public class VectorOverlayOperator {
 
-    /**
-     * The Constant logger.
-     */
-    final static Logger logger = Logger.getLogger(VectorOverlayOperator.class);
-    /**
-     * The back vector image.
-     */
+    /** The Constant logger. */
+    static final Logger logger = Logger.getLogger(VectorOverlayOperator.class);
+    /** The back vector image. */
     public List<String> backVectorImage = null;
-    /**
-     * The distributed back vector image.
-     */
+    /** The distributed back vector image. */
     public JavaPairRDD<Integer, String> distributedBackVectorImage = null;
-    /**
-     * The generate distributed image.
-     */
+    /** The generate distributed image. */
     public boolean generateDistributedImage = false;
 
     /**
@@ -56,8 +44,7 @@ public class VectorOverlayOperator
      *
      * @param distributedBackImage the distributed back image
      */
-    public VectorOverlayOperator(JavaPairRDD<Integer, String> distributedBackImage)
-    {
+    public VectorOverlayOperator(JavaPairRDD<Integer, String> distributedBackImage) {
         this.distributedBackVectorImage = distributedBackImage;
         this.generateDistributedImage = true;
     }
@@ -67,8 +54,7 @@ public class VectorOverlayOperator
      *
      * @param backVectorImage the back vector image
      */
-    public VectorOverlayOperator(List<String> backVectorImage)
-    {
+    public VectorOverlayOperator(List<String> backVectorImage) {
         this.backVectorImage = backVectorImage;
         this.generateDistributedImage = false;
     }
@@ -80,27 +66,31 @@ public class VectorOverlayOperator
      * @return true, if successful
      * @throws Exception the exception
      */
-    public boolean JoinImage(JavaPairRDD<Integer, String> distributedFontImage)
-            throws Exception
-    {
+    public boolean JoinImage(JavaPairRDD<Integer, String> distributedFontImage) throws Exception {
         logger.info("[Sedona-Viz][JoinImage][Start]");
         if (this.generateDistributedImage == false) {
-            throw new Exception("[OverlayOperator][JoinImage] The back image is not distributed. Please don't use distributed format.");
+            throw new Exception(
+                    "[OverlayOperator][JoinImage] The back image is not distributed. Please don't"
+                            + " use distributed format.");
         }
-        // Prune SVG header and footer because we only need one header and footer per SVG even if we merge two SVG images.
-        JavaPairRDD<Integer, String> distributedFontImageNoHeaderFooter = distributedFontImage.filter(new Function<Tuple2<Integer, String>, Boolean>()
-        {
+        // Prune SVG header and footer because we only need one header and footer per SVG even if we
+        // merge two SVG images.
+        JavaPairRDD<Integer, String> distributedFontImageNoHeaderFooter =
+                distributedFontImage.filter(
+                        new Function<Tuple2<Integer, String>, Boolean>() {
 
-            @Override
-            public Boolean call(Tuple2<Integer, String> vectorObject)
-                    throws Exception
-            {
-                // Check whether the vectorObject's key is 1. 1 means this object is SVG body.
-                // 0 means this object is SVG header, 2 means this object is SVG footer.
-                return vectorObject._1 == 1;
-            }
-        });
-        this.distributedBackVectorImage = this.distributedBackVectorImage.union(distributedFontImageNoHeaderFooter);
+                            @Override
+                            public Boolean call(Tuple2<Integer, String> vectorObject)
+                                    throws Exception {
+                                // Check whether the vectorObject's key is 1. 1 means this object is
+                                // SVG body.
+                                // 0 means this object is SVG header, 2 means this object is SVG
+                                // footer.
+                                return vectorObject._1 == 1;
+                            }
+                        });
+        this.distributedBackVectorImage =
+                this.distributedBackVectorImage.union(distributedFontImageNoHeaderFooter);
         this.distributedBackVectorImage = this.distributedBackVectorImage.sortByKey();
         logger.info("[Sedona-VizViz][JoinImage][Stop]");
         return true;
@@ -113,14 +103,15 @@ public class VectorOverlayOperator
      * @return true, if successful
      * @throws Exception the exception
      */
-    public boolean JoinImage(List<String> frontVectorImage)
-            throws Exception
-    {
+    public boolean JoinImage(List<String> frontVectorImage) throws Exception {
         logger.info("[Sedona-VizViz][JoinImage][Start]");
         if (this.generateDistributedImage == true) {
-            throw new Exception("[OverlayOperator][JoinImage] The back image is distributed. Please don't use centralized format.");
+            throw new Exception(
+                    "[OverlayOperator][JoinImage] The back image is distributed. Please don't use"
+                            + " centralized format.");
         }
-        // Merge two SVG images. Skip the first element and last element because they are SVG image header and footer.
+        // Merge two SVG images. Skip the first element and last element because they are SVG image
+        // header and footer.
         List<String> copyOf = new ArrayList<String>();
         for (int i = 0; i < this.backVectorImage.size() - 1; i++) {
             copyOf.add(this.backVectorImage.get(i));

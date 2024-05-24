@@ -16,38 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.dbf;
 
 import java.io.Serializable;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class FieldDescriptor.
- */
-public class FieldDescriptor
-        implements Serializable
-{
+/** The Class FieldDescriptor. */
+public class FieldDescriptor implements Serializable {
 
-    /**
-     * field name.
-     */
+    /** field name. */
     private String fieldName = null;
 
-    /**
-     * field type.
-     */
+    /** field type. */
     private byte fieldType = 0;
 
-    /**
-     * field length.
-     */
+    /** field length. */
     private int fieldLength = 0;
 
-    /**
-     * decimal count.
-     */
+    /** decimal count. */
     private byte fieldDecimalCount = 0;
 
     /**
@@ -55,8 +42,7 @@ public class FieldDescriptor
      *
      * @return the field name
      */
-    public String getFieldName()
-    {
+    public String getFieldName() {
         return fieldName;
     }
 
@@ -65,8 +51,7 @@ public class FieldDescriptor
      *
      * @param fieldName the new field name
      */
-    public void setFieldName(String fieldName)
-    {
+    public void setFieldName(String fieldName) {
         this.fieldName = fieldName;
     }
 
@@ -75,8 +60,7 @@ public class FieldDescriptor
      *
      * @return the field type
      */
-    public byte getFieldType()
-    {
+    public byte getFieldType() {
         return fieldType;
     }
 
@@ -85,8 +69,7 @@ public class FieldDescriptor
      *
      * @param fieldType the new field type
      */
-    public void setFieldType(byte fieldType)
-    {
+    public void setFieldType(byte fieldType) {
         this.fieldType = fieldType;
     }
 
@@ -95,8 +78,7 @@ public class FieldDescriptor
      *
      * @return the field length
      */
-    public int getFieldLength()
-    {
+    public int getFieldLength() {
         return fieldLength;
     }
 
@@ -105,8 +87,7 @@ public class FieldDescriptor
      *
      * @param fieldLength the new field length
      */
-    public void setFieldLength(int fieldLength)
-    {
+    public void setFieldLength(int fieldLength) {
         this.fieldLength = fieldLength;
     }
 
@@ -115,8 +96,7 @@ public class FieldDescriptor
      *
      * @return the field decimal count
      */
-    public byte getFieldDecimalCount()
-    {
+    public byte getFieldDecimalCount() {
         return fieldDecimalCount;
     }
 
@@ -125,8 +105,7 @@ public class FieldDescriptor
      *
      * @param fieldDecimalCount the new field decimal count
      */
-    public void setFieldDecimalCount(byte fieldDecimalCount)
-    {
+    public void setFieldDecimalCount(byte fieldDecimalCount) {
         this.fieldDecimalCount = fieldDecimalCount;
     }
 }

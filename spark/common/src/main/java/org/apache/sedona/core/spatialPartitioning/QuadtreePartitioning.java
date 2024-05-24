@@ -16,23 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
 
+import java.io.Serializable;
+import java.util.List;
 import org.apache.sedona.core.spatialPartitioning.quadtree.QuadRectangle;
 import org.apache.sedona.core.spatialPartitioning.quadtree.StandardQuadTree;
 import org.locationtech.jts.geom.Envelope;
 
-import java.io.Serializable;
-import java.util.List;
+public class QuadtreePartitioning implements Serializable {
 
-public class QuadtreePartitioning
-        implements Serializable
-{
-
-    /**
-     * The Quad-Tree.
-     */
+    /** The Quad-Tree. */
     private final StandardQuadTree<Integer> partitionTree;
 
     /**
@@ -43,19 +37,18 @@ public class QuadtreePartitioning
      * @param partitions the partitions
      */
     public QuadtreePartitioning(List<Envelope> samples, Envelope boundary, int partitions)
-            throws Exception
-    {
+            throws Exception {
         this(samples, boundary, partitions, -1);
     }
 
-    public QuadtreePartitioning(List<Envelope> samples, Envelope boundary, final int partitions, int minTreeLevel)
-            throws Exception
-    {
+    public QuadtreePartitioning(
+            List<Envelope> samples, Envelope boundary, final int partitions, int minTreeLevel)
+            throws Exception {
         // Make sure the tree doesn't get too deep in case of data skew
         int maxLevel = partitions;
         int maxItemsPerNode = samples.size() / partitions;
-        partitionTree = new StandardQuadTree(new QuadRectangle(boundary), 0,
-                maxItemsPerNode, maxLevel);
+        partitionTree =
+                new StandardQuadTree(new QuadRectangle(boundary), 0, maxItemsPerNode, maxLevel);
         if (minTreeLevel > 0) {
             partitionTree.forceGrowUp(minTreeLevel);
         }
@@ -67,8 +60,7 @@ public class QuadtreePartitioning
         partitionTree.assignPartitionIds();
     }
 
-    public StandardQuadTree getPartitionTree()
-    {
+    public StandardQuadTree getPartitionTree() {
         return this.partitionTree;
     }
 }

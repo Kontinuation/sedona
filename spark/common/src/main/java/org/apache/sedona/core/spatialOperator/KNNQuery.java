@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialOperator;
 
+import java.io.Serializable;
+import java.util.List;
 import org.apache.sedona.common.FunctionsGeoTools;
 import org.apache.sedona.core.knnJudgement.GeometryDistanceComparator;
 import org.apache.sedona.core.knnJudgement.KnnJudgement;
@@ -29,17 +30,10 @@ import org.locationtech.jts.geom.Geometry;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.operation.TransformException;
 
-import java.io.Serializable;
-import java.util.List;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class KNNQuery.
- */
-public class KNNQuery
-        implements Serializable
-{
+/** The Class KNNQuery. */
+public class KNNQuery implements Serializable {
 
     /**
      * Spatial knn query.
@@ -50,29 +44,36 @@ public class KNNQuery
      * @param useIndex the use index
      * @return the list
      */
-    public static <U extends Geometry, T extends Geometry> List<T> SpatialKnnQuery(SpatialRDD<T> spatialRDD, U originalQueryPoint, Integer k, boolean useIndex)
-    {
+    public static <U extends Geometry, T extends Geometry> List<T> SpatialKnnQuery(
+            SpatialRDD<T> spatialRDD, U originalQueryPoint, Integer k, boolean useIndex) {
         U queryCenter = originalQueryPoint;
         if (spatialRDD.getCRStransformation()) {
             try {
-                queryCenter = (U) FunctionsGeoTools.transform(originalQueryPoint, spatialRDD.getSourceEpsgCode(), spatialRDD.getTargetEpgsgCode());
-            }
-            catch (FactoryException | TransformException e) {
+                queryCenter =
+                        (U)
+                                FunctionsGeoTools.transform(
+                                        originalQueryPoint,
+                                        spatialRDD.getSourceEpsgCode(),
+                                        spatialRDD.getTargetEpgsgCode());
+            } catch (FactoryException | TransformException e) {
                 throw new RuntimeException(e);
             }
         }
 
         if (useIndex) {
             if (spatialRDD.indexedRawRDD == null) {
-                throw new NullPointerException("Need to invoke buildIndex() first, indexedRDDNoId is null");
+                throw new NullPointerException(
+                        "Need to invoke buildIndex() first, indexedRDDNoId is null");
             }
-            JavaRDD<T> tmp = spatialRDD.indexedRawRDD.mapPartitions(new KnnJudgementUsingIndex(queryCenter, k));
+            JavaRDD<T> tmp =
+                    spatialRDD.indexedRawRDD.mapPartitions(
+                            new KnnJudgementUsingIndex(queryCenter, k));
             List<T> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter, true));
             // Take the top k
             return result;
-        }
-        else {
-            JavaRDD<T> tmp = spatialRDD.getRawSpatialRDD().mapPartitions(new KnnJudgement(queryCenter, k));
+        } else {
+            JavaRDD<T> tmp =
+                    spatialRDD.getRawSpatialRDD().mapPartitions(new KnnJudgement(queryCenter, k));
             List<T> result = tmp.takeOrdered(k, new GeometryDistanceComparator(queryCenter, true));
             // Take the top k
             return result;

@@ -19,7 +19,6 @@
 package org.apache.sedona.common.raster;
 
 import java.util.Set;
-
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.common.FunctionsGeoTools;
 import org.apache.sedona.common.utils.CachedCRSTransformFinder;
@@ -41,9 +40,9 @@ public class RasterPredicates {
     /**
      * Test if a raster intersects a query window. If both the raster and the query window have a
      * CRS, the query window and the envelope of the raster will be transformed to a common CRS
-     * before testing for intersection.
-     * Please note that the CRS transformation will be lenient, which means that the transformation
-     * may not be accurate.
+     * before testing for intersection. Please note that the CRS transformation will be lenient,
+     * which means that the transformation may not be accurate.
+     *
      * @param raster the raster
      * @param geometry the query window
      * @return true if the raster intersects the query window
@@ -83,7 +82,8 @@ public class RasterPredicates {
         return leftGeometry.contains(rightGeometry);
     }
 
-    private static Pair<Geometry, Geometry> convertCRSIfNeeded(GridCoverage2D raster, Geometry queryWindow) {
+    private static Pair<Geometry, Geometry> convertCRSIfNeeded(
+            GridCoverage2D raster, Geometry queryWindow) {
         Geometry rasterGeometry;
         try {
             rasterGeometry = GeometryFunctions.convexHull(raster);
@@ -102,7 +102,8 @@ public class RasterPredicates {
         }
 
         if (isCRSMatchesSRID(rasterCRS, queryWindowSRID)) {
-            // Fast path: The CRS of the query window has the same EPSG code as the raster, so we don't
+            // Fast path: The CRS of the query window has the same EPSG code as the raster, so we
+            // don't
             // need to decode the CRS of the query window and transform it.
             return Pair.of(rasterGeometry, queryWindow);
         }
@@ -121,7 +122,8 @@ public class RasterPredicates {
         return Pair.of(transformedRasterGeometry, transformedQueryWindow);
     }
 
-    private static Pair<Geometry, Geometry> convertCRSIfNeeded(GridCoverage2D left, GridCoverage2D right) {
+    private static Pair<Geometry, Geometry> convertCRSIfNeeded(
+            GridCoverage2D left, GridCoverage2D right) {
         Geometry leftGeometry;
         Geometry rightGeometry;
         try {
@@ -144,7 +146,8 @@ public class RasterPredicates {
             return Pair.of(leftGeometry, rightGeometry);
         }
 
-        // Transform both sides to WGS84, and then return transformed geometries for evaluating predicates.
+        // Transform both sides to WGS84, and then return transformed geometries for evaluating
+        // predicates.
         Geometry transformedLeftGeometry = transformGeometryToWGS84(leftGeometry, leftCRS);
         Geometry transformedRightGeometry = transformGeometryToWGS84(rightGeometry, rightCRS);
         return Pair.of(transformedLeftGeometry, transformedRightGeometry);
@@ -152,18 +155,23 @@ public class RasterPredicates {
 
     /**
      * Test if crs matches the EPSG code. This method tries to avoid the expensive CRS.decode and
-     * CRS.equalsIgnoreMetadata calls. If the crs has an identifier matching the EPSG code, we assume
-     * that the crs matches the EPSG code.
+     * CRS.equalsIgnoreMetadata calls. If the crs has an identifier matching the EPSG code, we
+     * assume that the crs matches the EPSG code.
+     *
      * @param crs The crs to test
-     * @param srid The SRID to test. The axis-order of the decoded CRS is assumed to be in lon/lat order
+     * @param srid The SRID to test. The axis-order of the decoded CRS is assumed to be in lon/lat
+     *     order
      * @return true if the crs matches the EPSG code, false otherwise
      */
     public static boolean isCRSMatchesSRID(CoordinateReferenceSystem crs, int srid) {
         CRS.AxisOrder axisOrder = CRS.getAxisOrder(crs);
         if (axisOrder == CRS.AxisOrder.NORTH_EAST) {
-            // SRID of geometries will always be decoded as CRS in lon/lat axis order. For projected CRS, the
-            // axis order should be east/north. If the crs is for Antarctic or Arctic, the axis order may be
-            // INAPPLICABLE. In this case, we'll assume that the axis order would match with the query window if
+            // SRID of geometries will always be decoded as CRS in lon/lat axis order. For projected
+            // CRS, the
+            // axis order should be east/north. If the crs is for Antarctic or Arctic, the axis
+            // order may be
+            // INAPPLICABLE. In this case, we'll assume that the axis order would match with the
+            // query window if
             // they have the same EPSG code.
             return false;
         }
@@ -178,12 +186,14 @@ public class RasterPredicates {
         return false;
     }
 
-    private static Geometry transformGeometryToWGS84(Geometry geometry, CoordinateReferenceSystem crs) {
+    private static Geometry transformGeometryToWGS84(
+            Geometry geometry, CoordinateReferenceSystem crs) {
         if (crs == DefaultGeographicCRS.WGS84) {
             return geometry;
         }
         try {
-            MathTransform transform = CachedCRSTransformFinder.findTransform(crs, DefaultGeographicCRS.WGS84);
+            MathTransform transform =
+                    CachedCRSTransformFinder.findTransform(crs, DefaultGeographicCRS.WGS84);
             Geometry transformedGeometry = JTS.transform(geometry, transform);
             if (!(crs instanceof GeographicCRS)) {
                 transformedGeometry = GeomUtils.antiMeridianSafeGeom(transformedGeometry);

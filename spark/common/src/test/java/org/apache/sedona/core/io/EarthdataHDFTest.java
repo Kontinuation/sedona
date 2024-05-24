@@ -35,88 +35,63 @@ import org.locationtech.jts.geom.Envelope;
 // TODO: Auto-generated Javadoc
 
 /**
- * The Class EarthdataHDFTest.
- * All tests here have been ignored. A new feature that reads HDF will be added.
+ * The Class EarthdataHDFTest. All tests here have been ignored. A new feature that reads HDF will
+ * be added.
  */
-public class EarthdataHDFTest
-{
+public class EarthdataHDFTest {
 
-    /**
-     * The sc.
-     */
+    /** The sc. */
     public static JavaSparkContext sc;
 
-    /**
-     * The Input location.
-     */
+    /** The Input location. */
     static String InputLocation;
 
-    /**
-     * The splitter.
-     */
+    /** The splitter. */
     static FileDataSplitter splitter;
 
-    /**
-     * The index type.
-     */
+    /** The index type. */
     static IndexType indexType;
 
-    /**
-     * The num partitions.
-     */
+    /** The num partitions. */
     static Integer numPartitions;
 
-    /**
-     * The query envelope.
-     */
+    /** The query envelope. */
     static Envelope queryEnvelope;
 
-    /**
-     * The loop times.
-     */
+    /** The loop times. */
     static int loopTimes;
 
-    /**
-     * The HD fincrement.
-     */
+    /** The HD fincrement. */
     static int HDFincrement = 5;
 
-    /**
-     * The HD foffset.
-     */
+    /** The HD foffset. */
     static int HDFoffset = 2;
 
-    /**
-     * The HD froot group name.
-     */
+    /** The HD froot group name. */
     static String HDFrootGroupName = "MOD_Swath_LST";
 
-    /**
-     * The HDF data variable list.
-     */
+    /** The HDF data variable list. */
     static String[] HDFDataVariableList = {"LST", "QC", "Error_LST", "Emis_31", "Emis_32"};
 
-    /**
-     * The HDF data variable name.
-     */
+    /** The HDF data variable name. */
     static String HDFDataVariableName = "LST";
 
-    /**
-     * The url prefix.
-     */
+    /** The url prefix. */
     static String urlPrefix = "";
 
-    /**
-     * Once executed before all.
-     */
+    /** Once executed before all. */
     @BeforeClass
-    public static void onceExecutedBeforeAll()
-    {
+    public static void onceExecutedBeforeAll() {
         SparkConf conf = new SparkConf().setAppName("EarthdataHDFTest").setMaster("local[2]");
         sc = new JavaSparkContext(conf);
         Logger.getLogger("org").setLevel(Level.WARN);
         Logger.getLogger("akka").setLevel(Level.WARN);
-        InputLocation = "file://" + EarthdataHDFTest.class.getClassLoader().getResource("modis/modis.csv").getPath();
+        InputLocation =
+                "file://"
+                        + EarthdataHDFTest.class
+                                .getClassLoader()
+                                .getResource("modis/modis.csv")
+                                .getPath();
         splitter = FileDataSplitter.CSV;
         indexType = IndexType.RTREE;
         queryEnvelope = new Envelope(-90.01, -80.01, 30.01, 40.01);
@@ -129,12 +104,9 @@ public class EarthdataHDFTest
         urlPrefix = System.getProperty("user.dir") + "/src/test/resources/modis/";
     }
 
-    /**
-     * Tear down.
-     */
+    /** Tear down. */
     @AfterClass
-    public static void TearDown()
-    {
+    public static void TearDown() {
         sc.stop();
     }
 
@@ -144,14 +116,19 @@ public class EarthdataHDFTest
      * @throws Exception the exception
      */
     @Ignore
-    public void testSpatialRangeQuery()
-            throws Exception
-    {
-        EarthdataHDFPointMapper earthdataHDFPoint = new EarthdataHDFPointMapper(HDFincrement, HDFoffset, HDFrootGroupName,
-                HDFDataVariableList, HDFDataVariableName, urlPrefix);
+    public void testSpatialRangeQuery() throws Exception {
+        EarthdataHDFPointMapper earthdataHDFPoint =
+                new EarthdataHDFPointMapper(
+                        HDFincrement,
+                        HDFoffset,
+                        HDFrootGroupName,
+                        HDFDataVariableList,
+                        HDFDataVariableName,
+                        urlPrefix);
         PointRDD spatialRDD = new PointRDD(sc, InputLocation, numPartitions, earthdataHDFPoint);
         for (int i = 0; i < loopTimes; i++) {
-            long resultSize = RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, false).count();
+            long resultSize =
+                    RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, false).count();
             assert resultSize > -1;
         }
     }
@@ -162,15 +139,20 @@ public class EarthdataHDFTest
      * @throws Exception the exception
      */
     @Ignore
-    public void testSpatialRangeQueryUsingIndex()
-            throws Exception
-    {
-        EarthdataHDFPointMapper earthdataHDFPoint = new EarthdataHDFPointMapper(HDFincrement, HDFoffset, HDFrootGroupName,
-                HDFDataVariableList, HDFDataVariableName, urlPrefix);
+    public void testSpatialRangeQueryUsingIndex() throws Exception {
+        EarthdataHDFPointMapper earthdataHDFPoint =
+                new EarthdataHDFPointMapper(
+                        HDFincrement,
+                        HDFoffset,
+                        HDFrootGroupName,
+                        HDFDataVariableList,
+                        HDFDataVariableName,
+                        urlPrefix);
         PointRDD spatialRDD = new PointRDD(sc, InputLocation, numPartitions, earthdataHDFPoint);
         spatialRDD.buildIndex(IndexType.RTREE, false);
         for (int i = 0; i < loopTimes; i++) {
-            long resultSize = RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, true).count();
+            long resultSize =
+                    RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, true).count();
             assert resultSize > -1;
         }
     }

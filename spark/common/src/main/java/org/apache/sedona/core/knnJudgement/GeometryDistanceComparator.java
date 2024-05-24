@@ -16,31 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.knnJudgement;
-
-import org.locationtech.jts.geom.Geometry;
 
 import java.io.Serializable;
 import java.util.Comparator;
+import org.locationtech.jts.geom.Geometry;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class GeometryDistanceComparator.
- */
-public class GeometryDistanceComparator<T extends Geometry>
-        implements Comparator<T>, Serializable
-{
+/** The Class GeometryDistanceComparator. */
+public class GeometryDistanceComparator<T extends Geometry> implements Comparator<T>, Serializable {
 
-    /**
-     * The query center.
-     */
+    /** The query center. */
     T queryCenter;
 
-    /**
-     * The normal order.
-     */
+    /** The normal order. */
     boolean normalOrder;
 
     /**
@@ -49,8 +39,7 @@ public class GeometryDistanceComparator<T extends Geometry>
      * @param queryCenter the query center
      * @param normalOrder the normal order
      */
-    public GeometryDistanceComparator(T queryCenter, boolean normalOrder)
-    {
+    public GeometryDistanceComparator(T queryCenter, boolean normalOrder) {
         this.queryCenter = queryCenter;
         this.normalOrder = normalOrder;
     }
@@ -58,24 +47,20 @@ public class GeometryDistanceComparator<T extends Geometry>
     /* (non-Javadoc)
      * @see java.util.Comparator#compare(java.lang.Object, java.lang.Object)
      */
-    public int compare(T p1, T p2)
-    {
+    public int compare(T p1, T p2) {
         double distance1 = (p1).distance(queryCenter);
         double distance2 = (p2).distance(queryCenter);
         if (this.normalOrder) {
             if (distance1 > distance2) {
                 return 1;
-            }
-            else if (distance1 == distance2) {
+            } else if (distance1 == distance2) {
                 return 0;
             }
             return -1;
-        }
-        else {
+        } else {
             if (distance1 > distance2) {
                 return -1;
-            }
-            else if (distance1 == distance2) {
+            } else if (distance1 == distance2) {
                 return 0;
             }
             return 1;

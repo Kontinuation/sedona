@@ -22,7 +22,6 @@ import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.Serializer;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-
 import java.awt.Point;
 import java.awt.image.DataBuffer;
 import java.awt.image.Raster;

@@ -18,6 +18,10 @@
  */
 package org.apache.sedona.viz.showcase;
 
+import java.awt.Color;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.Properties;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.enums.FileDataSplitter;
@@ -43,157 +47,93 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Polygon;
 
-import java.awt.Color;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.util.Properties;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class Example.
- */
-public class Example
-{
+/** The Class Example. */
+public class Example {
 
-    /**
-     * The spark context.
-     */
+    /** The spark context. */
     static JavaSparkContext sparkContext;
 
-    /**
-     * The prop.
-     */
+    /** The prop. */
     static Properties prop;
 
-    /**
-     * The Point input location.
-     */
+    /** The Point input location. */
     static String PointInputLocation;
 
-    /**
-     * The Point offset.
-     */
+    /** The Point offset. */
     static Integer PointOffset;
 
-    /**
-     * The Point splitter.
-     */
+    /** The Point splitter. */
     static FileDataSplitter PointSplitter;
 
-    /**
-     * The Point num partitions.
-     */
+    /** The Point num partitions. */
     static Integer PointNumPartitions;
 
-    /**
-     * The Rectangle input location.
-     */
+    /** The Rectangle input location. */
     static String RectangleInputLocation;
 
-    /**
-     * The Rectangle offset.
-     */
+    /** The Rectangle offset. */
     static Integer RectangleOffset;
 
-    /**
-     * The Rectangle splitter.
-     */
+    /** The Rectangle splitter. */
     static FileDataSplitter RectangleSplitter;
 
-    /**
-     * The Rectangle num partitions.
-     */
+    /** The Rectangle num partitions. */
     static Integer RectangleNumPartitions;
 
-    /**
-     * The Polygon input location.
-     */
+    /** The Polygon input location. */
     static String PolygonInputLocation;
 
-    /**
-     * The Polygon offset.
-     */
+    /** The Polygon offset. */
     static Integer PolygonOffset;
 
-    /**
-     * The Polygon splitter.
-     */
+    /** The Polygon splitter. */
     static FileDataSplitter PolygonSplitter;
 
-    /**
-     * The Polygon num partitions.
-     */
+    /** The Polygon num partitions. */
     static Integer PolygonNumPartitions;
 
-    /**
-     * The Line string input location.
-     */
+    /** The Line string input location. */
     static String LineStringInputLocation;
 
-    /**
-     * The Line string offset.
-     */
+    /** The Line string offset. */
     static Integer LineStringOffset;
 
-    /**
-     * The Line string splitter.
-     */
+    /** The Line string splitter. */
     static FileDataSplitter LineStringSplitter;
 
-    /**
-     * The Line string num partitions.
-     */
+    /** The Line string num partitions. */
     static Integer LineStringNumPartitions;
 
-    /**
-     * The US main land boundary.
-     */
+    /** The US main land boundary. */
     static Envelope USMainLandBoundary;
 
-    /**
-     * The earthdata input location.
-     */
+    /** The earthdata input location. */
     static String earthdataInputLocation;
 
-    /**
-     * The earthdata num partitions.
-     */
+    /** The earthdata num partitions. */
     static Integer earthdataNumPartitions;
 
-    /**
-     * The HDF increment.
-     */
+    /** The HDF increment. */
     static int HDFIncrement = 5;
 
-    /**
-     * The HDF offset.
-     */
+    /** The HDF offset. */
     static int HDFOffset = 2;
 
-    /**
-     * The HDF root group name.
-     */
+    /** The HDF root group name. */
     static String HDFRootGroupName = "MOD_Swath_LST";
 
-    /**
-     * The HDF data variable name.
-     */
+    /** The HDF data variable name. */
     static String HDFDataVariableName = "LST";
 
-    /**
-     * The HDF data variable list.
-     */
+    /** The HDF data variable list. */
     static String[] HDFDataVariableList = {"LST", "QC", "Error_LST", "Emis_31", "Emis_32"};
 
-    /**
-     * The HD fswitch XY.
-     */
+    /** The HD fswitch XY. */
     static boolean HDFswitchXY = true;
 
-    /**
-     * The url prefix.
-     */
+    /** The url prefix. */
     static String urlPrefix = "";
 
     /**
@@ -202,29 +142,41 @@ public class Example
      * @param outputPath the output path
      * @return true, if successful
      */
-    public static boolean buildScatterPlot(String outputPath)
-    {
+    public static boolean buildScatterPlot(String outputPath) {
         try {
-            PolygonRDD spatialRDD = new PolygonRDD(sparkContext, PolygonInputLocation, PolygonSplitter, false, PolygonNumPartitions);
-            ScatterPlot visualizationOperator = new ScatterPlot(1000, 600, USMainLandBoundary, false);
+            PolygonRDD spatialRDD =
+                    new PolygonRDD(
+                            sparkContext,
+                            PolygonInputLocation,
+                            PolygonSplitter,
+                            false,
+                            PolygonNumPartitions);
+            ScatterPlot visualizationOperator =
+                    new ScatterPlot(1000, 600, USMainLandBoundary, false);
             visualizationOperator.CustomizeColor(255, 255, 255, 255, Color.GREEN, true);
             visualizationOperator.Visualize(sparkContext, spatialRDD);
             SedonaVizImageGenerator imageGenerator = new SedonaVizImageGenerator();
-            imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.rasterImage, outputPath, ImageType.PNG);
+            imageGenerator.SaveRasterImageAsLocalFile(
+                    visualizationOperator.rasterImage, outputPath, ImageType.PNG);
 
-            visualizationOperator = new ScatterPlot(1000, 600, USMainLandBoundary, false, -1, -1, false, true);
+            visualizationOperator =
+                    new ScatterPlot(1000, 600, USMainLandBoundary, false, -1, -1, false, true);
             visualizationOperator.CustomizeColor(255, 255, 255, 255, Color.GREEN, true);
             visualizationOperator.Visualize(sparkContext, spatialRDD);
             imageGenerator = new SedonaVizImageGenerator();
-            imageGenerator.SaveVectorImageAsLocalFile(visualizationOperator.vectorImage, outputPath, ImageType.SVG);
+            imageGenerator.SaveVectorImageAsLocalFile(
+                    visualizationOperator.vectorImage, outputPath, ImageType.SVG);
 
-            visualizationOperator = new ScatterPlot(1000, 600, USMainLandBoundary, false, -1, -1, true, true);
+            visualizationOperator =
+                    new ScatterPlot(1000, 600, USMainLandBoundary, false, -1, -1, true, true);
             visualizationOperator.CustomizeColor(255, 255, 255, 255, Color.GREEN, true);
             visualizationOperator.Visualize(sparkContext, spatialRDD);
             imageGenerator = new SedonaVizImageGenerator();
-            imageGenerator.SaveVectorImageAsLocalFile(visualizationOperator.distributedVectorImage, "file://" + outputPath + "-distributed", ImageType.SVG);
-        }
-        catch (Exception e) {
+            imageGenerator.SaveVectorImageAsLocalFile(
+                    visualizationOperator.distributedVectorImage,
+                    "file://" + outputPath + "-distributed",
+                    ImageType.SVG);
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
@@ -237,16 +189,21 @@ public class Example
      * @param outputPath the output path
      * @return true, if successful
      */
-    public static boolean buildHeatMap(String outputPath)
-    {
+    public static boolean buildHeatMap(String outputPath) {
         try {
-            RectangleRDD spatialRDD = new RectangleRDD(sparkContext, RectangleInputLocation, RectangleSplitter, false, RectangleNumPartitions);
+            RectangleRDD spatialRDD =
+                    new RectangleRDD(
+                            sparkContext,
+                            RectangleInputLocation,
+                            RectangleSplitter,
+                            false,
+                            RectangleNumPartitions);
             HeatMap visualizationOperator = new HeatMap(1000, 600, USMainLandBoundary, false, 2);
             visualizationOperator.Visualize(sparkContext, spatialRDD);
             SedonaVizImageGenerator imageGenerator = new SedonaVizImageGenerator();
-            imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.rasterImage, outputPath, ImageType.PNG);
-        }
-        catch (Exception e) {
+            imageGenerator.SaveRasterImageAsLocalFile(
+                    visualizationOperator.rasterImage, outputPath, ImageType.PNG);
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
@@ -259,17 +216,31 @@ public class Example
      * @param outputPath the output path
      * @return true, if successful
      */
-    public static boolean buildChoroplethMap(String outputPath)
-    {
+    public static boolean buildChoroplethMap(String outputPath) {
         try {
-            PointRDD spatialRDD = new PointRDD(sparkContext, PointInputLocation, PointOffset, PointSplitter, false, PointNumPartitions);
-            PolygonRDD queryRDD = new PolygonRDD(sparkContext, PolygonInputLocation, PolygonSplitter, false, PolygonNumPartitions);
+            PointRDD spatialRDD =
+                    new PointRDD(
+                            sparkContext,
+                            PointInputLocation,
+                            PointOffset,
+                            PointSplitter,
+                            false,
+                            PointNumPartitions);
+            PolygonRDD queryRDD =
+                    new PolygonRDD(
+                            sparkContext,
+                            PolygonInputLocation,
+                            PolygonSplitter,
+                            false,
+                            PolygonNumPartitions);
             spatialRDD.spatialPartitioning(GridType.KDBTREE);
             queryRDD.spatialPartitioning(spatialRDD.getPartitioner());
             spatialRDD.buildIndex(IndexType.RTREE, true);
-            JavaPairRDD<Polygon, Long> joinResult = JoinQuery.SpatialJoinQueryCountByKey(spatialRDD, queryRDD, true, false);
+            JavaPairRDD<Polygon, Long> joinResult =
+                    JoinQuery.SpatialJoinQueryCountByKey(spatialRDD, queryRDD, true, false);
 
-            ChoroplethMap visualizationOperator = new ChoroplethMap(1000, 600, USMainLandBoundary, false);
+            ChoroplethMap visualizationOperator =
+                    new ChoroplethMap(1000, 600, USMainLandBoundary, false);
             visualizationOperator.CustomizeColor(255, 255, 255, 255, Color.RED, true);
             visualizationOperator.Visualize(sparkContext, joinResult);
 
@@ -277,13 +248,14 @@ public class Example
             frontImage.CustomizeColor(0, 0, 0, 255, Color.GREEN, true);
             frontImage.Visualize(sparkContext, queryRDD);
 
-            RasterOverlayOperator overlayOperator = new RasterOverlayOperator(visualizationOperator.rasterImage);
+            RasterOverlayOperator overlayOperator =
+                    new RasterOverlayOperator(visualizationOperator.rasterImage);
             overlayOperator.JoinImage(frontImage.rasterImage);
 
             SedonaVizImageGenerator imageGenerator = new SedonaVizImageGenerator();
-            imageGenerator.SaveRasterImageAsLocalFile(overlayOperator.backRasterImage, outputPath, ImageType.PNG);
-        }
-        catch (Exception e) {
+            imageGenerator.SaveRasterImageAsLocalFile(
+                    overlayOperator.backRasterImage, outputPath, ImageType.PNG);
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
@@ -296,16 +268,22 @@ public class Example
      * @param outputPath the output path
      * @return true, if successful
      */
-    public static boolean parallelFilterRenderNoStitch(String outputPath)
-    {
+    public static boolean parallelFilterRenderNoStitch(String outputPath) {
         try {
-            RectangleRDD spatialRDD = new RectangleRDD(sparkContext, RectangleInputLocation, RectangleSplitter, false, RectangleNumPartitions);
-            HeatMap visualizationOperator = new HeatMap(1000, 600, USMainLandBoundary, false, 2, 4, 4, true, true);
+            RectangleRDD spatialRDD =
+                    new RectangleRDD(
+                            sparkContext,
+                            RectangleInputLocation,
+                            RectangleSplitter,
+                            false,
+                            RectangleNumPartitions);
+            HeatMap visualizationOperator =
+                    new HeatMap(1000, 600, USMainLandBoundary, false, 2, 4, 4, true, true);
             visualizationOperator.Visualize(sparkContext, spatialRDD);
             SedonaVizImageGenerator imageGenerator = new SedonaVizImageGenerator();
-            imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.distributedRasterImage, outputPath, ImageType.PNG);
-        }
-        catch (Exception e) {
+            imageGenerator.SaveRasterImageAsLocalFile(
+                    visualizationOperator.distributedRasterImage, outputPath, ImageType.PNG);
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
@@ -318,17 +296,28 @@ public class Example
      * @param outputPath the output path
      * @return true, if successful
      */
-    public static boolean parallelFilterRenderStitch(String outputPath)
-    {
+    public static boolean parallelFilterRenderStitch(String outputPath) {
         try {
-            RectangleRDD spatialRDD = new RectangleRDD(sparkContext, RectangleInputLocation, RectangleSplitter, false, RectangleNumPartitions);
-            HeatMap visualizationOperator = new HeatMap(1000, 600, USMainLandBoundary, false, 2, 4, 4, true, true);
+            RectangleRDD spatialRDD =
+                    new RectangleRDD(
+                            sparkContext,
+                            RectangleInputLocation,
+                            RectangleSplitter,
+                            false,
+                            RectangleNumPartitions);
+            HeatMap visualizationOperator =
+                    new HeatMap(1000, 600, USMainLandBoundary, false, 2, 4, 4, true, true);
             visualizationOperator.Visualize(sparkContext, spatialRDD);
             ImageGenerator imageGenerator = new ImageGenerator();
-            imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.distributedRasterImage, outputPath, ImageType.PNG, 0, 4, 4);
+            imageGenerator.SaveRasterImageAsLocalFile(
+                    visualizationOperator.distributedRasterImage,
+                    outputPath,
+                    ImageType.PNG,
+                    0,
+                    4,
+                    4);
             ImageStitcher.stitchImagePartitionsFromLocalFile(outputPath, 1000, 600, 0, 4, 4);
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
@@ -341,20 +330,38 @@ public class Example
      * @param outputPath the output path
      * @return true, if successful
      */
-    public static boolean earthdataVisualization(String outputPath)
-    {
+    public static boolean earthdataVisualization(String outputPath) {
 
         try {
-            EarthdataHDFPointMapper earthdataHDFPoint = new EarthdataHDFPointMapper(HDFIncrement, HDFOffset, HDFRootGroupName,
-                    HDFDataVariableList, HDFDataVariableName, HDFswitchXY, urlPrefix);
-            PointRDD spatialRDD = new PointRDD(sparkContext, earthdataInputLocation, earthdataNumPartitions, earthdataHDFPoint);
-            ScatterPlot visualizationOperator = new ScatterPlot(1000, 600, spatialRDD.boundaryEnvelope, ColorizeOption.EARTHOBSERVATION, false, false);
+            EarthdataHDFPointMapper earthdataHDFPoint =
+                    new EarthdataHDFPointMapper(
+                            HDFIncrement,
+                            HDFOffset,
+                            HDFRootGroupName,
+                            HDFDataVariableList,
+                            HDFDataVariableName,
+                            HDFswitchXY,
+                            urlPrefix);
+            PointRDD spatialRDD =
+                    new PointRDD(
+                            sparkContext,
+                            earthdataInputLocation,
+                            earthdataNumPartitions,
+                            earthdataHDFPoint);
+            ScatterPlot visualizationOperator =
+                    new ScatterPlot(
+                            1000,
+                            600,
+                            spatialRDD.boundaryEnvelope,
+                            ColorizeOption.EARTHOBSERVATION,
+                            false,
+                            false);
             visualizationOperator.CustomizeColor(255, 255, 255, 255, Color.BLUE, true);
             visualizationOperator.Visualize(sparkContext, spatialRDD);
             SedonaVizImageGenerator imageGenerator = new SedonaVizImageGenerator();
-            imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.rasterImage, outputPath, ImageType.PNG);
-        }
-        catch (Exception e) {
+            imageGenerator.SaveRasterImageAsLocalFile(
+                    visualizationOperator.rasterImage, outputPath, ImageType.PNG);
+        } catch (Exception e) {
             e.printStackTrace();
             return false;
         }
@@ -367,9 +374,7 @@ public class Example
      * @param args the arguments
      * @throws IOException Signals that an I/O exception has occurred.
      */
-    public static void main(String[] args)
-            throws IOException
-    {
+    public static void main(String[] args) throws IOException {
         SparkConf sparkConf = new SparkConf().setAppName("SedonaVizDemo").setMaster("local[4]");
         sparkContext = new JavaSparkContext(sparkConf);
         Logger.getLogger("org").setLevel(Level.WARN);
@@ -381,41 +386,71 @@ public class Example
         FileInputStream ConfFile = new FileInputStream(resourcePath + "babylon.point.properties");
         prop.load(ConfFile);
 
-        String scatterPlotOutputPath = System.getProperty("user.dir") + "/" + demoOutputPath + "/scatterplot";
-        String heatMapOutputPath = System.getProperty("user.dir") + "/" + demoOutputPath + "/heatmap";
-        String choroplethMapOutputPath = System.getProperty("user.dir") + "/" + demoOutputPath + "/choroplethmap";
-        String parallelFilterRenderStitchOutputPath = System.getProperty("user.dir") + "/" + demoOutputPath + "/parallelfilterrenderstitchheatmap";
-        String earthdataScatterPlotOutputPath = System.getProperty("user.dir") + "/" + demoOutputPath + "/earthdatascatterplot";
+        String scatterPlotOutputPath =
+                System.getProperty("user.dir") + "/" + demoOutputPath + "/scatterplot";
+        String heatMapOutputPath =
+                System.getProperty("user.dir") + "/" + demoOutputPath + "/heatmap";
+        String choroplethMapOutputPath =
+                System.getProperty("user.dir") + "/" + demoOutputPath + "/choroplethmap";
+        String parallelFilterRenderStitchOutputPath =
+                System.getProperty("user.dir")
+                        + "/"
+                        + demoOutputPath
+                        + "/parallelfilterrenderstitchheatmap";
+        String earthdataScatterPlotOutputPath =
+                System.getProperty("user.dir") + "/" + demoOutputPath + "/earthdatascatterplot";
 
-        PointInputLocation = "file://" + System.getProperty("user.dir") + "/" + resourcePath + prop.getProperty("inputLocation");
+        PointInputLocation =
+                "file://"
+                        + System.getProperty("user.dir")
+                        + "/"
+                        + resourcePath
+                        + prop.getProperty("inputLocation");
         PointOffset = Integer.parseInt(prop.getProperty("offset"));
         PointSplitter = FileDataSplitter.getFileDataSplitter(prop.getProperty("splitter"));
         PointNumPartitions = Integer.parseInt(prop.getProperty("numPartitions"));
 
         ConfFile = new FileInputStream(resourcePath + "babylon.rectangle.properties");
         prop.load(ConfFile);
-        RectangleInputLocation = "file://" + System.getProperty("user.dir") + "/" + resourcePath + prop.getProperty("inputLocation");
+        RectangleInputLocation =
+                "file://"
+                        + System.getProperty("user.dir")
+                        + "/"
+                        + resourcePath
+                        + prop.getProperty("inputLocation");
         RectangleOffset = Integer.parseInt(prop.getProperty("offset"));
         RectangleSplitter = FileDataSplitter.getFileDataSplitter(prop.getProperty("splitter"));
         RectangleNumPartitions = Integer.parseInt(prop.getProperty("numPartitions"));
 
         ConfFile = new FileInputStream(resourcePath + "babylon.polygon.properties");
         prop.load(ConfFile);
-        PolygonInputLocation = "file://" + System.getProperty("user.dir") + "/" + resourcePath + prop.getProperty("inputLocation");
+        PolygonInputLocation =
+                "file://"
+                        + System.getProperty("user.dir")
+                        + "/"
+                        + resourcePath
+                        + prop.getProperty("inputLocation");
         PolygonOffset = Integer.parseInt(prop.getProperty("offset"));
         PolygonSplitter = FileDataSplitter.getFileDataSplitter(prop.getProperty("splitter"));
         PolygonNumPartitions = Integer.parseInt(prop.getProperty("numPartitions"));
 
         ConfFile = new FileInputStream(resourcePath + "babylon.linestring.properties");
         prop.load(ConfFile);
-        LineStringInputLocation = "file://" + System.getProperty("user.dir") + "/" + resourcePath + prop.getProperty("inputLocation");
+        LineStringInputLocation =
+                "file://"
+                        + System.getProperty("user.dir")
+                        + "/"
+                        + resourcePath
+                        + prop.getProperty("inputLocation");
         LineStringOffset = Integer.parseInt(prop.getProperty("offset"));
         LineStringSplitter = FileDataSplitter.getFileDataSplitter(prop.getProperty("splitter"));
         LineStringNumPartitions = Integer.parseInt(prop.getProperty("numPartitions"));
 
         USMainLandBoundary = new Envelope(-126.790180, -64.630926, 24.863836, 50.000);
 
-        earthdataInputLocation = System.getProperty("user.dir") + "/../spark/common/src/test/resources/modis/modis.csv";
+        earthdataInputLocation =
+                System.getProperty("user.dir")
+                        + "/../spark/common/src/test/resources/modis/modis.csv";
         earthdataNumPartitions = 5;
         HDFIncrement = 5;
         HDFOffset = 2;
@@ -424,12 +459,14 @@ public class Example
         HDFswitchXY = true;
         urlPrefix = System.getProperty("user.dir") + "/../spark/common/src/test/resources/modis/";
 
-        if (buildScatterPlot(scatterPlotOutputPath) && buildHeatMap(heatMapOutputPath)
-                && buildChoroplethMap(choroplethMapOutputPath) && parallelFilterRenderStitch(parallelFilterRenderStitchOutputPath + "-stitched")
-                && parallelFilterRenderNoStitch(parallelFilterRenderStitchOutputPath) && earthdataVisualization(earthdataScatterPlotOutputPath)) {
+        if (buildScatterPlot(scatterPlotOutputPath)
+                && buildHeatMap(heatMapOutputPath)
+                && buildChoroplethMap(choroplethMapOutputPath)
+                && parallelFilterRenderStitch(parallelFilterRenderStitchOutputPath + "-stitched")
+                && parallelFilterRenderNoStitch(parallelFilterRenderStitchOutputPath)
+                && earthdataVisualization(earthdataScatterPlotOutputPath)) {
             System.out.println("All 5 Demos have passed.");
-        }
-        else {
+        } else {
             System.out.println("Demos failed.");
         }
         sparkContext.stop();

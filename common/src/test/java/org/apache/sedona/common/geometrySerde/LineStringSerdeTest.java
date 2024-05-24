@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.geometrySerde;
 
-import org.junit.Test;
 import org.junit.Assert;
+import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.CoordinateXYM;
@@ -46,8 +45,8 @@ public class LineStringSerdeTest {
     @Test
     public void testLineString() {
         Coordinate[] coordinates =
-                new Coordinate[]{
-                        new Coordinate(1.0, 2.0), new Coordinate(3.0, 4.0), new Coordinate(5.0, 6.0),
+                new Coordinate[] {
+                    new Coordinate(1.0, 2.0), new Coordinate(3.0, 4.0), new Coordinate(5.0, 6.0),
                 };
         LineString lineString = gf.createLineString(coordinates);
         lineString.setSRID(4326);
@@ -73,8 +72,8 @@ public class LineStringSerdeTest {
     @Test
     public void testLineStringXYZ() {
         Coordinate[] coordinates =
-                new Coordinate[]{
-                        new Coordinate(1.0, 2.0, 3.0), new Coordinate(4.0, 5.0, 6.0),
+                new Coordinate[] {
+                    new Coordinate(1.0, 2.0, 3.0), new Coordinate(4.0, 5.0, 6.0),
                 };
         LineString lineString = gf.createLineString(coordinates);
         lineString.setSRID(4326);
@@ -98,8 +97,8 @@ public class LineStringSerdeTest {
     @Test
     public void testLineStringXYM() {
         Coordinate[] coordinates =
-                new Coordinate[]{
-                        new CoordinateXYM(1.0, 2.0, 3.0), new CoordinateXYM(4.0, 5.0, 6.0),
+                new Coordinate[] {
+                    new CoordinateXYM(1.0, 2.0, 3.0), new CoordinateXYM(4.0, 5.0, 6.0),
                 };
         LineString lineString = gf.createLineString(coordinates);
         lineString.setSRID(4326);
@@ -124,8 +123,8 @@ public class LineStringSerdeTest {
     @Test
     public void testLineStringXYZM() {
         Coordinate[] coordinates =
-                new Coordinate[]{
-                        new CoordinateXYZM(1.0, 2.0, 3.0, 4.0), new CoordinateXYZM(5.0, 6.0, 7.0, 8.0),
+                new Coordinate[] {
+                    new CoordinateXYZM(1.0, 2.0, 3.0, 4.0), new CoordinateXYZM(5.0, 6.0, 7.0, 8.0),
                 };
         LineString lineString = gf.createLineString(coordinates);
         lineString.setSRID(4326);

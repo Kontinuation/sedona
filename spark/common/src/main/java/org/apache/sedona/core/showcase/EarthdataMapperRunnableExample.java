@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.showcase;
 
 import org.apache.log4j.Level;
@@ -35,75 +34,46 @@ import org.locationtech.jts.geom.Envelope;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class EarthdataMapperRunnableExample.
- */
-public class EarthdataMapperRunnableExample
-{
+/** The Class EarthdataMapperRunnableExample. */
+public class EarthdataMapperRunnableExample {
 
-    /**
-     * The sc.
-     */
+    /** The sc. */
     public static JavaSparkContext sc;
 
-    /**
-     * The Input location.
-     */
+    /** The Input location. */
     static String InputLocation;
 
-    /**
-     * The splitter.
-     */
+    /** The splitter. */
     static FileDataSplitter splitter;
 
-    /**
-     * The index type.
-     */
+    /** The index type. */
     static IndexType indexType;
 
-    /**
-     * The num partitions.
-     */
+    /** The num partitions. */
     static Integer numPartitions;
 
-    /**
-     * The query envelope.
-     */
+    /** The query envelope. */
     static Envelope queryEnvelope;
 
-    /**
-     * The loop times.
-     */
+    /** The loop times. */
     static int loopTimes;
 
-    /**
-     * The HDF increment.
-     */
+    /** The HDF increment. */
     static int HDFIncrement = 5;
 
-    /**
-     * The HDF offset.
-     */
+    /** The HDF offset. */
     static int HDFOffset = 2;
 
-    /**
-     * The HDF root group name.
-     */
+    /** The HDF root group name. */
     static String HDFRootGroupName = "MOD_Swath_LST";
 
-    /**
-     * The HDF data variable name.
-     */
+    /** The HDF data variable name. */
     static String HDFDataVariableName = "LST";
 
-    /**
-     * The HDF data variable list.
-     */
+    /** The HDF data variable list. */
     static String[] HDFDataVariableList = {"LST", "QC", "Error_LST", "Emis_31", "Emis_32"};
 
-    /**
-     * The url prefix.
-     */
+    /** The url prefix. */
     static String urlPrefix = "";
 
     /**
@@ -111,9 +81,9 @@ public class EarthdataMapperRunnableExample
      *
      * @param args the arguments
      */
-    public static void main(String[] args)
-    {
-        SparkConf conf = new SparkConf().setAppName("EarthdataMapperRunnableExample").setMaster("local[2]");
+    public static void main(String[] args) {
+        SparkConf conf =
+                new SparkConf().setAppName("EarthdataMapperRunnableExample").setMaster("local[2]");
         conf.set("spark.serializer", KryoSerializer.class.getName());
         conf.set("spark.kryo.registrator", SedonaKryoRegistrator.class.getName());
         sc = new JavaSparkContext(conf);
@@ -136,40 +106,46 @@ public class EarthdataMapperRunnableExample
         System.out.println("All Earthdata DEMOs passed!");
     }
 
-    /**
-     * Test spatial range query.
-     */
-    public static void testSpatialRangeQuery()
-    {
-        EarthdataHDFPointMapper earthdataHDFPoint = new EarthdataHDFPointMapper(HDFIncrement, HDFOffset, HDFRootGroupName,
-                HDFDataVariableList, HDFDataVariableName, urlPrefix);
+    /** Test spatial range query. */
+    public static void testSpatialRangeQuery() {
+        EarthdataHDFPointMapper earthdataHDFPoint =
+                new EarthdataHDFPointMapper(
+                        HDFIncrement,
+                        HDFOffset,
+                        HDFRootGroupName,
+                        HDFDataVariableList,
+                        HDFDataVariableName,
+                        urlPrefix);
         PointRDD spatialRDD = new PointRDD(sc, InputLocation, numPartitions, earthdataHDFPoint);
         spatialRDD.rawSpatialRDD.persist(StorageLevel.MEMORY_ONLY());
         for (int i = 0; i < loopTimes; i++) {
             long resultSize;
             try {
-                resultSize = RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, false).count();
+                resultSize =
+                        RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, false)
+                                .count();
                 assert resultSize > 0;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
     }
 
-    /**
-     * Test spatial range query using index.
-     */
-    public static void testSpatialRangeQueryUsingIndex()
-    {
-        EarthdataHDFPointMapper earthdataHDFPoint = new EarthdataHDFPointMapper(HDFIncrement, HDFOffset, HDFRootGroupName,
-                HDFDataVariableList, HDFDataVariableName, urlPrefix);
+    /** Test spatial range query using index. */
+    public static void testSpatialRangeQueryUsingIndex() {
+        EarthdataHDFPointMapper earthdataHDFPoint =
+                new EarthdataHDFPointMapper(
+                        HDFIncrement,
+                        HDFOffset,
+                        HDFRootGroupName,
+                        HDFDataVariableList,
+                        HDFDataVariableName,
+                        urlPrefix);
         PointRDD spatialRDD = new PointRDD(sc, InputLocation, numPartitions, earthdataHDFPoint);
         try {
             spatialRDD.buildIndex(IndexType.RTREE, false);
-        }
-        catch (Exception e1) {
+        } catch (Exception e1) {
             // TODO Auto-generated catch block
             e1.printStackTrace();
         }
@@ -177,10 +153,11 @@ public class EarthdataMapperRunnableExample
         for (int i = 0; i < loopTimes; i++) {
             try {
                 long resultSize;
-                resultSize = RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, true).count();
+                resultSize =
+                        RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, true)
+                                .count();
                 assert resultSize > 0;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
             }

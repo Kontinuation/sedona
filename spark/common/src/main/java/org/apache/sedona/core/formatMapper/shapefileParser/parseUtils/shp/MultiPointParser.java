@@ -16,27 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.shp;
 
+import java.io.IOException;
 import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.MultiPoint;
 
-import java.io.IOException;
-
-public class MultiPointParser
-        extends ShapeParser
-{
+public class MultiPointParser extends ShapeParser {
 
     /**
      * create a parser that can abstract a MultiPoint from input source with given GeometryFactory.
      *
      * @param geometryFactory the geometry factory
      */
-    public MultiPointParser(GeometryFactory geometryFactory)
-    {
+    public MultiPointParser(GeometryFactory geometryFactory) {
         super(geometryFactory);
     }
 
@@ -48,8 +43,7 @@ public class MultiPointParser
      * @throws IOException Signals that an I/O exception has occurred.
      */
     @Override
-    public Geometry parseShape(ShapeReader reader)
-    {
+    public Geometry parseShape(ShapeReader reader) {
         reader.skip(4 * ShapeFileConst.DOUBLE_LENGTH);
         int numPoints = reader.readInt();
         CoordinateSequence coordinateSequence = readCoordinates(reader, numPoints);

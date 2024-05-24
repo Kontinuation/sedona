@@ -18,6 +18,15 @@
  */
 package org.apache.sedona.viz.core;
 
+import java.awt.image.BufferedImage;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.Serializable;
+import java.net.URI;
+import java.util.List;
+import javax.imageio.ImageIO;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -32,30 +41,13 @@ import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.VoidFunction;
 import scala.Tuple2;
 
-import javax.imageio.ImageIO;
-
-import java.awt.image.BufferedImage;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.Serializable;
-import java.net.URI;
-import java.util.List;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class ImageGenerator.
- */
-public class ImageGenerator
-        implements Serializable
-{
+/** The Class ImageGenerator. */
+public class ImageGenerator implements Serializable {
 
-    /**
-     * The Constant logger.
-     */
-    final static Logger logger = Logger.getLogger(ImageGenerator.class);
+    /** The Constant logger. */
+    static final Logger logger = Logger.getLogger(ImageGenerator.class);
 
     /**
      * Save raster image as local file.
@@ -69,22 +61,42 @@ public class ImageGenerator
      * @return true, if successful
      * @throws Exception the exception
      */
-    public boolean SaveRasterImageAsLocalFile(JavaPairRDD<Integer, ImageSerializableWrapper> distributedImage, final String outputPath, final ImageType imageType, final int zoomLevel, final int partitionOnX, final int partitionOnY)
-            throws Exception
-    {
+    public boolean SaveRasterImageAsLocalFile(
+            JavaPairRDD<Integer, ImageSerializableWrapper> distributedImage,
+            final String outputPath,
+            final ImageType imageType,
+            final int zoomLevel,
+            final int partitionOnX,
+            final int partitionOnY)
+            throws Exception {
         logger.info("[Sedona-Viz][SaveRasterImageAsLocalFile][Start]");
         for (int i = 0; i < partitionOnX * partitionOnY; i++) {
-            deleteLocalFile(outputPath + "-" + RasterizationUtils.getImageTileName(zoomLevel, partitionOnX, partitionOnY, i), imageType);
+            deleteLocalFile(
+                    outputPath
+                            + "-"
+                            + RasterizationUtils.getImageTileName(
+                                    zoomLevel, partitionOnX, partitionOnY, i),
+                    imageType);
         }
-        distributedImage.foreach(new VoidFunction<Tuple2<Integer, ImageSerializableWrapper>>()
-        {
-            @Override
-            public void call(Tuple2<Integer, ImageSerializableWrapper> integerImageSerializableWrapperTuple2)
-                    throws Exception
-            {
-                SaveRasterImageAsLocalFile(integerImageSerializableWrapperTuple2._2.image, outputPath + "-" + RasterizationUtils.getImageTileName(zoomLevel, partitionOnX, partitionOnY, integerImageSerializableWrapperTuple2._1), imageType);
-            }
-        });
+        distributedImage.foreach(
+                new VoidFunction<Tuple2<Integer, ImageSerializableWrapper>>() {
+                    @Override
+                    public void call(
+                            Tuple2<Integer, ImageSerializableWrapper>
+                                    integerImageSerializableWrapperTuple2)
+                            throws Exception {
+                        SaveRasterImageAsLocalFile(
+                                integerImageSerializableWrapperTuple2._2.image,
+                                outputPath
+                                        + "-"
+                                        + RasterizationUtils.getImageTileName(
+                                                zoomLevel,
+                                                partitionOnX,
+                                                partitionOnY,
+                                                integerImageSerializableWrapperTuple2._1),
+                                imageType);
+                    }
+                });
         logger.info("[Sedona-Viz][SaveRasterImageAsLocalFile][Stop]");
         return true;
     }
@@ -98,12 +110,16 @@ public class ImageGenerator
      * @return true, if successful
      * @throws Exception the exception
      */
-    public boolean SaveRasterImageAsLocalFile(JavaPairRDD<Integer, ImageSerializableWrapper> distributedImage, String outputPath, ImageType imageType)
-            throws Exception
-    {
-        List<Tuple2<Integer, ImageSerializableWrapper>> imagePartitions = distributedImage.collect();
+    public boolean SaveRasterImageAsLocalFile(
+            JavaPairRDD<Integer, ImageSerializableWrapper> distributedImage,
+            String outputPath,
+            ImageType imageType)
+            throws Exception {
+        List<Tuple2<Integer, ImageSerializableWrapper>> imagePartitions =
+                distributedImage.collect();
         for (Tuple2<Integer, ImageSerializableWrapper> imagePartition : imagePartitions) {
-            SaveRasterImageAsLocalFile(imagePartition._2.image, outputPath + "-" + imagePartition._1, imageType);
+            SaveRasterImageAsLocalFile(
+                    imagePartition._2.image, outputPath + "-" + imagePartition._1, imageType);
         }
         return true;
     }
@@ -120,22 +136,43 @@ public class ImageGenerator
      * @return true, if successful
      * @throws Exception the exception
      */
-    public boolean SaveRasterImageAsHadoopFile(JavaPairRDD<Integer, ImageSerializableWrapper> distributedImage, final String outputPath, final ImageType imageType, final int zoomLevel, final int partitionOnX, final int partitionOnY)
-            throws Exception
-    {
+    public boolean SaveRasterImageAsHadoopFile(
+            JavaPairRDD<Integer, ImageSerializableWrapper> distributedImage,
+            final String outputPath,
+            final ImageType imageType,
+            final int zoomLevel,
+            final int partitionOnX,
+            final int partitionOnY)
+            throws Exception {
         logger.info("[Sedona-Viz][SaveRasterImageAsHadoopFile][Start]");
         for (int i = 0; i < partitionOnX * partitionOnY; i++) {
-            deleteHadoopFile(outputPath + "-" + RasterizationUtils.getImageTileName(zoomLevel, partitionOnX, partitionOnY, i) + ".", imageType);
+            deleteHadoopFile(
+                    outputPath
+                            + "-"
+                            + RasterizationUtils.getImageTileName(
+                                    zoomLevel, partitionOnX, partitionOnY, i)
+                            + ".",
+                    imageType);
         }
-        distributedImage.foreach(new VoidFunction<Tuple2<Integer, ImageSerializableWrapper>>()
-        {
-            @Override
-            public void call(Tuple2<Integer, ImageSerializableWrapper> integerImageSerializableWrapperTuple2)
-                    throws Exception
-            {
-                SaveRasterImageAsHadoopFile(integerImageSerializableWrapperTuple2._2.image, outputPath + "-" + RasterizationUtils.getImageTileName(zoomLevel, partitionOnX, partitionOnY, integerImageSerializableWrapperTuple2._1), imageType);
-            }
-        });
+        distributedImage.foreach(
+                new VoidFunction<Tuple2<Integer, ImageSerializableWrapper>>() {
+                    @Override
+                    public void call(
+                            Tuple2<Integer, ImageSerializableWrapper>
+                                    integerImageSerializableWrapperTuple2)
+                            throws Exception {
+                        SaveRasterImageAsHadoopFile(
+                                integerImageSerializableWrapperTuple2._2.image,
+                                outputPath
+                                        + "-"
+                                        + RasterizationUtils.getImageTileName(
+                                                zoomLevel,
+                                                partitionOnX,
+                                                partitionOnY,
+                                                integerImageSerializableWrapperTuple2._1),
+                                imageType);
+                    }
+                });
         logger.info("[Sedona-Viz][SaveRasterImageAsHadoopFile][Stop]");
         return true;
     }
@@ -155,24 +192,52 @@ public class ImageGenerator
      * @param partitionOnY the partition on Y
      * @return true, if successful
      */
-    public boolean SaveRasterImageAsS3File(JavaPairRDD<Integer, ImageSerializableWrapper> distributedImage,
-            final String regionName, final String accessKey, final String secretKey,
-            final String bucketName, final String path, final ImageType imageType, final int zoomLevel, final int partitionOnX, final int partitionOnY)
-    {
+    public boolean SaveRasterImageAsS3File(
+            JavaPairRDD<Integer, ImageSerializableWrapper> distributedImage,
+            final String regionName,
+            final String accessKey,
+            final String secretKey,
+            final String bucketName,
+            final String path,
+            final ImageType imageType,
+            final int zoomLevel,
+            final int partitionOnX,
+            final int partitionOnY) {
         logger.info("[Sedona-Viz][SaveRasterImageAsS3File][Start]");
         S3Operator s3Operator = new S3Operator(regionName, accessKey, secretKey);
         for (int i = 0; i < partitionOnX * partitionOnY; i++) {
-            s3Operator.deleteImage(bucketName, path + "-" + RasterizationUtils.getImageTileName(zoomLevel, partitionOnX, partitionOnY, i) + "." + imageType.getTypeName());
+            s3Operator.deleteImage(
+                    bucketName,
+                    path
+                            + "-"
+                            + RasterizationUtils.getImageTileName(
+                                    zoomLevel, partitionOnX, partitionOnY, i)
+                            + "."
+                            + imageType.getTypeName());
         }
-        distributedImage.foreach(new VoidFunction<Tuple2<Integer, ImageSerializableWrapper>>()
-        {
-            @Override
-            public void call(Tuple2<Integer, ImageSerializableWrapper> integerImageSerializableWrapperTuple2)
-                    throws Exception
-            {
-                SaveRasterImageAsS3File(integerImageSerializableWrapperTuple2._2.image, regionName, accessKey, secretKey, bucketName, path + "-" + RasterizationUtils.getImageTileName(zoomLevel, partitionOnX, partitionOnY, integerImageSerializableWrapperTuple2._1), imageType);
-            }
-        });
+        distributedImage.foreach(
+                new VoidFunction<Tuple2<Integer, ImageSerializableWrapper>>() {
+                    @Override
+                    public void call(
+                            Tuple2<Integer, ImageSerializableWrapper>
+                                    integerImageSerializableWrapperTuple2)
+                            throws Exception {
+                        SaveRasterImageAsS3File(
+                                integerImageSerializableWrapperTuple2._2.image,
+                                regionName,
+                                accessKey,
+                                secretKey,
+                                bucketName,
+                                path
+                                        + "-"
+                                        + RasterizationUtils.getImageTileName(
+                                                zoomLevel,
+                                                partitionOnX,
+                                                partitionOnY,
+                                                integerImageSerializableWrapperTuple2._1),
+                                imageType);
+                    }
+                });
         logger.info("[Sedona-Viz][SaveRasterImageAsS3File][Stop]");
         return true;
     }
@@ -186,16 +251,14 @@ public class ImageGenerator
      * @return true, if successful
      * @throws Exception the exception
      */
-    public boolean SaveRasterImageAsLocalFile(BufferedImage rasterImage, String outputPath, ImageType imageType)
-            throws Exception
-    {
+    public boolean SaveRasterImageAsLocalFile(
+            BufferedImage rasterImage, String outputPath, ImageType imageType) throws Exception {
         logger.info("[Sedona-Viz][SaveRasterImageAsLocalFile][Start]");
         File outputImage = new File(outputPath + "." + imageType.getTypeName());
         outputImage.getParentFile().mkdirs();
         try {
             ImageIO.write(rasterImage, imageType.getTypeName(), outputImage);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
         }
         logger.info("[Sedona-Viz][SaveRasterImageAsLocalFile][Stop]");
@@ -211,9 +274,9 @@ public class ImageGenerator
      * @return true, if successful
      * @throws Exception the exception
      */
-    public boolean SaveRasterImageAsHadoopFile(BufferedImage rasterImage, String originalOutputPath, ImageType imageType)
-            throws Exception
-    {
+    public boolean SaveRasterImageAsHadoopFile(
+            BufferedImage rasterImage, String originalOutputPath, ImageType imageType)
+            throws Exception {
         logger.info("[Sedona-Viz][SaveRasterImageAsHadoopFile][Start]");
         // Locate HDFS path
         String outputPath = originalOutputPath + "." + imageType.getTypeName();
@@ -228,9 +291,12 @@ public class ImageGenerator
         localPath += "." + imageType.getTypeName();
         // Delete existing files
         Configuration hadoopConf = new org.apache.hadoop.conf.Configuration();
-        logger.info("[Sedona-Viz][SaveRasterImageAsSparkFile] HDFS URI BASE: " + hostName + ":" + port);
+        logger.info(
+                "[Sedona-Viz][SaveRasterImageAsSparkFile] HDFS URI BASE: " + hostName + ":" + port);
         FileSystem hdfs = FileSystem.get(new URI(hostName + ":" + port), hadoopConf);
-        logger.info("[Sedona-Viz][SaveRasterImageAsSparkFile] Check the existence of path: " + localPath);
+        logger.info(
+                "[Sedona-Viz][SaveRasterImageAsSparkFile] Check the existence of path: "
+                        + localPath);
         if (hdfs.exists(new org.apache.hadoop.fs.Path(localPath))) {
             logger.info("[Sedona-Viz][SaveRasterImageAsSparkFile] Deleting path: " + localPath);
             hdfs.delete(new org.apache.hadoop.fs.Path(localPath), true);
@@ -258,9 +324,15 @@ public class ImageGenerator
      * @return true, if successful
      * @throws IOException Signals that an I/O exception has occurred.
      */
-    public boolean SaveRasterImageAsS3File(BufferedImage rasterImage, String regionName, String accessKey, String secretKey, String bucketName, String path, ImageType imageType)
-            throws IOException
-    {
+    public boolean SaveRasterImageAsS3File(
+            BufferedImage rasterImage,
+            String regionName,
+            String accessKey,
+            String secretKey,
+            String bucketName,
+            String path,
+            ImageType imageType)
+            throws IOException {
         logger.info("[Sedona-Viz][SaveRasterImageAsS3File][Start]");
         S3Operator s3Operator = new S3Operator(regionName, accessKey, secretKey);
         s3Operator.putImage(bucketName, path + "." + imageType.getTypeName(), rasterImage);
@@ -277,21 +349,22 @@ public class ImageGenerator
      * @return true, if successful
      * @throws Exception the exception
      */
-    public boolean SaveVectorImageAsLocalFile(JavaPairRDD<Integer, String> distributedImage, String outputPath, ImageType imageType)
-            throws Exception
-    {
+    public boolean SaveVectorImageAsLocalFile(
+            JavaPairRDD<Integer, String> distributedImage, String outputPath, ImageType imageType)
+            throws Exception {
         logger.info("[Sedona-Viz][SaveVectormageAsLocalFile][Start]");
-        JavaRDD<String> distributedVectorImageNoKey = distributedImage.map(new Function<Tuple2<Integer, String>, String>()
-        {
+        JavaRDD<String> distributedVectorImageNoKey =
+                distributedImage.map(
+                        new Function<Tuple2<Integer, String>, String>() {
 
-            @Override
-            public String call(Tuple2<Integer, String> vectorObject)
-                    throws Exception
-            {
-                return vectorObject._2();
-            }
-        });
-        this.SaveVectorImageAsLocalFile(distributedVectorImageNoKey.collect(), outputPath, imageType);
+                            @Override
+                            public String call(Tuple2<Integer, String> vectorObject)
+                                    throws Exception {
+                                return vectorObject._2();
+                            }
+                        });
+        this.SaveVectorImageAsLocalFile(
+                distributedVectorImageNoKey.collect(), outputPath, imageType);
         logger.info("[Sedona-Viz][SaveVectormageAsLocalFile][Stop]");
         return true;
     }
@@ -305,9 +378,8 @@ public class ImageGenerator
      * @return true, if successful
      * @throws Exception the exception
      */
-    public boolean SaveVectorImageAsLocalFile(List<String> vectorImage, String outputPath, ImageType imageType)
-            throws Exception
-    {
+    public boolean SaveVectorImageAsLocalFile(
+            List<String> vectorImage, String outputPath, ImageType imageType) throws Exception {
         logger.info("[Sedona-Viz][SaveVectorImageAsLocalFile][Start]");
         File outputImage = new File(outputPath + "." + imageType.getTypeName());
         outputImage.getParentFile().mkdirs();
@@ -320,20 +392,21 @@ public class ImageGenerator
             for (String svgElement : vectorImage) {
                 bw.write(svgElement);
             }
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
 
             e.printStackTrace();
-        }
-        finally {
+        } finally {
 
             try {
 
-                if (bw != null) { bw.close(); }
+                if (bw != null) {
+                    bw.close();
+                }
 
-                if (fw != null) { fw.close(); }
-            }
-            catch (IOException ex) {
+                if (fw != null) {
+                    fw.close();
+                }
+            } catch (IOException ex) {
 
                 ex.printStackTrace();
             }
@@ -351,8 +424,7 @@ public class ImageGenerator
      * @throws Exception the exception
      */
     public boolean deleteHadoopFile(String originalOutputPath, ImageType imageType)
-            throws Exception
-    {
+            throws Exception {
         String outputPath = originalOutputPath + "." + imageType.getTypeName();
         String[] splitString = outputPath.split(":");
         String hostName = splitString[0] + ":" + splitString[1];
@@ -365,9 +437,12 @@ public class ImageGenerator
         localPath += "." + imageType.getTypeName();
         // Delete existing files
         Configuration hadoopConf = new org.apache.hadoop.conf.Configuration();
-        logger.info("[Sedona-Viz][SaveRasterImageAsSparkFile] HDFS URI BASE: " + hostName + ":" + port);
+        logger.info(
+                "[Sedona-Viz][SaveRasterImageAsSparkFile] HDFS URI BASE: " + hostName + ":" + port);
         FileSystem hdfs = FileSystem.get(new URI(hostName + ":" + port), hadoopConf);
-        logger.info("[Sedona-Viz][SaveRasterImageAsSparkFile] Check the existence of path: " + localPath);
+        logger.info(
+                "[Sedona-Viz][SaveRasterImageAsSparkFile] Check the existence of path: "
+                        + localPath);
         if (hdfs.exists(new org.apache.hadoop.fs.Path(localPath))) {
             logger.info("[Sedona-Viz][SaveRasterImageAsSparkFile] Deleting path: " + localPath);
             hdfs.delete(new org.apache.hadoop.fs.Path(localPath), true);
@@ -383,8 +458,7 @@ public class ImageGenerator
      * @param imageType the image type
      * @return true, if successful
      */
-    public boolean deleteLocalFile(String originalOutputPath, ImageType imageType)
-    {
+    public boolean deleteLocalFile(String originalOutputPath, ImageType imageType) {
         File file = null;
         try {
 
@@ -393,8 +467,7 @@ public class ImageGenerator
 
             // tries to delete a non-existing file
             file.delete();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
 
             // if any error occurs
             e.printStackTrace();

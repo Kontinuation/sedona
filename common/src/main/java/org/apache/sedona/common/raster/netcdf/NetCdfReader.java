@@ -19,6 +19,8 @@
 package org.apache.sedona.common.raster.netcdf;
 
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
+import java.util.*;
 import org.apache.sedona.common.raster.RasterConstructors;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.opengis.referencing.FactoryException;
@@ -26,16 +28,15 @@ import org.opengis.referencing.datum.PixelInCell;
 import ucar.ma2.Array;
 import ucar.nc2.*;
 
-import java.io.IOException;
-import java.util.*;
-
 public class NetCdfReader {
     /*
     ==================================== Sedona NetCDF Public APIS ====================================
      */
 
     /**
-     * Return a string depicting information about record variables in the provided netcdf file along with its dimensions
+     * Return a string depicting information about record variables in the provided netcdf file
+     * along with its dimensions
+     *
      * @param netcdfFile NetCDF file to retrieve info of
      * @return a string containing information about all record variables present within the file
      */
@@ -46,58 +47,74 @@ public class NetCdfReader {
         StringBuilder recordInfo = new StringBuilder();
         for (int i = 0; i < numRecordVariables; i++) {
             Variable variable = recordVariables.get(i);
-            recordInfo.append(variable.getNameAndDimensions(false)); //make strict true to get short name
+            recordInfo.append(
+                    variable.getNameAndDimensions(false)); // make strict true to get short name
             if (i != numRecordVariables - 1) recordInfo.append("\n\n");
         }
         return recordInfo.toString();
     }
 
     /**
-     * Return a raster containing the record variable data, assuming the last two dimensions of the variable as Y and X respectively
+     * Return a raster containing the record variable data, assuming the last two dimensions of the
+     * variable as Y and X respectively
+     *
      * @param netcdfFile NetCDF file to read
      * @param variableShortName short name of the variable to read
      * @return GridCoverage2D object
      * @throws FactoryException
      * @throws IOException
      */
-    public static GridCoverage2D getRaster(NetcdfFile netcdfFile, String variableShortName) throws FactoryException, IOException {
+    public static GridCoverage2D getRaster(NetcdfFile netcdfFile, String variableShortName)
+            throws FactoryException, IOException {
         Variable recordVariable = getRecordVariableFromShortName(netcdfFile, variableShortName);
         ImmutableList<Dimension> variableDimensions = recordVariable.getDimensions();
         int numDimensions = variableDimensions.size();
         if (numDimensions < 2) {
             throw new IllegalArgumentException(NetCdfConstants.INSUFFICIENT_DIMENSIONS_VARIABLE);
         }
-        //Assume ... Y, X dimension list in the variable
+        // Assume ... Y, X dimension list in the variable
         String latDimensionShortName = variableDimensions.get(numDimensions - 2).getShortName();
         String lonDimensionShortName = variableDimensions.get(numDimensions - 1).getShortName();
 
-        Variable[] coordVariablePair = getCoordVariables(netcdfFile, latDimensionShortName, lonDimensionShortName);
+        Variable[] coordVariablePair =
+                getCoordVariables(netcdfFile, latDimensionShortName, lonDimensionShortName);
         Variable latVariable = coordVariablePair[1];
         Variable lonVariable = coordVariablePair[0];
-        return NetCdfReader.getRasterHelper(netcdfFile, recordVariable, lonVariable, latVariable, false);
+        return NetCdfReader.getRasterHelper(
+                netcdfFile, recordVariable, lonVariable, latVariable, false);
     }
 
     /**
-     *
      * @param netcdfFile NetCDF file to read
      * @param variableShortName short name of the variable to read
-     * @param latDimShortName short name of the variable that serves as the lat dimension of the record variable
-     * @param lonDimShortName short name of the variable that serves as the lon dimension of the record variable
+     * @param latDimShortName short name of the variable that serves as the lat dimension of the
+     *     record variable
+     * @param lonDimShortName short name of the variable that serves as the lon dimension of the
+     *     record variable
      * @return GridCoverage2D object
      * @throws FactoryException
      * @throws IOException
      */
-    public static GridCoverage2D getRaster(NetcdfFile netcdfFile, String variableShortName, String latDimShortName, String lonDimShortName) throws FactoryException, IOException {
+    public static GridCoverage2D getRaster(
+            NetcdfFile netcdfFile,
+            String variableShortName,
+            String latDimShortName,
+            String lonDimShortName)
+            throws FactoryException, IOException {
         Variable recordVariable = getRecordVariableFromShortName(netcdfFile, variableShortName);
 
-        Variable[] coordVariablePair = getCoordVariables(netcdfFile, latDimShortName, lonDimShortName);
+        Variable[] coordVariablePair =
+                getCoordVariables(netcdfFile, latDimShortName, lonDimShortName);
         Variable latVariable = coordVariablePair[1];
         Variable lonVariable = coordVariablePair[0];
-        return NetCdfReader.getRasterHelper(netcdfFile, recordVariable, lonVariable, latVariable, true);
+        return NetCdfReader.getRasterHelper(
+                netcdfFile, recordVariable, lonVariable, latVariable, true);
     }
 
     /**
-     * Return the properties map of the raster which contains metadata information about a netCDF file
+     * Return the properties map of the raster which contains metadata information about a netCDF
+     * file
+     *
      * @param raster GridCoverage2D raster created from a NetCDF file
      * @return a map of containing metadata
      */
@@ -105,41 +122,52 @@ public class NetCdfReader {
         return raster.getProperties();
     }
 
-     /*
+    /*
     ==================================== Sedona NetCDF Helper APIS ====================================
      */
 
-    private static Variable getRecordVariableFromShortName(NetcdfFile netcdfFile, String variableShortName) {
-        Variable recordVariable = findVariableRecursive(variableShortName, netcdfFile.getRootGroup());
+    private static Variable getRecordVariableFromShortName(
+            NetcdfFile netcdfFile, String variableShortName) {
+        Variable recordVariable =
+                findVariableRecursive(variableShortName, netcdfFile.getRootGroup());
         ensureRecordVar(recordVariable);
         return recordVariable;
     }
 
-    private static Variable[] getCoordVariables(NetcdfFile netcdfFile, String latVariableShortName, String lonVariableShortName) {
+    private static Variable[] getCoordVariables(
+            NetcdfFile netcdfFile, String latVariableShortName, String lonVariableShortName) {
         Group rootGroup = netcdfFile.getRootGroup();
 
-        //TODO: optimize to get all variables in 1 tree traversal?
+        // TODO: optimize to get all variables in 1 tree traversal?
         Variable lonVariable = findVariableRecursive(lonVariableShortName, rootGroup);
         Variable latVariable = findVariableRecursive(latVariableShortName, rootGroup);
         ensureCoordVar(lonVariable, latVariable);
-        return new Variable[]{lonVariable, latVariable};
+        return new Variable[] {lonVariable, latVariable};
     }
 
     private static ImmutableList<Variable> getRecordVariables(NetcdfFile netcdfFile) {
         ImmutableList<Variable> variables = netcdfFile.getVariables();
         List<Variable> recordVariables = null;
-        for (Variable variable: variables) {
+        for (Variable variable : variables) {
             ImmutableList<Dimension> variableDimensions = variable.getDimensions();
-            if (variableDimensions.size() < 2) continue; //record variables have least 2 dimensions (lat and lon)
+            if (variableDimensions.size() < 2)
+                continue; // record variables have least 2 dimensions (lat and lon)
             if (Objects.isNull(recordVariables)) recordVariables = new ArrayList<>();
-            //ASSUMPTION: A record is not restricted to having an unlimited dimension
+            // ASSUMPTION: A record is not restricted to having an unlimited dimension
             recordVariables.add(variable);
         }
         if (Objects.isNull(recordVariables)) return null;
         return ImmutableList.copyOf(recordVariables);
     }
-    private static GridCoverage2D getRasterHelper(NetcdfFile netcdfFile, Variable recordVariable, Variable lonVariable, Variable latVariable, boolean findCoordIndices) throws IOException, FactoryException {
-        //assert(netcdfFile.getFileTypeVersion().equalsIgnoreCase("1")); //CDF - 1
+
+    private static GridCoverage2D getRasterHelper(
+            NetcdfFile netcdfFile,
+            Variable recordVariable,
+            Variable lonVariable,
+            Variable latVariable,
+            boolean findCoordIndices)
+            throws IOException, FactoryException {
+        // assert(netcdfFile.getFileTypeVersion().equalsIgnoreCase("1")); //CDF - 1
         ImmutableList<Attribute> globalAttributes = netcdfFile.getGlobalAttributes();
         Group rootGroup = netcdfFile.getRootGroup();
 
@@ -149,8 +177,8 @@ public class NetCdfReader {
         boolean isIncreasing = false;
         HashMap<String, List<String>> varMetadata = new HashMap<>();
 
-
-        //========================= Set Raster geo-reference (width, height, scaleX, scaleY =========================
+        // ========================= Set Raster geo-reference (width, height, scaleX, scaleY
+        // =========================
         lonData = lonVariable.read();
         width = lonData.getShape()[0];
         double firstVal, lastVal;
@@ -167,7 +195,7 @@ public class NetCdfReader {
         isIncreasing = firstVal < lastVal;
         maxY = isIncreasing ? lastVal : firstVal;
         translateY = Math.abs(lastVal - firstVal) / (height - 1);
-        //======================================================================================================
+        // ======================================================================================================
 
         String lonVariableName = lonVariable.getShortName();
         String latVariableName = latVariable.getShortName();
@@ -175,7 +203,7 @@ public class NetCdfReader {
         List<Dimension> recordDimensions = recordVariable.getDimensions();
         int numRecordDimensions = recordDimensions.size();
 
-        //==================== Re-check existence of dimensions if necessary ====================
+        // ==================== Re-check existence of dimensions if necessary ====================
         int lonIndex = numRecordDimensions - 1;
         int latIndex = numRecordDimensions - 2;
         if (findCoordIndices) {
@@ -186,15 +214,14 @@ public class NetCdfReader {
             }
         }
 
-        //read recordVariable data
+        // read recordVariable data
         Array recordData = recordVariable.read();
 
         // Set noDataValue if available, null otherwise
         Double noDataValue = null;
         if (recordVariable.attributes().hasAttribute(NetCdfConstants.MISSING_VALUE)) {
             Attribute noDataAttribute = recordVariable.findAttribute(NetCdfConstants.MISSING_VALUE);
-            if (!Objects.isNull(noDataAttribute))
-                noDataValue = getAttrDoubleValue(noDataAttribute);
+            if (!Objects.isNull(noDataAttribute)) noDataValue = getAttrDoubleValue(noDataAttribute);
         }
         int[] strides = recordData.getIndex().getShape();
         int[] pointers = recordData.getIndex().getCurrentCounter();
@@ -203,10 +230,12 @@ public class NetCdfReader {
         for (int i = 0; i < numRecordDimensions; i++) {
             Dimension recordDimension = recordDimensions.get(i);
             String dimensionShortName = recordDimension.getShortName();
-            //TODO: Maybe replace this string comparison with index comparison since we already have lon and lat dimension indices stored?
-            if (dimensionShortName.equalsIgnoreCase(latVariableName) || dimensionShortName.equalsIgnoreCase(lonVariableName)) {
+            // TODO: Maybe replace this string comparison with index comparison since we already
+            // have lon and lat dimension indices stored?
+            if (dimensionShortName.equalsIgnoreCase(latVariableName)
+                    || dimensionShortName.equalsIgnoreCase(lonVariableName)) {
                 numValuesPerBand *= strides[i];
-            }else {
+            } else {
                 numBands *= strides[i];
             }
         }
@@ -218,44 +247,48 @@ public class NetCdfReader {
             else {
                 Dimension recordDimension = recordDimensions.get(i);
                 String dimensionShortName = recordDimension.getShortName();
-                //TODO: This leads to tree traversal for dimensions, can we do this in one go?
-                Variable recordDimVar = findVariableRecursive(dimensionShortName, rootGroup);//rootGroup.findVariableLocal(dimensionShortName);
-                if (Objects.isNull(recordDimVar)) throw new IllegalArgumentException(String.format(NetCdfConstants.COORD_VARIABLE_NOT_FOUND, dimensionShortName));
+                // TODO: This leads to tree traversal for dimensions, can we do this in one go?
+                Variable recordDimVar =
+                        findVariableRecursive(
+                                dimensionShortName,
+                                rootGroup); // rootGroup.findVariableLocal(dimensionShortName);
+                if (Objects.isNull(recordDimVar))
+                    throw new IllegalArgumentException(
+                            String.format(
+                                    NetCdfConstants.COORD_VARIABLE_NOT_FOUND, dimensionShortName));
                 AttributeContainer recordDimAttrs = recordDimVar.attributes();
                 varMetadata.computeIfAbsent(dimensionShortName, k -> new ArrayList<>());
-                for (Attribute attr: recordDimAttrs) {
+                for (Attribute attr : recordDimAttrs) {
                     varMetadata.get(dimensionShortName).add(attr.getStringValue());
                     if (attr.getShortName().equalsIgnoreCase(NetCdfConstants.SCALE_FACTOR)) {
                         Array values = attr.getValues();
-                        if (!Objects.isNull(values))
-                            scaleFactor = getElement(attr.getValues(), 0);
+                        if (!Objects.isNull(values)) scaleFactor = getElement(attr.getValues(), 0);
                     }
                     if (attr.getShortName().equalsIgnoreCase(NetCdfConstants.ADD_OFFSET)) {
                         Array values = attr.getValues();
-                        if (!Objects.isNull(values))
-                            offset = getElement(attr.getValues(), 0);
+                        if (!Objects.isNull(values)) offset = getElement(attr.getValues(), 0);
                     }
                 }
                 dimensionVars[i] = recordDimVar.read();
-
             }
         }
         double[][] allBandValues = new double[numBands][numValuesPerBand];
-        //check for offset in the record variable
+        // check for offset in the record variable
         List<List<String>> bandMetaData = new ArrayList<>();
         int currBandNum = 0;
         while (currBandNum < numBands) {
             if (dimensionVars.length > 2) {
-                //start from the bottom 3rd dimension going up to form metadata
+                // start from the bottom 3rd dimension going up to form metadata
                 List<String> currBandMetadata = new ArrayList<>();
                 for (int metadataDim = dimensionVars.length - 3; metadataDim >= 0; metadataDim--) {
                     double data = getElement(dimensionVars[metadataDim], pointers[metadataDim]);
-                    String metadata = recordDimensions.get(metadataDim).getShortName() + " : " + data;
+                    String metadata =
+                            recordDimensions.get(metadataDim).getShortName() + " : " + data;
                     currBandMetadata.add(metadata);
                 }
                 bandMetaData.add(currBandMetadata);
             }
-            //int dataIndex = currBandNum;
+            // int dataIndex = currBandNum;
             for (int j = height - 1; j >= 0; j--) {
                 for (int i = 0; i < width; i++) {
                     int index = (j * width + i);
@@ -278,15 +311,30 @@ public class NetCdfReader {
             }
             currBandNum++;
         }
-        Map<String, List<String>> rasterProperties = getRasterProperties(globalAttributes, varMetadata, bandMetaData);
-        return RasterConstructors.makeNonEmptyRaster(numBands, width, height, minX, maxY, translateX, -translateY, skewX, skewY, 0, allBandValues, rasterProperties, noDataValue, PixelInCell.CELL_CENTER);
+        Map<String, List<String>> rasterProperties =
+                getRasterProperties(globalAttributes, varMetadata, bandMetaData);
+        return RasterConstructors.makeNonEmptyRaster(
+                numBands,
+                width,
+                height,
+                minX,
+                maxY,
+                translateX,
+                -translateY,
+                skewX,
+                skewY,
+                0,
+                allBandValues,
+                rasterProperties,
+                noDataValue,
+                PixelInCell.CELL_CENTER);
     }
 
     private static Variable findVariableRecursive(String shortName, Group currGroup) {
         if (!Objects.isNull(currGroup.findVariableLocal(shortName))) {
             return currGroup.findVariableLocal(shortName);
-        }else {
-            for (Group group: currGroup.getGroups()) {
+        } else {
+            for (Group group : currGroup.getGroups()) {
                 Variable ret = findVariableRecursive(shortName, group);
                 if (!Objects.isNull(ret)) return ret;
             }
@@ -294,16 +342,19 @@ public class NetCdfReader {
         }
     }
 
-    private static Map<String, List<String>> getRasterProperties(ImmutableList<Attribute> globalAttrs, Map<String, List<String>> varAttrs, List<List<String>> bandAttrs) {
+    private static Map<String, List<String>> getRasterProperties(
+            ImmutableList<Attribute> globalAttrs,
+            Map<String, List<String>> varAttrs,
+            List<List<String>> bandAttrs) {
         Map<String, List<String>> res = new HashMap<>(varAttrs);
         if (!Objects.isNull(globalAttrs) && !globalAttrs.isEmpty()) {
             List<String> globalAttrString = new ArrayList<>();
-            for (Attribute globalAttr: globalAttrs) {
+            for (Attribute globalAttr : globalAttrs) {
                 globalAttrString.add(globalAttr.getStringValue());
             }
             res.put(NetCdfConstants.GLOBAL_ATTR_PREFIX, globalAttrString);
         }
-        for(int band = 0; band < bandAttrs.size(); band++) {
+        for (int band = 0; band < bandAttrs.size(); band++) {
             int currBandNum = band + 1;
             res.put(NetCdfConstants.BAND_ATTR_PREFIX + currBandNum, bandAttrs.get(band));
         }
@@ -342,13 +393,13 @@ public class NetCdfReader {
         Number numericValue = attr.getNumericValue();
         if (!Objects.isNull(numericValue)) {
             return numericValue.doubleValue();
-        }else {
+        } else {
             throw new IllegalArgumentException(NetCdfConstants.NON_NUMERIC_VALUE);
         }
     }
 
-
-    private static void ensureCoordVar(Variable lonVar, Variable latVar) throws NullPointerException, IllegalArgumentException {
+    private static void ensureCoordVar(Variable lonVar, Variable latVar)
+            throws NullPointerException, IllegalArgumentException {
         if (latVar == null) {
             throw new NullPointerException(NetCdfConstants.INVALID_LAT_NAME);
         }
@@ -371,6 +422,4 @@ public class NetCdfReader {
             throw new IllegalArgumentException(NetCdfConstants.INVALID_RECORD_NAME);
         }
     }
-
-
 }

@@ -19,12 +19,11 @@
 package org.apache.sedona.common.utils;
 
 import com.google.common.geometry.*;
-import org.locationtech.jts.algorithm.Orientation;
-import org.locationtech.jts.geom.*;
-
-import javax.swing.*;
 import java.util.*;
 import java.util.stream.Collectors;
+import javax.swing.*;
+import org.locationtech.jts.algorithm.Orientation;
+import org.locationtech.jts.geom.*;
 
 public class S2Utils {
 
@@ -50,23 +49,23 @@ public class S2Utils {
 
     public static S2Loop toS2Loop(LinearRing ring) {
         return new S2Loop(
-                Orientation.isCCW(ring.getCoordinates()) ? toS2Points(ring.getCoordinates()) : toS2Points(ring.reverse().getCoordinates())
-        );
+                Orientation.isCCW(ring.getCoordinates())
+                        ? toS2Points(ring.getCoordinates())
+                        : toS2Points(ring.reverse().getCoordinates()));
     }
 
     public static S2Polygon toS2Polygon(Polygon polygon) {
         List<LinearRing> rings = new ArrayList<>();
         rings.add(polygon.getExteriorRing());
-        for (int i = 0; i < polygon.getNumInteriorRing(); i++){
+        for (int i = 0; i < polygon.getNumInteriorRing(); i++) {
             rings.add(polygon.getInteriorRingN(i));
         }
-        List<S2Loop> s2Loops = rings.stream().map(
-                S2Utils::toS2Loop
-        ).collect(Collectors.toList());
+        List<S2Loop> s2Loops = rings.stream().map(S2Utils::toS2Loop).collect(Collectors.toList());
         return new S2Polygon(s2Loops);
     }
 
-    public static List<S2CellId> s2RegionToCellIDs(S2Region region, int minLevel, int maxLevel, int maxNum) {
+    public static List<S2CellId> s2RegionToCellIDs(
+            S2Region region, int minLevel, int maxLevel, int maxNum) {
         S2RegionCoverer.Builder coverBuilder = S2RegionCoverer.builder();
         coverBuilder.setMinLevel(minLevel);
         coverBuilder.setMaxLevel(maxLevel);
@@ -83,8 +82,10 @@ public class S2Utils {
         for (S2CellId cellID : cellIDs) {
             if (cellID.level() > level) {
                 results.add(cellID.parent(level).id());
-            } else if(cellID.level() < level) {
-                for (S2CellId c = cellID.childBegin(level); !c.equals(cellID.childEnd(level)); c = c.next()) {
+            } else if (cellID.level() < level) {
+                for (S2CellId c = cellID.childBegin(level);
+                        !c.equals(cellID.childEnd(level));
+                        c = c.next()) {
                     results.add(c.id());
                 }
             } else {
@@ -98,8 +99,11 @@ public class S2Utils {
         S2LatLngRect bound = new S2Cell(cellId).getRectBound();
         Coordinate[] coords = new Coordinate[5];
         int[] iters = new int[] {0, 1, 2, 3, 0};
-        for (int i = 0;i < 5; i++) {
-            coords[i] = new Coordinate(bound.getVertex(iters[i]).lngDegrees(), bound.getVertex(iters[i]).latDegrees());
+        for (int i = 0; i < 5; i++) {
+            coords[i] =
+                    new Coordinate(
+                            bound.getVertex(iters[i]).lngDegrees(),
+                            bound.getVertex(iters[i]).latDegrees());
         }
         return new GeometryFactory().createPolygon(coords);
     }
@@ -111,7 +115,6 @@ public class S2Utils {
             return S2Utils.toS2PolyLine((LineString) geom);
         }
         throw new IllegalArgumentException(
-                "only object of Polygon, LinearRing, LineString type can be converted to S2Region"
-        );
+                "only object of Polygon, LinearRing, LineString type can be converted to S2Region");
     }
 }

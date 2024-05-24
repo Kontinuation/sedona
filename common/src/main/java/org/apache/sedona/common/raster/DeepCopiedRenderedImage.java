@@ -1,15 +1,20 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.common.raster;
 
@@ -21,18 +26,6 @@ import com.esotericsoftware.kryo.serializers.JavaSerializer;
 import com.sun.media.jai.rmi.ColorModelState;
 import com.sun.media.jai.util.ImageUtil;
 import it.geosolutions.jaiext.range.NoDataContainer;
-import org.apache.sedona.common.raster.serde.AWTRasterSerializer;
-import org.apache.sedona.common.raster.serde.KryoUtil;
-import org.apache.sedona.common.utils.RasterUtils;
-
-import javax.media.jai.JAI;
-import javax.media.jai.PlanarImage;
-import javax.media.jai.RasterAccessor;
-import javax.media.jai.RasterFormatTag;
-import javax.media.jai.RemoteImage;
-import javax.media.jai.TileCache;
-import javax.media.jai.remote.SerializableState;
-import javax.media.jai.remote.SerializerFactory;
 import java.awt.Image;
 import java.awt.Point;
 import java.awt.Rectangle;
@@ -49,14 +42,27 @@ import java.io.Serializable;
 import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Vector;
+import javax.media.jai.JAI;
+import javax.media.jai.PlanarImage;
+import javax.media.jai.RasterAccessor;
+import javax.media.jai.RasterFormatTag;
+import javax.media.jai.RemoteImage;
+import javax.media.jai.TileCache;
+import javax.media.jai.remote.SerializableState;
+import javax.media.jai.remote.SerializerFactory;
+import org.apache.sedona.common.raster.serde.AWTRasterSerializer;
+import org.apache.sedona.common.raster.serde.KryoUtil;
+import org.apache.sedona.common.utils.RasterUtils;
 
 /**
- * This class is mostly copied from {@link javax.media.jai.remote.SerializableRenderedImage}. We've removed the
- * shallow copy support and fixed a bug of SerializableRenderedImage: When a deep-copied serializable rendered image
- * object is being disposed, it tries to connect to the remote server. However, there is no remote server in deep-copy
- * mode, so the dispose() method throws a java.net.SocketException.
+ * This class is mostly copied from {@link javax.media.jai.remote.SerializableRenderedImage}. We've
+ * removed the shallow copy support and fixed a bug of SerializableRenderedImage: When a deep-copied
+ * serializable rendered image object is being disposed, it tries to connect to the remote server.
+ * However, there is no remote server in deep-copy mode, so the dispose() method throws a
+ * java.net.SocketException.
  */
-public final class DeepCopiedRenderedImage implements RenderedImage, Serializable, KryoSerializable {
+public final class DeepCopiedRenderedImage
+        implements RenderedImage, Serializable, KryoSerializable {
     private transient RenderedImage source;
     private int minX;
     private int minY;
@@ -162,7 +168,8 @@ public final class DeepCopiedRenderedImage implements RenderedImage, Serializabl
     @Override
     public Raster getData(Rectangle rect) {
         if (source == null) {
-            return this.imageRaster.createChild(rect.x, rect.y, rect.width, rect.height, rect.x, rect.y, (int[])null);
+            return this.imageRaster.createChild(
+                    rect.x, rect.y, rect.width, rect.height, rect.x, rect.y, (int[]) null);
         } else {
             return this.source.getData(rect);
         }
@@ -174,27 +181,38 @@ public final class DeepCopiedRenderedImage implements RenderedImage, Serializabl
             Rectangle region;
             if (dest == null) {
                 region = this.imageBounds;
-                SampleModel destSM = this.getSampleModel().createCompatibleSampleModel(region.width, region.height);
+                SampleModel destSM =
+                        this.getSampleModel()
+                                .createCompatibleSampleModel(region.width, region.height);
                 dest = Raster.createWritableRaster(destSM, new Point(region.x, region.y));
             } else {
                 region = dest.getBounds().intersection(this.imageBounds);
             }
 
             if (!region.isEmpty()) {
-                int startTileX = PlanarImage.XToTileX(region.x, this.tileGridXOffset, this.tileWidth);
-                int startTileY = PlanarImage.YToTileY(region.y, this.tileGridYOffset, this.tileHeight);
-                int endTileX = PlanarImage.XToTileX(region.x + region.width - 1, this.tileGridXOffset, this.tileWidth);
-                int endTileY = PlanarImage.YToTileY(region.y + region.height - 1, this.tileGridYOffset, this.tileHeight);
-                SampleModel[] sampleModels = new SampleModel[]{this.getSampleModel()};
+                int startTileX =
+                        PlanarImage.XToTileX(region.x, this.tileGridXOffset, this.tileWidth);
+                int startTileY =
+                        PlanarImage.YToTileY(region.y, this.tileGridYOffset, this.tileHeight);
+                int endTileX =
+                        PlanarImage.XToTileX(
+                                region.x + region.width - 1, this.tileGridXOffset, this.tileWidth);
+                int endTileY =
+                        PlanarImage.YToTileY(
+                                region.y + region.height - 1,
+                                this.tileGridYOffset,
+                                this.tileHeight);
+                SampleModel[] sampleModels = new SampleModel[] {this.getSampleModel()};
                 int tagID = RasterAccessor.findCompatibleTag(sampleModels, dest.getSampleModel());
                 RasterFormatTag srcTag = new RasterFormatTag(this.getSampleModel(), tagID);
                 RasterFormatTag dstTag = new RasterFormatTag(dest.getSampleModel(), tagID);
 
-                for(int ty = startTileY; ty <= endTileY; ++ty) {
-                    for(int tx = startTileX; tx <= endTileX; ++tx) {
+                for (int ty = startTileY; ty <= endTileY; ++ty) {
+                    for (int tx = startTileX; tx <= endTileX; ++tx) {
                         Raster tile = this.getTile(tx, ty);
                         Rectangle subRegion = region.intersection(tile.getBounds());
-                        RasterAccessor s = new RasterAccessor(tile, subRegion, srcTag, this.getColorModel());
+                        RasterAccessor s =
+                                new RasterAccessor(tile, subRegion, srcTag, this.getColorModel());
                         RasterAccessor d = new RasterAccessor(dest, subRegion, dstTag, null);
                         ImageUtil.copyRaster(s, d);
                     }
@@ -284,8 +302,16 @@ public final class DeepCopiedRenderedImage implements RenderedImage, Serializabl
                 }
             }
 
-            Rectangle imageBounds = new Rectangle(this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight());
-            Rectangle destRect = imageBounds.intersection(new Rectangle(this.tileXToX(tileX), this.tileYToY(tileY), this.getTileWidth(), this.getTileHeight()));
+            Rectangle imageBounds =
+                    new Rectangle(
+                            this.getMinX(), this.getMinY(), this.getWidth(), this.getHeight());
+            Rectangle destRect =
+                    imageBounds.intersection(
+                            new Rectangle(
+                                    this.tileXToX(tileX),
+                                    this.tileYToY(tileY),
+                                    this.getTileWidth(),
+                                    this.getTileHeight()));
             Raster tile = this.getData(destRect);
             if (cache != null) {
                 cache.add(this, tileX, tileY, tile);
@@ -349,9 +375,9 @@ public final class DeepCopiedRenderedImage implements RenderedImage, Serializabl
         this.source = null;
         in.defaultReadObject();
 
-        SerializableState cmState = (SerializableState)in.readObject();
-        this.colorModel = (ColorModel)cmState.getObject();
-        this.properties = (Hashtable<String, Object>)in.readObject();
+        SerializableState cmState = (SerializableState) in.readObject();
+        this.colorModel = (ColorModel) cmState.getObject();
+        this.properties = (Hashtable<String, Object>) in.readObject();
         for (String key : this.properties.keySet()) {
             Object value = this.properties.get(key);
             // Restore the value of GC_NODATA property as a NoDataContainer object.
@@ -360,8 +386,8 @@ public final class DeepCopiedRenderedImage implements RenderedImage, Serializabl
                 this.properties.put(key, new NoDataContainer(noDataContainer.singleValue));
             }
         }
-        SerializableState rasState = (SerializableState)in.readObject();
-        this.imageRaster = (Raster)rasState.getObject();
+        SerializableState rasState = (SerializableState) in.readObject();
+        this.imageRaster = (Raster) rasState.getObject();
 
         // The deserialized rendered image contains only one tile (imageRaster). We need to update
         // the sample model and tile properties to reflect this.
@@ -393,7 +419,9 @@ public final class DeepCopiedRenderedImage implements RenderedImage, Serializabl
                 // GC_NODATA is a special property used by GeoTools. We need to serialize it.
                 if (value instanceof NoDataContainer) {
                     NoDataContainer noDataContainer = (NoDataContainer) value;
-                    propertyTable.put(key, new SingleValueNoDataContainer(noDataContainer.getAsSingleValue()));
+                    propertyTable.put(
+                            key,
+                            new SingleValueNoDataContainer(noDataContainer.getAsSingleValue()));
                 } else {
                     propertyTable.remove(key);
                 }
@@ -478,12 +506,13 @@ public final class DeepCopiedRenderedImage implements RenderedImage, Serializabl
     }
 
     /**
-     * This class is for serializing NoDataContainer objects. It is mainly used to serialize the value of
-     * GC_NODATA property. We only considered the case where the NoDataContainer object contains only one
-     * value. However, it will cover most of the real world cases.
+     * This class is for serializing NoDataContainer objects. It is mainly used to serialize the
+     * value of GC_NODATA property. We only considered the case where the NoDataContainer object
+     * contains only one value. However, it will cover most of the real world cases.
      */
     private static class SingleValueNoDataContainer implements Serializable {
         private final double singleValue;
+
         SingleValueNoDataContainer(double value) {
             singleValue = value;
         }

@@ -16,20 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.enums;
 
 import java.io.Serializable;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Enum GeometryType.
- */
-public enum GeometryType
-        implements Serializable
-{
-
+/** The Enum GeometryType. */
+public enum GeometryType implements Serializable {
     POINT,
     POLYGON,
     LINESTRING,
@@ -46,11 +40,13 @@ public enum GeometryType
      * @param str the str
      * @return the GeometryType
      */
-    public static GeometryType getGeometryType(String str)
-    {
+    public static GeometryType getGeometryType(String str) {
         for (GeometryType me : GeometryType.values()) {
-            if (me.name().equalsIgnoreCase(str)) { return me; }
+            if (me.name().equalsIgnoreCase(str)) {
+                return me;
+            }
         }
-        throw new IllegalArgumentException("[" + GeometryType.class + "] Unsupported geometry type:" + str);
+        throw new IllegalArgumentException(
+                "[" + GeometryType.class + "] Unsupported geometry type:" + str);
     }
 }

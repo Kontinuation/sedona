@@ -18,6 +18,9 @@
  */
 package org.apache.sedona.core.spatialRDD;
 
+import static org.junit.Assert.assertEquals;
+
+import java.util.List;
 import org.apache.sedona.core.enums.IndexType;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -25,33 +28,19 @@ import org.junit.Test;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.index.strtree.STRtree;
 
-import java.util.List;
-
-import static org.junit.Assert.assertEquals;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class PointRDDTest.
- */
-public class PointRDDTest
-        extends SpatialRDDTestBase
-{
-    /**
-     * Once executed before all.
-     */
+/** The Class PointRDDTest. */
+public class PointRDDTest extends SpatialRDDTestBase {
+    /** Once executed before all. */
     @BeforeClass
-    public static void onceExecutedBeforeAll()
-    {
+    public static void onceExecutedBeforeAll() {
         initialize(PointRDDTest.class.getSimpleName(), "point.test.properties");
     }
 
-    /**
-     * Tear down.
-     */
+    /** Tear down. */
     @AfterClass
-    public static void TearDown()
-    {
+    public static void TearDown() {
         sc.stop();
     }
 
@@ -61,23 +50,42 @@ public class PointRDDTest
      * @throws Exception the exception
      */
     @Test
-    public void testConstructor()
-    {
-        PointRDD spatialRDD = new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
+    public void testConstructor() {
+        PointRDD spatialRDD =
+                new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
         spatialRDD.analyze();
         assertEquals(inputCount, spatialRDD.approximateTotalCount);
         assertEquals(inputBoundary, spatialRDD.boundaryEnvelope);
-        assert spatialRDD.rawSpatialRDD.take(9).get(0).getUserData().equals("testattribute0\ttestattribute1\ttestattribute2");
-        assert spatialRDD.rawSpatialRDD.take(9).get(2).getUserData().equals("testattribute0\ttestattribute1\ttestattribute2");
-        assert spatialRDD.rawSpatialRDD.take(9).get(4).getUserData().equals("testattribute0\ttestattribute1\ttestattribute2");
-        assert spatialRDD.rawSpatialRDD.take(9).get(8).getUserData().equals("testattribute0\ttestattribute1\ttestattribute2");
+        assert spatialRDD
+                .rawSpatialRDD
+                .take(9)
+                .get(0)
+                .getUserData()
+                .equals("testattribute0\ttestattribute1\ttestattribute2");
+        assert spatialRDD
+                .rawSpatialRDD
+                .take(9)
+                .get(2)
+                .getUserData()
+                .equals("testattribute0\ttestattribute1\ttestattribute2");
+        assert spatialRDD
+                .rawSpatialRDD
+                .take(9)
+                .get(4)
+                .getUserData()
+                .equals("testattribute0\ttestattribute1\ttestattribute2");
+        assert spatialRDD
+                .rawSpatialRDD
+                .take(9)
+                .get(8)
+                .getUserData()
+                .equals("testattribute0\ttestattribute1\ttestattribute2");
     }
 
     @Test
-    public void testEmptyConstructor()
-            throws Exception
-    {
-        PointRDD spatialRDD = new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
+    public void testEmptyConstructor() throws Exception {
+        PointRDD spatialRDD =
+                new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
         spatialRDD.buildIndex(IndexType.RTREE, false);
         // Create an empty spatialRDD and manually assemble it
         PointRDD spatialRDDcopy = new PointRDD();
@@ -92,10 +100,9 @@ public class PointRDDTest
      * @throws Exception the exception
      */
     @Test
-    public void testBuildIndexWithoutSetGrid()
-            throws Exception
-    {
-        PointRDD spatialRDD = new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
+    public void testBuildIndexWithoutSetGrid() throws Exception {
+        PointRDD spatialRDD =
+                new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
         spatialRDD.buildIndex(IndexType.RTREE, false);
     }
 
@@ -105,18 +112,18 @@ public class PointRDDTest
      * @throws Exception the exception
      */
     @Test
-    public void testBuildRtreeIndex()
-            throws Exception
-    {
-        PointRDD spatialRDD = new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
+    public void testBuildRtreeIndex() throws Exception {
+        PointRDD spatialRDD =
+                new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
         spatialRDD.analyze();
         spatialRDD.spatialPartitioning(gridType);
         spatialRDD.buildIndex(IndexType.RTREE, true);
         if (spatialRDD.indexedRDD.take(1).get(0) instanceof STRtree) {
-            List<Point> result = spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
-        }
-        else {
-            List<Point> result = spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
+            List<Point> result =
+                    spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
+        } else {
+            List<Point> result =
+                    spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
         }
     }
 
@@ -126,18 +133,18 @@ public class PointRDDTest
      * @throws Exception the exception
      */
     @Test
-    public void testBuildQuadtreeIndex()
-            throws Exception
-    {
-        PointRDD spatialRDD = new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
+    public void testBuildQuadtreeIndex() throws Exception {
+        PointRDD spatialRDD =
+                new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
         spatialRDD.analyze();
         spatialRDD.spatialPartitioning(gridType);
         spatialRDD.buildIndex(IndexType.QUADTREE, true);
         if (spatialRDD.indexedRDD.take(1).get(0) instanceof STRtree) {
-            List<Point> result = spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
-        }
-        else {
-            List<Point> result = spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
+            List<Point> result =
+                    spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
+        } else {
+            List<Point> result =
+                    spatialRDD.indexedRDD.take(1).get(0).query(spatialRDD.boundaryEnvelope);
         }
     }
 }

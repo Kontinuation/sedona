@@ -18,6 +18,9 @@
  */
 package org.apache.sedona.common.raster;
 
+import java.awt.geom.Point2D;
+import java.util.Arrays;
+import java.util.Set;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
@@ -32,17 +35,12 @@ import org.opengis.referencing.ReferenceIdentifier;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.TransformException;
 
-import java.awt.geom.Point2D;
-import java.util.Arrays;
-import java.util.Set;
-
-public class RasterAccessors
-{
-    public static int srid(GridCoverage2D raster) throws FactoryException
-    {
+public class RasterAccessors {
+    public static int srid(GridCoverage2D raster) throws FactoryException {
         CoordinateReferenceSystem crs = raster.getCoordinateReferenceSystem();
         if (crs instanceof DefaultEngineeringCRS) {
-            // GeoTools defaults to internal non-standard epsg codes, like 404000, if crs is missing.
+            // GeoTools defaults to internal non-standard epsg codes, like 404000, if crs is
+            // missing.
             // We need to check for this case and return 0 instead.
             if (((DefaultEngineeringCRS) crs).isWildcard()) {
                 return 0;
@@ -98,17 +96,22 @@ public class RasterAccessors
         return RasterUtils.getGDALAffineTransform(raster).getShearY();
     }
 
-    public static double getWorldCoordX(GridCoverage2D raster, int colX, int rowY) throws TransformException {
+    public static double getWorldCoordX(GridCoverage2D raster, int colX, int rowY)
+            throws TransformException {
         return RasterUtils.getWorldCornerCoordinates(raster, colX, rowY).getX();
     }
 
-    public static double getWorldCoordY(GridCoverage2D raster, int colX, int rowY) throws TransformException {
+    public static double getWorldCoordY(GridCoverage2D raster, int colX, int rowY)
+            throws TransformException {
         return RasterUtils.getWorldCornerCoordinates(raster, colX, rowY).getY();
     }
 
-    public static Geometry getWorldCoord(GridCoverage2D raster, int colX, int rowY) throws TransformException {
+    public static Geometry getWorldCoord(GridCoverage2D raster, int colX, int rowY)
+            throws TransformException {
         Point2D worldCoords = RasterUtils.getWorldCornerCoordinates(raster, colX, rowY);
-        Geometry point = new GeometryFactory().createPoint(new Coordinate(worldCoords.getX(), worldCoords.getY()));
+        Geometry point =
+                new GeometryFactory()
+                        .createPoint(new Coordinate(worldCoords.getX(), worldCoords.getY()));
         return point;
     }
 
@@ -124,16 +127,24 @@ public class RasterAccessors
         double upperLeftX = getUpperLeftX(raster);
         double upperLeftY = getUpperLeftY(raster);
 
-        if(format.equalsIgnoreCase("GDAL")) {
-            return String.format("%f \n%f \n%f \n%f \n%f \n%f", scaleX, skewY, skewX, scaleY, upperLeftX, upperLeftY);
-        } else if (format.equalsIgnoreCase("ESRI")){
-            return String.format("%f \n%f \n%f \n%f \n%f \n%f", scaleX, skewY, skewX, scaleY, (upperLeftX + (scaleX * 0.5)),
+        if (format.equalsIgnoreCase("GDAL")) {
+            return String.format(
+                    "%f \n%f \n%f \n%f \n%f \n%f",
+                    scaleX, skewY, skewX, scaleY, upperLeftX, upperLeftY);
+        } else if (format.equalsIgnoreCase("ESRI")) {
+            return String.format(
+                    "%f \n%f \n%f \n%f \n%f \n%f",
+                    scaleX,
+                    skewY,
+                    skewX,
+                    scaleY,
+                    (upperLeftX + (scaleX * 0.5)),
                     (upperLeftY + (scaleY * 0.5)));
         } else {
-            throw new IllegalArgumentException("Please select between the following formats GDAL and ESRI");
+            throw new IllegalArgumentException(
+                    "Please select between the following formats GDAL and ESRI");
         }
     }
-
 
     public static double[] getGeoTransform(GridCoverage2D raster) throws FactoryException {
         // size of a pixel along the transformed i axis
@@ -157,7 +168,7 @@ public class RasterAccessors
         double offsetY = metadata[1];
 
         double scaleX = metadata[4];
-        double scaleY =  metadata[5];
+        double scaleY = metadata[5];
         double skewX = metadata[6];
         double skewY = metadata[7];
 
@@ -197,36 +208,42 @@ public class RasterAccessors
         return rotation;
     }
 
-    public static Geometry getGridCoord(GridCoverage2D raster, double x, double y) throws TransformException {
+    public static Geometry getGridCoord(GridCoverage2D raster, double x, double y)
+            throws TransformException {
         int[] coords = RasterUtils.getGridCoordinatesFromWorld(raster, x, y);
         coords = Arrays.stream(coords).map(number -> number + 1).toArray();
         Geometry point = new GeometryFactory().createPoint(new Coordinate(coords[0], coords[1]));
         return point;
     }
 
-    public static Geometry getGridCoord(GridCoverage2D raster, Geometry point) throws TransformException {
+    public static Geometry getGridCoord(GridCoverage2D raster, Geometry point)
+            throws TransformException {
         ensurePoint(point);
         point = RasterUtils.convertCRSIfNeeded(point, raster.getCoordinateReferenceSystem2D());
         Point actualPoint = (Point) point;
         return getGridCoord(raster, actualPoint.getX(), actualPoint.getY());
     }
 
-    public static int getGridCoordX(GridCoverage2D raster, double x, double y) throws TransformException {
+    public static int getGridCoordX(GridCoverage2D raster, double x, double y)
+            throws TransformException {
         return RasterUtils.getGridCoordinatesFromWorld(raster, x, y)[0] + 1;
     }
 
-    public static int getGridCoordX(GridCoverage2D raster, Geometry point) throws TransformException {
+    public static int getGridCoordX(GridCoverage2D raster, Geometry point)
+            throws TransformException {
         ensurePoint(point);
         point = RasterUtils.convertCRSIfNeeded(point, raster.getCoordinateReferenceSystem2D());
         Point actualPoint = (Point) point;
         return getGridCoordX(raster, actualPoint.getX(), actualPoint.getY());
     }
 
-    public static int getGridCoordY(GridCoverage2D raster, double x, double y) throws TransformException {
+    public static int getGridCoordY(GridCoverage2D raster, double x, double y)
+            throws TransformException {
         return RasterUtils.getGridCoordinatesFromWorld(raster, x, y)[1] + 1;
     }
 
-    public static int getGridCoordY(GridCoverage2D raster, Geometry point) throws TransformException {
+    public static int getGridCoordY(GridCoverage2D raster, Geometry point)
+            throws TransformException {
         ensurePoint(point);
         point = RasterUtils.convertCRSIfNeeded(point, raster.getCoordinateReferenceSystem2D());
         Point actualPoint = (Point) point;
@@ -235,29 +252,22 @@ public class RasterAccessors
 
     private static void ensurePoint(Geometry geometry) throws IllegalArgumentException {
         if (!(geometry instanceof Point)) {
-            throw new IllegalArgumentException("Only point geometries are expected as real world coordinates");
+            throw new IllegalArgumentException(
+                    "Only point geometries are expected as real world coordinates");
         }
     }
 
     /**
      * Returns the metadata of a raster as an array of doubles.
+     *
      * @param raster the raster
-     * @return double[] with the following values:
-     * 0: upperLeftX: upper left x
-     * 1: upperLeftY: upper left y
-     * 2: width: number of pixels on x axis
-     * 3: height: number of pixels on y axis
-     * 4: scaleX: pixel width
-     * 5: scaleY: pixel height
-     * 6: skewX: skew on x axis
-     * 7: skewY: skew on y axis
-     * 8: srid
-     * 9: numBands
+     * @return double[] with the following values: 0: upperLeftX: upper left x 1: upperLeftY: upper
+     *     left y 2: width: number of pixels on x axis 3: height: number of pixels on y axis 4:
+     *     scaleX: pixel width 5: scaleY: pixel height 6: skewX: skew on x axis 7: skewY: skew on y
+     *     axis 8: srid 9: numBands
      * @throws FactoryException
      */
-    public static double[] metadata(GridCoverage2D raster)
-            throws FactoryException
-    {
+    public static double[] metadata(GridCoverage2D raster) throws FactoryException {
         // Get Geo-reference metadata
         GridEnvelope2D gridRange = raster.getGridGeometry().getGridRange2D();
         AffineTransform2D affine = RasterUtils.getGDALAffineTransform(raster);
@@ -270,9 +280,16 @@ public class RasterAccessors
         double skewX = affine.getShearX();
         double skewY = affine.getShearY();
         return new double[] {
-                upperLeftX, upperLeftY,
-                gridRange.getWidth(), gridRange.getHeight(),
-                scaleX, scaleY, skewX, skewY,
-                srid(raster), raster.getNumSampleDimensions()};
+            upperLeftX,
+            upperLeftY,
+            gridRange.getWidth(),
+            gridRange.getHeight(),
+            scaleX,
+            scaleY,
+            skewX,
+            skewY,
+            srid(raster),
+            raster.getNumSampleDimensions()
+        };
     }
 }

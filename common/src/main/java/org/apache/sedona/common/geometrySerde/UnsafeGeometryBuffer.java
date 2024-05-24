@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.geometrySerde;
 
+import java.lang.reflect.Field;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.CoordinateXY;
@@ -26,8 +26,6 @@ import org.locationtech.jts.geom.CoordinateXYM;
 import org.locationtech.jts.geom.CoordinateXYZM;
 import org.locationtech.jts.geom.impl.CoordinateArraySequence;
 import sun.misc.Unsafe;
-
-import java.lang.reflect.Field;
 
 class UnsafeGeometryBuffer implements GeometryBuffer {
     private static final Unsafe UNSAFE;
@@ -112,7 +110,8 @@ class UnsafeGeometryBuffer implements GeometryBuffer {
     @Override
     public void putBytes(int offset, byte[] inBytes) {
         assert baseOffset + offset + inBytes.length <= bytes.length + BYTE_ARRAY_BASE_OFFSET;
-        UNSAFE.copyMemory(inBytes, BYTE_ARRAY_BASE_OFFSET, bytes, baseOffset + offset, inBytes.length);
+        UNSAFE.copyMemory(
+                inBytes, BYTE_ARRAY_BASE_OFFSET, bytes, baseOffset + offset, inBytes.length);
     }
 
     @Override

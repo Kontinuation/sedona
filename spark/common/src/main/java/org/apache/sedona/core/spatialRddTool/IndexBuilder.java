@@ -16,9 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialRddTool;
 
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.Set;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.locationtech.jts.geom.Envelope;
@@ -27,29 +29,20 @@ import org.locationtech.jts.index.SpatialIndex;
 import org.locationtech.jts.index.quadtree.Quadtree;
 import org.locationtech.jts.index.strtree.STRtree;
 
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.Set;
-
 public final class IndexBuilder<T extends Geometry>
-        implements FlatMapFunction<Iterator<T>, SpatialIndex>
-{
+        implements FlatMapFunction<Iterator<T>, SpatialIndex> {
     IndexType indexType;
 
-    public IndexBuilder(IndexType indexType)
-    {
+    public IndexBuilder(IndexType indexType) {
         this.indexType = indexType;
     }
 
     @Override
-    public Iterator<SpatialIndex> call(Iterator<T> objectIterator)
-            throws Exception
-    {
+    public Iterator<SpatialIndex> call(Iterator<T> objectIterator) throws Exception {
         SpatialIndex spatialIndex;
         if (indexType == IndexType.RTREE) {
             spatialIndex = new STRtree();
-        }
-        else {
+        } else {
             spatialIndex = new Quadtree();
         }
         while (objectIterator.hasNext()) {

@@ -16,9 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
 
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.List;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -28,22 +30,12 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.triangulate.VoronoiDiagramBuilder;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.List;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class VoronoiPartitioning.
- */
-public class VoronoiPartitioning
-        implements Serializable
-{
+/** The Class VoronoiPartitioning. */
+public class VoronoiPartitioning implements Serializable {
 
-    /**
-     * The grids.
-     */
+    /** The grids. */
     List<Envelope> grids = new ArrayList<Envelope>();
 
     /**
@@ -53,17 +45,18 @@ public class VoronoiPartitioning
      * @param partitions the partitions
      * @throws Exception the exception
      */
-    public VoronoiPartitioning(List<Envelope> samples, int partitions)
-            throws Exception
-    {
+    public VoronoiPartitioning(List<Envelope> samples, int partitions) throws Exception {
         GeometryFactory fact = new GeometryFactory();
         ArrayList<Point> subSampleList = new ArrayList<Point>();
         MultiPoint mp;
 
-        //Take a subsample according to the partitions
+        // Take a subsample according to the partitions
         for (int i = 0; i < samples.size(); i = i + samples.size() / partitions) {
             Envelope envelope = samples.get(i);
-            Coordinate coordinate = new Coordinate((envelope.getMinX() + envelope.getMaxX()) / 2.0, (envelope.getMinY() + envelope.getMaxY()) / 2.0);
+            Coordinate coordinate =
+                    new Coordinate(
+                            (envelope.getMinX() + envelope.getMaxX()) / 2.0,
+                            (envelope.getMinY() + envelope.getMaxY()) / 2.0);
             subSampleList.add(fact.createPoint(coordinate));
         }
 
@@ -75,7 +68,7 @@ public class VoronoiPartitioning
             Polygon poly = (Polygon) voronoiDiagram.getGeometryN(i);
             grids.add(poly.getEnvelopeInternal());
         }
-        //grids.add(new EnvelopeWithGrid(boundary,grids.size()));
+        // grids.add(new EnvelopeWithGrid(boundary,grids.size()));
     }
 
     /**
@@ -83,8 +76,7 @@ public class VoronoiPartitioning
      *
      * @return the grids
      */
-    public List<Envelope> getGrids()
-    {
+    public List<Envelope> getGrids() {
 
         return this.grids;
     }

@@ -16,16 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning.quadtree;
-
-import org.apache.commons.lang3.mutable.MutableInt;
-import org.apache.sedona.core.spatialPartitioning.PartitioningUtils;
-import org.apache.sedona.common.utils.HalfOpenRectangle;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Point;
-import scala.Tuple2;
 
 import java.io.Serializable;
 import java.util.ArrayList;
@@ -34,10 +25,15 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.apache.commons.lang3.mutable.MutableInt;
+import org.apache.sedona.common.utils.HalfOpenRectangle;
+import org.apache.sedona.core.spatialPartitioning.PartitioningUtils;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
+import scala.Tuple2;
 
-public class StandardQuadTree<T> extends PartitioningUtils
-        implements Serializable
-{
+public class StandardQuadTree<T> extends PartitioningUtils implements Serializable {
     public static final int REGION_SELF = -1;
     public static final int REGION_NW = 0;
     public static final int REGION_NE = 1;
@@ -56,26 +52,23 @@ public class StandardQuadTree<T> extends PartitioningUtils
     // may be null if not needed
     private StandardQuadTree<T>[] regions;
 
-    public StandardQuadTree(QuadRectangle definition, int level)
-    {
+    public StandardQuadTree(QuadRectangle definition, int level) {
         this(definition, level, 5, 10);
     }
 
-    public StandardQuadTree(QuadRectangle definition, int level, int maxItemsPerZone, int maxLevel)
-    {
+    public StandardQuadTree(
+            QuadRectangle definition, int level, int maxItemsPerZone, int maxLevel) {
         this.maxItemsPerZone = maxItemsPerZone;
         this.maxLevel = maxLevel;
         this.zone = definition;
         this.level = level;
     }
 
-    public QuadRectangle getZone()
-    {
+    public QuadRectangle getZone() {
         return this.zone;
     }
 
-    private int findRegion(QuadRectangle r, boolean split)
-    {
+    private int findRegion(QuadRectangle r, boolean split) {
         int region = REGION_SELF;
         if (nodeNum >= maxItemsPerZone && this.level < maxLevel) {
             // we don't want to split if we just need to retrieve
@@ -99,8 +92,7 @@ public class StandardQuadTree<T> extends PartitioningUtils
         return region;
     }
 
-    private int findRegion(int x, int y)
-    {
+    private int findRegion(int x, int y) {
         int region = REGION_SELF;
         // can be null if not split
         if (regions != null) {
@@ -114,13 +106,11 @@ public class StandardQuadTree<T> extends PartitioningUtils
         return region;
     }
 
-    private StandardQuadTree<T> newQuadTree(QuadRectangle zone, int level)
-    {
+    private StandardQuadTree<T> newQuadTree(QuadRectangle zone, int level) {
         return new StandardQuadTree<T>(zone, level, this.maxItemsPerZone, this.maxLevel);
     }
 
-    private void split()
-    {
+    private void split() {
 
         regions = new StandardQuadTree[4];
 
@@ -128,38 +118,31 @@ public class StandardQuadTree<T> extends PartitioningUtils
         double newHeight = zone.height / 2;
         int newLevel = level + 1;
 
-        regions[REGION_NW] = newQuadTree(new QuadRectangle(
-                zone.x,
-                zone.y + zone.height / 2,
-                newWidth,
-                newHeight
-        ), newLevel);
+        regions[REGION_NW] =
+                newQuadTree(
+                        new QuadRectangle(zone.x, zone.y + zone.height / 2, newWidth, newHeight),
+                        newLevel);
 
-        regions[REGION_NE] = newQuadTree(new QuadRectangle(
-                zone.x + zone.width / 2,
-                zone.y + zone.height / 2,
-                newWidth,
-                newHeight
-        ), newLevel);
+        regions[REGION_NE] =
+                newQuadTree(
+                        new QuadRectangle(
+                                zone.x + zone.width / 2,
+                                zone.y + zone.height / 2,
+                                newWidth,
+                                newHeight),
+                        newLevel);
 
-        regions[REGION_SW] = newQuadTree(new QuadRectangle(
-                zone.x,
-                zone.y,
-                newWidth,
-                newHeight
-        ), newLevel);
+        regions[REGION_SW] =
+                newQuadTree(new QuadRectangle(zone.x, zone.y, newWidth, newHeight), newLevel);
 
-        regions[REGION_SE] = newQuadTree(new QuadRectangle(
-                zone.x + zone.width / 2,
-                zone.y,
-                newWidth,
-                newHeight
-        ), newLevel);
+        regions[REGION_SE] =
+                newQuadTree(
+                        new QuadRectangle(zone.x + zone.width / 2, zone.y, newWidth, newHeight),
+                        newLevel);
     }
 
     // Force the quad tree to grow up to a certain level.
-    public void forceGrowUp(int minLevel)
-    {
+    public void forceGrowUp(int minLevel) {
         if (minLevel < 1) {
             throw new IllegalArgumentException("minLevel must be >= 1. Received " + minLevel);
         }
@@ -176,15 +159,13 @@ public class StandardQuadTree<T> extends PartitioningUtils
         }
     }
 
-    public void insert(QuadRectangle r, T element)
-    {
+    public void insert(QuadRectangle r, T element) {
         int region = this.findRegion(r, true);
         if (region == REGION_SELF || this.level == maxLevel) {
             nodes.add(new QuadNode<T>(r, element));
             nodeNum++;
             return;
-        }
-        else {
+        } else {
             regions[region].insert(r, element);
         }
 
@@ -200,21 +181,18 @@ public class StandardQuadTree<T> extends PartitioningUtils
         }
     }
 
-    public void dropElements()
-    {
-        traverse(new Visitor<T>()
-        {
-            @Override
-            public boolean visit(StandardQuadTree<T> tree)
-            {
-                tree.nodes.clear();
-                return true;
-            }
-        });
+    public void dropElements() {
+        traverse(
+                new Visitor<T>() {
+                    @Override
+                    public boolean visit(StandardQuadTree<T> tree) {
+                        tree.nodes.clear();
+                        return true;
+                    }
+                });
     }
 
-    public List<T> getElements(QuadRectangle r)
-    {
+    public List<T> getElements(QuadRectangle r) {
         int region = this.findRegion(r, false);
 
         final List<T> list = new ArrayList<>();
@@ -225,8 +203,7 @@ public class StandardQuadTree<T> extends PartitioningUtils
             }
 
             list.addAll(regions[region].getElements(r));
-        }
-        else {
+        } else {
             addAllElements(list);
         }
 
@@ -234,11 +211,10 @@ public class StandardQuadTree<T> extends PartitioningUtils
     }
 
     /**
-     * Traverses the tree top-down breadth-first and calls the visitor
-     * for each node. Stops traversing if a call to Visitor.visit returns false.
+     * Traverses the tree top-down breadth-first and calls the visitor for each node. Stops
+     * traversing if a call to Visitor.visit returns false.
      */
-    private void traverse(Visitor<T> visitor)
-    {
+    private void traverse(Visitor<T> visitor) {
         if (!visitor.visit(this)) {
             return;
         }
@@ -252,12 +228,11 @@ public class StandardQuadTree<T> extends PartitioningUtils
     }
 
     /**
-     * Traverses the tree top-down breadth-first and calls the visitor
-     * for each node. Stops traversing if a call to Visitor.visit returns false.
-     * lineage will memorize the traversal path for each nodes
+     * Traverses the tree top-down breadth-first and calls the visitor for each node. Stops
+     * traversing if a call to Visitor.visit returns false. lineage will memorize the traversal path
+     * for each nodes
      */
-    private void traverseWithTrace(VisitorWithLineage<T> visitor, String lineage)
-    {
+    private void traverseWithTrace(VisitorWithLineage<T> visitor, String lineage) {
         if (!visitor.visit(this, lineage)) {
             return;
         }
@@ -270,56 +245,49 @@ public class StandardQuadTree<T> extends PartitioningUtils
         }
     }
 
-    private void addAllElements(final List<T> list)
-    {
-        traverse(new Visitor<T>()
-        {
-            @Override
-            public boolean visit(StandardQuadTree<T> tree)
-            {
-                for (QuadNode<T> node : tree.nodes) {
-                    list.add(node.element);
-                }
-                return true;
-            }
-        });
+    private void addAllElements(final List<T> list) {
+        traverse(
+                new Visitor<T>() {
+                    @Override
+                    public boolean visit(StandardQuadTree<T> tree) {
+                        for (QuadNode<T> node : tree.nodes) {
+                            list.add(node.element);
+                        }
+                        return true;
+                    }
+                });
     }
 
-    public boolean isLeaf()
-    {
+    public boolean isLeaf() {
         return regions == null;
     }
 
-    public List<QuadRectangle> getAllZones()
-    {
+    public List<QuadRectangle> getAllZones() {
         final List<QuadRectangle> zones = new ArrayList<>();
-        traverse(new Visitor<T>()
-        {
-            @Override
-            public boolean visit(StandardQuadTree<T> tree)
-            {
-                zones.add(tree.zone);
-                return true;
-            }
-        });
+        traverse(
+                new Visitor<T>() {
+                    @Override
+                    public boolean visit(StandardQuadTree<T> tree) {
+                        zones.add(tree.zone);
+                        return true;
+                    }
+                });
 
         return zones;
     }
 
-    public int getTotalNumLeafNode()
-    {
+    public int getTotalNumLeafNode() {
         final MutableInt leafCount = new MutableInt(0);
-        traverse(new Visitor<T>()
-        {
-            @Override
-            public boolean visit(StandardQuadTree<T> tree)
-            {
-                if (tree.isLeaf()) {
-                    leafCount.increment();
-                }
-                return true;
-            }
-        });
+        traverse(
+                new Visitor<T>() {
+                    @Override
+                    public boolean visit(StandardQuadTree<T> tree) {
+                        if (tree.isLeaf()) {
+                            leafCount.increment();
+                        }
+                        return true;
+                    }
+                });
 
         return leafCount.getValue();
     }
@@ -331,43 +299,50 @@ public class StandardQuadTree<T> extends PartitioningUtils
      * @param y
      * @return
      */
-    public QuadRectangle getZone(int x, int y)
-            throws ArrayIndexOutOfBoundsException
-    {
+    public QuadRectangle getZone(int x, int y) throws ArrayIndexOutOfBoundsException {
         int region = this.findRegion(x, y);
         if (region != REGION_SELF) {
             return regions[region].getZone(x, y);
-        }
-        else {
+        } else {
             if (this.zone.contains(x, y)) {
                 return this.zone;
             }
 
-            throw new ArrayIndexOutOfBoundsException("[Sedona][StandardQuadTree] this pixel is out of the quad tree boundary.");
+            throw new ArrayIndexOutOfBoundsException(
+                    "[Sedona][StandardQuadTree] this pixel is out of the quad tree boundary.");
         }
     }
 
-    public QuadRectangle getParentZone(int x, int y, int minLevel)
-            throws Exception
-    {
+    public QuadRectangle getParentZone(int x, int y, int minLevel) throws Exception {
         int region = this.findRegion(x, y);
-        // Assume this quad tree has done force grow up. Thus, the min tree depth is the min tree level
+        // Assume this quad tree has done force grow up. Thus, the min tree depth is the min tree
+        // level
         if (level < minLevel) {
-            // In our case, this node must have child nodes. But, in general, if the region is still -1, that means none of its child contains
+            // In our case, this node must have child nodes. But, in general, if the region is still
+            // -1, that means none of its child contains
             // the given x and y
             if (region == REGION_SELF) {
                 assert regions == null;
                 if (zone.contains(x, y)) {
                     // This should not happen
-                    throw new Exception("[Sedona][StandardQuadTree][getParentZone] this leaf node doesn't have enough depth. " +
-                            "Please check ForceGrowUp. Expected: " + minLevel + " Actual: " + level + ". Query point: " + x + " " + y +
-                            ". Tree statistics, total leaf nodes: " + getTotalNumLeafNode());
+                    throw new Exception(
+                            "[Sedona][StandardQuadTree][getParentZone] this leaf node doesn't have"
+                                    + " enough depth. Please check ForceGrowUp. Expected: "
+                                    + minLevel
+                                    + " Actual: "
+                                    + level
+                                    + ". Query point: "
+                                    + x
+                                    + " "
+                                    + y
+                                    + ". Tree statistics, total leaf nodes: "
+                                    + getTotalNumLeafNode());
+                } else {
+                    throw new Exception(
+                            "[Sedona][StandardQuadTree][getParentZone] this pixel is out of the"
+                                    + " quad tree boundary.");
                 }
-                else {
-                    throw new Exception("[Sedona][StandardQuadTree][getParentZone] this pixel is out of the quad tree boundary.");
-                }
-            }
-            else {
+            } else {
                 return regions[region].getParentZone(x, y, minLevel);
             }
         }
@@ -375,70 +350,65 @@ public class StandardQuadTree<T> extends PartitioningUtils
             return zone;
         }
 
-        throw new Exception("[Sedona][StandardQuadTree][getParentZone] this pixel is out of the quad tree boundary.");
+        throw new Exception(
+                "[Sedona][StandardQuadTree][getParentZone] this pixel is out of the quad tree"
+                        + " boundary.");
     }
 
-    public List<QuadRectangle> findZones(QuadRectangle r)
-    {
+    public List<QuadRectangle> findZones(QuadRectangle r) {
         final Envelope envelope = r.getEnvelope();
 
         final List<QuadRectangle> matches = new ArrayList<>();
-        traverse(new Visitor<T>()
-        {
-            @Override
-            public boolean visit(StandardQuadTree<T> tree)
-            {
-                if (!disjoint(tree.zone.getEnvelope(), envelope)) {
-                    if (tree.isLeaf()) {
-                        matches.add(tree.zone);
+        traverse(
+                new Visitor<T>() {
+                    @Override
+                    public boolean visit(StandardQuadTree<T> tree) {
+                        if (!disjoint(tree.zone.getEnvelope(), envelope)) {
+                            if (tree.isLeaf()) {
+                                matches.add(tree.zone);
+                            }
+                            return true;
+                        } else {
+                            return false;
+                        }
                     }
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            }
-        });
+                });
 
         return matches;
     }
 
-    private boolean disjoint(Envelope r1, Envelope r2)
-    {
+    private boolean disjoint(Envelope r1, Envelope r2) {
         return !r1.intersects(r2) && !r1.covers(r2) && !r2.covers(r1);
     }
 
-    public void assignPartitionIds()
-    {
-        traverse(new Visitor<T>()
-        {
-            private int partitionId = 0;
+    public void assignPartitionIds() {
+        traverse(
+                new Visitor<T>() {
+                    private int partitionId = 0;
 
-            @Override
-            public boolean visit(StandardQuadTree<T> tree)
-            {
-                if (tree.isLeaf()) {
-                    tree.getZone().partitionId = partitionId;
-                    partitionId++;
-                }
-                return true;
-            }
-        });
+                    @Override
+                    public boolean visit(StandardQuadTree<T> tree) {
+                        if (tree.isLeaf()) {
+                            tree.getZone().partitionId = partitionId;
+                            partitionId++;
+                        }
+                        return true;
+                    }
+                });
     }
 
-    public void assignPartitionLineage()
-    {
-        traverseWithTrace(new VisitorWithLineage<T>()
-        {
-            @Override
-            public boolean visit(StandardQuadTree<T> tree, String lineage)
-            {
-                if (tree.isLeaf()) {
-                    tree.getZone().lineage = lineage;
-                }
-                return true;
-            }
-        }, "");
+    public void assignPartitionLineage() {
+        traverseWithTrace(
+                new VisitorWithLineage<T>() {
+                    @Override
+                    public boolean visit(StandardQuadTree<T> tree, String lineage) {
+                        if (tree.isLeaf()) {
+                            tree.getZone().lineage = lineage;
+                        }
+                        return true;
+                    }
+                },
+                "");
     }
 
     @Override
@@ -454,7 +424,8 @@ public class StandardQuadTree<T> extends PartitioningUtils
         final Set<Tuple2<Integer, Geometry>> result = new HashSet<>();
         for (QuadRectangle rectangle : matchedPartitions) {
             // For points, make sure to return only one partition
-            if (point != null && !(new HalfOpenRectangle(rectangle.getEnvelope())).contains(point)) {
+            if (point != null
+                    && !(new HalfOpenRectangle(rectangle.getEnvelope())).contains(point)) {
                 continue;
             }
 
@@ -477,7 +448,8 @@ public class StandardQuadTree<T> extends PartitioningUtils
         final Set<Integer> result = new HashSet<>();
         for (QuadRectangle rectangle : matchedPartitions) {
             // For points, make sure to return only one partition
-            if (point != null && !(new HalfOpenRectangle(rectangle.getEnvelope())).contains(point)) {
+            if (point != null
+                    && !(new HalfOpenRectangle(rectangle.getEnvelope())).contains(point)) {
                 continue;
             }
 
@@ -490,22 +462,20 @@ public class StandardQuadTree<T> extends PartitioningUtils
     @Override
     public List<Envelope> fetchLeafZones() {
         final List<Envelope> leafZones = new ArrayList<>();
-        traverse(new Visitor<T>()
-        {
-            @Override
-            public boolean visit(StandardQuadTree<T> tree)
-            {
-                if (tree.isLeaf()) {
-                    leafZones.add(tree.zone.getEnvelope());
-                }
-                return true;
-            }
-        });
+        traverse(
+                new Visitor<T>() {
+                    @Override
+                    public boolean visit(StandardQuadTree<T> tree) {
+                        if (tree.isLeaf()) {
+                            leafZones.add(tree.zone.getEnvelope());
+                        }
+                        return true;
+                    }
+                });
         return leafZones;
     }
 
-    private interface Visitor<T>
-    {
+    private interface Visitor<T> {
         /**
          * Visits a single node of the tree
          *
@@ -515,8 +485,7 @@ public class StandardQuadTree<T> extends PartitioningUtils
         boolean visit(StandardQuadTree<T> tree);
     }
 
-    private interface VisitorWithLineage<T>
-    {
+    private interface VisitorWithLineage<T> {
         /**
          * Visits a single node of the tree, with the traversal trace
          *

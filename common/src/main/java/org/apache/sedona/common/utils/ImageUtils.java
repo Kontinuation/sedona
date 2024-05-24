@@ -21,21 +21,25 @@ package org.apache.sedona.common.utils;
 import java.awt.image.Raster;
 import java.awt.image.WritableRaster;
 
-/**
- * Utility functions for image processing.
- */
+/** Utility functions for image processing. */
 public class ImageUtils {
     private ImageUtils() {}
 
     /**
      * Copy a raster to another raster, with padding if necessary.
+     *
      * @param sourceRaster the source raster
      * @param sourceBand the source band
      * @param destRaster the destination raster, which must not be smaller than the source raster
      * @param destBand the destination band
      * @param padValue the padding value, or NaN if no padding is needed
      */
-    public static void copyRasterWithPadding(Raster sourceRaster, int sourceBand, WritableRaster destRaster, int destBand, double padValue) {
+    public static void copyRasterWithPadding(
+            Raster sourceRaster,
+            int sourceBand,
+            WritableRaster destRaster,
+            int destBand,
+            double padValue) {
         int destWidth = destRaster.getWidth();
         int destHeight = destRaster.getHeight();
         int destMinX = destRaster.getMinX();
@@ -49,7 +53,14 @@ public class ImageUtils {
         }
 
         // Copy the source raster to the destination raster
-        double[] samples = sourceRaster.getSamples(sourceMinX, sourceMinY, sourceWidth, sourceHeight, sourceBand, (double[]) null);
+        double[] samples =
+                sourceRaster.getSamples(
+                        sourceMinX,
+                        sourceMinY,
+                        sourceWidth,
+                        sourceHeight,
+                        sourceBand,
+                        (double[]) null);
         destRaster.setSamples(destMinX, destMinY, sourceWidth, sourceHeight, destBand, samples);
 
         // Pad the right edge

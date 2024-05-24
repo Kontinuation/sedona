@@ -18,13 +18,12 @@
  */
 package org.apache.sedona.common.utils;
 
+import java.awt.Color;
 import org.geotools.coverage.Category;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.util.NumberRange;
 import org.junit.Assert;
 import org.junit.Test;
-
-import java.awt.Color;
 
 public class RasterUtilsTest {
     @Test
@@ -44,11 +43,11 @@ public class RasterUtilsTest {
     @Test
     public void testNoDataValueUsingComplexCategoryList() {
         Category[] categories = {
-                new Category("C0", new Color(87, 154, 60, 255), 1),
-                new Category("C1", new Color(0, 0, 255, 255), 2),
-                new Category("C2", new Color(255, 255, 255, 255), 3),
-                new Category(Category.NODATA.getName(), new Color(0, 0, 0, 0), 10),
-                new Category("GrayScale", (Color) null, NumberRange.create(100, 200))
+            new Category("C0", new Color(87, 154, 60, 255), 1),
+            new Category("C1", new Color(0, 0, 255, 255), 2),
+            new Category("C2", new Color(255, 255, 255, 255), 3),
+            new Category(Category.NODATA.getName(), new Color(0, 0, 0, 0), 10),
+            new Category("GrayScale", (Color) null, NumberRange.create(100, 200))
         };
         GridSampleDimension band = new GridSampleDimension("test", categories, null);
         Assert.assertEquals(10, RasterUtils.getNoDataValue(band), 1e-9);
@@ -69,7 +68,8 @@ public class RasterUtilsTest {
         Assert.assertEquals(20, RasterUtils.getNoDataValue(band4), 1e-9);
         Assert.assertEquals(5, band4.getCategories().size());
 
-        // If the new no data value falls within the range of an existing qualitative category, the category is replaced
+        // If the new no data value falls within the range of an existing qualitative category, the
+        // category is replaced
         // with NODATA category.
         GridSampleDimension band5 = RasterUtils.createSampleDimensionWithNoDataValue(band, 1);
         Assert.assertEquals(1, RasterUtils.getNoDataValue(band5), 1e-9);
@@ -80,7 +80,8 @@ public class RasterUtilsTest {
         Assert.assertNull(band5.getCategory(10));
         Assert.assertEquals("GrayScale", band5.getCategory(100).getName().toString());
 
-        // If the new no data value falls within the range of an existing quantitative category, the category is split
+        // If the new no data value falls within the range of an existing quantitative category, the
+        // category is split
         // into two categories.
         GridSampleDimension band6 = RasterUtils.createSampleDimensionWithNoDataValue(band, 150);
         Assert.assertEquals(150, RasterUtils.getNoDataValue(band6), 1e-9);
@@ -94,8 +95,8 @@ public class RasterUtilsTest {
     @Test
     public void testNoDataValueUsingQuantitativeCategory() {
         Category[] categories = {
-                new Category(Category.NODATA.getName(), new Color(0, 0, 0, 0), 10),
-                new Category("GrayScale", (Color) null, NumberRange.create(100, 200))
+            new Category(Category.NODATA.getName(), new Color(0, 0, 0, 0), 10),
+            new Category("GrayScale", (Color) null, NumberRange.create(100, 200))
         };
         GridSampleDimension band = new GridSampleDimension("test", categories, null);
 
@@ -115,8 +116,8 @@ public class RasterUtilsTest {
     @Test
     public void testNoDataValueUsingFloatQuantitativeCategory() {
         Category[] categories = {
-                new Category(Category.NODATA.getName(), new Color(0, 0, 0, 0), 10.0),
-                new Category("GrayScale", (Color) null, NumberRange.create(100.0, 200.0))
+            new Category(Category.NODATA.getName(), new Color(0, 0, 0, 0), 10.0),
+            new Category("GrayScale", (Color) null, NumberRange.create(100.0, 200.0))
         };
         GridSampleDimension band = new GridSampleDimension("test", categories, null);
 

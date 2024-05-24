@@ -16,18 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.shp;
-
-import org.locationtech.jts.geom.GeometryFactory;
 
 import java.io.Serializable;
 import java.util.HashMap;
 import java.util.Map;
+import org.locationtech.jts.geom.GeometryFactory;
 
-public enum ShapeType
-        implements Serializable
-{
+public enum ShapeType implements Serializable {
     // The following IDs are defined in Shapefile specification
     NULL(0, false),
     POINT(1, true),
@@ -57,8 +53,7 @@ public enum ShapeType
         }
     }
 
-    ShapeType(int id, boolean supported)
-    {
+    ShapeType(int id, boolean supported) {
         this.id = id;
         this.supported = supported;
     }
@@ -69,8 +64,7 @@ public enum ShapeType
      * @param id the id
      * @return the type
      */
-    public static ShapeType getType(int id)
-    {
+    public static ShapeType getType(int id) {
         ShapeType type = lookup.get(id);
         return type == null ? UNDEFINED : type;
     }
@@ -81,8 +75,7 @@ public enum ShapeType
      * @param geometryFactory the geometry factory
      * @return the parser
      */
-    public ShapeParser getParser(GeometryFactory geometryFactory)
-    {
+    public ShapeParser getParser(GeometryFactory geometryFactory) {
         switch (this) {
             case POINT:
                 return new PointParser(geometryFactory);
@@ -102,17 +95,16 @@ public enum ShapeType
      *
      * @return the id
      */
-    public int getId()
-    {
+    public int getId() {
         return id;
     }
 
     /**
      * return whether the shape type is supported by Sedona
+     *
      * @return
      */
-    public boolean isSupported()
-    {
+    public boolean isSupported() {
         return supported;
     }
 }

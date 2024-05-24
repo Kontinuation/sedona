@@ -16,37 +16,33 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper;
 
+import static org.junit.Assert.assertEquals;
+
+import java.io.IOException;
 import org.apache.sedona.core.TestBase;
 import org.apache.sedona.core.spatialRDD.SpatialRDD;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.io.IOException;
-
-import static org.junit.Assert.assertEquals;
-
-public class TestReadInvalidSyntaxGeometriesTest
-        extends TestBase
-{
+public class TestReadInvalidSyntaxGeometriesTest extends TestBase {
 
     public static String invalidSyntaxGeoJsonGeomWithFeatureProperty = null;
 
     @BeforeClass
-    public static void onceExecutedBeforeAll()
-            throws IOException
-    {
+    public static void onceExecutedBeforeAll() throws IOException {
         initialize(GeoJsonIOTest.class.getName());
-        invalidSyntaxGeoJsonGeomWithFeatureProperty = TestReadInvalidSyntaxGeometriesTest.class.getClassLoader().getResource("invalidSyntaxGeometriesJson.json").getPath();
+        invalidSyntaxGeoJsonGeomWithFeatureProperty =
+                TestReadInvalidSyntaxGeometriesTest.class
+                        .getClassLoader()
+                        .getResource("invalidSyntaxGeometriesJson.json")
+                        .getPath();
     }
 
     @AfterClass
-    public static void tearDown()
-            throws Exception
-    {
+    public static void tearDown() throws Exception {
         sc.stop();
     }
 
@@ -56,11 +52,12 @@ public class TestReadInvalidSyntaxGeometriesTest
      * @throws IOException
      */
     @Test
-    public void testReadToGeometryRDD()
-            throws IOException
-    {
-        // would crash with java.lang.IllegalArgumentException: Points of LinearRing do not form a closed linestring if Invalid syntax is not skipped
-        SpatialRDD geojsonRDD = GeoJsonReader.readToGeometryRDD(sc, invalidSyntaxGeoJsonGeomWithFeatureProperty, false, true);
+    public void testReadToGeometryRDD() throws IOException {
+        // would crash with java.lang.IllegalArgumentException: Points of LinearRing do not form a
+        // closed linestring if Invalid syntax is not skipped
+        SpatialRDD geojsonRDD =
+                GeoJsonReader.readToGeometryRDD(
+                        sc, invalidSyntaxGeoJsonGeomWithFeatureProperty, false, true);
         assertEquals(geojsonRDD.rawSpatialRDD.count(), 1);
     }
 }

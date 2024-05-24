@@ -22,31 +22,19 @@ import java.io.Serializable;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Enum ImageType.
- */
-public enum ImageType
-        implements Serializable
-{
+/** The Enum ImageType. */
+public enum ImageType implements Serializable {
 
-    /**
-     * The png.
-     */
+    /** The png. */
     PNG("png"),
 
-    /**
-     * The gif.
-     */
+    /** The gif. */
     GIF("gif"),
 
-    /**
-     * The svg.
-     */
+    /** The svg. */
     SVG("svg");
 
-    /**
-     * The type name.
-     */
+    /** The type name. */
     private String typeName = "png";
 
     /**
@@ -54,8 +42,7 @@ public enum ImageType
      *
      * @param typeName the type name
      */
-    ImageType(String typeName)
-    {
+    ImageType(String typeName) {
         this.setTypeName(typeName);
     }
 
@@ -65,10 +52,11 @@ public enum ImageType
      * @param str the str
      * @return the image type
      */
-    public static ImageType getImageType(String str)
-    {
+    public static ImageType getImageType(String str) {
         for (ImageType me : ImageType.values()) {
-            if (me.name().equalsIgnoreCase(str)) { return me; }
+            if (me.name().equalsIgnoreCase(str)) {
+                return me;
+            }
         }
         return null;
     }
@@ -78,8 +66,7 @@ public enum ImageType
      *
      * @return the type name
      */
-    public String getTypeName()
-    {
+    public String getTypeName() {
         return typeName;
     }
 
@@ -88,8 +75,7 @@ public enum ImageType
      *
      * @param typeName the new type name
      */
-    public void setTypeName(String typeName)
-    {
+    public void setTypeName(String typeName) {
         this.typeName = typeName;
     }
 }

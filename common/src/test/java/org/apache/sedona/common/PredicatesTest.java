@@ -18,16 +18,15 @@
  */
 package org.apache.sedona.common;
 
+import static org.apache.sedona.common.Constructors.geomFromEWKT;
+import static org.apache.sedona.common.Functions.crossesDateLine;
+import static org.junit.Assert.*;
+
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.io.ParseException;
-
-import static org.apache.sedona.common.Constructors.geomFromEWKT;
-import static org.apache.sedona.common.Constructors.geomFromWKT;
-import static org.apache.sedona.common.Functions.crossesDateLine;
-import static org.junit.Assert.*;
 
 public class PredicatesTest extends TestBase {
 
@@ -44,9 +43,10 @@ public class PredicatesTest extends TestBase {
 
     @Test
     public void testDWithinFailure() {
-        Geometry polygon1 = GEOMETRY_FACTORY.createPolygon(coordArray(0, 0, 0, 1, 1, 1, 1, 0, 0, 0));
-        Geometry polygon2 = GEOMETRY_FACTORY.createPolygon(coordArray(3, 0, 3, 3, 6, 3, 6, 0, 3, 0));
-
+        Geometry polygon1 =
+                GEOMETRY_FACTORY.createPolygon(coordArray(0, 0, 0, 1, 1, 1, 1, 0, 0, 0));
+        Geometry polygon2 =
+                GEOMETRY_FACTORY.createPolygon(coordArray(3, 0, 3, 3, 6, 3, 6, 0, 3, 0));
 
         double distance = 1.2;
         boolean actual = Predicates.dWithin(polygon1, polygon2, distance);
@@ -55,11 +55,13 @@ public class PredicatesTest extends TestBase {
 
     @Test
     public void testDWithinGeomCollection() {
-        Geometry polygon1 = GEOMETRY_FACTORY.createPolygon(coordArray(0, 0, 0, 1, 1, 1, 1, 0, 0, 0));
-        Geometry polygon2 = GEOMETRY_FACTORY.createPolygon(coordArray(3, 0, 3, 3, 6, 3, 6, 0, 3, 0));
+        Geometry polygon1 =
+                GEOMETRY_FACTORY.createPolygon(coordArray(0, 0, 0, 1, 1, 1, 1, 0, 0, 0));
+        Geometry polygon2 =
+                GEOMETRY_FACTORY.createPolygon(coordArray(3, 0, 3, 3, 6, 3, 6, 0, 3, 0));
         Geometry point = GEOMETRY_FACTORY.createPoint(new Coordinate(1.1, 0));
-        Geometry geometryCollection = GEOMETRY_FACTORY.createGeometryCollection(new Geometry[] {polygon2, point});
-
+        Geometry geometryCollection =
+                GEOMETRY_FACTORY.createGeometryCollection(new Geometry[] {polygon2, point});
 
         double distance = 1.2;
         boolean actual = Predicates.dWithin(polygon1, geometryCollection, distance);
@@ -68,10 +70,11 @@ public class PredicatesTest extends TestBase {
 
     @Test
     public void testDWithinSpheroid() {
-        Geometry seattlePoint = GEOMETRY_FACTORY.createPoint(new Coordinate(-122.335167, 47.608013));
+        Geometry seattlePoint =
+                GEOMETRY_FACTORY.createPoint(new Coordinate(-122.335167, 47.608013));
         Geometry newYorkPoint = GEOMETRY_FACTORY.createPoint(new Coordinate(-73.935242, 40.730610));
 
-        double distance = 4000 * 1e3; //distance between NY and Seattle is less than 4000 km
+        double distance = 4000 * 1e3; // distance between NY and Seattle is less than 4000 km
         boolean actual = Predicates.dWithin(newYorkPoint, seattlePoint, distance, true);
         assertTrue(actual);
     }
@@ -83,14 +86,27 @@ public class PredicatesTest extends TestBase {
         Geometry geom3 = geomFromEWKT("POLYGON((175 10, -175 10, -175 -10, 175 -10, 175 10))");
         Geometry geom4 = geomFromEWKT("POLYGON((-120 10, -130 10, -130 -10, -120 -10, -120 10))");
         Geometry geom5 = geomFromEWKT("POINT(180 30)");
-        Geometry geom6 = geomFromEWKT("POLYGON((160 20, 180 20, 180 -20, 160 -20, 160 20), (165 15, 175 15, 175 -15, 165 -15, 165 15))");
-        Geometry geom8 = geomFromEWKT("POLYGON((170 -10, -170 -10, -170 10, 170 10, 170 -10), (175 -5, -175 -5, -175 5, 175 5, 175 -5))");
+        Geometry geom6 =
+                geomFromEWKT(
+                        "POLYGON((160 20, 180 20, 180 -20, 160 -20, 160 20), (165 15, 175 15, 175"
+                                + " -15, 165 -15, 165 15))");
+        Geometry geom8 =
+                geomFromEWKT(
+                        "POLYGON((170 -10, -170 -10, -170 10, 170 10, 170 -10), (175 -5, -175 -5,"
+                                + " -175 5, 175 5, 175 -5))");
 
         // Multi-geometry test cases
-        Geometry multiGeom1 = geomFromEWKT("MULTILINESTRING((170 30, -170 30), (-120 30, -130 40))");
-        Geometry multiGeom2 = geomFromEWKT("MULTIPOLYGON(((175 10, -175 10, -175 -10, 175 -10, 175 10)), ((-120 10, -130 10, -130 -10, -120 -10, -120 10)))");
+        Geometry multiGeom1 =
+                geomFromEWKT("MULTILINESTRING((170 30, -170 30), (-120 30, -130 40))");
+        Geometry multiGeom2 =
+                geomFromEWKT(
+                        "MULTIPOLYGON(((175 10, -175 10, -175 -10, 175 -10, 175 10)), ((-120 10,"
+                                + " -130 10, -130 -10, -120 -10, -120 10)))");
         Geometry multiGeom3 = geomFromEWKT("MULTIPOINT((180 30), (170 -20))");
-        Geometry multiGeom4 = geomFromEWKT("MULTIPOLYGON(((160 20, 180 20, 180 -20, 160 -20, 160 20)), ((-120 10, -130 10, -130 -10, -120 -10, -120 10)))");
+        Geometry multiGeom4 =
+                geomFromEWKT(
+                        "MULTIPOLYGON(((160 20, 180 20, 180 -20, 160 -20, 160 20)), ((-120 10,"
+                                + " -130 10, -130 -10, -120 -10, -120 10)))");
 
         assertEquals(true, crossesDateLine(geom1));
         assertEquals(false, crossesDateLine(geom2));
@@ -104,5 +120,4 @@ public class PredicatesTest extends TestBase {
         assertEquals(false, crossesDateLine(multiGeom3));
         assertEquals(false, crossesDateLine(multiGeom4));
     }
-
 }

@@ -33,6 +33,7 @@
 
     <properties>
         <maven.deploy.skip>false</maven.deploy.skip>
+        <project.rootdir>${project.basedir}/..</project.rootdir>
         <geotools.scope>provided</geotools.scope>
         <cdm.scope>compile</cdm.scope>
     </properties>

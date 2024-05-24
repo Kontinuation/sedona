@@ -16,11 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.shp;
 
-public interface ShapeReader
-{
+public interface ShapeReader {
 
     int readInt();
 

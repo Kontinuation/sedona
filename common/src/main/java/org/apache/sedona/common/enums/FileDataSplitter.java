@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.enums;
 
 import java.io.Serializable;
@@ -25,36 +24,22 @@ import java.util.Map;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Enum FileDataSplitter.
- */
-public enum FileDataSplitter
-        implements Serializable
-{
+/** The Enum FileDataSplitter. */
+public enum FileDataSplitter implements Serializable {
 
-    /**
-     * The csv.
-     */
+    /** The csv. */
     CSV(","),
 
-    /**
-     * The tsv.
-     */
+    /** The tsv. */
     TSV("\t"),
 
-    /**
-     * The geojson.
-     */
+    /** The geojson. */
     GEOJSON(""),
 
-    /**
-     * The wkt.
-     */
+    /** The wkt. */
     WKT("\t"),
 
-    /**
-     * The wkb.
-     */
+    /** The wkb. */
     WKB("\t"),
 
     COMMA(","),
@@ -79,13 +64,12 @@ public enum FileDataSplitter
 
     SEMICOLON(";");
 
-    /**
-     * The splitter.
-     */
+    /** The splitter. */
     private final String splitter;
 
     // A lookup map for getting a FileDataSplitter from a delimiter, or its name
-    private static final Map<String, FileDataSplitter> lookup = new HashMap<String, FileDataSplitter>();
+    private static final Map<String, FileDataSplitter> lookup =
+            new HashMap<String, FileDataSplitter>();
 
     static {
         for (FileDataSplitter f : FileDataSplitter.values()) {
@@ -99,8 +83,7 @@ public enum FileDataSplitter
      *
      * @param splitter the splitter
      */
-    FileDataSplitter(String splitter)
-    {
+    FileDataSplitter(String splitter) {
         this.splitter = splitter;
     }
 
@@ -110,11 +93,11 @@ public enum FileDataSplitter
      * @param str the str
      * @return the file data splitter
      */
-    public static FileDataSplitter getFileDataSplitter(String str)
-    {
+    public static FileDataSplitter getFileDataSplitter(String str) {
         FileDataSplitter f = lookup.get(str);
         if (f == null) {
-            throw new IllegalArgumentException("[" + FileDataSplitter.class + "] Unsupported FileDataSplitter:" + str);
+            throw new IllegalArgumentException(
+                    "[" + FileDataSplitter.class + "] Unsupported FileDataSplitter:" + str);
         }
         return f;
     }
@@ -124,8 +107,7 @@ public enum FileDataSplitter
      *
      * @return the delimiter
      */
-    public String getDelimiter()
-    {
+    public String getDelimiter() {
         return this.splitter;
     }
 }

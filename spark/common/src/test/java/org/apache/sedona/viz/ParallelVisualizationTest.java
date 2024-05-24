@@ -30,31 +30,19 @@ import org.junit.Test;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class ParallelVisualizationTest.
- */
-public class ParallelVisualizationTest
-        extends VizTestBase
-{
+/** The Class ParallelVisualizationTest. */
+public class ParallelVisualizationTest extends VizTestBase {
 
-    /**
-     * The resolution X.
-     */
+    /** The resolution X. */
     static int resolutionX = 1000;
 
-    /**
-     * The resolution Y.
-     */
+    /** The resolution Y. */
     static int resolutionY = 600;
 
-    /**
-     * The partition X.
-     */
+    /** The partition X. */
     static int partitionX = 2;
 
-    /**
-     * The partition Y.
-     */
+    /** The partition Y. */
     static int partitionY = 2;
 
     /**
@@ -63,16 +51,43 @@ public class ParallelVisualizationTest
      * @throws Exception the exception
      */
     @Test
-    public void testPointRDDVisualization()
-            throws Exception
-    {
-        PointRDD spatialRDD = new PointRDD(sparkContext, PointInputLocation, PointOffset, PointSplitter, false, PointNumPartitions);
-        HeatMap visualizationOperator = new HeatMap(resolutionX, resolutionY, USMainLandBoundary, false, 2, partitionX, partitionY, true, true);
+    public void testPointRDDVisualization() throws Exception {
+        PointRDD spatialRDD =
+                new PointRDD(
+                        sparkContext,
+                        PointInputLocation,
+                        PointOffset,
+                        PointSplitter,
+                        false,
+                        PointNumPartitions);
+        HeatMap visualizationOperator =
+                new HeatMap(
+                        resolutionX,
+                        resolutionY,
+                        USMainLandBoundary,
+                        false,
+                        2,
+                        partitionX,
+                        partitionY,
+                        true,
+                        true);
         visualizationOperator.Visualize(sparkContext, spatialRDD);
 
         ImageGenerator imageGenerator = new ImageGenerator();
-        imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.distributedRasterImage, "./target/parallelvisualization/PointRDD", ImageType.PNG, 0, partitionX, partitionY);
-        ImageStitcher.stitchImagePartitionsFromLocalFile("./target/parallelvisualization/PointRDD", resolutionX, resolutionY, 0, partitionX, partitionY);
+        imageGenerator.SaveRasterImageAsLocalFile(
+                visualizationOperator.distributedRasterImage,
+                "./target/parallelvisualization/PointRDD",
+                ImageType.PNG,
+                0,
+                partitionX,
+                partitionY);
+        ImageStitcher.stitchImagePartitionsFromLocalFile(
+                "./target/parallelvisualization/PointRDD",
+                resolutionX,
+                resolutionY,
+                0,
+                partitionX,
+                partitionY);
     }
 
     /**
@@ -81,16 +96,42 @@ public class ParallelVisualizationTest
      * @throws Exception the exception
      */
     @Test
-    public void testRectangleRDDVisualizationWithTiles()
-            throws Exception
-    {
-        RectangleRDD spatialRDD = new RectangleRDD(sparkContext, RectangleInputLocation, RectangleSplitter, false, RectangleNumPartitions);
-        HeatMap visualizationOperator = new HeatMap(resolutionX, resolutionY, USMainLandBoundary, false, 2, partitionX, partitionY, true, true);
+    public void testRectangleRDDVisualizationWithTiles() throws Exception {
+        RectangleRDD spatialRDD =
+                new RectangleRDD(
+                        sparkContext,
+                        RectangleInputLocation,
+                        RectangleSplitter,
+                        false,
+                        RectangleNumPartitions);
+        HeatMap visualizationOperator =
+                new HeatMap(
+                        resolutionX,
+                        resolutionY,
+                        USMainLandBoundary,
+                        false,
+                        2,
+                        partitionX,
+                        partitionY,
+                        true,
+                        true);
         visualizationOperator.Visualize(sparkContext, spatialRDD);
 
         ImageGenerator imageGenerator = new ImageGenerator();
-        imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.distributedRasterImage, "./target/parallelvisualization/RectangleRDDWithTiles", ImageType.PNG, 0, partitionX, partitionY);
-        ImageStitcher.stitchImagePartitionsFromLocalFile("./target/parallelvisualization/RectangleRDDWithTiles", resolutionX, resolutionY, 0, partitionX, partitionY);
+        imageGenerator.SaveRasterImageAsLocalFile(
+                visualizationOperator.distributedRasterImage,
+                "./target/parallelvisualization/RectangleRDDWithTiles",
+                ImageType.PNG,
+                0,
+                partitionX,
+                partitionY);
+        ImageStitcher.stitchImagePartitionsFromLocalFile(
+                "./target/parallelvisualization/RectangleRDDWithTiles",
+                resolutionX,
+                resolutionY,
+                0,
+                partitionX,
+                partitionY);
     }
 
     /**
@@ -99,16 +140,42 @@ public class ParallelVisualizationTest
      * @throws Exception the exception
      */
     @Test
-    public void testRectangleRDDVisualizationNoTiles()
-            throws Exception
-    {
-        RectangleRDD spatialRDD = new RectangleRDD(sparkContext, RectangleInputLocation, RectangleSplitter, false, RectangleNumPartitions);
-        HeatMap visualizationOperator = new HeatMap(resolutionX, resolutionY, USMainLandBoundary, false, 5, partitionX, partitionY, true, true);
+    public void testRectangleRDDVisualizationNoTiles() throws Exception {
+        RectangleRDD spatialRDD =
+                new RectangleRDD(
+                        sparkContext,
+                        RectangleInputLocation,
+                        RectangleSplitter,
+                        false,
+                        RectangleNumPartitions);
+        HeatMap visualizationOperator =
+                new HeatMap(
+                        resolutionX,
+                        resolutionY,
+                        USMainLandBoundary,
+                        false,
+                        5,
+                        partitionX,
+                        partitionY,
+                        true,
+                        true);
         visualizationOperator.Visualize(sparkContext, spatialRDD);
 
         ImageGenerator imageGenerator = new ImageGenerator();
-        imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.distributedRasterImage, "./target/parallelvisualization/RectangleRDDNoTiles", ImageType.PNG, 0, partitionX, partitionY);
-        ImageStitcher.stitchImagePartitionsFromLocalFile("./target/parallelvisualization/RectangleRDDNoTiles", resolutionX, resolutionY, 0, partitionX, partitionY);
+        imageGenerator.SaveRasterImageAsLocalFile(
+                visualizationOperator.distributedRasterImage,
+                "./target/parallelvisualization/RectangleRDDNoTiles",
+                ImageType.PNG,
+                0,
+                partitionX,
+                partitionY);
+        ImageStitcher.stitchImagePartitionsFromLocalFile(
+                "./target/parallelvisualization/RectangleRDDNoTiles",
+                resolutionX,
+                resolutionY,
+                0,
+                partitionX,
+                partitionY);
     }
 
     /**
@@ -117,17 +184,43 @@ public class ParallelVisualizationTest
      * @throws Exception the exception
      */
     @Test
-    public void testPolygonRDDVisualization()
-            throws Exception
-    {
-        //UserSuppliedPolygonMapper userSuppliedPolygonMapper = new UserSuppliedPolygonMapper();
-        PolygonRDD spatialRDD = new PolygonRDD(sparkContext, PolygonInputLocation, PolygonSplitter, false, PolygonNumPartitions);
-        HeatMap visualizationOperator = new HeatMap(resolutionX, resolutionY, USMainLandBoundary, false, 2, partitionX, partitionY, true, true);
+    public void testPolygonRDDVisualization() throws Exception {
+        // UserSuppliedPolygonMapper userSuppliedPolygonMapper = new UserSuppliedPolygonMapper();
+        PolygonRDD spatialRDD =
+                new PolygonRDD(
+                        sparkContext,
+                        PolygonInputLocation,
+                        PolygonSplitter,
+                        false,
+                        PolygonNumPartitions);
+        HeatMap visualizationOperator =
+                new HeatMap(
+                        resolutionX,
+                        resolutionY,
+                        USMainLandBoundary,
+                        false,
+                        2,
+                        partitionX,
+                        partitionY,
+                        true,
+                        true);
         visualizationOperator.Visualize(sparkContext, spatialRDD);
 
         ImageGenerator imageGenerator = new ImageGenerator();
-        imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.distributedRasterImage, "./target/parallelvisualization/PolygonRDD", ImageType.PNG, 0, partitionX, partitionY);
-        ImageStitcher.stitchImagePartitionsFromLocalFile("./target/parallelvisualization/PolygonRDD", resolutionX, resolutionY, 0, partitionX, partitionY);
+        imageGenerator.SaveRasterImageAsLocalFile(
+                visualizationOperator.distributedRasterImage,
+                "./target/parallelvisualization/PolygonRDD",
+                ImageType.PNG,
+                0,
+                partitionX,
+                partitionY);
+        ImageStitcher.stitchImagePartitionsFromLocalFile(
+                "./target/parallelvisualization/PolygonRDD",
+                resolutionX,
+                resolutionY,
+                0,
+                partitionX,
+                partitionY);
     }
 
     /**
@@ -136,15 +229,41 @@ public class ParallelVisualizationTest
      * @throws Exception the exception
      */
     @Test
-    public void testLineStringRDDVisualization()
-            throws Exception
-    {
-        LineStringRDD spatialRDD = new LineStringRDD(sparkContext, LineStringInputLocation, LineStringSplitter, false, LineStringNumPartitions);
-        HeatMap visualizationOperator = new HeatMap(resolutionX, resolutionY, USMainLandBoundary, false, 2, partitionX, partitionY, true, true);
+    public void testLineStringRDDVisualization() throws Exception {
+        LineStringRDD spatialRDD =
+                new LineStringRDD(
+                        sparkContext,
+                        LineStringInputLocation,
+                        LineStringSplitter,
+                        false,
+                        LineStringNumPartitions);
+        HeatMap visualizationOperator =
+                new HeatMap(
+                        resolutionX,
+                        resolutionY,
+                        USMainLandBoundary,
+                        false,
+                        2,
+                        partitionX,
+                        partitionY,
+                        true,
+                        true);
         visualizationOperator.Visualize(sparkContext, spatialRDD);
 
         ImageGenerator imageGenerator = new ImageGenerator();
-        imageGenerator.SaveRasterImageAsLocalFile(visualizationOperator.distributedRasterImage, "./target/parallelvisualization/LineStringRDD", ImageType.PNG, 0, partitionX, partitionY);
-        ImageStitcher.stitchImagePartitionsFromLocalFile("./target/parallelvisualization/LineStringRDD", resolutionX, resolutionY, 0, partitionX, partitionY);
+        imageGenerator.SaveRasterImageAsLocalFile(
+                visualizationOperator.distributedRasterImage,
+                "./target/parallelvisualization/LineStringRDD",
+                ImageType.PNG,
+                0,
+                partitionX,
+                partitionY);
+        ImageStitcher.stitchImagePartitionsFromLocalFile(
+                "./target/parallelvisualization/LineStringRDD",
+                resolutionX,
+                resolutionY,
+                0,
+                partitionX,
+                partitionY);
     }
 }

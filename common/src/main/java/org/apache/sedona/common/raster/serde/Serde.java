@@ -1,15 +1,20 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.common.raster.serde;
 
@@ -20,6 +25,11 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import com.esotericsoftware.kryo.io.UnsafeInput;
 import com.esotericsoftware.kryo.io.UnsafeOutput;
+import java.awt.image.RenderedImage;
+import java.io.IOException;
+import java.io.Serializable;
+import java.net.URI;
+import javax.media.jai.RenderedImageAdapter;
 import org.apache.sedona.common.raster.DeepCopiedRenderedImage;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
@@ -30,18 +40,10 @@ import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.objenesis.strategy.StdInstantiatorStrategy;
 import org.opengis.referencing.operation.MathTransform;
 
-import javax.media.jai.RenderedImageAdapter;
-import java.awt.image.RenderedImage;
-import java.io.IOException;
-import java.io.Serializable;
-import java.net.URI;
-
 public class Serde {
     private Serde() {}
 
-    /**
-     * URIs are not serializable. We need to provide a custom serializer
-     */
+    /** URIs are not serializable. We need to provide a custom serializer */
     private static class URISerializer extends Serializer<java.net.URI> {
         public URISerializer() {
             setImmutable(true);
@@ -58,22 +60,32 @@ public class Serde {
         }
     }
 
-    private static final ThreadLocal<Kryo> kryos = ThreadLocal.withInitial(() -> {
-        Kryo kryo = new Kryo();
-        kryo.setInstantiatorStrategy(new Kryo.DefaultInstantiatorStrategy(new StdInstantiatorStrategy()));
-        kryo.register(AffineTransform2D.class, new AffineTransform2DSerializer());
-        kryo.register(GridSampleDimension.class, new GridSampleDimensionSerializer());
-        kryo.register(URI.class, new URISerializer());
-        DeepCopiedRenderedImage.registerKryo(kryo);
-        try {
-            kryo.register(Class.forName("org.geotools.coverage.grid.RenderedSampleDimension"),
-                    new GridSampleDimensionSerializer());
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException("Cannot register kryo serializer for class RenderedSampleDimension", e);
-        }
-        kryo.setClassLoader(Thread.currentThread().getContextClassLoader());
-        return kryo;
-    });
+    private static final ThreadLocal<Kryo> kryos =
+            ThreadLocal.withInitial(
+                    () -> {
+                        Kryo kryo = new Kryo();
+                        kryo.setInstantiatorStrategy(
+                                new Kryo.DefaultInstantiatorStrategy(
+                                        new StdInstantiatorStrategy()));
+                        kryo.register(AffineTransform2D.class, new AffineTransform2DSerializer());
+                        kryo.register(
+                                GridSampleDimension.class, new GridSampleDimensionSerializer());
+                        kryo.register(URI.class, new URISerializer());
+                        DeepCopiedRenderedImage.registerKryo(kryo);
+                        try {
+                            kryo.register(
+                                    Class.forName(
+                                            "org.geotools.coverage.grid.RenderedSampleDimension"),
+                                    new GridSampleDimensionSerializer());
+                        } catch (ClassNotFoundException e) {
+                            throw new RuntimeException(
+                                    "Cannot register kryo serializer for class"
+                                            + " RenderedSampleDimension",
+                                    e);
+                        }
+                        kryo.setClassLoader(Thread.currentThread().getContextClassLoader());
+                        return kryo;
+                    });
 
     private static class SerializableState implements Serializable, KryoSerializable {
         public CharSequence name;
@@ -89,13 +101,18 @@ public class Serde {
         public DeepCopiedRenderedImage image;
 
         public GridCoverage2D restore() {
-            GridGeometry2D gridGeometry = new GridGeometry2D(gridEnvelope2D, gridToCRS, CRSSerializer.deserialize(serializedCRS));
+            GridGeometry2D gridGeometry =
+                    new GridGeometry2D(
+                            gridEnvelope2D, gridToCRS, CRSSerializer.deserialize(serializedCRS));
             return new GridCoverageFactory().create(name, image, gridGeometry, bands, null, null);
         }
 
-        private static final GridEnvelopeSerializer gridEnvelopeSerializer = new GridEnvelopeSerializer();
-        private static final AffineTransform2DSerializer affineTransform2DSerializer = new AffineTransform2DSerializer();
-        private static final GridSampleDimensionSerializer gridSampleDimensionSerializer = new GridSampleDimensionSerializer();
+        private static final GridEnvelopeSerializer gridEnvelopeSerializer =
+                new GridEnvelopeSerializer();
+        private static final AffineTransform2DSerializer affineTransform2DSerializer =
+                new AffineTransform2DSerializer();
+        private static final GridSampleDimensionSerializer gridSampleDimensionSerializer =
+                new GridSampleDimensionSerializer();
 
         @Override
         public void write(Kryo kryo, Output output) {
@@ -124,7 +141,8 @@ public class Serde {
             int bandCount = input.readInt();
             bands = new GridSampleDimension[bandCount];
             for (int i = 0; i < bandCount; i++) {
-                bands[i] = gridSampleDimensionSerializer.read(kryo, input, GridSampleDimension.class);
+                bands[i] =
+                        gridSampleDimensionSerializer.read(kryo, input, GridSampleDimension.class);
             }
             image = new DeepCopiedRenderedImage();
             image.read(kryo, input);
@@ -136,7 +154,8 @@ public class Serde {
 
     public static byte[] serialize(GridCoverage2D raster) throws IOException {
         Kryo kryo = kryos.get();
-        // GridCoverage2D created by GridCoverage2DReaders contain references that are not serializable.
+        // GridCoverage2D created by GridCoverage2DReaders contain references that are not
+        // serializable.
         // Wrap the RenderedImage in DeepCopiedRenderedImage to make it serializable.
         DeepCopiedRenderedImage deepCopiedRenderedImage = null;
         RenderedImage renderedImage = raster.getRenderedImage();
@@ -164,12 +183,13 @@ public class Serde {
         }
     }
 
-    public static GridCoverage2D deserialize(byte[] bytes) throws IOException, ClassNotFoundException {
+    public static GridCoverage2D deserialize(byte[] bytes)
+            throws IOException, ClassNotFoundException {
         Kryo kryo = kryos.get();
         try (UnsafeInput in = new UnsafeInput(bytes)) {
             int rasterType = in.readByte();
             if (rasterType != IN_DB) {
-              throw new IllegalArgumentException("Unsupported raster type: " + rasterType);
+                throw new IllegalArgumentException("Unsupported raster type: " + rasterType);
             }
             SerializableState state = new SerializableState();
             state.read(kryo, in);

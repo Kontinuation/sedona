@@ -1,15 +1,20 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.common.utils;
 
@@ -19,9 +24,6 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryCollection;
@@ -34,13 +36,12 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.linearref.LinearGeometryBuilder;
 import org.locationtech.jts.operation.polygonize.Polygonizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-
-/**
- * Class to split geometry by other geometry.
- */
+/** Class to split geometry by other geometry. */
 public final class GeometrySplitter {
-    final static Logger logger = LoggerFactory.getLogger(GeometrySplitter.class);
+    static final Logger logger = LoggerFactory.getLogger(GeometrySplitter.class);
     private final GeometryFactory geometryFactory;
 
     public GeometrySplitter(GeometryFactory geometryFactory) {
@@ -48,24 +49,20 @@ public final class GeometrySplitter {
     }
 
     /**
-     * Split input geometry by the blade geometry.
-     * Input geometry can be lineal (LineString or MultiLineString)
-     * or polygonal (Polygon or MultiPolygon). A GeometryCollection
-     * can also be used as an input but it must be homogeneous.
-     * For lineal geometry refer to the
-     * {@link splitLines(Geometry, Geometry) splitLines} method for
-     * restrictions on the blade. Refer to
-     * {@link splitPolygons(Geometry, Geometry) splitPolygons} for
-     * restrictions on the blade for polygonal input geometry.
-     * <p>
-     * The result will be null if the input geometry and blade are either
-     * invalid in general or in relation to each other. Otherwise, the result
-     * will always be a MultiLineString or MultiPolygon depending on the input,
-     * and even if the result is a single geometry.
+     * Split input geometry by the blade geometry. Input geometry can be lineal (LineString or
+     * MultiLineString) or polygonal (Polygon or MultiPolygon). A GeometryCollection can also be
+     * used as an input but it must be homogeneous. For lineal geometry refer to the {@link
+     * splitLines(Geometry, Geometry) splitLines} method for restrictions on the blade. Refer to
+     * {@link splitPolygons(Geometry, Geometry) splitPolygons} for restrictions on the blade for
+     * polygonal input geometry.
      *
-     * @param  input input geometry
-     * @param  blade geometry to use as a blade
-     * @return       multi-geometry resulting from the split or null if invalid
+     * <p>The result will be null if the input geometry and blade are either invalid in general or
+     * in relation to each other. Otherwise, the result will always be a MultiLineString or
+     * MultiPolygon depending on the input, and even if the result is a single geometry.
+     *
+     * @param input input geometry
+     * @param blade geometry to use as a blade
+     * @return multi-geometry resulting from the split or null if invalid
      */
     public GeometryCollection split(Geometry input, Geometry blade) {
         GeometryCollection result = null;
@@ -80,18 +77,15 @@ public final class GeometrySplitter {
     }
 
     /**
-     * Split linear input geometry by the blade geometry.
-     * Input geometry is assumed to be either a LineString,
-     * MultiLineString, or a homogeneous collection of lines in a
-     * GeometryCollection. The blade geometry can be any individual
-     * puntal, lineal, or polygonal geometry or homogeneous collection
-     * of those geometries. Blades that are polygonal will use their
-     * boundary for the split. Will always return a MultiLineString.
+     * Split linear input geometry by the blade geometry. Input geometry is assumed to be either a
+     * LineString, MultiLineString, or a homogeneous collection of lines in a GeometryCollection.
+     * The blade geometry can be any individual puntal, lineal, or polygonal geometry or homogeneous
+     * collection of those geometries. Blades that are polygonal will use their boundary for the
+     * split. Will always return a MultiLineString.
      *
-     * @param  input input geometry to be split that must be lineal
-     * @param  blade blade geometry to use for split
-     *
-     * @return       input geometry split by blade
+     * @param input input geometry to be split that must be lineal
+     * @param blade blade geometry to use for split
+     * @return input geometry split by blade
      */
     public MultiLineString splitLines(Geometry input, Geometry blade) {
         MultiLineString result = null;
@@ -110,17 +104,15 @@ public final class GeometrySplitter {
     }
 
     /**
-     * Split polygonal input geometry by the blade geometry.
-     * Input geometry is assumed to be either a Polygon, MultiPolygon,
-     * or a GeometryCollection of only polygons. The blade geometry
-     * can be any individual lineal or polygonal geometry or homogeneous
-     * collection of those geometries. Blades that are polygonal
-     * will use their boundary for the split. Will always return a
+     * Split polygonal input geometry by the blade geometry. Input geometry is assumed to be either
+     * a Polygon, MultiPolygon, or a GeometryCollection of only polygons. The blade geometry can be
+     * any individual lineal or polygonal geometry or homogeneous collection of those geometries.
+     * Blades that are polygonal will use their boundary for the split. Will always return a
      * MultiPolygon.
      *
-     * @param  input input polygonal geometry to split
-     * @param  blade geometry to split the input by
-     * @return       input geometry split by the blade
+     * @param input input polygonal geometry to split
+     * @param blade geometry to split the input by
+     * @return input geometry split by the blade
      */
     public MultiPolygon splitPolygons(Geometry input, Geometry blade) {
         MultiPolygon result = null;
@@ -146,10 +138,12 @@ public final class GeometrySplitter {
         lineBuilder.setIgnoreInvalidLines(true);
 
         for (int lineIndex = 0; lineIndex < lines.getNumGeometries(); lineIndex++) {
-            splitLineStringAtCoordinates((LineString)lines.getGeometryN(lineIndex), pointCoords, lineBuilder);
+            splitLineStringAtCoordinates(
+                    (LineString) lines.getGeometryN(lineIndex), pointCoords, lineBuilder);
         }
 
-        MultiLineString result = (MultiLineString)ensureMultiGeometryOfDimensionN(lineBuilder.getGeometry(), 1);
+        MultiLineString result =
+                (MultiLineString) ensureMultiGeometryOfDimensionN(lineBuilder.getGeometry(), 1);
 
         return result;
     }
@@ -161,9 +155,10 @@ public final class GeometrySplitter {
 
         if (intersectionWithBlade.isEmpty()) {
             // blade and inputLines are disjoint so just return the input as a multilinestring
-            return (MultiLineString)ensureMultiGeometryOfDimensionN(inputLines, 1);
+            return (MultiLineString) ensureMultiGeometryOfDimensionN(inputLines, 1);
         } else if (intersectionWithBlade.getDimension() != 0) {
-            logger.warn("Colinear sections detected between source and blade geometry. Returned null.");
+            logger.warn(
+                    "Colinear sections detected between source and blade geometry. Returned null.");
             return null;
         }
 
@@ -193,14 +188,17 @@ public final class GeometrySplitter {
         return coordsDeque;
     }
 
-    private void splitLineStringAtCoordinates(LineString line, Deque<Coordinate> pointCoords, LinearGeometryBuilder lineBuilder) {
+    private void splitLineStringAtCoordinates(
+            LineString line, Deque<Coordinate> pointCoords, LinearGeometryBuilder lineBuilder) {
         Coordinate[] lineCoords = line.getCoordinates();
         if (lineCoords.length > 1) {
             lineBuilder.add(lineCoords[0]);
 
             for (int endCoordIndex = 1; endCoordIndex < lineCoords.length; endCoordIndex++) {
                 Coordinate endCoord = lineCoords[endCoordIndex];
-                Iterator<Coordinate> coordIterator = getIteratorForSegmentDirection(pointCoords, lineBuilder.getLastCoordinate(), endCoord);
+                Iterator<Coordinate> coordIterator =
+                        getIteratorForSegmentDirection(
+                                pointCoords, lineBuilder.getLastCoordinate(), endCoord);
 
                 applyCoordsToLineSegment(lineBuilder, coordIterator, endCoord);
             }
@@ -209,7 +207,8 @@ public final class GeometrySplitter {
         }
     }
 
-    private Iterator<Coordinate> getIteratorForSegmentDirection(Deque<Coordinate> coords, Coordinate startCoord, Coordinate endCoord) {
+    private Iterator<Coordinate> getIteratorForSegmentDirection(
+            Deque<Coordinate> coords, Coordinate startCoord, Coordinate endCoord) {
         // line segments are assumed to be left to right, bottom to top
         // and coords is also ordered that way
         // however, if the line segment is backwards then coords will
@@ -225,7 +224,10 @@ public final class GeometrySplitter {
         return coordIterator;
     }
 
-    private void applyCoordsToLineSegment(LinearGeometryBuilder lineBuilder, Iterator<Coordinate> coordIterator, Coordinate endCoord) {
+    private void applyCoordsToLineSegment(
+            LinearGeometryBuilder lineBuilder,
+            Iterator<Coordinate> coordIterator,
+            Coordinate endCoord) {
 
         while (coordIterator.hasNext()) {
             Coordinate pointCoord = coordIterator.next();
@@ -234,16 +236,18 @@ public final class GeometrySplitter {
             if (coordIsOnLineSegment(pointCoord, lastCoord, endCoord)) {
                 splitOnCoord(lineBuilder, pointCoord);
             }
-
         }
 
         lineBuilder.add(endCoord, false);
     }
 
-    private boolean coordIsOnLineSegment(Coordinate coord, Coordinate startCoord, Coordinate endCoord) {
+    private boolean coordIsOnLineSegment(
+            Coordinate coord, Coordinate startCoord, Coordinate endCoord) {
         boolean result = false;
         boolean segmentIsVertical = startCoord.x == endCoord.x;
-        boolean coordIsWithinVerticalRange = Math.min(startCoord.y, endCoord.y) <= coord.y && coord.y <= Math.max(startCoord.y, endCoord.y);
+        boolean coordIsWithinVerticalRange =
+                Math.min(startCoord.y, endCoord.y) <= coord.y
+                        && coord.y <= Math.max(startCoord.y, endCoord.y);
 
         if (coordIsWithinVerticalRange) {
             if (segmentIsVertical) {
@@ -289,7 +293,7 @@ public final class GeometrySplitter {
         for (int i = 0; i < polygons.getNumGeometries(); i++) {
             Geometry candidateResult = polygons.getGeometryN(i);
             if (candidateResult instanceof Polygon && original.contains(candidateResult)) {
-                list.add((Polygon)candidateResult);
+                list.add((Polygon) candidateResult);
             }
         }
     }
@@ -316,13 +320,22 @@ public final class GeometrySplitter {
 
                 switch (dimension) {
                     case 0:
-                        result = (GeometryCollection)geometryFactory.createMultiPoint(validGeometries.toArray(new Point[0]));
+                        result =
+                                (GeometryCollection)
+                                        geometryFactory.createMultiPoint(
+                                                validGeometries.toArray(new Point[0]));
                         break;
                     case 1:
-                        result = (GeometryCollection)geometryFactory.createMultiLineString(validGeometries.toArray(new LineString[0]));
+                        result =
+                                (GeometryCollection)
+                                        geometryFactory.createMultiLineString(
+                                                validGeometries.toArray(new LineString[0]));
                         break;
                     case 2:
-                        result = (GeometryCollection)geometryFactory.createMultiPolygon(validGeometries.toArray(new Polygon[0]));
+                        result =
+                                (GeometryCollection)
+                                        geometryFactory.createMultiPolygon(
+                                                validGeometries.toArray(new Polygon[0]));
                         break;
                 }
             }

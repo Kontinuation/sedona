@@ -60,6 +60,7 @@
     <properties>
         <project.scm.id>github</project.scm.id>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.rootdir>${project.basedir}</project.rootdir>
         <java.version>1.8</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
@@ -525,7 +526,7 @@
                         <failOnWarning>false</failOnWarning>
                         <sourceDirectory>${project.basedir}/src/main/scala</sourceDirectory>
                         <testSourceDirectory>${project.basedir}/src/test/scala</testSourceDirectory>
-                        <configLocation>${project.basedir}/../scalastyle_config.xml</configLocation>
+                        <configLocation>${project.rootdir}/dev/scalastyle_config.xml</configLocation>
                         <outputFile>${project.basedir}/target/scalastyle-output.xml</outputFile>
                         <outputEncoding>UTF-8</outputEncoding>
                     </configuration>
@@ -618,6 +619,41 @@
                 <groupId>org.apache.rat</groupId>
                 <artifactId>apache-rat-plugin</artifactId>
                 <version>0.14</version>
+            </plugin>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>2.30.0</version>
+                <configuration>
+                    <java>
+                        <googleJavaFormat>
+                            <version>1.8</version>
+                            <style>AOSP</style>
+                            <reflowLongStrings>true</reflowLongStrings>
+                        </googleJavaFormat>
+                        <licenseHeader>
+                            <file>${project.rootdir}/dev/license-header.txt</file>
+                        </licenseHeader>
+                    </java>
+                    <scala>
+                        <scalafmt>
+                            <version>3.7.5</version>
+                            <file>${project.rootdir}/dev/scalafmt.conf</file>
+                            <scalaMajorVersion>2.12</scalaMajorVersion>
+                        </scalafmt>
+                        <licenseHeader>
+                            <file>${project.rootdir}/dev/license-header.txt</file>
+                        </licenseHeader>
+                    </scala>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <phase>compile</phase>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

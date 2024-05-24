@@ -21,28 +21,29 @@ package org.locationtech.jts.index.quadtree;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.sedona.common.geometrySerde.GeometrySerde;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * Provides methods to efficiently serialize and deserialize the index.
- * trees are serialized recursively.
+ * Provides methods to efficiently serialize and deserialize the index. trees are serialized
+ * recursively.
  */
-public class IndexSerde
-{
+public class IndexSerde {
     GeometrySerde geometrySerde;
+
     public IndexSerde() {
         geometrySerde = new GeometrySerde();
     }
 
-    public Object read(Kryo kryo, Input input){
+    public Object read(Kryo kryo, Input input) {
         Quadtree index = new Quadtree();
         boolean notEmpty = (input.readByte() & 0x01) == 1;
-        if (!notEmpty) { return index; }
+        if (!notEmpty) {
+            return index;
+        }
         int itemSize = input.readInt();
         List items = new ArrayList();
         for (int i = 0; i < itemSize; ++i) {
@@ -59,8 +60,7 @@ public class IndexSerde
         // serialize quadtree index
         if (tree.isEmpty()) {
             output.writeByte(0);
-        }
-        else {
+        } else {
             output.writeByte(1);
             // write root
             List items = tree.getRoot().getItems();
@@ -75,13 +75,11 @@ public class IndexSerde
         }
     }
 
-    private void writeQuadTreeNode(Kryo kryo, Output output, Node node)
-    {
+    private void writeQuadTreeNode(Kryo kryo, Output output, Node node) {
         // write head first
         if (node == null || node.isEmpty()) {
             output.writeByte(0);
-        }
-        else { // not empty
+        } else { // not empty
             output.writeByte(1);
             // write node information, envelope and level
             geometrySerde.write(kryo, output, node.getEnvelope());
@@ -98,10 +96,11 @@ public class IndexSerde
         }
     }
 
-    private Node readQuadTreeNode(Kryo kryo, Input input)
-    {
+    private Node readQuadTreeNode(Kryo kryo, Input input) {
         boolean notEmpty = (input.readByte() & 0x01) == 1;
-        if (!notEmpty) { return null; }
+        if (!notEmpty) {
+            return null;
+        }
         Envelope envelope = (Envelope) geometrySerde.read(kryo, input, Envelope.class);
         int level = input.readInt();
         Node node = new Node(envelope, level);

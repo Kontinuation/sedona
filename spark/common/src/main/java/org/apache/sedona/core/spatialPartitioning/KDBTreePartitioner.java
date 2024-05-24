@@ -16,47 +16,38 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
 
+import java.util.Iterator;
+import javax.annotation.Nullable;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
-import javax.annotation.Nullable;
-
-import java.util.Iterator;
-
-public class KDBTreePartitioner
-        extends SpatialPartitioner
-{
+public class KDBTreePartitioner extends SpatialPartitioner {
     private final KDB tree;
 
-    public KDBTreePartitioner(KDB tree)
-    {
+    public KDBTreePartitioner(KDB tree) {
         super(GridType.KDBTREE, tree.fetchLeafZones());
         this.tree = tree;
         this.tree.dropElements();
     }
 
     @Override
-    public int numPartitions()
-    {
+    public int numPartitions() {
         return grids.size();
     }
 
     @Override
     public Iterator<Tuple2<Integer, Geometry>> placeObject(Geometry spatialObject)
-            throws Exception
-    {
+            throws Exception {
         return tree.placeObject(spatialObject);
     }
 
     @Nullable
     @Override
-    public DedupParams getDedupParams()
-    {
+    public DedupParams getDedupParams() {
         return new DedupParams(grids);
     }
 }

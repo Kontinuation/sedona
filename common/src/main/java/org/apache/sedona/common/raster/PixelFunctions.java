@@ -18,8 +18,12 @@
  */
 package org.apache.sedona.common.raster;
 
+import java.awt.geom.Point2D;
+import java.awt.image.Raster;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.sedona.common.Functions;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
@@ -31,32 +35,28 @@ import org.opengis.geometry.DirectPosition;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.operation.TransformException;
 
-import java.awt.geom.Point2D;
-import java.awt.image.Raster;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
-public class PixelFunctions
-{
+public class PixelFunctions {
     private static GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
-    public static Double value(GridCoverage2D rasterGeom, Geometry geometry, int band) throws TransformException, FactoryException {
+
+    public static Double value(GridCoverage2D rasterGeom, Geometry geometry, int band)
+            throws TransformException, FactoryException {
         return values(rasterGeom, Arrays.asList(geometry), band).get(0);
     }
 
-    public static Double value(GridCoverage2D rasterGeom, Geometry geometry) throws TransformException, FactoryException {
+    public static Double value(GridCoverage2D rasterGeom, Geometry geometry)
+            throws TransformException, FactoryException {
         return values(rasterGeom, Arrays.asList(geometry), 1).get(0);
     }
 
-    public static Double value(GridCoverage2D rasterGeom, int colX, int rowY, int band) throws TransformException
-    {
+    public static Double value(GridCoverage2D rasterGeom, int colX, int rowY, int band)
+            throws TransformException {
         int[] xCoordinates = {colX};
         int[] yCoordinates = {rowY};
         return values(rasterGeom, xCoordinates, yCoordinates, band).get(0);
     }
 
-    public static Geometry getPixelAsPolygon(GridCoverage2D raster, int colX, int rowY) throws TransformException, FactoryException {
+    public static Geometry getPixelAsPolygon(GridCoverage2D raster, int colX, int rowY)
+            throws TransformException, FactoryException {
         int srid = RasterAccessors.srid(raster);
         Point2D point2D1 = RasterUtils.getWorldCornerCoordinates(raster, colX, rowY);
         Point2D point2D2 = RasterUtils.getWorldCornerCoordinates(raster, colX + 1, rowY);
@@ -70,14 +70,15 @@ public class PixelFunctions
         coordinateArray[3] = new Coordinate(point2D4.getX(), point2D4.getY());
         coordinateArray[4] = new Coordinate(point2D1.getX(), point2D1.getY());
 
-        if(srid != 0) {
+        if (srid != 0) {
             GeometryFactory factory = new GeometryFactory(new PrecisionModel(), srid);
             return factory.createPolygon(coordinateArray);
         }
         return GEOMETRY_FACTORY.createPolygon(coordinateArray);
     }
 
-    public static List<PixelRecord> getPixelAsPolygons(GridCoverage2D rasterGeom, int band) throws TransformException, FactoryException {
+    public static List<PixelRecord> getPixelAsPolygons(GridCoverage2D rasterGeom, int band)
+            throws TransformException, FactoryException {
         RasterUtils.ensureBand(rasterGeom, band);
 
         int width = RasterAccessors.getWidth(rasterGeom);
@@ -93,7 +94,8 @@ public class PixelFunctions
         double shearY = gridToCRS.getShearY();
 
         int srid = RasterAccessors.srid(rasterGeom);
-        GeometryFactory geometryFactory = srid != 0 ? new GeometryFactory(new PrecisionModel(), srid) : GEOMETRY_FACTORY;
+        GeometryFactory geometryFactory =
+                srid != 0 ? new GeometryFactory(new PrecisionModel(), srid) : GEOMETRY_FACTORY;
 
         Point2D upperLeft = RasterUtils.getWorldCornerCoordinates(rasterGeom, 1, 1);
         List<PixelRecord> pixelRecords = new ArrayList<>();
@@ -111,13 +113,14 @@ public class PixelFunctions
                 double worldX4 = worldX1 + shearX;
                 double worldY4 = worldY1 + cellSizeY;
 
-                Coordinate[] coordinates = new Coordinate[] {
-                        new Coordinate(worldX1, worldY1),
-                        new Coordinate(worldX2, worldY2),
-                        new Coordinate(worldX3, worldY3),
-                        new Coordinate(worldX4, worldY4),
-                        new Coordinate(worldX1, worldY1)
-                };
+                Coordinate[] coordinates =
+                        new Coordinate[] {
+                            new Coordinate(worldX1, worldY1),
+                            new Coordinate(worldX2, worldY2),
+                            new Coordinate(worldX3, worldY3),
+                            new Coordinate(worldX4, worldY4),
+                            new Coordinate(worldX1, worldY1)
+                        };
 
                 Geometry polygon = geometryFactory.createPolygon(coordinates);
                 pixelRecords.add(new PixelRecord(polygon, pixelValue, x, y));
@@ -127,12 +130,14 @@ public class PixelFunctions
         return pixelRecords;
     }
 
-    public static Geometry getPixelAsCentroid(GridCoverage2D raster, int colX, int rowY) throws FactoryException, TransformException {
+    public static Geometry getPixelAsCentroid(GridCoverage2D raster, int colX, int rowY)
+            throws FactoryException, TransformException {
         Geometry polygon = PixelFunctions.getPixelAsPolygon(raster, colX, rowY);
-        return  polygon.getCentroid();
+        return polygon.getCentroid();
     }
 
-    public static List<PixelRecord> getPixelAsCentroids(GridCoverage2D rasterGeom, int band) throws TransformException, FactoryException {
+    public static List<PixelRecord> getPixelAsCentroids(GridCoverage2D rasterGeom, int band)
+            throws TransformException, FactoryException {
         RasterUtils.ensureBand(rasterGeom, band);
 
         int width = RasterAccessors.getWidth(rasterGeom);
@@ -148,7 +153,8 @@ public class PixelFunctions
         double shearY = gridToCRS.getShearY();
 
         int srid = RasterAccessors.srid(rasterGeom);
-        GeometryFactory geometryFactory = srid != 0 ? new GeometryFactory(new PrecisionModel(), srid) : GEOMETRY_FACTORY;
+        GeometryFactory geometryFactory =
+                srid != 0 ? new GeometryFactory(new PrecisionModel(), srid) : GEOMETRY_FACTORY;
 
         Point2D upperLeft = RasterUtils.getWorldCornerCoordinates(rasterGeom, 1, 1);
         List<PixelRecord> pixelRecords = new ArrayList<>();
@@ -169,7 +175,8 @@ public class PixelFunctions
         return pixelRecords;
     }
 
-    public static Geometry getPixelAsPoint(GridCoverage2D raster, int colX, int rowY) throws TransformException, FactoryException {
+    public static Geometry getPixelAsPoint(GridCoverage2D raster, int colX, int rowY)
+            throws TransformException, FactoryException {
         int srid = RasterAccessors.srid(raster);
         Point2D point2D = RasterUtils.getWorldCornerCoordinatesWithRangeCheck(raster, colX, rowY);
         Coordinate pointCoord = new Coordinate(point2D.getX(), point2D.getY());
@@ -180,7 +187,8 @@ public class PixelFunctions
         return GEOMETRY_FACTORY.createPoint(pointCoord);
     }
 
-    public static List<PixelRecord> getPixelAsPoints(GridCoverage2D rasterGeom, int band) throws TransformException, FactoryException {
+    public static List<PixelRecord> getPixelAsPoints(GridCoverage2D rasterGeom, int band)
+            throws TransformException, FactoryException {
         RasterUtils.ensureBand(rasterGeom, band);
 
         int width = RasterAccessors.getWidth(rasterGeom);
@@ -196,7 +204,8 @@ public class PixelFunctions
         double shearY = gridToCRS.getShearY();
 
         int srid = RasterAccessors.srid(rasterGeom);
-        GeometryFactory geometryFactory = srid != 0 ? new GeometryFactory(new PrecisionModel(), srid) : GEOMETRY_FACTORY;
+        GeometryFactory geometryFactory =
+                srid != 0 ? new GeometryFactory(new PrecisionModel(), srid) : GEOMETRY_FACTORY;
 
         Point2D upperLeft = RasterUtils.getWorldCornerCoordinates(rasterGeom, 1, 1);
         List<PixelRecord> pointRecords = new ArrayList<>();
@@ -217,7 +226,9 @@ public class PixelFunctions
         return pointRecords;
     }
 
-    public static List<Double> values(GridCoverage2D rasterGeom, int[] xCoordinates, int[] yCoordinates, int band) throws TransformException {
+    public static List<Double> values(
+            GridCoverage2D rasterGeom, int[] xCoordinates, int[] yCoordinates, int band)
+            throws TransformException {
         RasterUtils.ensureBand(rasterGeom, band); // Check for invalid band index
         int numBands = rasterGeom.getNumSampleDimensions();
 
@@ -248,7 +259,9 @@ public class PixelFunctions
         return result;
     }
 
-    public static List<Double> values(GridCoverage2D rasterGeom, List<Geometry> geometries, int band) throws TransformException, FactoryException {
+    public static List<Double> values(
+            GridCoverage2D rasterGeom, List<Geometry> geometries, int band)
+            throws TransformException, FactoryException {
         RasterUtils.ensureBand(rasterGeom, band); // Check for invalid band index
 
         for (int i = 0; i < geometries.size(); i++) {
@@ -257,8 +270,8 @@ public class PixelFunctions
                 continue;
             }
 
-
-            Pair<GridCoverage2D, Geometry> pair = RasterUtils.setDefaultCRSAndTransform(rasterGeom, geometries.get(i));
+            Pair<GridCoverage2D, Geometry> pair =
+                    RasterUtils.setDefaultCRSAndTransform(rasterGeom, geometries.get(i));
 
             geometries.set(i, pair.getRight());
 
@@ -295,7 +308,8 @@ public class PixelFunctions
         return result;
     }
 
-    public static List<Double> values(GridCoverage2D rasterGeom, List<Geometry> geometries) throws TransformException, FactoryException {
+    public static List<Double> values(GridCoverage2D rasterGeom, List<Geometry> geometries)
+            throws TransformException, FactoryException {
         return values(rasterGeom, geometries, 1);
     }
 
@@ -303,6 +317,7 @@ public class PixelFunctions
         if (geometry instanceof Point) {
             return (Point) geometry;
         }
-        throw new IllegalArgumentException("Attempting to get the value of a pixel with a non-point geometry.");
+        throw new IllegalArgumentException(
+                "Attempting to get the value of a pixel with a non-point geometry.");
     }
 }

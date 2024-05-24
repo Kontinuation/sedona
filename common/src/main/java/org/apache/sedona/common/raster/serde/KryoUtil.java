@@ -1,35 +1,41 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.common.raster.serde;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Utility methods for serializing objects with Kryo. The serialization formats are well-defined and independent
- * of the Kryo version. This allows us to exchange serialized data with other tech stack, such as Python.
+ * Utility methods for serializing objects with Kryo. The serialization formats are well-defined and
+ * independent of the Kryo version. This allows us to exchange serialized data with other tech
+ * stack, such as Python.
  */
 public class KryoUtil {
     private KryoUtil() {}
 
     /**
      * Write the length of the next serialized object, followed by the serialized object
+     *
      * @param kryo the kryo instance
      * @param output the output stream
      * @param object the object to serialize
@@ -52,6 +58,7 @@ public class KryoUtil {
 
     /**
      * Write string as UTF-8 byte sequence
+     *
      * @param output the output stream
      * @param value the string to write
      */
@@ -63,6 +70,7 @@ public class KryoUtil {
 
     /**
      * Read UTF-8 byte sequence as string
+     *
      * @param input the input stream
      * @return the string
      */
@@ -75,6 +83,7 @@ public class KryoUtil {
 
     /**
      * Write an array of integers
+     *
      * @param output the output stream
      * @param array the array to write
      */
@@ -85,6 +94,7 @@ public class KryoUtil {
 
     /**
      * Read an array of integers
+     *
      * @param input the input stream
      * @return the array
      */
@@ -95,6 +105,7 @@ public class KryoUtil {
 
     /**
      * Write a 2-d array of ints
+     *
      * @param output the output stream
      * @param arrays the array to write
      */
@@ -107,6 +118,7 @@ public class KryoUtil {
 
     /**
      * Read a 2-d array of ints
+     *
      * @param input the input stream
      * @return the array
      */
@@ -121,6 +133,7 @@ public class KryoUtil {
 
     /**
      * Write a 2-d array of bytes
+     *
      * @param output the output stream
      * @param arrays the array to write
      */
@@ -134,6 +147,7 @@ public class KryoUtil {
 
     /**
      * Read a 2-d array of bytes
+     *
      * @param input the input stream
      * @return the array
      */
@@ -149,6 +163,7 @@ public class KryoUtil {
 
     /**
      * Write a 2-d array of doubles
+     *
      * @param output the output stream
      * @param arrays the array to write
      */
@@ -162,6 +177,7 @@ public class KryoUtil {
 
     /**
      * Read a 2-d array of doubles
+     *
      * @param input the input stream
      * @return the array
      */
@@ -177,6 +193,7 @@ public class KryoUtil {
 
     /**
      * Write a 2-d array of longs
+     *
      * @param output the output stream
      * @param arrays the array to write
      */
@@ -190,6 +207,7 @@ public class KryoUtil {
 
     /**
      * Read a 2-d array of longs
+     *
      * @param input the input stream
      * @return the array
      */
@@ -205,6 +223,7 @@ public class KryoUtil {
 
     /**
      * Write a 2-d array of floats
+     *
      * @param output the output stream
      * @param arrays the array to write
      */
@@ -218,6 +237,7 @@ public class KryoUtil {
 
     /**
      * Read a 2-d array of floats
+     *
      * @param input the input stream
      * @return the array
      */
@@ -233,6 +253,7 @@ public class KryoUtil {
 
     /**
      * Write a 2-d array of shorts
+     *
      * @param output the output stream
      * @param arrays the array to write
      */
@@ -246,6 +267,7 @@ public class KryoUtil {
 
     /**
      * Read a 2-d array of shorts
+     *
      * @param input the input stream
      * @return the array
      */
@@ -261,6 +283,7 @@ public class KryoUtil {
 
     /**
      * Write a {@code Map<String, String>} object to the output stream
+     *
      * @param output the output stream
      * @param map the map to write
      */
@@ -278,6 +301,7 @@ public class KryoUtil {
 
     /**
      * Read a {@code Map<String, String>} object from the input stream
+     *
      * @param input the input stream
      * @return the map
      */

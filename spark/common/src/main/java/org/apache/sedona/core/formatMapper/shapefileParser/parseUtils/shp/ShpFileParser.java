@@ -16,32 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.shp;
-
-import org.apache.commons.io.EndianUtils;
-import org.apache.hadoop.fs.FSDataInputStream;
-import org.apache.sedona.core.formatMapper.shapefileParser.shapes.ShpRecord;
 
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.ByteBuffer;
+import org.apache.commons.io.EndianUtils;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.sedona.core.formatMapper.shapefileParser.shapes.ShpRecord;
 
-public class ShpFileParser
-        implements Serializable, ShapeFileConst
-{
+public class ShpFileParser implements Serializable, ShapeFileConst {
 
-    /**
-     * input reader
-     */
+    /** input reader */
     private final SafeReader reader;
-    /**
-     * length of file in bytes
-     */
+    /** length of file in bytes */
     private long fileLength = 0;
-    /**
-     * remain length of bytes to parse
-     */
+    /** remain length of bytes to parse */
     private long remainLength = 0;
 
     /**
@@ -49,8 +39,7 @@ public class ShpFileParser
      *
      * @param inputStream
      */
-    public ShpFileParser(FSDataInputStream inputStream)
-    {
+    public ShpFileParser(FSDataInputStream inputStream) {
         reader = new SafeReader(inputStream);
     }
 
@@ -59,9 +48,7 @@ public class ShpFileParser
      *
      * @throws IOException
      */
-    public void parseShapeFileHead()
-            throws IOException
-    {
+    public void parseShapeFileHead() throws IOException {
         reader.skip(ShapeFileConst.INT_LENGTH);
         reader.skip(ShapeFileConst.HEAD_EMPTY_NUM * ShapeFileConst.INT_LENGTH);
         fileLength = 2 * ((long) reader.readInt() - ShapeFileConst.HEAD_FILE_LENGTH_16BIT);
@@ -73,39 +60,41 @@ public class ShpFileParser
     }
 
     /**
-     * abstract information from record header and then copy primitive bytes data of record to a primitive record.
+     * abstract information from record header and then copy primitive bytes data of record to a
+     * primitive record.
      *
      * @return
      * @throws IOException
      */
-    public ShpRecord parseRecordPrimitiveContent()
-            throws IOException
-    {
+    public ShpRecord parseRecordPrimitiveContent() throws IOException {
         // get length of record content
         int contentLength = reader.readInt();
         long recordLength = 2 * (contentLength + 4);
         remainLength -= recordLength;
         int typeID = EndianUtils.swapInteger(reader.readInt());
-        byte[] contentArray = new byte[contentLength * 2 - ShapeFileConst.INT_LENGTH];// exclude the 4 bytes we read for shape type
+        byte[] contentArray =
+                new byte
+                        [contentLength * 2
+                                - ShapeFileConst
+                                        .INT_LENGTH]; // exclude the 4 bytes we read for shape type
         reader.read(contentArray, 0, contentArray.length);
         return new ShpRecord(contentArray, typeID);
     }
 
     /**
-     * abstract information from record header and then copy primitive bytes data of record to a primitive record.
+     * abstract information from record header and then copy primitive bytes data of record to a
+     * primitive record.
      *
      * @return
      * @throws IOException
      */
-    public ShpRecord parseRecordPrimitiveContent(int length)
-            throws IOException
-    {
+    public ShpRecord parseRecordPrimitiveContent(int length) throws IOException {
         // get length of record content
         int contentLength = reader.readInt();
         long recordLength = 2 * (contentLength + 4);
         remainLength -= recordLength;
         int typeID = EndianUtils.swapInteger(reader.readInt());
-        byte[] contentArray = new byte[length];// exclude the 4 bytes we read for shape type
+        byte[] contentArray = new byte[length]; // exclude the 4 bytes we read for shape type
         reader.read(contentArray, 0, contentArray.length);
         return new ShpRecord(contentArray, typeID);
     }
@@ -116,9 +105,7 @@ public class ShpFileParser
      * @return
      * @throws IOException
      */
-    public int parseRecordHeadID()
-            throws IOException
-    {
+    public int parseRecordHeadID() throws IOException {
         return reader.readInt();
     }
 
@@ -127,41 +114,32 @@ public class ShpFileParser
      *
      * @return
      */
-    public float getProgress()
-    {
+    public float getProgress() {
         return 1 - (float) remainLength / (float) fileLength;
     }
 
     /**
-     * A limited wrapper around FSDataInputStream providing proper implementations
-     * for methods of FSDataInputStream which are known to be broken on some platforms.
+     * A limited wrapper around FSDataInputStream providing proper implementations for methods of
+     * FSDataInputStream which are known to be broken on some platforms.
      */
-    private static final class SafeReader
-    {
+    private static final class SafeReader {
         private final FSDataInputStream input;
 
-        private SafeReader(FSDataInputStream input)
-        {
+        private SafeReader(FSDataInputStream input) {
             this.input = input;
         }
 
-        public int readInt()
-                throws IOException
-        {
+        public int readInt() throws IOException {
             byte[] bytes = new byte[ShapeFileConst.INT_LENGTH];
             input.readFully(bytes);
             return ByteBuffer.wrap(bytes).getInt();
         }
 
-        public void skip(int numBytes)
-                throws IOException
-        {
+        public void skip(int numBytes) throws IOException {
             input.skip(numBytes);
         }
 
-        public void read(byte[] buffer, int offset, int length)
-                throws IOException
-        {
+        public void read(byte[] buffer, int offset, int length) throws IOException {
             input.readFully(buffer, offset, length);
         }
     }

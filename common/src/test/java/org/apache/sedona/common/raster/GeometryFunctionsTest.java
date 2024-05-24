@@ -18,6 +18,10 @@
  */
 package org.apache.sedona.common.raster;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+
+import java.io.IOException;
 import org.apache.sedona.common.Functions;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.junit.Test;
@@ -26,11 +30,6 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.operation.TransformException;
-
-import java.io.IOException;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertThrows;
 
 public class GeometryFunctionsTest extends RasterTestBase {
 
@@ -45,7 +44,8 @@ public class GeometryFunctionsTest extends RasterTestBase {
 
     @Test
     public void testConvexHullSkewed() throws FactoryException, TransformException {
-        GridCoverage2D emptyRaster = RasterConstructors.makeEmptyRaster(1, 5, 10, 156, -132, 5, 10, 3, 5, 0);
+        GridCoverage2D emptyRaster =
+                RasterConstructors.makeEmptyRaster(1, 5, 10, 156, -132, 5, 10, 3, 5, 0);
         Geometry convexHull = GeometryFunctions.convexHull(emptyRaster);
         String expected = "POLYGON ((156 -132, 181 -107, 211 -7, 186 -32, 156 -132))";
         String actual = Functions.asWKT(convexHull);
@@ -53,7 +53,8 @@ public class GeometryFunctionsTest extends RasterTestBase {
     }
 
     @Test
-    public void testConvexHullFromRasterFile() throws FactoryException, TransformException, IOException {
+    public void testConvexHullFromRasterFile()
+            throws FactoryException, TransformException, IOException {
         GridCoverage2D raster = rasterFromGeoTiff(resourceFolder + "raster/test1.tiff");
         Geometry convexHull = GeometryFunctions.convexHull(raster);
         Coordinate[] coordinates = convexHull.getCoordinates();
@@ -79,11 +80,18 @@ public class GeometryFunctionsTest extends RasterTestBase {
 
     @Test
     public void testMinConvexHull() throws FactoryException, TransformException {
-        GridCoverage2D emptyRaster = RasterConstructors.makeEmptyRaster(2, 5, 5, 0, 0, 1, -1, 0, 0, 0);
-        double[] values1 = new double[] {0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0};
-        double[] values2 = new double[] {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0};
+        GridCoverage2D emptyRaster =
+                RasterConstructors.makeEmptyRaster(2, 5, 5, 0, 0, 1, -1, 0, 0, 0);
+        double[] values1 =
+                new double[] {
+                    0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0
+                };
+        double[] values2 =
+                new double[] {
+                    0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0
+                };
         emptyRaster = MapAlgebra.addBandFromArray(emptyRaster, values1, 1, 0d);
-        emptyRaster  = MapAlgebra.addBandFromArray(emptyRaster, values2, 2, 0d);
+        emptyRaster = MapAlgebra.addBandFromArray(emptyRaster, values2, 2, 0d);
         Geometry minConvexHull1 = GeometryFunctions.minConvexHull(emptyRaster, 1);
         Geometry minConvexHull2 = GeometryFunctions.minConvexHull(emptyRaster, 2);
         Geometry minConvexHullAll = GeometryFunctions.minConvexHull(emptyRaster);
@@ -97,11 +105,12 @@ public class GeometryFunctionsTest extends RasterTestBase {
 
     @Test
     public void testMinConvexHullRectange() throws FactoryException, TransformException {
-        GridCoverage2D emptyRaster = RasterConstructors.makeEmptyRaster(2, 5, 3, 0, 0, 1, -1, 0, 0, 0);
+        GridCoverage2D emptyRaster =
+                RasterConstructors.makeEmptyRaster(2, 5, 3, 0, 0, 1, -1, 0, 0, 0);
         double[] values1 = new double[] {0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 1, 0};
         double[] values2 = new double[] {0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0};
         emptyRaster = MapAlgebra.addBandFromArray(emptyRaster, values1, 1, 0d);
-        emptyRaster  = MapAlgebra.addBandFromArray(emptyRaster, values2, 2, 0d);
+        emptyRaster = MapAlgebra.addBandFromArray(emptyRaster, values2, 2, 0d);
         Geometry minConvexHull1 = GeometryFunctions.minConvexHull(emptyRaster, 1);
         Geometry minConvexHull2 = GeometryFunctions.minConvexHull(emptyRaster, 2);
         Geometry minConvexHullAll = GeometryFunctions.minConvexHull(emptyRaster);
@@ -115,14 +124,17 @@ public class GeometryFunctionsTest extends RasterTestBase {
 
     @Test
     public void testMinConvexHullIllegalBand() throws FactoryException, TransformException {
-        GridCoverage2D emptyRaster = RasterConstructors.makeEmptyRaster(2, 5, 3, 0, 0, 1, -1, 0, 0, 0);
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> GeometryFunctions.minConvexHull(emptyRaster, 3));
+        GridCoverage2D emptyRaster =
+                RasterConstructors.makeEmptyRaster(2, 5, 3, 0, 0, 1, -1, 0, 0, 0);
+        IllegalArgumentException exception =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> GeometryFunctions.minConvexHull(emptyRaster, 3));
         assertEquals("Provided band index 3 does not lie in the raster", exception.getMessage());
     }
 
     @Test
-    public void envelope() throws FactoryException
-    {
+    public void envelope() throws FactoryException {
         Geometry envelope = GeometryFunctions.envelope(oneBandRaster);
         assertEquals(3600.0d, envelope.getArea(), 0.1d);
         assertEquals(378922.0d + 30.0d, envelope.getCentroid().getX(), 0.1d);
@@ -132,25 +144,28 @@ public class GeometryFunctionsTest extends RasterTestBase {
 
     @Test
     public void testEnvelopeUsingSkewedRaster() throws FactoryException {
-        GridCoverage2D raster = RasterConstructors.makeEmptyRaster(1, 100, 100, 5, 4, 3, -2, 0.1, 0.15, 3857);
+        GridCoverage2D raster =
+                RasterConstructors.makeEmptyRaster(1, 100, 100, 5, 4, 3, -2, 0.1, 0.15, 3857);
         Geometry envelope = GeometryFunctions.envelope(raster);
         Envelope env = envelope.getEnvelopeInternal();
         // The expected values were obtained by running the following query in PostGIS:
-        // SELECT ST_AsText(ST_Envelope(ST_MakeEmptyRaster(100, 100, 5, 4, 3, -2, 0.1, 0.15, 3857)));
+        // SELECT ST_AsText(ST_Envelope(ST_MakeEmptyRaster(100, 100, 5, 4, 3, -2, 0.1, 0.15,
+        // 3857)));
         assertEquals(5, env.getMinX(), 1e-9);
         assertEquals(315, env.getMaxX(), 1e-9);
         assertEquals(-196, env.getMinY(), 1e-9);
         assertEquals(19, env.getMaxY(), 1e-9);
 
-        raster = RasterConstructors.makeEmptyRaster(1, 800, 700, 5, 4, 0.3, -0.2, -0.1, -0.15, 3857);
+        raster =
+                RasterConstructors.makeEmptyRaster(1, 800, 700, 5, 4, 0.3, -0.2, -0.1, -0.15, 3857);
         envelope = GeometryFunctions.envelope(raster);
         env = envelope.getEnvelopeInternal();
         // The expected values were obtained by running the following query in PostGIS:
-        // SELECT ST_AsText(ST_Envelope(ST_MakeEmptyRaster(800, 700, 5, 4, 0.3, -0.2, -0.1, -0.15, 3857)));
+        // SELECT ST_AsText(ST_Envelope(ST_MakeEmptyRaster(800, 700, 5, 4, 0.3, -0.2, -0.1, -0.15,
+        // 3857)));
         assertEquals(-65, env.getMinX(), 1e-9);
         assertEquals(245, env.getMaxX(), 1e-9);
         assertEquals(-256, env.getMinY(), 1e-9);
         assertEquals(4, env.getMaxY(), 1e-9);
     }
-
 }

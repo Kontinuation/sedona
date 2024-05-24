@@ -20,20 +20,13 @@ package org.apache.sedona.viz.core;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class PhotoFilter.
- */
-public abstract class PhotoFilter
-{
+/** The Class PhotoFilter. */
+public abstract class PhotoFilter {
 
-    /**
-     * The filter radius.
-     */
+    /** The filter radius. */
     protected int filterRadius;
 
-    /**
-     * The convolution matrix.
-     */
+    /** The convolution matrix. */
     protected Double[][] convolutionMatrix;
 
     /**
@@ -41,8 +34,7 @@ public abstract class PhotoFilter
      *
      * @param filterRadius the filter radius
      */
-    public PhotoFilter(int filterRadius)
-    {
+    public PhotoFilter(int filterRadius) {
         this.filterRadius = filterRadius;
         this.convolutionMatrix = new Double[2 * filterRadius + 1][2 * filterRadius + 1];
     }
@@ -52,8 +44,7 @@ public abstract class PhotoFilter
      *
      * @return the filter radius
      */
-    public int getFilterRadius()
-    {
+    public int getFilterRadius() {
         return filterRadius;
     }
 
@@ -62,8 +53,7 @@ public abstract class PhotoFilter
      *
      * @return the convolution matrix
      */
-    public Double[][] getConvolutionMatrix()
-    {
+    public Double[][] getConvolutionMatrix() {
         return convolutionMatrix;
     }
 }

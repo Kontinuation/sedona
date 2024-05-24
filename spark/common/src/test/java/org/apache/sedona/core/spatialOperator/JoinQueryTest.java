@@ -18,6 +18,12 @@
  */
 package org.apache.sedona.core.spatialOperator;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.spatialRDD.CircleRDD;
@@ -31,13 +37,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.locationtech.jts.geom.Geometry;
-
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @RunWith(Parameterized.class)
 public class JoinQueryTest extends SpatialQueryTestBase {
@@ -73,36 +72,56 @@ public class JoinQueryTest extends SpatialQueryTestBase {
 
     private Map<Integer, List<Integer>> buildExpectedResults(SpatialPredicate spatialPredicate) {
         Map<Integer, List<Integer>> results = new HashMap<>();
-        queryWindowDataset.forEach((queryWindowId, queryWindow) -> testDataset.forEach((geomId, value) -> {
-            if (evaluateSpatialPredicate(spatialPredicate, value, queryWindow)) {
-                results.computeIfAbsent(queryWindowId, k -> new ArrayList<>()).add(geomId);
-            }
-        }));
+        queryWindowDataset.forEach(
+                (queryWindowId, queryWindow) ->
+                        testDataset.forEach(
+                                (geomId, value) -> {
+                                    if (evaluateSpatialPredicate(
+                                            spatialPredicate, value, queryWindow)) {
+                                        results.computeIfAbsent(
+                                                        queryWindowId, k -> new ArrayList<>())
+                                                .add(geomId);
+                                    }
+                                }));
         results.forEach((k, v) -> v.sort(Integer::compareTo));
         return results;
     }
 
-    private Map<Integer, List<Integer>> spatialJoinResultRddToIdMap(JavaPairRDD<Geometry, List<Geometry>> resultRdd) {
+    private Map<Integer, List<Integer>> spatialJoinResultRddToIdMap(
+            JavaPairRDD<Geometry, List<Geometry>> resultRdd) {
         Map<Integer, List<Integer>> resultIdMap = new HashMap<>();
-        resultRdd.collect().forEach(pair -> {
-            Geometry queryWindow = pair._1;
-            List<Geometry> queryResults = pair._2;
-            int queryWindowId = ((UserData) queryWindow.getUserData()).getId();
-            List<Integer> geomIds = queryResults.stream().map(geom -> ((UserData) geom.getUserData()).getId()).sorted(Integer::compareTo).collect(Collectors.toList());
-            resultIdMap.put(queryWindowId, geomIds);
-        });
+        resultRdd
+                .collect()
+                .forEach(
+                        pair -> {
+                            Geometry queryWindow = pair._1;
+                            List<Geometry> queryResults = pair._2;
+                            int queryWindowId = ((UserData) queryWindow.getUserData()).getId();
+                            List<Integer> geomIds =
+                                    queryResults.stream()
+                                            .map(geom -> ((UserData) geom.getUserData()).getId())
+                                            .sorted(Integer::compareTo)
+                                            .collect(Collectors.toList());
+                            resultIdMap.put(queryWindowId, geomIds);
+                        });
         return resultIdMap;
     }
 
-    private Map<Integer, List<Integer>> spatialJoinFlatResultRddToIdMap(JavaPairRDD<Geometry, Geometry> resultRdd) {
+    private Map<Integer, List<Integer>> spatialJoinFlatResultRddToIdMap(
+            JavaPairRDD<Geometry, Geometry> resultRdd) {
         Map<Integer, List<Integer>> resultIdMap = new HashMap<>();
-        resultRdd.collect().forEach(pair -> {
-            Geometry queryWindow = pair._1;
-            Geometry queryResult = pair._2;
-            int queryWindowId = ((UserData) queryWindow.getUserData()).getId();
-            int geomId = ((UserData) queryResult.getUserData()).getId();
-            resultIdMap.computeIfAbsent(queryWindowId, k -> new ArrayList<>()).add(geomId);
-        });
+        resultRdd
+                .collect()
+                .forEach(
+                        pair -> {
+                            Geometry queryWindow = pair._1;
+                            Geometry queryResult = pair._2;
+                            int queryWindowId = ((UserData) queryWindow.getUserData()).getId();
+                            int geomId = ((UserData) queryResult.getUserData()).getId();
+                            resultIdMap
+                                    .computeIfAbsent(queryWindowId, k -> new ArrayList<>())
+                                    .add(geomId);
+                        });
         resultIdMap.forEach((k, v) -> v.sort(Integer::compareTo));
         return resultIdMap;
     }
@@ -116,7 +135,8 @@ public class JoinQueryTest extends SpatialQueryTestBase {
         SpatialRDD<Geometry> queryRDD = new SpatialRDD<>();
         queryRDD.rawSpatialRDD = queryDataRdd;
         queryRDD.spatialPartitioning(spatialRDD.getPartitioner());
-        JavaPairRDD<Geometry, List<Geometry>> actualResultRdd = JoinQuery.SpatialJoinQuery(spatialRDD, queryRDD, false, spatialPredicate);
+        JavaPairRDD<Geometry, List<Geometry>> actualResultRdd =
+                JoinQuery.SpatialJoinQuery(spatialRDD, queryRDD, false, spatialPredicate);
         verifySpatialJoinResult(actualResultRdd);
     }
 
@@ -130,7 +150,8 @@ public class JoinQueryTest extends SpatialQueryTestBase {
         SpatialRDD<Geometry> queryRDD = new SpatialRDD<>();
         queryRDD.rawSpatialRDD = queryDataRdd;
         queryRDD.spatialPartitioning(spatialRDD.getPartitioner());
-        JavaPairRDD<Geometry, List<Geometry>> actualResultRdd = JoinQuery.SpatialJoinQuery(spatialRDD, queryRDD, true, spatialPredicate);
+        JavaPairRDD<Geometry, List<Geometry>> actualResultRdd =
+                JoinQuery.SpatialJoinQuery(spatialRDD, queryRDD, true, spatialPredicate);
         verifySpatialJoinResult(actualResultRdd);
     }
 
@@ -144,7 +165,8 @@ public class JoinQueryTest extends SpatialQueryTestBase {
         queryRDD.rawSpatialRDD = queryDataRdd;
         queryRDD.spatialPartitioning(spatialRDD.getPartitioner());
         queryRDD.buildIndex(IndexType.RTREE, true);
-        JavaPairRDD<Geometry, List<Geometry>> actualResultRdd = JoinQuery.SpatialJoinQuery(spatialRDD, queryRDD, true, spatialPredicate);
+        JavaPairRDD<Geometry, List<Geometry>> actualResultRdd =
+                JoinQuery.SpatialJoinQuery(spatialRDD, queryRDD, true, spatialPredicate);
         verifySpatialJoinResult(actualResultRdd);
     }
 
@@ -157,7 +179,8 @@ public class JoinQueryTest extends SpatialQueryTestBase {
         SpatialRDD<Geometry> queryRDD = new SpatialRDD<>();
         queryRDD.rawSpatialRDD = queryDataRdd;
         queryRDD.spatialPartitioning(spatialRDD.getPartitioner());
-        JavaPairRDD<Geometry, List<Geometry>> actualResultRdd = JoinQuery.SpatialJoinQuery(spatialRDD, queryRDD, true, spatialPredicate);
+        JavaPairRDD<Geometry, List<Geometry>> actualResultRdd =
+                JoinQuery.SpatialJoinQuery(spatialRDD, queryRDD, true, spatialPredicate);
         verifySpatialJoinResult(actualResultRdd);
     }
 
@@ -170,7 +193,8 @@ public class JoinQueryTest extends SpatialQueryTestBase {
         SpatialRDD<Geometry> queryRDD = new SpatialRDD<>();
         queryRDD.rawSpatialRDD = queryDataRdd;
         queryRDD.spatialPartitioning(spatialRDD.getPartitioner());
-        JavaPairRDD<Geometry, Geometry> actualResultRdd = JoinQuery.SpatialJoinQueryFlat(spatialRDD, queryRDD, false, spatialPredicate);
+        JavaPairRDD<Geometry, Geometry> actualResultRdd =
+                JoinQuery.SpatialJoinQueryFlat(spatialRDD, queryRDD, false, spatialPredicate);
         verifySpatialJoinFlatResult(actualResultRdd);
     }
 
@@ -183,7 +207,8 @@ public class JoinQueryTest extends SpatialQueryTestBase {
         SpatialRDD<Geometry> queryRDD = new SpatialRDD<>();
         queryRDD.rawSpatialRDD = queryDataRdd;
         queryRDD.spatialPartitioning(spatialRDD.getPartitioner());
-        JavaPairRDD<Geometry, Long> actualResultRdd = JoinQuery.SpatialJoinQueryCountByKey(spatialRDD, queryRDD, false, spatialPredicate);
+        JavaPairRDD<Geometry, Long> actualResultRdd =
+                JoinQuery.SpatialJoinQueryCountByKey(spatialRDD, queryRDD, false, spatialPredicate);
         verifySpatialJoinCountByKeyResult(actualResultRdd);
     }
 
@@ -197,13 +222,21 @@ public class JoinQueryTest extends SpatialQueryTestBase {
         queryRDD.rawSpatialRDD = queryDataRdd;
         CircleRDD circleRDD = new CircleRDD(queryRDD, 1.0);
         circleRDD.spatialPartitioning(spatialRDD.getPartitioner());
-        if (spatialPredicate == SpatialPredicate.INTERSECTS || spatialPredicate == SpatialPredicate.COVERED_BY) {
+        if (spatialPredicate == SpatialPredicate.INTERSECTS
+                || spatialPredicate == SpatialPredicate.COVERED_BY) {
             boolean considerBoundaryIntersection = spatialPredicate == SpatialPredicate.INTERSECTS;
-            JavaPairRDD<Geometry, List<Geometry>> actualResultRdd = JoinQuery.DistanceJoinQuery(spatialRDD, circleRDD, false, spatialPredicate);
-            JavaPairRDD<Geometry, List<Geometry>> expectedResultRdd = JoinQuery.DistanceJoinQuery(spatialRDD, circleRDD, false, considerBoundaryIntersection);
+            JavaPairRDD<Geometry, List<Geometry>> actualResultRdd =
+                    JoinQuery.DistanceJoinQuery(spatialRDD, circleRDD, false, spatialPredicate);
+            JavaPairRDD<Geometry, List<Geometry>> expectedResultRdd =
+                    JoinQuery.DistanceJoinQuery(
+                            spatialRDD, circleRDD, false, considerBoundaryIntersection);
             verifySpatialJoinResult(expectedResultRdd, actualResultRdd);
         } else {
-            Assert.assertThrows(IllegalArgumentException.class, () -> JoinQuery.DistanceJoinQuery(spatialRDD, circleRDD, false, spatialPredicate));
+            Assert.assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            JoinQuery.DistanceJoinQuery(
+                                    spatialRDD, circleRDD, false, spatialPredicate));
         }
     }
 
@@ -217,13 +250,21 @@ public class JoinQueryTest extends SpatialQueryTestBase {
         queryRDD.rawSpatialRDD = queryDataRdd;
         CircleRDD circleRDD = new CircleRDD(queryRDD, 1.0);
         circleRDD.spatialPartitioning(spatialRDD.getPartitioner());
-        if (spatialPredicate == SpatialPredicate.INTERSECTS || spatialPredicate == SpatialPredicate.COVERED_BY) {
+        if (spatialPredicate == SpatialPredicate.INTERSECTS
+                || spatialPredicate == SpatialPredicate.COVERED_BY) {
             boolean considerBoundaryIntersection = spatialPredicate == SpatialPredicate.INTERSECTS;
-            JavaPairRDD<Geometry, Geometry> actualResultRdd = JoinQuery.DistanceJoinQueryFlat(spatialRDD, circleRDD, false, spatialPredicate);
-            JavaPairRDD<Geometry, Geometry> expectedResultRdd = JoinQuery.DistanceJoinQueryFlat(spatialRDD, circleRDD, false, considerBoundaryIntersection);
+            JavaPairRDD<Geometry, Geometry> actualResultRdd =
+                    JoinQuery.DistanceJoinQueryFlat(spatialRDD, circleRDD, false, spatialPredicate);
+            JavaPairRDD<Geometry, Geometry> expectedResultRdd =
+                    JoinQuery.DistanceJoinQueryFlat(
+                            spatialRDD, circleRDD, false, considerBoundaryIntersection);
             verifySpatialJoinFlatResult(expectedResultRdd, actualResultRdd);
         } else {
-            Assert.assertThrows(IllegalArgumentException.class, () -> JoinQuery.DistanceJoinQueryFlat(spatialRDD, circleRDD, false, spatialPredicate));
+            Assert.assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            JoinQuery.DistanceJoinQueryFlat(
+                                    spatialRDD, circleRDD, false, spatialPredicate));
         }
     }
 
@@ -237,13 +278,22 @@ public class JoinQueryTest extends SpatialQueryTestBase {
         queryRDD.rawSpatialRDD = queryDataRdd;
         CircleRDD circleRDD = new CircleRDD(queryRDD, 1.0);
         circleRDD.spatialPartitioning(spatialRDD.getPartitioner());
-        if (spatialPredicate == SpatialPredicate.INTERSECTS || spatialPredicate == SpatialPredicate.COVERED_BY) {
+        if (spatialPredicate == SpatialPredicate.INTERSECTS
+                || spatialPredicate == SpatialPredicate.COVERED_BY) {
             boolean considerBoundaryIntersection = spatialPredicate == SpatialPredicate.INTERSECTS;
-            JavaPairRDD<Geometry, Long> actualResultRdd = JoinQuery.DistanceJoinQueryCountByKey(spatialRDD, circleRDD, false, spatialPredicate);
-            JavaPairRDD<Geometry, Long> expectedResultRdd = JoinQuery.DistanceJoinQueryCountByKey(spatialRDD, circleRDD, false, considerBoundaryIntersection);
+            JavaPairRDD<Geometry, Long> actualResultRdd =
+                    JoinQuery.DistanceJoinQueryCountByKey(
+                            spatialRDD, circleRDD, false, spatialPredicate);
+            JavaPairRDD<Geometry, Long> expectedResultRdd =
+                    JoinQuery.DistanceJoinQueryCountByKey(
+                            spatialRDD, circleRDD, false, considerBoundaryIntersection);
             verifySpatialJoinCountByKeyResult(expectedResultRdd, actualResultRdd);
         } else {
-            Assert.assertThrows(IllegalArgumentException.class, () -> JoinQuery.DistanceJoinQueryCountByKey(spatialRDD, circleRDD, false, spatialPredicate));
+            Assert.assertThrows(
+                    IllegalArgumentException.class,
+                    () ->
+                            JoinQuery.DistanceJoinQueryCountByKey(
+                                    spatialRDD, circleRDD, false, spatialPredicate));
         }
     }
 
@@ -256,18 +306,25 @@ public class JoinQueryTest extends SpatialQueryTestBase {
         SpatialRDD<Geometry> queryRDD = new SpatialRDD<>();
         queryRDD.rawSpatialRDD = queryDataRdd;
         queryRDD.spatialPartitioning(spatialRDD.getPartitioner());
-        if (spatialPredicate == SpatialPredicate.INTERSECTS || spatialPredicate == SpatialPredicate.COVERED_BY) {
+        if (spatialPredicate == SpatialPredicate.INTERSECTS
+                || spatialPredicate == SpatialPredicate.COVERED_BY) {
             boolean considerBoundaryIntersection = spatialPredicate == SpatialPredicate.INTERSECTS;
             {
-                JavaPairRDD<Geometry, List<Geometry>> actualResultRdd = JoinQuery.SpatialJoinQuery(spatialRDD, queryRDD, false, considerBoundaryIntersection);
+                JavaPairRDD<Geometry, List<Geometry>> actualResultRdd =
+                        JoinQuery.SpatialJoinQuery(
+                                spatialRDD, queryRDD, false, considerBoundaryIntersection);
                 verifySpatialJoinResult(actualResultRdd);
             }
             {
-                JavaPairRDD<Geometry, Geometry> actualResultRdd = JoinQuery.SpatialJoinQueryFlat(spatialRDD, queryRDD, false, considerBoundaryIntersection);
+                JavaPairRDD<Geometry, Geometry> actualResultRdd =
+                        JoinQuery.SpatialJoinQueryFlat(
+                                spatialRDD, queryRDD, false, considerBoundaryIntersection);
                 verifySpatialJoinFlatResult(actualResultRdd);
             }
             {
-                JavaPairRDD<Geometry, Long> actualResultRdd = JoinQuery.SpatialJoinQueryCountByKey(spatialRDD, queryRDD, false, considerBoundaryIntersection);
+                JavaPairRDD<Geometry, Long> actualResultRdd =
+                        JoinQuery.SpatialJoinQueryCountByKey(
+                                spatialRDD, queryRDD, false, considerBoundaryIntersection);
                 verifySpatialJoinCountByKeyResult(actualResultRdd);
             }
         }
@@ -275,39 +332,67 @@ public class JoinQueryTest extends SpatialQueryTestBase {
 
     private void verifySpatialJoinResult(JavaPairRDD<Geometry, List<Geometry>> actualResultRdd) {
         Map<Integer, List<Integer>> actualResults = spatialJoinResultRddToIdMap(actualResultRdd);
-        Assert.assertEquals("Actual result of spatial join should match expected results", expectedResults, actualResults);
+        Assert.assertEquals(
+                "Actual result of spatial join should match expected results",
+                expectedResults,
+                actualResults);
     }
 
     private void verifySpatialJoinFlatResult(JavaPairRDD<Geometry, Geometry> actualResultRdd) {
-        Map<Integer, List<Integer>> actualResults = spatialJoinFlatResultRddToIdMap(actualResultRdd);
-        Assert.assertEquals("Actual result of spatial join should match expected results", expectedResults, actualResults);
+        Map<Integer, List<Integer>> actualResults =
+                spatialJoinFlatResultRddToIdMap(actualResultRdd);
+        Assert.assertEquals(
+                "Actual result of spatial join should match expected results",
+                expectedResults,
+                actualResults);
     }
 
     private void verifySpatialJoinCountByKeyResult(JavaPairRDD<Geometry, Long> actualResultRdd) {
         Map<Integer, Long> actualResults = new HashMap<>();
-        actualResultRdd.collect().forEach(pair -> {
-            Geometry queryWindow = pair._1;
-            Long count = pair._2;
-            int queryWindowId = ((UserData) queryWindow.getUserData()).getId();
-            actualResults.put(queryWindowId, count);
-        });
-        Map<Integer, Long> expectedResultsCountByKey = expectedResults.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> (long) e.getValue().size()));
-        Assert.assertEquals("Actual result of spatial join should match expected results", expectedResultsCountByKey, actualResults);
+        actualResultRdd
+                .collect()
+                .forEach(
+                        pair -> {
+                            Geometry queryWindow = pair._1;
+                            Long count = pair._2;
+                            int queryWindowId = ((UserData) queryWindow.getUserData()).getId();
+                            actualResults.put(queryWindowId, count);
+                        });
+        Map<Integer, Long> expectedResultsCountByKey =
+                expectedResults.entrySet().stream()
+                        .collect(
+                                Collectors.toMap(
+                                        Map.Entry::getKey, e -> (long) e.getValue().size()));
+        Assert.assertEquals(
+                "Actual result of spatial join should match expected results",
+                expectedResultsCountByKey,
+                actualResults);
     }
 
-    private void verifySpatialJoinResult(JavaPairRDD<Geometry, List<Geometry>> expectedResultRdd, JavaPairRDD<Geometry, List<Geometry>> actualResultRdd) {
+    private void verifySpatialJoinResult(
+            JavaPairRDD<Geometry, List<Geometry>> expectedResultRdd,
+            JavaPairRDD<Geometry, List<Geometry>> actualResultRdd) {
         Map<Integer, List<Integer>> expected = spatialJoinResultRddToIdMap(expectedResultRdd);
         Map<Integer, List<Integer>> actual = spatialJoinResultRddToIdMap(actualResultRdd);
-        Assert.assertEquals("Actual result of distance join should match expected results", expected, actual);
+        Assert.assertEquals(
+                "Actual result of distance join should match expected results", expected, actual);
     }
 
-    private void verifySpatialJoinFlatResult(JavaPairRDD<Geometry, Geometry> expectedResultRdd, JavaPairRDD<Geometry, Geometry> actualResultRdd) {
+    private void verifySpatialJoinFlatResult(
+            JavaPairRDD<Geometry, Geometry> expectedResultRdd,
+            JavaPairRDD<Geometry, Geometry> actualResultRdd) {
         Map<Integer, List<Integer>> expected = spatialJoinFlatResultRddToIdMap(expectedResultRdd);
         Map<Integer, List<Integer>> actual = spatialJoinFlatResultRddToIdMap(actualResultRdd);
-        Assert.assertEquals("Actual result of distance join should match expected results", expected, actual);
+        Assert.assertEquals(
+                "Actual result of distance join should match expected results", expected, actual);
     }
 
-    private void verifySpatialJoinCountByKeyResult(JavaPairRDD<Geometry, Long> expectedResultRdd, JavaPairRDD<Geometry, Long> actualResultRdd) {
-        Assert.assertEquals("Actual result of distance join should match expected results", expectedResultRdd.collectAsMap(), actualResultRdd.collectAsMap());
+    private void verifySpatialJoinCountByKeyResult(
+            JavaPairRDD<Geometry, Long> expectedResultRdd,
+            JavaPairRDD<Geometry, Long> actualResultRdd) {
+        Assert.assertEquals(
+                "Actual result of distance join should match expected results",
+                expectedResultRdd.collectAsMap(),
+                actualResultRdd.collectAsMap());
     }
 }

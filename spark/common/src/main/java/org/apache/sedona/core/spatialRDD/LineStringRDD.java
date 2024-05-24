@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialRDD;
 
 import org.apache.sedona.common.enums.FileDataSplitter;
@@ -29,15 +28,9 @@ import org.locationtech.jts.geom.LineString;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class LineStringRDD.
- */
-public class LineStringRDD
-        extends SpatialRDD<LineString>
-{
-    /**
-     * Instantiates a new line string RDD.
-     */
+/** The Class LineStringRDD. */
+public class LineStringRDD extends SpatialRDD<LineString> {
+    /** Instantiates a new line string RDD. */
     public LineStringRDD() {}
 
     /**
@@ -45,8 +38,7 @@ public class LineStringRDD
      *
      * @param rawSpatialRDD the raw spatial RDD
      */
-    public LineStringRDD(JavaRDD<LineString> rawSpatialRDD)
-    {
+    public LineStringRDD(JavaRDD<LineString> rawSpatialRDD) {
         this.setRawSpatialRDD(rawSpatialRDD);
     }
 
@@ -60,8 +52,13 @@ public class LineStringRDD
      * @param splitter the splitter
      * @param carryInputData the carry input data
      */
-    public LineStringRDD(JavaSparkContext sparkContext, String InputLocation, Integer startOffset, Integer endOffset, FileDataSplitter splitter, boolean carryInputData)
-    {
+    public LineStringRDD(
+            JavaSparkContext sparkContext,
+            String InputLocation,
+            Integer startOffset,
+            Integer endOffset,
+            FileDataSplitter splitter,
+            boolean carryInputData) {
         this(sparkContext, InputLocation, startOffset, endOffset, splitter, carryInputData, null);
     }
 
@@ -74,8 +71,12 @@ public class LineStringRDD
      * @param carryInputData the carry input data
      * @param partitions the partitions
      */
-    public LineStringRDD(JavaSparkContext sparkContext, String InputLocation, FileDataSplitter splitter, boolean carryInputData, Integer partitions)
-    {
+    public LineStringRDD(
+            JavaSparkContext sparkContext,
+            String InputLocation,
+            FileDataSplitter splitter,
+            boolean carryInputData,
+            Integer partitions) {
         this(sparkContext, InputLocation, null, null, splitter, carryInputData, partitions);
     }
 
@@ -87,8 +88,11 @@ public class LineStringRDD
      * @param splitter the splitter
      * @param carryInputData the carry input data
      */
-    public LineStringRDD(JavaSparkContext sparkContext, String InputLocation, FileDataSplitter splitter, boolean carryInputData)
-    {
+    public LineStringRDD(
+            JavaSparkContext sparkContext,
+            String InputLocation,
+            FileDataSplitter splitter,
+            boolean carryInputData) {
         this(sparkContext, InputLocation, null, null, splitter, carryInputData);
     }
 
@@ -100,9 +104,13 @@ public class LineStringRDD
      * @param partitions the partitions
      * @param userSuppliedMapper the user supplied mapper
      */
-    public LineStringRDD(JavaSparkContext sparkContext, String InputLocation, Integer partitions, FlatMapFunction userSuppliedMapper)
-    {
-        this.setRawSpatialRDD(sparkContext.textFile(InputLocation, partitions).mapPartitions(userSuppliedMapper));
+    public LineStringRDD(
+            JavaSparkContext sparkContext,
+            String InputLocation,
+            Integer partitions,
+            FlatMapFunction userSuppliedMapper) {
+        this.setRawSpatialRDD(
+                sparkContext.textFile(InputLocation, partitions).mapPartitions(userSuppliedMapper));
     }
 
     /**
@@ -112,9 +120,12 @@ public class LineStringRDD
      * @param InputLocation the input location
      * @param userSuppliedMapper the user supplied mapper
      */
-    public LineStringRDD(JavaSparkContext sparkContext, String InputLocation, FlatMapFunction userSuppliedMapper)
-    {
-        this.setRawSpatialRDD(sparkContext.textFile(InputLocation).mapPartitions(userSuppliedMapper));
+    public LineStringRDD(
+            JavaSparkContext sparkContext,
+            String InputLocation,
+            FlatMapFunction userSuppliedMapper) {
+        this.setRawSpatialRDD(
+                sparkContext.textFile(InputLocation).mapPartitions(userSuppliedMapper));
     }
 
     /**
@@ -128,16 +139,31 @@ public class LineStringRDD
      * @param carryInputData the carry input data
      * @param partitions the partitions
      */
-    public LineStringRDD(JavaSparkContext sparkContext, String InputLocation, Integer startOffset, Integer endOffset, FileDataSplitter splitter, boolean carryInputData, Integer partitions)
-    {
-        JavaRDD rawTextRDD = partitions != null ? sparkContext.textFile(InputLocation, partitions) : sparkContext.textFile(InputLocation);
+    public LineStringRDD(
+            JavaSparkContext sparkContext,
+            String InputLocation,
+            Integer startOffset,
+            Integer endOffset,
+            FileDataSplitter splitter,
+            boolean carryInputData,
+            Integer partitions) {
+        JavaRDD rawTextRDD =
+                partitions != null
+                        ? sparkContext.textFile(InputLocation, partitions)
+                        : sparkContext.textFile(InputLocation);
         if (startOffset != null && endOffset != null) {
-            this.setRawSpatialRDD(rawTextRDD.mapPartitions(new LineStringFormatMapper(startOffset, endOffset, splitter, carryInputData)));
+            this.setRawSpatialRDD(
+                    rawTextRDD.mapPartitions(
+                            new LineStringFormatMapper(
+                                    startOffset, endOffset, splitter, carryInputData)));
+        } else {
+            this.setRawSpatialRDD(
+                    rawTextRDD.mapPartitions(new LineStringFormatMapper(splitter, carryInputData)));
         }
-        else {
-            this.setRawSpatialRDD(rawTextRDD.mapPartitions(new LineStringFormatMapper(splitter, carryInputData)));
+        if (splitter.equals(FileDataSplitter.GEOJSON)) {
+            this.fieldNames =
+                    FormatMapper.readGeoJsonPropertyNames(rawTextRDD.take(1).get(0).toString());
         }
-        if (splitter.equals(FileDataSplitter.GEOJSON)) { this.fieldNames = FormatMapper.readGeoJsonPropertyNames(rawTextRDD.take(1).get(0).toString()); }
         this.analyze();
     }
 }

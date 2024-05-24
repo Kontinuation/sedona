@@ -16,11 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.geometrySerde;
 
-import org.junit.Test;
 import org.junit.Assert;
+import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateXYM;
 import org.locationtech.jts.geom.Geometry;
@@ -46,8 +45,8 @@ public class MultiPointSerdeTest {
     public void testMultiPoint() {
         MultiPoint multiPoint =
                 gf.createMultiPointFromCoords(
-                        new Coordinate[]{
-                                new Coordinate(1, 2), new Coordinate(3, 4), new Coordinate(5, 6),
+                        new Coordinate[] {
+                            new Coordinate(1, 2), new Coordinate(3, 4), new Coordinate(5, 6),
                         });
         multiPoint.setSRID(4326);
         byte[] bytes = GeometrySerializer.serialize(multiPoint);
@@ -67,10 +66,10 @@ public class MultiPointSerdeTest {
     @Test
     public void testMultiPointWithEmptyPoints() {
         Point[] points =
-                new Point[]{
-                        gf.createPoint(new Coordinate(1, 2)),
-                        gf.createPoint(),
-                        gf.createPoint(new Coordinate(3, 4))
+                new Point[] {
+                    gf.createPoint(new Coordinate(1, 2)),
+                    gf.createPoint(),
+                    gf.createPoint(new Coordinate(3, 4))
                 };
         MultiPoint multiPoint = gf.createMultiPoint(points);
         byte[] bytes = GeometrySerializer.serialize(multiPoint);
@@ -88,12 +87,7 @@ public class MultiPointSerdeTest {
 
     @Test
     public void testMultiPointWithEmptyPointsOnly() {
-        Point[] points =
-                new Point[]{
-                        gf.createPoint(),
-                        gf.createPoint(),
-                        gf.createPoint()
-                };
+        Point[] points = new Point[] {gf.createPoint(), gf.createPoint(), gf.createPoint()};
         MultiPoint multiPoint = gf.createMultiPoint(points);
         byte[] bytes = GeometrySerializer.serialize(multiPoint);
         Geometry geom = GeometrySerializer.deserialize(bytes);
@@ -105,8 +99,10 @@ public class MultiPointSerdeTest {
     public void testMultiPointXYM() {
         MultiPoint multiPoint =
                 gf.createMultiPointFromCoords(
-                        new Coordinate[]{
-                                new CoordinateXYM(1, 2, 3), new CoordinateXYM(4, 5, 6), new CoordinateXYM(7, 8, 9),
+                        new Coordinate[] {
+                            new CoordinateXYM(1, 2, 3),
+                            new CoordinateXYM(4, 5, 6),
+                            new CoordinateXYM(7, 8, 9),
                         });
         multiPoint.setSRID(4326);
         byte[] bytes = GeometrySerializer.serialize(multiPoint);

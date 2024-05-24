@@ -16,9 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.geometrySerde;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.util.Arrays;
+import java.util.Collection;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
@@ -27,12 +31,6 @@ import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.CoordinateXYM;
 import org.locationtech.jts.geom.CoordinateXYZM;
 import org.locationtech.jts.geom.impl.CoordinateArraySequence;
-
-import java.util.Arrays;
-import java.util.Collection;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 @RunWith(Parameterized.class)
 public class GeometryBufferTest {
@@ -58,8 +56,8 @@ public class GeometryBufferTest {
     @Test
     public void testPutGetBytes() {
         GeometryBuffer buffer = GeometryBufferFactory.create(bufferType, 4);
-        buffer.putBytes(2, new byte[]{3, 4});
-        buffer.putBytes(0, new byte[]{1, 2});
+        buffer.putBytes(2, new byte[] {3, 4});
+        buffer.putBytes(0, new byte[] {1, 2});
         byte[] bytes = new byte[4];
         buffer.getBytes(bytes, 2, 2);
         assertEquals((byte) 3, bytes[0]);
@@ -146,7 +144,8 @@ public class GeometryBufferTest {
     public void testPutGetCoordinates() {
         GeometryBuffer buffer = GeometryBufferFactory.create(bufferType, 32);
         CoordinateSequence coordinates =
-                new CoordinateArraySequence(new Coordinate[]{new Coordinate(1, 2), new Coordinate(3, 4)});
+                new CoordinateArraySequence(
+                        new Coordinate[] {new Coordinate(1, 2), new Coordinate(3, 4)});
         buffer.putCoordinates(0, coordinates);
         CoordinateSequence coordinates2 = buffer.getCoordinates(0, 2);
         assertEquals(1, coordinates2.getCoordinate(0).x, 1e-6);
@@ -161,7 +160,7 @@ public class GeometryBufferTest {
         buffer.setCoordinateType(CoordinateType.XYZ);
         CoordinateSequence coordinates =
                 new CoordinateArraySequence(
-                        new Coordinate[]{new Coordinate(1, 2, 3), new Coordinate(4, 5, 6)});
+                        new Coordinate[] {new Coordinate(1, 2, 3), new Coordinate(4, 5, 6)});
         buffer.putCoordinates(0, coordinates);
         CoordinateSequence coordinates2 = buffer.getCoordinates(0, 2);
         assertEquals(1, coordinates2.getCoordinate(0).x, 1e-6);
@@ -178,7 +177,7 @@ public class GeometryBufferTest {
         buffer.setCoordinateType(CoordinateType.XYM);
         CoordinateSequence coordinates =
                 new CoordinateArraySequence(
-                        new Coordinate[]{new CoordinateXYM(1, 2, 3), new CoordinateXYM(4, 5, 6)});
+                        new Coordinate[] {new CoordinateXYM(1, 2, 3), new CoordinateXYM(4, 5, 6)});
         buffer.putCoordinates(0, coordinates);
         CoordinateSequence coordinates2 = buffer.getCoordinates(0, 2);
         assertEquals(1, coordinates2.getCoordinate(0).x, 1e-6);
@@ -195,7 +194,9 @@ public class GeometryBufferTest {
         buffer.setCoordinateType(CoordinateType.XYZM);
         CoordinateSequence coordinates =
                 new CoordinateArraySequence(
-                        new Coordinate[]{new CoordinateXYZM(1, 2, 3, 4), new CoordinateXYZM(5, 6, 7, 8)});
+                        new Coordinate[] {
+                            new CoordinateXYZM(1, 2, 3, 4), new CoordinateXYZM(5, 6, 7, 8)
+                        });
         buffer.putCoordinates(0, coordinates);
         CoordinateSequence coordinates2 = buffer.getCoordinates(0, 2);
         assertEquals(1, coordinates2.getCoordinate(0).x, 1e-6);
@@ -214,7 +215,7 @@ public class GeometryBufferTest {
         buffer.setCoordinateType(CoordinateType.XYZ);
         CoordinateSequence coordinates =
                 new CoordinateArraySequence(
-                        new Coordinate[]{new CoordinateXYM(1, 2, 3), new CoordinateXYM(4, 5, 6)});
+                        new Coordinate[] {new CoordinateXYM(1, 2, 3), new CoordinateXYM(4, 5, 6)});
         buffer.putCoordinates(0, coordinates);
         CoordinateSequence coordinates2 = buffer.getCoordinates(0, 2);
         assertEquals(1, coordinates2.getCoordinate(0).x, 1e-6);
@@ -228,7 +229,7 @@ public class GeometryBufferTest {
     @Test
     public void testSlice() {
         GeometryBuffer buffer = GeometryBufferFactory.create(bufferType, 16);
-        buffer.putBytes(0, new byte[]{1, 2, 3, 4});
+        buffer.putBytes(0, new byte[] {1, 2, 3, 4});
         GeometryBuffer slice = buffer.slice(0);
         assertEquals((byte) 1, slice.getByte(0));
         assertEquals((byte) 2, slice.getByte(1));
@@ -270,7 +271,7 @@ public class GeometryBufferTest {
 
     @Test
     public void testWrap() {
-        byte[] bytes = new byte[]{1, 2, 3, 4};
+        byte[] bytes = new byte[] {1, 2, 3, 4};
         GeometryBuffer buffer = GeometryBufferFactory.wrap(bufferType, bytes);
         assertEquals(4, buffer.getLength());
         assertEquals((byte) 1, buffer.getByte(0));

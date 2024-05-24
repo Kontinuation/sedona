@@ -18,31 +18,29 @@
  */
 package org.apache.sedona.core.spatialPartitioning.quadtree;
 
-import org.junit.Test;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.ThreadLocalRandom;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class QuadTreeTest
-{
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
+import org.junit.Test;
+
+public class QuadTreeTest {
 
     @Test
-    public void testInsertElements()
-    {
+    public void testInsertElements() {
 
         long startTime;
         long endTime;
         int maxTest = 1000000;
 
-//        startTime = System.currentTimeMillis();
-//        for (int i = 0; i <= maxTest; i++)
+        //        startTime = System.currentTimeMillis();
+        //        for (int i = 0; i <= maxTest; i++)
         {
-            StandardQuadTree<QuadRectangle> quadTree = new StandardQuadTree<>(new QuadRectangle(0, 0, 10, 10), 0, 1, 2);
+            StandardQuadTree<QuadRectangle> quadTree =
+                    new StandardQuadTree<>(new QuadRectangle(0, 0, 10, 10), 0, 1, 2);
 
             QuadRectangle r1 = new QuadRectangle(1, 1, 1, 1);
             QuadRectangle r2 = new QuadRectangle(2, 2, 1, 1);
@@ -90,12 +88,11 @@ public class QuadTreeTest
                 assertEquals(7, matches.size());
             }
         }
-//        endTime = System.currentTimeMillis();
-//        System.out.println("Total execution time hoho: " + (endTime - startTime) + "ms");
+        //        endTime = System.currentTimeMillis();
+        //        System.out.println("Total execution time hoho: " + (endTime - startTime) + "ms");
     }
 
-    private void assertEqualElements(List<QuadRectangle> expected, List<QuadRectangle> actual)
-    {
+    private void assertEqualElements(List<QuadRectangle> expected, List<QuadRectangle> actual) {
         assertEquals(expected.size(), actual.size());
         for (QuadRectangle r : actual) {
             assertTrue(expected.contains(r));
@@ -103,9 +100,9 @@ public class QuadTreeTest
     }
 
     @Test
-    public void testIntersectElementsAreInserted()
-    {
-        StandardQuadTree<QuadRectangle> quadTree = new StandardQuadTree<>(new QuadRectangle(0, 0, 10, 10), 0, 1, 2);
+    public void testIntersectElementsAreInserted() {
+        StandardQuadTree<QuadRectangle> quadTree =
+                new StandardQuadTree<>(new QuadRectangle(0, 0, 10, 10), 0, 1, 2);
 
         QuadRectangle r1 = new QuadRectangle(1, 1, 1, 1);
         QuadRectangle r2 = new QuadRectangle(2, 2, 1, 1);
@@ -118,9 +115,9 @@ public class QuadTreeTest
     }
 
     @Test
-    public void testPixelQuadTree()
-    {
-        StandardQuadTree<QuadRectangle> quadTree = new StandardQuadTree<QuadRectangle>(new QuadRectangle(0, 0, 10, 10), 0, 5, 5);
+    public void testPixelQuadTree() {
+        StandardQuadTree<QuadRectangle> quadTree =
+                new StandardQuadTree<QuadRectangle>(new QuadRectangle(0, 0, 10, 10), 0, 5, 5);
 
         QuadRectangle r1 = new QuadRectangle(1, 1, 0, 0);
         QuadRectangle r2 = new QuadRectangle(2, 2, 0, 0);
@@ -140,12 +137,12 @@ public class QuadTreeTest
     }
 
     @Test
-    public void testQuadTreeForceGrow()
-    {
+    public void testQuadTreeForceGrow() {
         int resolutionX = 100000;
         int resolutionY = 100000;
 
-        StandardQuadTree<QuadRectangle> quadTree = new StandardQuadTree<>(new QuadRectangle(0, 0, resolutionX, resolutionY), 0, 4, 10);
+        StandardQuadTree<QuadRectangle> quadTree =
+                new StandardQuadTree<>(new QuadRectangle(0, 0, resolutionX, resolutionY), 0, 4, 10);
         quadTree.forceGrowUp(4);
         int leafPartitionNum = quadTree.getTotalNumLeafNode();
         assertEquals(256, leafPartitionNum);
@@ -173,12 +170,12 @@ public class QuadTreeTest
     }
 
     @Test
-    public void testQuadTreePartitionLineage()
-    {
+    public void testQuadTreePartitionLineage() {
         int resolutionX = 100000;
         int resolutionY = 100000;
 
-        StandardQuadTree<QuadRectangle> quadTree = new StandardQuadTree<>(new QuadRectangle(0, 0, resolutionX, resolutionY), 0, 4, 10);
+        StandardQuadTree<QuadRectangle> quadTree =
+                new StandardQuadTree<>(new QuadRectangle(0, 0, resolutionX, resolutionY), 0, 4, 10);
         quadTree.forceGrowUp(4);
         int leafPartitionNum = quadTree.getTotalNumLeafNode();
         assertEquals(256, leafPartitionNum);

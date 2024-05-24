@@ -22,12 +22,8 @@ import java.io.Serializable;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class ColoringRule.
- */
-public abstract class ColoringRule
-        implements Serializable
-{
+/** The Class ColoringRule. */
+public abstract class ColoringRule implements Serializable {
 
     /**
      * Encode to RGB.
@@ -37,6 +33,6 @@ public abstract class ColoringRule
      * @return the integer
      * @throws Exception the exception
      */
-    public abstract Integer EncodeToRGB(Double normailizedCount, final GlobalParameter globalParameter)
-            throws Exception;
+    public abstract Integer EncodeToRGB(
+            Double normailizedCount, final GlobalParameter globalParameter) throws Exception;
 }

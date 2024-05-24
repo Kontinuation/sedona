@@ -33,6 +33,7 @@
 
     <properties>
         <maven.deploy.skip>${skip.deploy.common.modules}</maven.deploy.skip>
+        <project.rootdir>${project.basedir}/..</project.rootdir>
         <cdm.scope>compile</cdm.scope>
     </properties>
 

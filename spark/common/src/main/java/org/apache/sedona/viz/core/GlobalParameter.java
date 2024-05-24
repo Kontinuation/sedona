@@ -18,138 +18,105 @@
  */
 package org.apache.sedona.viz.core;
 
+import java.awt.Color;
+import java.io.Serializable;
 import org.apache.log4j.Logger;
 import org.apache.sedona.viz.extension.coloringRule.ColoringRuleFactory;
 import org.apache.sedona.viz.extension.coloringRule.LinearFunction;
 import org.apache.sedona.viz.extension.photoFilter.GaussianBlur;
 import org.locationtech.jts.geom.Envelope;
 
-import java.awt.Color;
-import java.io.Serializable;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class GlobalParameter.
- */
-public class GlobalParameter
-        implements Serializable
-{
+/** The Class GlobalParameter. */
+public class GlobalParameter implements Serializable {
 
-    /**
-     * The Constant logger.
-     */
-    final static Logger logger = Logger.getLogger(GlobalParameter.class);
+    /** The Constant logger. */
+    static final Logger logger = Logger.getLogger(GlobalParameter.class);
 
-    /**
-     * The resolution X.
-     */
+    /** The resolution X. */
     // Pixelize parameters: 5
     public int resolutionX = -1;
 
-    /**
-     * The resolution Y.
-     */
+    /** The resolution Y. */
     public int resolutionY = -1;
 
-    /**
-     * The reverse spatial coordinate.
-     */
+    /** The reverse spatial coordinate. */
     public boolean reverseSpatialCoordinate = false;
 
-    /**
-     * The draw outline only.
-     */
+    /** The draw outline only. */
     public boolean drawOutlineOnly = false;
 
-    /**
-     * The min tree level.
-     */
+    /** The min tree level. */
     public int minTreeLevel = 0;
 
-    /**
-     * The filter radius.
-     */
+    /** The filter radius. */
     // Photo filter parameters: 2
     public int filterRadius = 0;
 
-    /**
-     * The photo filter.
-     */
+    /** The photo filter. */
     public PhotoFilter photoFilter;
 
-    /**
-     * The sample amount.
-     */
+    /** The sample amount. */
     // Coloring rule parameters: 6
     public double samplingFraction = 0.01;
 
-    /**
-     * The max pixel weight.
-     */
+    /** The max pixel weight. */
     public int maxPixelWeight = -1;
 
-    /**
-     * The coloring rule.
-     */
+    /** The coloring rule. */
     public ColoringRule coloringRule;
 
-    /**
-     * The control color channel.
-     */
+    /** The control color channel. */
     public Color controlColorChannel = Color.GREEN;
 
-    /**
-     * The use inverse ratio for control color channel.
-     */
+    /** The use inverse ratio for control color channel. */
     public boolean useInverseRatioForControlColorChannel = false;
 
-    /**
-     * The color alpha.
-     */
+    /** The color alpha. */
     public int colorAlpha = 255;
 
-    /**
-     * The dataset boundary.
-     */
+    /** The dataset boundary. */
     // Dataset boundary: 1
-    public Envelope datasetBoundary = new Envelope(-20026376.39, 20026376.39, -20048966.10, 20048966.10);
+    public Envelope datasetBoundary =
+            new Envelope(-20026376.39, 20026376.39, -20048966.10, 20048966.10);
 
-    /**
-     * The partitions on single axis.
-     */
+    /** The partitions on single axis. */
     // Indirect parameters: 3
     public int partitionsOnSingleAxis = -1;
 
-    /**
-     * The partition interval X.
-     */
+    /** The partition interval X. */
     public double partitionIntervalX = -1.0;
 
-    /**
-     * The partition interval Y.
-     */
+    /** The partition interval Y. */
     public double partitionIntervalY = -1.0;
 
-    /**
-     * The use user supplied resolution.
-     */
+    /** The use user supplied resolution. */
     public boolean useUserSuppliedResolution = false;
 
-    /**
-     * The max partition tree level.
-     */
+    /** The max partition tree level. */
     public int maxPartitionTreeLevel = 9;
 
-    /**
-     * The overwrite existing images.
-     */
+    /** The overwrite existing images. */
     public boolean overwriteExistingImages = true;
 
-    private GlobalParameter(int resolutionX, int resolutionY, boolean reverseSpatialCoordinate, boolean drawOutlineOnly, int minTreeLevel,
-            int filterRadius, PhotoFilter photoFilter, Double samplingFraction, int maxPixelWeight, ColoringRule coloringRule, Color controlColorChannel,
-            boolean useInverseRatioForControlColorChannel, int colorAlpha, Envelope datasetBoundary, int maxPartitionTreeLevel, boolean overwriteExistingImages)
-    {
+    private GlobalParameter(
+            int resolutionX,
+            int resolutionY,
+            boolean reverseSpatialCoordinate,
+            boolean drawOutlineOnly,
+            int minTreeLevel,
+            int filterRadius,
+            PhotoFilter photoFilter,
+            Double samplingFraction,
+            int maxPixelWeight,
+            ColoringRule coloringRule,
+            Color controlColorChannel,
+            boolean useInverseRatioForControlColorChannel,
+            int colorAlpha,
+            Envelope datasetBoundary,
+            int maxPartitionTreeLevel,
+            boolean overwriteExistingImages) {
         // Pixelize parameters: 5
         this.resolutionX = resolutionX;
         this.resolutionY = resolutionY;
@@ -179,14 +146,14 @@ public class GlobalParameter
         // Indirect parameters: 3
         this.partitionsOnSingleAxis = (int) Math.sqrt(Math.pow(4, minTreeLevel));
         if (this.resolutionX <= 0 && this.resolutionY <= 0) {
-            // If not specify the resolution, then enforce the general image tile size which is 256*256.
+            // If not specify the resolution, then enforce the general image tile size which is
+            // 256*256.
             this.partitionIntervalX = 256;
             this.partitionIntervalY = 256;
             this.resolutionX = this.partitionsOnSingleAxis * 256;
             this.resolutionY = this.partitionsOnSingleAxis * 256;
             this.useUserSuppliedResolution = false;
-        }
-        else {
+        } else {
             this.partitionIntervalX = resolutionX * 1.0 / partitionsOnSingleAxis;
             this.partitionIntervalY = resolutionY * 1.0 / partitionsOnSingleAxis;
             this.useUserSuppliedResolution = true;
@@ -199,8 +166,7 @@ public class GlobalParameter
      * @param parameterString the parameter string
      * @return the global parameter
      */
-    public static GlobalParameter getGlobalParameter(String parameterString)
-    {
+    public static GlobalParameter getGlobalParameter(String parameterString) {
         GlobalParameter globalParameter = getGlobalParameter();
         String[] parameters = parameterString.split(" ");
         for (String parameter : parameters) {
@@ -214,10 +180,25 @@ public class GlobalParameter
      *
      * @return the global parameter
      */
-    public static GlobalParameter getGlobalParameter()
-    {
-        GlobalParameter globalParameter = new GlobalParameter(0, 0, false, true, 0,
-                0, new GaussianBlur(3), 0.01, -1, new LinearFunction(), Color.GREEN, false, 255, new Envelope(-20026376.39, 20026376.39, -20048966.10, 20048966.10), 9, true);
+    public static GlobalParameter getGlobalParameter() {
+        GlobalParameter globalParameter =
+                new GlobalParameter(
+                        0,
+                        0,
+                        false,
+                        true,
+                        0,
+                        0,
+                        new GaussianBlur(3),
+                        0.01,
+                        -1,
+                        new LinearFunction(),
+                        Color.GREEN,
+                        false,
+                        255,
+                        new Envelope(-20026376.39, 20026376.39, -20048966.10, 20048966.10),
+                        9,
+                        true);
         return globalParameter;
     }
 
@@ -242,24 +223,50 @@ public class GlobalParameter
      * @param overwriteExistingImages the overwrite existing images
      * @return the global parameter
      */
-    public static GlobalParameter getGlobalParameter(int resolutionX, int resolutionY, boolean reverseSpatialCoordinate, boolean drawOutlineOnly, int minTreeLevel,
-            int filterRadius, PhotoFilter photoFilter, Double samplingFraction, int maxPixelWeight, ColoringRule coloringRule, Color controlColorChannel,
-            boolean useInverseRatioForControlColorChannel, int colorAlpha, Envelope datasetBoundary, int maxPartitionTreeLevel, boolean overwriteExistingImages)
-    {
-        return new GlobalParameter(resolutionX, resolutionY, reverseSpatialCoordinate, drawOutlineOnly, minTreeLevel, filterRadius, photoFilter,
-                samplingFraction, maxPixelWeight, coloringRule, controlColorChannel, useInverseRatioForControlColorChannel, colorAlpha, datasetBoundary, maxPartitionTreeLevel, overwriteExistingImages);
+    public static GlobalParameter getGlobalParameter(
+            int resolutionX,
+            int resolutionY,
+            boolean reverseSpatialCoordinate,
+            boolean drawOutlineOnly,
+            int minTreeLevel,
+            int filterRadius,
+            PhotoFilter photoFilter,
+            Double samplingFraction,
+            int maxPixelWeight,
+            ColoringRule coloringRule,
+            Color controlColorChannel,
+            boolean useInverseRatioForControlColorChannel,
+            int colorAlpha,
+            Envelope datasetBoundary,
+            int maxPartitionTreeLevel,
+            boolean overwriteExistingImages) {
+        return new GlobalParameter(
+                resolutionX,
+                resolutionY,
+                reverseSpatialCoordinate,
+                drawOutlineOnly,
+                minTreeLevel,
+                filterRadius,
+                photoFilter,
+                samplingFraction,
+                maxPixelWeight,
+                coloringRule,
+                controlColorChannel,
+                useInverseRatioForControlColorChannel,
+                colorAlpha,
+                datasetBoundary,
+                maxPartitionTreeLevel,
+                overwriteExistingImages);
     }
 
-    private boolean updateIndirectParameters()
-    {
+    private boolean updateIndirectParameters() {
         this.partitionsOnSingleAxis = (int) Math.sqrt(Math.pow(4, this.minTreeLevel));
         if (this.useUserSuppliedResolution == false) {
             this.partitionIntervalX = 256;
             this.partitionIntervalY = 256;
             this.resolutionX = partitionsOnSingleAxis * 256;
             this.resolutionY = partitionsOnSingleAxis * 256;
-        }
-        else {
+        } else {
             this.partitionIntervalX = resolutionX * 1.0 / partitionsOnSingleAxis;
             this.partitionIntervalY = resolutionY * 1.0 / partitionsOnSingleAxis;
         }
@@ -272,8 +279,7 @@ public class GlobalParameter
      * @param datasetBoundary the dataset boundary
      * @return true, if successful
      */
-    public boolean setDatasetBoundary(Envelope datasetBoundary)
-    {
+    public boolean setDatasetBoundary(Envelope datasetBoundary) {
         this.datasetBoundary = datasetBoundary;
         return true;
     }
@@ -284,8 +290,7 @@ public class GlobalParameter
      * @param coloringRule the coloring rule
      * @return true, if successful
      */
-    public boolean setColoringRule(ColoringRule coloringRule)
-    {
+    public boolean setColoringRule(ColoringRule coloringRule) {
         this.coloringRule = coloringRule;
         return true;
     }
@@ -296,8 +301,7 @@ public class GlobalParameter
      * @param photoFilter the photo filter
      * @return true, if successful
      */
-    public boolean setPhotoFilter(PhotoFilter photoFilter)
-    {
+    public boolean setPhotoFilter(PhotoFilter photoFilter) {
         this.photoFilter = photoFilter;
         return true;
     }
@@ -308,8 +312,7 @@ public class GlobalParameter
      * @param keyValuePair the key value pair
      * @return true, if successful
      */
-    public boolean set(String keyValuePair)
-    {
+    public boolean set(String keyValuePair) {
         String[] keyValue = keyValuePair.split(":");
         this.set(keyValue[0], keyValue[1]);
         return true;
@@ -322,26 +325,22 @@ public class GlobalParameter
      * @param value the value
      * @return true, if successful
      */
-    public boolean set(String key, String value)
-    {
+    public boolean set(String key, String value) {
         // Pixelize parameters: 5
         if (key.equalsIgnoreCase("resolutionX") || key.equalsIgnoreCase("resX")) {
             this.resolutionX = Integer.parseInt(value);
             this.useUserSuppliedResolution = true;
             this.updateIndirectParameters();
-        }
-        else if (key.equalsIgnoreCase("resolutionY") || key.equalsIgnoreCase("resY")) {
+        } else if (key.equalsIgnoreCase("resolutionY") || key.equalsIgnoreCase("resY")) {
             this.resolutionY = Integer.parseInt(value);
             this.useUserSuppliedResolution = true;
             this.updateIndirectParameters();
-        }
-        else if (key.equalsIgnoreCase("reverseSpatialCoordinate") || key.equalsIgnoreCase("revCoor")) {
+        } else if (key.equalsIgnoreCase("reverseSpatialCoordinate")
+                || key.equalsIgnoreCase("revCoor")) {
             this.reverseSpatialCoordinate = Boolean.parseBoolean(value);
-        }
-        else if (key.equalsIgnoreCase("drawOutlineOnly") || key.equalsIgnoreCase("outline")) {
+        } else if (key.equalsIgnoreCase("drawOutlineOnly") || key.equalsIgnoreCase("outline")) {
             this.drawOutlineOnly = Boolean.parseBoolean(value);
-        }
-        else if (key.equalsIgnoreCase("minTreeLevel") || key.equalsIgnoreCase("level")) {
+        } else if (key.equalsIgnoreCase("minTreeLevel") || key.equalsIgnoreCase("level")) {
             this.minTreeLevel = Integer.parseInt(value);
             this.updateIndirectParameters();
         }
@@ -354,20 +353,16 @@ public class GlobalParameter
         // Coloring rule parameters: 6
         else if (key.equalsIgnoreCase("samplingfraction") || key.equalsIgnoreCase("fraction")) {
             this.samplingFraction = Double.parseDouble(value);
-        }
-        else if (key.equalsIgnoreCase("maxPixelWeight")) {
+        } else if (key.equalsIgnoreCase("maxPixelWeight")) {
             this.maxPixelWeight = Integer.parseInt(value);
-        }
-        else if (key.equalsIgnoreCase("coloringRule")) {
+        } else if (key.equalsIgnoreCase("coloringRule")) {
             this.coloringRule = ColoringRuleFactory.getColoringRule(value);
-        }
-        else if (key.equalsIgnoreCase("controlColorChannel") || key.equalsIgnoreCase("ccolor")) {
+        } else if (key.equalsIgnoreCase("controlColorChannel") || key.equalsIgnoreCase("ccolor")) {
             this.controlColorChannel = Color.getColor(value);
-        }
-        else if (key.equalsIgnoreCase("useInverseRatioForControlColorChannel") || key.equalsIgnoreCase("invColor")) {
+        } else if (key.equalsIgnoreCase("useInverseRatioForControlColorChannel")
+                || key.equalsIgnoreCase("invColor")) {
             this.useInverseRatioForControlColorChannel = Boolean.parseBoolean(value);
-        }
-        else if (key.equalsIgnoreCase("colorAlpha") || key.equalsIgnoreCase("alpha")) {
+        } else if (key.equalsIgnoreCase("colorAlpha") || key.equalsIgnoreCase("alpha")) {
             this.colorAlpha = Integer.parseInt(value);
         }
 
@@ -379,14 +374,13 @@ public class GlobalParameter
             double minY = Double.parseDouble(coordinates[2]);
             double maxY = Double.parseDouble(coordinates[3]);
             this.datasetBoundary = new Envelope(minX, maxX, minY, maxY);
-        }
-        else if (key.equalsIgnoreCase("maxPartitionTreeLevel") || key.equalsIgnoreCase("maxtreelevel")) {
+        } else if (key.equalsIgnoreCase("maxPartitionTreeLevel")
+                || key.equalsIgnoreCase("maxtreelevel")) {
             this.maxPartitionTreeLevel = Integer.parseInt(value);
-        }
-        else if (key.equalsIgnoreCase("overwriteexistingimages") || key.equalsIgnoreCase("overwrite")) {
+        } else if (key.equalsIgnoreCase("overwriteexistingimages")
+                || key.equalsIgnoreCase("overwrite")) {
             this.overwriteExistingImages = Boolean.parseBoolean(value);
-        }
-        else {
+        } else {
             logger.error(new Exception("[Babylon][set] No such parameter: " + key));
         }
         return true;
@@ -396,8 +390,7 @@ public class GlobalParameter
      * @see java.lang.Object#toString()
      */
     @Override
-    public String toString()
-    {
+    public String toString() {
         String parameterString = "\n";
 
         // Pixelize parameters: 5
@@ -416,7 +409,10 @@ public class GlobalParameter
         parameterString += "maxPixelWeight: " + this.maxPixelWeight + "\n";
         parameterString += "coloringRule: " + this.coloringRule.getClass().getName() + "\n";
         parameterString += "controlColorChannel: " + this.controlColorChannel + "\n";
-        parameterString += "useInverseRatioForControlColorChannel: " + this.useInverseRatioForControlColorChannel + "\n";
+        parameterString +=
+                "useInverseRatioForControlColorChannel: "
+                        + this.useInverseRatioForControlColorChannel
+                        + "\n";
         parameterString += "colorAlpha: " + this.colorAlpha + "\n";
 
         // Dataset boundary: 1

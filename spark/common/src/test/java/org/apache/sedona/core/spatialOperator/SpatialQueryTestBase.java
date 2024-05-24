@@ -18,18 +18,17 @@
  */
 package org.apache.sedona.core.spatialOperator;
 
-import org.apache.sedona.core.TestBase;
-import org.apache.spark.api.java.JavaRDD;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.io.ParseException;
-import org.locationtech.jts.io.WKTReader;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.apache.sedona.core.TestBase;
+import org.apache.spark.api.java.JavaRDD;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.io.ParseException;
+import org.locationtech.jts.io.WKTReader;
 
 public class SpatialQueryTestBase extends TestBase {
     protected static JavaRDD<Geometry> inputRdd;
@@ -47,7 +46,8 @@ public class SpatialQueryTestBase extends TestBase {
         WKTReader reader = new WKTReader();
         try {
             Geometry geom = reader.read(lineSplit[2]);
-            geom.setUserData(new RangeQueryTest.UserData(Integer.parseInt(lineSplit[0]), lineSplit[1]));
+            geom.setUserData(
+                    new RangeQueryTest.UserData(Integer.parseInt(lineSplit[0]), lineSplit[1]));
             return geom;
         } catch (ParseException e) {
             throw new RuntimeException("Invalid geometry data in line: " + line, e);
@@ -55,24 +55,28 @@ public class SpatialQueryTestBase extends TestBase {
     }
 
     protected static JavaRDD<Geometry> readTestDataAsRDD(String fileName) {
-        String inputLocation = RangeQueryTest.class.getClassLoader().getResource(fileName).getPath();
+        String inputLocation =
+                RangeQueryTest.class.getClassLoader().getResource(fileName).getPath();
         return sc.textFile("file://" + inputLocation).map(SpatialQueryTestBase::lineToGeometry);
     }
 
     protected static Map<Integer, Geometry> readTestDataAsMap(String fileName) throws IOException {
-        String inputLocation = RangeQueryTest.class.getClassLoader().getResource(fileName).getPath();
+        String inputLocation =
+                RangeQueryTest.class.getClassLoader().getResource(fileName).getPath();
         try (Stream<String> lines = Files.lines(Paths.get(inputLocation))) {
             Map<Integer, Geometry> map = new HashMap<>();
-            lines.forEach(line -> {
-                Geometry geom = lineToGeometry(line);
-                int id = ((RangeQueryTest.UserData) geom.getUserData()).getId();
-                map.put(id, geom);
-            });
+            lines.forEach(
+                    line -> {
+                        Geometry geom = lineToGeometry(line);
+                        int id = ((RangeQueryTest.UserData) geom.getUserData()).getId();
+                        map.put(id, geom);
+                    });
             return map;
         }
     }
 
-    protected static boolean evaluateSpatialPredicate(SpatialPredicate spatialPredicate, Geometry geom1, Geometry geom2) {
+    protected static boolean evaluateSpatialPredicate(
+            SpatialPredicate spatialPredicate, Geometry geom1, Geometry geom2) {
         switch (spatialPredicate) {
             case INTERSECTS:
                 return geom1.intersects(geom2);
@@ -93,7 +97,8 @@ public class SpatialQueryTestBase extends TestBase {
             case TOUCHES:
                 return geom1.touches(geom2);
             default:
-                throw new IllegalArgumentException("Unknown spatial predicate: " + spatialPredicate);
+                throw new IllegalArgumentException(
+                        "Unknown spatial predicate: " + spatialPredicate);
         }
     }
 

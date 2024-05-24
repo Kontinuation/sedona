@@ -16,28 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialRDD;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang.NullArgumentException;
-import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.common.enums.FileDataSplitter;
+import org.apache.sedona.common.utils.GeomUtils;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.locationtech.jts.geom.Point;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.List;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
-public class SpatialRDDWriterTest
-        extends SpatialRDDTestBase
-{
+public class SpatialRDDWriterTest extends SpatialRDDTestBase {
 
     private static String testSaveAsWKBWithData;
     private static String testSaveAsWKB;
@@ -45,12 +41,9 @@ public class SpatialRDDWriterTest
     private static String testSaveAsWKT;
     private static String testSaveAsWKTWithData;
 
-    /**
-     * Once executed before all.
-     */
+    /** Once executed before all. */
     @BeforeClass
-    public static void onceExecutedBeforeAll()
-    {
+    public static void onceExecutedBeforeAll() {
         initialize(SpatialRDDWriterTest.class.getSimpleName(), "point.test.properties");
         String wkbFolder = System.getProperty("user.dir") + "/target/test-classes/wkb/";
         String wktFolder = System.getProperty("user.dir") + "/target/test-classes/wkt/";
@@ -62,107 +55,107 @@ public class SpatialRDDWriterTest
         testSaveAsWKTWithData = wktFolder + "testSaveAsWKTWithData";
     }
 
-    /**
-     * Tear down.
-     */
+    /** Tear down. */
     @AfterClass
-    public static void TearDown()
-    {
+    public static void TearDown() {
         sc.stop();
     }
 
-    /**
-     * Test save as wkb with data
-     */
+    /** Test save as wkb with data */
     @Test
-    public void testSaveAsWKBWithData()
-            throws IOException
-    {
+    public void testSaveAsWKBWithData() throws IOException {
         File wkb = new File(testSaveAsWKBWithData);
-        if (wkb.exists()) { FileUtils.deleteDirectory(wkb);}
+        if (wkb.exists()) {
+            FileUtils.deleteDirectory(wkb);
+        }
 
-        PointRDD spatialRDD = new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
+        PointRDD spatialRDD =
+                new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
         spatialRDD.saveAsWKB(testSaveAsWKBWithData);
 
         // Load the saved rdd and compare them
-        PointRDD resultWKB = new PointRDD(sc, testSaveAsWKBWithData, 0, FileDataSplitter.WKB, true, numPartitions);
+        PointRDD resultWKB =
+                new PointRDD(
+                        sc, testSaveAsWKBWithData, 0, FileDataSplitter.WKB, true, numPartitions);
 
         assertEquals(resultWKB.rawSpatialRDD.count(), spatialRDD.rawSpatialRDD.count());
-        verifyResult(resultWKB.rawSpatialRDD.takeOrdered(5), spatialRDD.rawSpatialRDD.takeOrdered(5));
+        verifyResult(
+                resultWKB.rawSpatialRDD.takeOrdered(5), spatialRDD.rawSpatialRDD.takeOrdered(5));
     }
 
-    /**
-     * Test save as wkt with data
-     */
+    /** Test save as wkt with data */
     @Test
-    public void testSaveAsWKTWithData()
-            throws IOException
-    {
+    public void testSaveAsWKTWithData() throws IOException {
         File wkt = new File(testSaveAsWKTWithData);
-        if (wkt.exists()) {FileUtils.deleteDirectory(wkt);}
+        if (wkt.exists()) {
+            FileUtils.deleteDirectory(wkt);
+        }
 
-        PointRDD spatialRDD = new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
+        PointRDD spatialRDD =
+                new PointRDD(sc, InputLocation, offset, splitter, true, numPartitions);
         spatialRDD.saveAsWKT(testSaveAsWKTWithData);
 
         // Load the saved rdd and compare them
-        PointRDD resultWKT = new PointRDD(sc, testSaveAsWKTWithData, 0, FileDataSplitter.WKT, true, numPartitions);
+        PointRDD resultWKT =
+                new PointRDD(
+                        sc, testSaveAsWKTWithData, 0, FileDataSplitter.WKT, true, numPartitions);
 
         assertEquals(resultWKT.rawSpatialRDD.count(), spatialRDD.rawSpatialRDD.count());
-        verifyResult(resultWKT.rawSpatialRDD.takeOrdered(5), spatialRDD.rawSpatialRDD.takeOrdered(5));
+        verifyResult(
+                resultWKT.rawSpatialRDD.takeOrdered(5), spatialRDD.rawSpatialRDD.takeOrdered(5));
     }
 
-    /**
-     * Test save as wkb.
-     */
+    /** Test save as wkb. */
     @Test
-    public void testSaveAsWKB()
-            throws IOException
-    {
+    public void testSaveAsWKB() throws IOException {
         File wkb = new File(testSaveAsWKB);
-        if (wkb.exists()) { FileUtils.deleteDirectory(wkb);}
+        if (wkb.exists()) {
+            FileUtils.deleteDirectory(wkb);
+        }
 
-        PointRDD spatialRDD = new PointRDD(sc, InputLocation, offset, splitter, false, numPartitions);
+        PointRDD spatialRDD =
+                new PointRDD(sc, InputLocation, offset, splitter, false, numPartitions);
         spatialRDD.saveAsWKB(testSaveAsWKB);
 
         // Load the saved rdd and compare them
-        PointRDD resultWKB = new PointRDD(sc, testSaveAsWKB, 0, FileDataSplitter.WKB, false, numPartitions);
+        PointRDD resultWKB =
+                new PointRDD(sc, testSaveAsWKB, 0, FileDataSplitter.WKB, false, numPartitions);
 
         assertEquals(resultWKB.rawSpatialRDD.count(), spatialRDD.rawSpatialRDD.count());
-        verifyResult(resultWKB.rawSpatialRDD.takeOrdered(5), spatialRDD.rawSpatialRDD.takeOrdered(5));
+        verifyResult(
+                resultWKB.rawSpatialRDD.takeOrdered(5), spatialRDD.rawSpatialRDD.takeOrdered(5));
     }
 
-    /**
-     * Test save as wkt.
-     */
+    /** Test save as wkt. */
     @Test
-    public void testSaveAsWKT()
-            throws IOException
-    {
+    public void testSaveAsWKT() throws IOException {
         File wkt = new File(testSaveAsWKT);
-        if (wkt.exists()) {FileUtils.deleteDirectory(wkt);}
+        if (wkt.exists()) {
+            FileUtils.deleteDirectory(wkt);
+        }
 
-        PointRDD spatialRDD = new PointRDD(sc, InputLocation, offset, splitter, false, numPartitions);
+        PointRDD spatialRDD =
+                new PointRDD(sc, InputLocation, offset, splitter, false, numPartitions);
         spatialRDD.saveAsWKT(testSaveAsWKT);
 
         // Load the saved rdd and compare them
-        PointRDD resultWKT = new PointRDD(sc, testSaveAsWKT, 0, FileDataSplitter.WKT, false, numPartitions);
+        PointRDD resultWKT =
+                new PointRDD(sc, testSaveAsWKT, 0, FileDataSplitter.WKT, false, numPartitions);
 
         assertEquals(resultWKT.rawSpatialRDD.count(), spatialRDD.rawSpatialRDD.count());
-        verifyResult(resultWKT.rawSpatialRDD.takeOrdered(5), spatialRDD.rawSpatialRDD.takeOrdered(5));
+        verifyResult(
+                resultWKT.rawSpatialRDD.takeOrdered(5), spatialRDD.rawSpatialRDD.takeOrdered(5));
     }
 
-    /**
-     * Test throws NullArgumentException when Spatial RDD is null.
-     */
+    /** Test throws NullArgumentException when Spatial RDD is null. */
     @Test(expected = NullArgumentException.class)
-    public void testSaveAsEmptyWKB()
-    {
+    public void testSaveAsEmptyWKB() {
 
         PointRDD emptySpatialRDD = new PointRDD();
         emptySpatialRDD.saveAsWKB(testSaveAsEmptyWKB);
     }
 
-    private void verifyResult(List<Point> left, List<Point> right){
+    private void verifyResult(List<Point> left, List<Point> right) {
         assertEquals(left.size(), right.size());
         for (int i = 0; i < left.size(); i++) {
             assertTrue(GeomUtils.equalsExactGeom(left.get(i), right.get(i)));

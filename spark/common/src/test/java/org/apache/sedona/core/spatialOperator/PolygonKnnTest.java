@@ -18,6 +18,12 @@
  */
 package org.apache.sedona.core.spatialOperator;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Properties;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.enums.FileDataSplitter;
@@ -34,95 +40,67 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
-
-/**
- * @author Arizona State University DataSystems Lab
- */
+/** @author Arizona State University DataSystems Lab */
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class PolygonKnnTest.
- */
-public class PolygonKnnTest
-{
+/** The Class PolygonKnnTest. */
+public class PolygonKnnTest {
 
-    /**
-     * The sc.
-     */
+    /** The sc. */
     public static JavaSparkContext sc;
 
-    /**
-     * The prop.
-     */
+    /** The prop. */
     static Properties prop;
 
-    /**
-     * The input.
-     */
+    /** The input. */
     static InputStream input;
 
-    /**
-     * The Input location.
-     */
+    /** The Input location. */
     static String InputLocation;
 
-    /**
-     * The offset.
-     */
+    /** The offset. */
     static Integer offset;
 
-    /**
-     * The splitter.
-     */
+    /** The splitter. */
     static FileDataSplitter splitter;
 
-    /**
-     * The index type.
-     */
+    /** The index type. */
     static IndexType indexType;
 
-    /**
-     * The num partitions.
-     */
+    /** The num partitions. */
     static Integer numPartitions;
 
-    /**
-     * The loop times.
-     */
+    /** The loop times. */
     static int loopTimes;
 
-    /**
-     * The query point.
-     */
+    /** The query point. */
     static Point queryPoint;
 
-    /**
-     * The top K.
-     */
+    /** The top K. */
     static int topK;
 
-    /**
-     * Once executed before all.
-     */
+    /** Once executed before all. */
     @BeforeClass
-    public static void onceExecutedBeforeAll()
-    {
+    public static void onceExecutedBeforeAll() {
         SparkConf conf = new SparkConf().setAppName("PolygonKnn").setMaster("local[2]");
         sc = new JavaSparkContext(conf);
         Logger.getLogger("org").setLevel(Level.WARN);
         Logger.getLogger("akka").setLevel(Level.WARN);
         prop = new Properties();
-        input = PolygonKnnTest.class.getClassLoader().getResourceAsStream("polygon.test.properties");
+        input =
+                PolygonKnnTest.class
+                        .getClassLoader()
+                        .getResourceAsStream("polygon.test.properties");
 
-        //Hard code to a file in resource folder. But you can replace it later in the try-catch field in your hdfs system.
-        InputLocation = "file://" + PolygonKnnTest.class.getClassLoader().getResource("primaryroads-polygon.csv").getPath();
+        // Hard code to a file in resource folder. But you can replace it later in the try-catch
+        // field in your hdfs system.
+        InputLocation =
+                "file://"
+                        + PolygonKnnTest.class
+                                .getClassLoader()
+                                .getResource("primaryroads-polygon.csv")
+                                .getPath();
 
         offset = 0;
         splitter = null;
@@ -134,22 +112,24 @@ public class PolygonKnnTest
             prop.load(input);
             // There is a field in the property file, you can edit your own file location there.
             // InputLocation = prop.getProperty("inputLocation");
-            InputLocation = "file://" + PolygonKnnTest.class.getClassLoader().getResource(prop.getProperty("inputLocation")).getPath();
+            InputLocation =
+                    "file://"
+                            + PolygonKnnTest.class
+                                    .getClassLoader()
+                                    .getResource(prop.getProperty("inputLocation"))
+                                    .getPath();
             offset = Integer.parseInt(prop.getProperty("offset"));
             splitter = FileDataSplitter.getFileDataSplitter(prop.getProperty("splitter"));
             indexType = IndexType.getIndexType(prop.getProperty("indexType"));
             numPartitions = Integer.parseInt(prop.getProperty("numPartitions"));
             loopTimes = 1;
-        }
-        catch (IOException ex) {
+        } catch (IOException ex) {
             ex.printStackTrace();
-        }
-        finally {
+        } finally {
             if (input != null) {
                 try {
                     input.close();
-                }
-                catch (IOException e) {
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
@@ -158,12 +138,9 @@ public class PolygonKnnTest
         topK = 100;
     }
 
-    /**
-     * Teardown.
-     */
+    /** Teardown. */
     @AfterClass
-    public static void teardown()
-    {
+    public static void teardown() {
         sc.stop();
     }
 
@@ -173,16 +150,14 @@ public class PolygonKnnTest
      * @throws Exception the exception
      */
     @Test
-    public void testSpatialKnnQuery()
-            throws Exception
-    {
+    public void testSpatialKnnQuery() throws Exception {
         PolygonRDD polygonRDD = new PolygonRDD(sc, InputLocation, splitter, true);
 
         for (int i = 0; i < loopTimes; i++) {
             List<Polygon> result = KNNQuery.SpatialKnnQuery(polygonRDD, queryPoint, topK, false);
             assert result.size() > -1;
             assert result.get(0).getUserData().toString() != null;
-            //System.out.println(result.get(0).getUserData().toString());
+            // System.out.println(result.get(0).getUserData().toString());
         }
     }
 
@@ -192,16 +167,14 @@ public class PolygonKnnTest
      * @throws Exception the exception
      */
     @Test
-    public void testSpatialKnnQueryUsingIndex()
-            throws Exception
-    {
+    public void testSpatialKnnQueryUsingIndex() throws Exception {
         PolygonRDD polygonRDD = new PolygonRDD(sc, InputLocation, splitter, true);
         polygonRDD.buildIndex(IndexType.RTREE, false);
         for (int i = 0; i < loopTimes; i++) {
             List<Polygon> result = KNNQuery.SpatialKnnQuery(polygonRDD, queryPoint, topK, true);
             assert result.size() > -1;
             assert result.get(0).getUserData().toString() != null;
-            //System.out.println(result.get(0).getUserData().toString());
+            // System.out.println(result.get(0).getUserData().toString());
         }
     }
 
@@ -211,14 +184,14 @@ public class PolygonKnnTest
      * @throws Exception the exception
      */
     @Test
-    public void testSpatialKNNCorrectness()
-            throws Exception
-    {
+    public void testSpatialKNNCorrectness() throws Exception {
         PolygonRDD polygonRDD = new PolygonRDD(sc, InputLocation, splitter, true);
         List<Polygon> resultNoIndex = KNNQuery.SpatialKnnQuery(polygonRDD, queryPoint, topK, false);
         polygonRDD.buildIndex(IndexType.RTREE, false);
-        List<Polygon> resultWithIndex = KNNQuery.SpatialKnnQuery(polygonRDD, queryPoint, topK, true);
-        GeometryDistanceComparator geometryDistanceComparator = new GeometryDistanceComparator(queryPoint, true);
+        List<Polygon> resultWithIndex =
+                KNNQuery.SpatialKnnQuery(polygonRDD, queryPoint, topK, true);
+        GeometryDistanceComparator geometryDistanceComparator =
+                new GeometryDistanceComparator(queryPoint, true);
 
         List<Polygon> mResultNoIndex = new ArrayList<>(resultNoIndex);
         List<Polygon> mResultWithIndex = new ArrayList<>(resultNoIndex);
@@ -227,7 +200,8 @@ public class PolygonKnnTest
         Collections.sort(mResultWithIndex, geometryDistanceComparator);
         int difference = 0;
         for (int i = 0; i < topK; i++) {
-            if (geometryDistanceComparator.compare(resultNoIndex.get(i), resultWithIndex.get(i)) != 0) {
+            if (geometryDistanceComparator.compare(resultNoIndex.get(i), resultWithIndex.get(i))
+                    != 0) {
                 difference++;
             }
         }

@@ -16,9 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialOperator;
 
+import static org.junit.Assert.assertEquals;
+
+import java.util.Arrays;
 import org.apache.sedona.common.Constructors;
 import org.apache.sedona.core.TestBase;
 import org.apache.sedona.core.enums.GridType;
@@ -28,10 +30,6 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.locationtech.jts.geom.Geometry;
-
-import java.util.Arrays;
-
-import static org.junit.Assert.assertEquals;
 
 public class JoinQueryDeduplicationTest extends TestBase {
 
@@ -45,31 +43,32 @@ public class JoinQueryDeduplicationTest extends TestBase {
         sc.stop();
     }
 
-    /**
-     * See https://issues.apache.org/jira/browse/SEDONA-233
-     */
+    /** See https://issues.apache.org/jira/browse/SEDONA-233 */
     @Test
     public void testDeduplication() throws Exception {
         SpatialRDD<Geometry> leftRDD = new SpatialRDD<>();
         leftRDD.setRawSpatialRDD(
                 sc.parallelize(
-                        Arrays.asList(
-                                "POLYGON ((3 0, 3 3, 0 3, 0 0, 3 0))",
-                                "POLYGON ((4 1, 4 4, 1 4, 1 1, 4 1))",
-                                "POLYGON ((3 1, 3 4, 0 4, 0 1, 3 1))",
-                                "POLYGON ((4 0, 4 3, 1 3, 1 0, 4 0))"
-                        )
-                ).map(wkt -> Constructors.geomFromWKT(wkt, 0)));
+                                Arrays.asList(
+                                        "POLYGON ((3 0, 3 3, 0 3, 0 0, 3 0))",
+                                        "POLYGON ((4 1, 4 4, 1 4, 1 1, 4 1))",
+                                        "POLYGON ((3 1, 3 4, 0 4, 0 1, 3 1))",
+                                        "POLYGON ((4 0, 4 3, 1 3, 1 0, 4 0))"))
+                        .map(wkt -> Constructors.geomFromWKT(wkt, 0)));
         leftRDD.analyze();
         leftRDD.spatialPartitioning(GridType.KDBTREE, 2);
 
         SpatialRDD<Geometry> rightRDD = new SpatialRDD<>();
-        rightRDD.setRawSpatialRDD(sc.parallelize(Arrays.asList("POLYGON ((4 0, 4 4, 0 4, 0 0, 4 0))"))
-                .map(wkt -> Constructors.geomFromWKT(wkt, 0)));
+        rightRDD.setRawSpatialRDD(
+                sc.parallelize(Arrays.asList("POLYGON ((4 0, 4 4, 0 4, 0 0, 4 0))"))
+                        .map(wkt -> Constructors.geomFromWKT(wkt, 0)));
         rightRDD.spatialPartitioning(leftRDD.getPartitioner());
 
-
-        JavaPairRDD<Geometry, Geometry> joined = JoinQuery.spatialJoin(leftRDD, rightRDD, new JoinQuery.JoinParams(false, SpatialPredicate.INTERSECTS));
+        JavaPairRDD<Geometry, Geometry> joined =
+                JoinQuery.spatialJoin(
+                        leftRDD,
+                        rightRDD,
+                        new JoinQuery.JoinParams(false, SpatialPredicate.INTERSECTS));
         assertEquals(8, joined.union(joined).count());
     }
 }

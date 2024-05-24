@@ -16,22 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.geometrySerde;
+
+import static org.hamcrest.core.Is.is;
+import static org.junit.Assert.assertThat;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import org.apache.sedona.common.geometrySerde.SpatialIndexSerde;
-import org.junit.Test;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.index.SpatialIndex;
-import org.locationtech.jts.index.quadtree.Quadtree;
-import org.locationtech.jts.index.strtree.STRtree;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -41,12 +33,16 @@ import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 import java.util.List;
 import java.util.Random;
+import org.junit.Test;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Envelope;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.index.SpatialIndex;
+import org.locationtech.jts.index.quadtree.Quadtree;
+import org.locationtech.jts.index.strtree.STRtree;
 
-import static org.hamcrest.core.Is.is;
-import static org.junit.Assert.assertThat;
-
-public class SpatialIndexSerdeTest
-{
+public class SpatialIndexSerdeTest {
 
     private final Kryo kryo = new Kryo();
 
@@ -55,9 +51,7 @@ public class SpatialIndexSerdeTest
     private final SpatialIndexSerde spatialIndexSerde = new SpatialIndexSerde();
 
     @Test
-    public void test()
-            throws Exception
-    {
+    public void test() throws Exception {
 
         kryo.register(Quadtree.class, spatialIndexSerde);
         kryo.register(STRtree.class, spatialIndexSerde);
@@ -70,14 +64,12 @@ public class SpatialIndexSerdeTest
         compareSize(Quadtree.class);
         compareSize(STRtree.class);
 
-//        // workbench of compare time
+        //        // workbench of compare time
         compareTime(Quadtree.class);
         compareTime(STRtree.class);
     }
 
-    public void testCorrectness(Class aClass)
-            throws IOException
-    {
+    public void testCorrectness(Class aClass) throws IOException {
         final int indexSize = 10000;
 
         SpatialIndex tree = generateIndex(indexSize, aClass);
@@ -98,9 +90,7 @@ public class SpatialIndexSerdeTest
         assertThat(queryIndex(tree, envelope), is(queryIndex(dtree, envelope)));
     }
 
-    public void compareSize(Class aClass)
-            throws IOException
-    {
+    public void compareSize(Class aClass) throws IOException {
         final int indexSize = 10000;
         SpatialIndex tree = generateIndex(indexSize, aClass);
 
@@ -108,8 +98,11 @@ public class SpatialIndexSerdeTest
         byte[] noSerde = serializeIndexNoKryo(tree);
 
         // do with serde
-        if (aClass == Quadtree.class) { kryo.register(Quadtree.class, new SpatialIndexSerde()); }
-        else { kryo.register(STRtree.class, new SpatialIndexSerde()); }
+        if (aClass == Quadtree.class) {
+            kryo.register(Quadtree.class, new SpatialIndexSerde());
+        } else {
+            kryo.register(STRtree.class, new SpatialIndexSerde());
+        }
         byte[] withSerde = serializeIndexKryo(tree);
 
         System.out.println("\n==== test size of " + aClass.toString() + "====");
@@ -118,9 +111,7 @@ public class SpatialIndexSerdeTest
         System.out.println("percent : " + (double) withSerde.length / (double) noSerde.length);
     }
 
-    public void compareTime(Class aClass)
-            throws Exception
-    {
+    public void compareTime(Class aClass) throws Exception {
         System.out.println("\n==== test Serialize time of " + aClass.toString() + "====");
         final int indexSize = 1000000;
         SpatialIndex tree = generateIndex(indexSize, aClass);
@@ -137,8 +128,11 @@ public class SpatialIndexSerdeTest
         after = System.currentTimeMillis();
         System.out.println("original deserialize time : " + (after - before) / 1000);
         // do with serde
-        if (aClass == Quadtree.class) { kryo.register(Quadtree.class, new SpatialIndexSerde()); }
-        else { kryo.register(STRtree.class, new SpatialIndexSerde()); }
+        if (aClass == Quadtree.class) {
+            kryo.register(Quadtree.class, new SpatialIndexSerde());
+        } else {
+            kryo.register(STRtree.class, new SpatialIndexSerde());
+        }
 
         before = System.currentTimeMillis();
         byte[] withSerde = serializeIndexKryo(tree);
@@ -151,9 +145,7 @@ public class SpatialIndexSerdeTest
         System.out.println("with serde kryo deserialize time : " + (after - before) / 1000);
     }
 
-    private byte[] serializeIndexNoKryo(SpatialIndex index)
-            throws IOException
-    {
+    private byte[] serializeIndexNoKryo(SpatialIndex index) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         ObjectOutput output = new ObjectOutputStream(outputStream);
         output.writeObject(index);
@@ -163,8 +155,7 @@ public class SpatialIndexSerdeTest
     }
 
     private SpatialIndex deserializeIndexNoKryo(byte[] array)
-            throws IOException, ClassNotFoundException
-    {
+            throws IOException, ClassNotFoundException {
         ByteArrayInputStream inputStream = new ByteArrayInputStream(array);
         ObjectInput input = new ObjectInputStream(inputStream);
         SpatialIndex res = (SpatialIndex) input.readObject();
@@ -173,9 +164,7 @@ public class SpatialIndexSerdeTest
         return res;
     }
 
-    private byte[] serializeIndexKryo(SpatialIndex index)
-            throws IOException
-    {
+    private byte[] serializeIndexKryo(SpatialIndex index) throws IOException {
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
         Output output = new Output(outputStream);
         kryo.writeClassAndObject(output, index);
@@ -184,9 +173,7 @@ public class SpatialIndexSerdeTest
         return outputStream.toByteArray();
     }
 
-    private SpatialIndex deserializeIndexKryo(byte[] array)
-            throws IOException
-    {
+    private SpatialIndex deserializeIndexKryo(byte[] array) throws IOException {
         ByteArrayInputStream inputStream = new ByteArrayInputStream(array);
         Input input = new Input(inputStream);
         input.close();
@@ -195,38 +182,41 @@ public class SpatialIndexSerdeTest
         return res;
     }
 
-    private List queryIndex(SpatialIndex index, Envelope envelope)
-    {
+    private List queryIndex(SpatialIndex index, Envelope envelope) {
         if (index instanceof Quadtree) {
             Quadtree quadtree = (Quadtree) index;
             if (envelope == null) {
                 return quadtree.queryAll();
+            } else {
+                return quadtree.query(envelope);
             }
-            else { return quadtree.query(envelope); }
-        }
-        else if (index instanceof STRtree) {
+        } else if (index instanceof STRtree) {
             STRtree strtree = (STRtree) index;
             if (envelope == null) {
                 envelope = new Envelope(-180, 180, -90, 90);
             }
             return strtree.query(envelope);
+        } else {
+            throw new UnsupportedOperationException("unsupported index type");
         }
-        else { throw new UnsupportedOperationException("unsupported index type"); }
     }
 
-    private SpatialIndex generateIndex(int geomNum, Class aClass)
-    {
+    private SpatialIndex generateIndex(int geomNum, Class aClass) {
         Random random = new Random();
         SpatialIndex quadtree;
         // initialize according to class pointed
-        if (aClass == Quadtree.class) { quadtree = new Quadtree(); }
-        else { quadtree = new STRtree(); }
+        if (aClass == Quadtree.class) {
+            quadtree = new Quadtree();
+        } else {
+            quadtree = new STRtree();
+        }
 
         for (int i = 0; i < geomNum; ++i) {
-            Point point = geometryFactory.createPoint(new Coordinate(
-                    random.nextDouble() * 360 - 180,
-                    random.nextDouble() * 180 - 90
-            ));
+            Point point =
+                    geometryFactory.createPoint(
+                            new Coordinate(
+                                    random.nextDouble() * 360 - 180,
+                                    random.nextDouble() * 180 - 90));
             quadtree.insert(point.getEnvelopeInternal(), point);
         }
         return quadtree;

@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.common.geometryObjects;
 
 import org.apache.sedona.common.utils.GeomUtils;
@@ -36,28 +35,16 @@ import org.locationtech.jts.geom.Polygon;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class Circle.
- */
-public class Circle
-        extends Geometry
-{
+/** The Class Circle. */
+public class Circle extends Geometry {
 
-    /**
-     * The center.
-     */
+    /** The center. */
     private final Geometry centerGeometry;
-    /**
-     * The center point.
-     */
+    /** The center point. */
     private final Coordinate centerPoint;
-    /**
-     * The radius.
-     */
+    /** The radius. */
     private Double radius;
-    /**
-     * The mbr.
-     */
+    /** The mbr. */
     private Envelope MBR;
 
     /**
@@ -66,19 +53,29 @@ public class Circle
      * @param centerGeometry the center geometry
      * @param givenRadius the given radius
      */
-    public Circle(Geometry centerGeometry, Double givenRadius)
-    {
+    public Circle(Geometry centerGeometry, Double givenRadius) {
         super(new GeometryFactory(centerGeometry.getPrecisionModel()));
         this.centerGeometry = centerGeometry;
         Envelope centerGeometryMBR = this.centerGeometry.getEnvelopeInternal();
-        this.centerPoint = new Coordinate((centerGeometryMBR.getMinX() + centerGeometryMBR.getMaxX()) / 2.0,
-                (centerGeometryMBR.getMinY() + centerGeometryMBR.getMaxY()) / 2.0);
-        // Get the internal radius of the object. We need to make sure that the circle at least should be the minimum circumscribed circle
+        this.centerPoint =
+                new Coordinate(
+                        (centerGeometryMBR.getMinX() + centerGeometryMBR.getMaxX()) / 2.0,
+                        (centerGeometryMBR.getMinY() + centerGeometryMBR.getMaxY()) / 2.0);
+        // Get the internal radius of the object. We need to make sure that the circle at least
+        // should be the minimum circumscribed circle
         double width = centerGeometryMBR.getMaxX() - centerGeometryMBR.getMinX();
         double length = centerGeometryMBR.getMaxY() - centerGeometryMBR.getMinY();
         double centerGeometryInternalRadius = Math.sqrt(width * width + length * length) / 2;
-        this.radius = givenRadius > centerGeometryInternalRadius ? givenRadius : centerGeometryInternalRadius;
-        this.MBR = new Envelope(this.centerPoint.x - this.radius, this.centerPoint.x + this.radius, this.centerPoint.y - this.radius, this.centerPoint.y + this.radius);
+        this.radius =
+                givenRadius > centerGeometryInternalRadius
+                        ? givenRadius
+                        : centerGeometryInternalRadius;
+        this.MBR =
+                new Envelope(
+                        this.centerPoint.x - this.radius,
+                        this.centerPoint.x + this.radius,
+                        this.centerPoint.y - this.radius,
+                        this.centerPoint.y + this.radius);
         this.setUserData(centerGeometry.getUserData());
     }
 
@@ -87,8 +84,7 @@ public class Circle
      *
      * @return the center geometry
      */
-    public Geometry getCenterGeometry()
-    {
+    public Geometry getCenterGeometry() {
         return centerGeometry;
     }
 
@@ -97,8 +93,7 @@ public class Circle
      *
      * @return the center point
      */
-    public Coordinate getCenterPoint()
-    {
+    public Coordinate getCenterPoint() {
         return this.centerPoint;
     }
 
@@ -107,8 +102,7 @@ public class Circle
      *
      * @return the radius
      */
-    public Double getRadius()
-    {
+    public Double getRadius() {
         return radius;
     }
 
@@ -117,23 +111,30 @@ public class Circle
      *
      * @param givenRadius the new radius
      */
-    public void setRadius(Double givenRadius)
-    {
-        // Get the internal radius of the object. We need to make sure that the circle at least should be the minimum circumscribed circle
+    public void setRadius(Double givenRadius) {
+        // Get the internal radius of the object. We need to make sure that the circle at least
+        // should be the minimum circumscribed circle
         Envelope centerGeometryMBR = this.centerGeometry.getEnvelopeInternal();
         double width = centerGeometryMBR.getMaxX() - centerGeometryMBR.getMinX();
         double length = centerGeometryMBR.getMaxY() - centerGeometryMBR.getMinY();
         double centerGeometryInternalRadius = Math.sqrt(width * width + length * length) / 2;
-        this.radius = givenRadius > centerGeometryInternalRadius ? givenRadius : centerGeometryInternalRadius;
-        this.MBR = new Envelope(this.centerPoint.x - this.radius, this.centerPoint.x + this.radius, this.centerPoint.y - this.radius, this.centerPoint.y + this.radius);
+        this.radius =
+                givenRadius > centerGeometryInternalRadius
+                        ? givenRadius
+                        : centerGeometryInternalRadius;
+        this.MBR =
+                new Envelope(
+                        this.centerPoint.x - this.radius,
+                        this.centerPoint.x + this.radius,
+                        this.centerPoint.y - this.radius,
+                        this.centerPoint.y + this.radius);
     }
 
     /* (non-Javadoc)
      * @see org.locationtech.jts.geom.Geometry#covers(org.locationtech.jts.geom.Geometry)
      */
     @Override
-    public boolean covers(Geometry other)
-    {
+    public boolean covers(Geometry other) {
         // short-circuit test
         Envelope otherEnvelope = other.getEnvelopeInternal();
         if (!getEnvelopeInternal().covers(otherEnvelope)) {
@@ -162,12 +163,11 @@ public class Circle
             return true;
         }
 
-        throw new IllegalArgumentException("Circle.covers() doesn't support geometry type " +
-                other.getGeometryType());
+        throw new IllegalArgumentException(
+                "Circle.covers() doesn't support geometry type " + other.getGeometryType());
     }
 
-    private boolean covers(LineString lineString)
-    {
+    private boolean covers(LineString lineString) {
         for (int i = 0; i < lineString.getNumPoints(); i++) {
             if (!covers(lineString.getPointN(i))) {
                 return false;
@@ -176,8 +176,7 @@ public class Circle
         return true;
     }
 
-    private boolean covers(Point point)
-    {
+    private boolean covers(Point point) {
         double deltaX = point.getX() - centerPoint.x;
         double deltaY = point.getY() - centerPoint.y;
 
@@ -188,8 +187,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#intersects(org.locationtech.jts.geom.Geometry)
      */
     @Override
-    public boolean intersects(Geometry other)
-    {
+    public boolean intersects(Geometry other) {
         // short-circuit test
         Envelope otherEnvelope = other.getEnvelopeInternal();
         if (!getEnvelopeInternal().intersects(otherEnvelope)) {
@@ -218,12 +216,11 @@ public class Circle
             return false;
         }
 
-        throw new IllegalArgumentException("Circle.intersects() doesn't support geometry type " +
-                other.getGeometryType());
+        throw new IllegalArgumentException(
+                "Circle.intersects() doesn't support geometry type " + other.getGeometryType());
     }
 
-    private boolean intersects(Polygon polygon)
-    {
+    private boolean intersects(Polygon polygon) {
         if (intersects(polygon.getExteriorRing())) {
             return true;
         }
@@ -245,8 +242,7 @@ public class Circle
         return false;
     }
 
-    private boolean intersects(LineString lineString)
-    {
+    private boolean intersects(LineString lineString) {
         for (int i = 0; i < lineString.getNumPoints() - 1; i++) {
             if (intersects(lineString.getPointN(i), lineString.getPointN(i + 1))) {
                 return true;
@@ -255,11 +251,8 @@ public class Circle
         return false;
     }
 
-    /**
-     * @return true if a line from `start` to `end` intersects this circle
-     */
-    private boolean intersects(Point start, Point end)
-    {
+    /** @return true if a line from `start` to `end` intersects this circle */
+    private boolean intersects(Point start, Point end) {
         double deltaX = end.getX() - start.getX();
         double deltaY = end.getY() - start.getY();
 
@@ -294,8 +287,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#getGeometryType()
      */
     @Override
-    public String getGeometryType()
-    {
+    public String getGeometryType() {
         return "Circle";
     }
 
@@ -303,8 +295,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#getCoordinate()
      */
     @Override
-    public Coordinate getCoordinate()
-    {
+    public Coordinate getCoordinate() {
         return this.centerGeometry.getCoordinate();
     }
 
@@ -312,8 +303,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#getCoordinates()
      */
     @Override
-    public Coordinate[] getCoordinates()
-    {
+    public Coordinate[] getCoordinates() {
         return this.centerGeometry.getCoordinates();
     }
 
@@ -321,8 +311,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#getNumPoints()
      */
     @Override
-    public int getNumPoints()
-    {
+    public int getNumPoints() {
         return this.centerGeometry.getNumPoints();
     }
 
@@ -330,8 +319,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#isEmpty()
      */
     @Override
-    public boolean isEmpty()
-    {
+    public boolean isEmpty() {
         return this.centerGeometry.isEmpty();
     }
 
@@ -339,8 +327,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#getDimension()
      */
     @Override
-    public int getDimension()
-    {
+    public int getDimension() {
         return 0;
     }
 
@@ -348,8 +335,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#getBoundary()
      */
     @Override
-    public Geometry getBoundary()
-    {
+    public Geometry getBoundary() {
         return getFactory().createGeometryCollection(null);
     }
 
@@ -357,8 +343,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#getBoundaryDimension()
      */
     @Override
-    public int getBoundaryDimension()
-    {
+    public int getBoundaryDimension() {
         return 0;
     }
 
@@ -366,30 +351,26 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#reverse()
      */
     @Override
-    public Geometry reverse()
-    {
+    public Geometry reverse() {
         Geometry g = this.centerGeometry.reverse();
         Circle newCircle = new Circle(g, this.radius);
         return newCircle;
     }
 
     @Override
-    protected Geometry reverseInternal()
-    {
+    protected Geometry reverseInternal() {
         Geometry g = this.centerGeometry.reverse();
         Circle newCircle = new Circle(g, this.radius);
         return newCircle;
     }
 
-    public Geometry copy()
-    {
+    public Geometry copy() {
         Circle cloneCircle = new Circle(this.centerGeometry.copy(), this.radius);
-        return cloneCircle;// return the clone
+        return cloneCircle; // return the clone
     }
 
     @Override
-    protected Geometry copyInternal()
-    {
+    protected Geometry copyInternal() {
         Circle cloneCircle = new Circle(this.centerGeometry.copy(), this.radius);
         return cloneCircle;
     }
@@ -398,15 +379,18 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#equalsExact(org.locationtech.jts.geom.Geometry, double)
      */
     @Override
-    public boolean equalsExact(Geometry g, double tolerance)
-    {
+    public boolean equalsExact(Geometry g, double tolerance) {
         String type1 = this.getGeometryType();
         String type2 = g.getGeometryType();
         double radius1 = this.radius;
         double radius2 = ((Circle) g).radius;
 
-        if (type1 != type2) { return false; }
-        if (radius1 != radius2) { return false; }
+        if (type1 != type2) {
+            return false;
+        }
+        if (radius1 != radius2) {
+            return false;
+        }
         return GeomUtils.equalsTopoGeom(this.centerGeometry, ((Circle) g).centerGeometry);
     }
 
@@ -414,8 +398,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#apply(org.locationtech.jts.geom.CoordinateFilter)
      */
     @Override
-    public void apply(CoordinateFilter filter)
-    {
+    public void apply(CoordinateFilter filter) {
         // Do nothing. This circle is not expected to be a complete geometry.
     }
 
@@ -423,8 +406,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#apply(org.locationtech.jts.geom.CoordinateSequenceFilter)
      */
     @Override
-    public void apply(CoordinateSequenceFilter filter)
-    {
+    public void apply(CoordinateSequenceFilter filter) {
         // Do nothing. This circle is not expected to be a complete geometry.
     }
 
@@ -432,8 +414,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#apply(org.locationtech.jts.geom.GeometryFilter)
      */
     @Override
-    public void apply(GeometryFilter filter)
-    {
+    public void apply(GeometryFilter filter) {
         // Do nothing. This circle is not expected to be a complete geometry.
     }
 
@@ -441,8 +422,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#apply(org.locationtech.jts.geom.GeometryComponentFilter)
      */
     @Override
-    public void apply(GeometryComponentFilter filter)
-    {
+    public void apply(GeometryComponentFilter filter) {
         // Do nothing. This circle is not expected to be a complete geometry.
     }
 
@@ -450,8 +430,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#normalize()
      */
     @Override
-    public void normalize()
-    {
+    public void normalize() {
         // Do nothing. This circle is not expected to be a complete geometry.
     }
 
@@ -459,8 +438,7 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#computeEnvelopeInternal()
      */
     @Override
-    protected Envelope computeEnvelopeInternal()
-    {
+    protected Envelope computeEnvelopeInternal() {
         if (isEmpty()) {
             return new Envelope();
         }
@@ -471,19 +449,34 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#compareToSameClass(java.lang.Object)
      */
     @Override
-    protected int compareToSameClass(Object other)
-    {
+    protected int compareToSameClass(Object other) {
         Envelope env = (Envelope) other;
         Envelope mbr = this.MBR;
         // compare based on numerical ordering of ordinates
-        if (mbr.getMinX() < env.getMinX()) { return -1; }
-        if (mbr.getMinX() > env.getMinX()) { return 1; }
-        if (mbr.getMinY() < env.getMinY()) { return -1; }
-        if (mbr.getMinY() > env.getMinY()) { return 1; }
-        if (mbr.getMaxX() < env.getMaxX()) { return -1; }
-        if (mbr.getMaxX() > env.getMaxX()) { return 1; }
-        if (mbr.getMaxY() < env.getMaxY()) { return -1; }
-        if (mbr.getMaxY() > env.getMaxY()) { return 1; }
+        if (mbr.getMinX() < env.getMinX()) {
+            return -1;
+        }
+        if (mbr.getMinX() > env.getMinX()) {
+            return 1;
+        }
+        if (mbr.getMinY() < env.getMinY()) {
+            return -1;
+        }
+        if (mbr.getMinY() > env.getMinY()) {
+            return 1;
+        }
+        if (mbr.getMaxX() < env.getMaxX()) {
+            return -1;
+        }
+        if (mbr.getMaxX() > env.getMaxX()) {
+            return 1;
+        }
+        if (mbr.getMaxY() < env.getMaxY()) {
+            return -1;
+        }
+        if (mbr.getMaxY() > env.getMaxY()) {
+            return 1;
+        }
         return 0;
     }
 
@@ -491,31 +484,44 @@ public class Circle
      * @see org.locationtech.jts.geom.Geometry#compareToSameClass(java.lang.Object, org.locationtech.jts.geom.CoordinateSequenceComparator)
      */
     @Override
-    protected int compareToSameClass(Object other, CoordinateSequenceComparator comp)
-    {
+    protected int compareToSameClass(Object other, CoordinateSequenceComparator comp) {
         Envelope env = (Envelope) other;
         Envelope mbr = this.MBR;
         // compare based on numerical ordering of ordinates
-        if (mbr.getMinX() < env.getMinX()) { return -1; }
-        if (mbr.getMinX() > env.getMinX()) { return 1; }
-        if (mbr.getMinY() < env.getMinY()) { return -1; }
-        if (mbr.getMinY() > env.getMinY()) { return 1; }
-        if (mbr.getMaxX() < env.getMaxX()) { return -1; }
-        if (mbr.getMaxX() > env.getMaxX()) { return 1; }
-        if (mbr.getMaxY() < env.getMaxY()) { return -1; }
-        if (mbr.getMaxY() > env.getMaxY()) { return 1; }
+        if (mbr.getMinX() < env.getMinX()) {
+            return -1;
+        }
+        if (mbr.getMinX() > env.getMinX()) {
+            return 1;
+        }
+        if (mbr.getMinY() < env.getMinY()) {
+            return -1;
+        }
+        if (mbr.getMinY() > env.getMinY()) {
+            return 1;
+        }
+        if (mbr.getMaxX() < env.getMaxX()) {
+            return -1;
+        }
+        if (mbr.getMaxX() > env.getMaxX()) {
+            return 1;
+        }
+        if (mbr.getMaxY() < env.getMaxY()) {
+            return -1;
+        }
+        if (mbr.getMaxY() > env.getMaxY()) {
+            return 1;
+        }
         return 0;
     }
 
     @Override
-    protected int getTypeCode()
-    {
+    protected int getTypeCode() {
         return 0;
     }
 
     @Override
-    public String toString()
-    {
+    public String toString() {
         return "Circle of radius " + radius + " around " + centerGeometry;
     }
 }

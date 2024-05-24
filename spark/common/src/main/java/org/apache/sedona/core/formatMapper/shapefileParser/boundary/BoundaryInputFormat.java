@@ -16,9 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.boundary;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -28,17 +30,10 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.CombineFileSplit;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-public class BoundaryInputFormat
-        extends CombineFileInputFormat<Long, BoundBox>
-{
+public class BoundaryInputFormat extends CombineFileInputFormat<Long, BoundBox> {
     @Override
-    public RecordReader<Long, BoundBox> createRecordReader(InputSplit inputSplit, TaskAttemptContext taskAttemptContext)
-            throws IOException
-    {
+    public RecordReader<Long, BoundBox> createRecordReader(
+            InputSplit inputSplit, TaskAttemptContext taskAttemptContext) throws IOException {
         return new BoundaryRecordReader();
     }
 
@@ -50,8 +45,7 @@ public class BoundaryInputFormat
      * @return
      */
     @Override
-    protected boolean isSplitable(JobContext context, Path file)
-    {
+    protected boolean isSplitable(JobContext context, Path file) {
         return false;
     }
 
@@ -63,9 +57,7 @@ public class BoundaryInputFormat
      * @throws IOException
      */
     @Override
-    public List<InputSplit> getSplits(JobContext job)
-            throws IOException
-    {
+    public List<InputSplit> getSplits(JobContext job) throws IOException {
         // get original combine split.
         CombineFileSplit combineSplit = (CombineFileSplit) super.getSplits(job).get(0);
         Path[] paths = combineSplit.getPaths();
@@ -90,8 +82,9 @@ public class BoundaryInputFormat
             shpLengths[i] = combineSplit.getLength(id);
         }
 
-        //combine all .shp splits as one split.
-        CombineFileSplit shpSplit = new CombineFileSplit(shpPaths, shpStarts, shpLengths, combineSplit.getLocations());
+        // combine all .shp splits as one split.
+        CombineFileSplit shpSplit =
+                new CombineFileSplit(shpPaths, shpStarts, shpLengths, combineSplit.getLocations());
         List<InputSplit> shpSplits = new ArrayList<>();
         shpSplits.add(shpSplit);
         return shpSplits;

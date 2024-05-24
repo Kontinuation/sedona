@@ -16,9 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.joinJudgement;
 
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Level;
 import org.apache.log4j.LogManager;
@@ -30,21 +34,14 @@ import org.apache.spark.util.LongAccumulator;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.index.SpatialIndex;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.NoSuchElementException;
-
 /**
  * Base class for partition level join implementations.
- * <p>
- * Provides `match` method to test whether a given pair of geometries satisfies join condition.
+ *
+ * <p>Provides `match` method to test whether a given pair of geometries satisfies join condition.
+ *
  * <p>
  */
-abstract class JudgementBase<T extends Geometry, U extends Geometry>
-        implements Serializable
-{
+abstract class JudgementBase<T extends Geometry, U extends Geometry> implements Serializable {
     private static final Logger log = LogManager.getLogger(JudgementBase.class);
 
     private final SpatialPredicate spatialPredicate;
@@ -62,15 +59,18 @@ abstract class JudgementBase<T extends Geometry, U extends Geometry>
     private int nextIndex = 0;
 
     /**
-     *
      * @param spatialPredicate spatial predicate as join condition
      * @param buildCount num of geometries in build side
      * @param streamCount num of geometries in stream side
      * @param resultCount num of join results
      * @param candidateCount num of candidate pairs to be refined by their real geometries
      */
-    protected JudgementBase(SpatialPredicate spatialPredicate, LongAccumulator buildCount, LongAccumulator streamCount, LongAccumulator resultCount, LongAccumulator candidateCount)
-    {
+    protected JudgementBase(
+            SpatialPredicate spatialPredicate,
+            LongAccumulator buildCount,
+            LongAccumulator streamCount,
+            LongAccumulator resultCount,
+            LongAccumulator candidateCount) {
         this.spatialPredicate = spatialPredicate;
         this.buildCount = buildCount;
         this.streamCount = streamCount;
@@ -80,69 +80,70 @@ abstract class JudgementBase<T extends Geometry, U extends Geometry>
     }
 
     /**
-     * Looks up the extent of the current partition. If found, `match` method will
-     * activate the logic to avoid emitting duplicate join results from multiple partitions.
-     * <p>
-     * Must be called before processing a partition. Must be called from the
-     * same instance that will be used to process the partition.
+     * Looks up the extent of the current partition. If found, `match` method will activate the
+     * logic to avoid emitting duplicate join results from multiple partitions.
+     *
+     * <p>Must be called before processing a partition. Must be called from the same instance that
+     * will be used to process the partition.
      */
-    protected void initPartition()
-    {
+    protected void initPartition() {
         evaluator = SpatialPredicateEvaluators.create(spatialPredicate);
     }
 
-    private boolean match(Geometry left, Geometry right)
-    {
+    private boolean match(Geometry left, Geometry right) {
         return evaluator.eval(left, right);
     }
 
     /**
-     * Iterator model for the index-based join.
-     * It checks if there is a next match and populate it to the result.
+     * Iterator model for the index-based join. It checks if there is a next match and populate it
+     * to the result.
+     *
      * @param spatialIndex
      * @param streamShapes
      * @param buildLeft
      * @return
      */
-    protected boolean hasNextBase(SpatialIndex spatialIndex, Iterator<? extends Geometry> streamShapes,
-            boolean buildLeft)
-    {
+    protected boolean hasNextBase(
+            SpatialIndex spatialIndex,
+            Iterator<? extends Geometry> streamShapes,
+            boolean buildLeft) {
         if (batch != null) {
             return true;
-        }
-        else {
+        } else {
             return populateNextBatch(spatialIndex, streamShapes, buildLeft);
         }
     }
 
     /**
-     * Iterator model for the nest loop join.
-     * It checks if there is a next match and populate it to the result.
+     * Iterator model for the nest loop join. It checks if there is a next match and populate it to
+     * the result.
+     *
      * @param buildShapes
      * @param streamShapes
      * @return
      */
-    protected boolean hasNextBase(List<? extends Geometry> buildShapes, Iterator<? extends Geometry> streamShapes)
-    {
+    protected boolean hasNextBase(
+            List<? extends Geometry> buildShapes, Iterator<? extends Geometry> streamShapes) {
         if (batch != null) {
             return true;
-        }
-        else {
+        } else {
             return populateNextBatch(buildShapes, streamShapes);
         }
     }
 
     /**
-     * Iterator model for the index-based join.
-     * It returns 1 pair in the current batch.
-     * Each batch contains a list of pairs of geometries that satisfy the join condition.
-     * The current batch is the result of the current stream shape against all the build shapes.
+     * Iterator model for the index-based join. It returns 1 pair in the current batch. Each batch
+     * contains a list of pairs of geometries that satisfy the join condition. The current batch is
+     * the result of the current stream shape against all the build shapes.
+     *
      * @param spatialIndex
      * @param streamShapes
      * @param buildLeft
      * @return
      */
-    protected Pair<U, T> nextBase(SpatialIndex spatialIndex, Iterator<? extends Geometry> streamShapes,
+    protected Pair<U, T> nextBase(
+            SpatialIndex spatialIndex,
+            Iterator<? extends Geometry> streamShapes,
             boolean buildLeft) {
         if (batch == null) {
             populateNextBatch(spatialIndex, streamShapes, buildLeft);
@@ -162,15 +163,16 @@ abstract class JudgementBase<T extends Geometry, U extends Geometry>
     }
 
     /**
-     * Iterator model for the nest loop join.
-     * It returns 1 pair in the current batch.
-     * Each batch contains a list of pairs of geometries that satisfy the join condition.
-     * The current batch is the result of the current stream shape against all the build shapes.
+     * Iterator model for the nest loop join. It returns 1 pair in the current batch. Each batch
+     * contains a list of pairs of geometries that satisfy the join condition. The current batch is
+     * the result of the current stream shape against all the build shapes.
+     *
      * @param buildShapes
      * @param streamShapes
      * @return
      */
-    protected Pair<U, T> nextBase(List<? extends Geometry> buildShapes, Iterator<? extends Geometry> streamShapes) {
+    protected Pair<U, T> nextBase(
+            List<? extends Geometry> buildShapes, Iterator<? extends Geometry> streamShapes) {
         if (batch == null) {
             populateNextBatch(buildShapes, streamShapes);
         }
@@ -189,22 +191,22 @@ abstract class JudgementBase<T extends Geometry, U extends Geometry>
     }
 
     /**
-     * Populates the next batch of matches given the current shape in the stream side.
-     * It works as follows:
-     * 1. If there is no shape left in the stream side, it returns false.
-     * 2. If there are shapes left in the stream side, it uses the current shape in the stream side to query the spatial index.
-     * The query result is a list of geometries in the build side that overlap with the current shape in the stream side.
-     * The query result is flattened to a list of pairs of geometries
-     * 3. If there are no results, it returns false.
+     * Populates the next batch of matches given the current shape in the stream side. It works as
+     * follows: 1. If there is no shape left in the stream side, it returns false. 2. If there are
+     * shapes left in the stream side, it uses the current shape in the stream side to query the
+     * spatial index. The query result is a list of geometries in the build side that overlap with
+     * the current shape in the stream side. The query result is flattened to a list of pairs of
+     * geometries 3. If there are no results, it returns false.
      *
      * @param spatialIndex spatial index of the build side
      * @param streamShapes stream side geometries
      * @param buildLeft whether the build side is left
      * @return whether there is a next batch
      */
-    private boolean populateNextBatch(SpatialIndex spatialIndex, Iterator<? extends Geometry> streamShapes,
-            boolean buildLeft)
-    {
+    private boolean populateNextBatch(
+            SpatialIndex spatialIndex,
+            Iterator<? extends Geometry> streamShapes,
+            boolean buildLeft) {
         if (!streamShapes.hasNext()) {
             if (batch != null) {
                 batch = null;
@@ -227,8 +229,7 @@ abstract class JudgementBase<T extends Geometry, U extends Geometry>
                         batch.add(Pair.of((U) buildShape, (T) streamShape));
                         resultCount.add(1);
                     }
-                }
-                else {
+                } else {
                     if (match(streamShape, buildShape)) {
                         batch.add(Pair.of((U) streamShape, (T) buildShape));
                         resultCount.add(1);
@@ -246,20 +247,20 @@ abstract class JudgementBase<T extends Geometry, U extends Geometry>
     }
 
     /**
-     * Populates the next batch of matches given the current shape in the stream side.
-     * This is solely used for nested loop join.
-     * It works as follows:
-     * 1. If there is no shape left in the stream side, it returns false.
-     * 2. If there are shapes left in the stream side, it uses the current shape in the stream side to query buildShapes
-     * The query result is a list of geometries in the build side that overlap with the current shape in the stream side.
-     * The query result is flattened to a list of pairs of geometries
-     * 3. If there are no results, it returns false.
+     * Populates the next batch of matches given the current shape in the stream side. This is
+     * solely used for nested loop join. It works as follows: 1. If there is no shape left in the
+     * stream side, it returns false. 2. If there are shapes left in the stream side, it uses the
+     * current shape in the stream side to query buildShapes The query result is a list of
+     * geometries in the build side that overlap with the current shape in the stream side. The
+     * query result is flattened to a list of pairs of geometries 3. If there are no results, it
+     * returns false.
+     *
      * @param buildShapes
      * @param streamShapes
      * @return
      */
-    private boolean populateNextBatch(List<? extends Geometry> buildShapes, Iterator<? extends Geometry> streamShapes)
-    {
+    private boolean populateNextBatch(
+            List<? extends Geometry> buildShapes, Iterator<? extends Geometry> streamShapes) {
         if (!streamShapes.hasNext()) {
             if (batch != null) {
                 batch = null;
@@ -291,17 +292,21 @@ abstract class JudgementBase<T extends Geometry, U extends Geometry>
         return false;
     }
 
-    protected void log(String message, Object... params)
-    {
+    protected void log(String message, Object... params) {
         if (Level.INFO.isGreaterOrEqual(log.getEffectiveLevel())) {
             final int partitionId = TaskContext.getPartitionId();
             final long threadId = Thread.currentThread().getId();
-            log.info("[" + threadId + ", PID=" + partitionId + "] " + String.format(message, params));
+            log.info(
+                    "["
+                            + threadId
+                            + ", PID="
+                            + partitionId
+                            + "] "
+                            + String.format(message, params));
         }
     }
 
-    private void logMilestone(long cnt, long threshold, String name)
-    {
+    private void logMilestone(long cnt, long threshold, String name) {
         if (cnt > 1 && cnt % threshold == 1) {
             log("[%s] Reached a milestone: %d", name, cnt);
         }

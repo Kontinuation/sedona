@@ -27,47 +27,44 @@ import com.amazonaws.services.s3.model.Bucket;
 import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
-import org.apache.log4j.Logger;
-
-import javax.imageio.ImageIO;
-
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import javax.imageio.ImageIO;
+import org.apache.log4j.Logger;
 
-public class S3Operator
-{
+public class S3Operator {
 
-    public final static Logger logger = Logger.getLogger(S3Operator.class);
+    public static final Logger logger = Logger.getLogger(S3Operator.class);
     private final AmazonS3 s3client;
 
-    public S3Operator(String regionName, String accessKey, String secretKey)
-    {
+    public S3Operator(String regionName, String accessKey, String secretKey) {
         Regions region = Regions.fromName(regionName);
         BasicAWSCredentials awsCreds = new BasicAWSCredentials(accessKey, secretKey);
-        s3client = AmazonS3ClientBuilder.standard().withRegion(region).withCredentials(new AWSStaticCredentialsProvider(awsCreds)).build();
+        s3client =
+                AmazonS3ClientBuilder.standard()
+                        .withRegion(region)
+                        .withCredentials(new AWSStaticCredentialsProvider(awsCreds))
+                        .build();
         logger.info("[Sedona-Viz][Constructor] Initialized a S3 client");
     }
 
-    public boolean createBucket(String bucketName)
-    {
+    public boolean createBucket(String bucketName) {
         Bucket bucket = s3client.createBucket(bucketName);
         logger.info("[Sedona-Viz][createBucket] Created a bucket: " + bucket.toString());
         return true;
     }
 
-    public boolean deleteImage(String bucketName, String path)
-    {
+    public boolean deleteImage(String bucketName, String path) {
         s3client.deleteObject(bucketName, path);
         logger.info("[Sedona-Viz][deleteImage] Deleted an image if exist");
         return true;
     }
 
     public boolean putImage(String bucketName, String path, BufferedImage rasterImage)
-            throws IOException
-    {
+            throws IOException {
         deleteImage(bucketName, path);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
@@ -83,9 +80,7 @@ public class S3Operator
         return true;
     }
 
-    public BufferedImage getImage(String bucketName, String path)
-            throws Exception
-    {
+    public BufferedImage getImage(String bucketName, String path) throws Exception {
         logger.debug("[Sedona-Viz][getImage] Start");
         S3Object s3Object = s3client.getObject(bucketName, path);
         InputStream inputStream = s3Object.getObjectContent();

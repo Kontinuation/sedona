@@ -16,9 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.showcase;
 
+import java.io.Serializable;
+import java.util.List;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.enums.FileDataSplitter;
@@ -41,106 +42,63 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 
-import java.io.Serializable;
-import java.util.List;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class Example.
- */
-public class Example
-        implements Serializable
-{
+/** The Class Example. */
+public class Example implements Serializable {
 
-    /**
-     * The sc.
-     */
+    /** The sc. */
     public static JavaSparkContext sc;
 
-    /**
-     * The geometry factory.
-     */
+    /** The geometry factory. */
     static GeometryFactory geometryFactory;
 
-    /**
-     * The Point RDD input location.
-     */
+    /** The Point RDD input location. */
     static String PointRDDInputLocation;
 
-    /**
-     * The Point RDD offset.
-     */
+    /** The Point RDD offset. */
     static Integer PointRDDOffset;
 
-    /**
-     * The Point RDD num partitions.
-     */
+    /** The Point RDD num partitions. */
     static Integer PointRDDNumPartitions;
 
-    /**
-     * The Point RDD splitter.
-     */
+    /** The Point RDD splitter. */
     static FileDataSplitter PointRDDSplitter;
 
-    /**
-     * The Point RDD index type.
-     */
+    /** The Point RDD index type. */
     static IndexType PointRDDIndexType;
 
-    /**
-     * The object RDD.
-     */
+    /** The object RDD. */
     static PointRDD objectRDD;
 
-    /**
-     * The Polygon RDD input location.
-     */
+    /** The Polygon RDD input location. */
     static String PolygonRDDInputLocation;
 
-    /**
-     * The Polygon RDD start offset.
-     */
+    /** The Polygon RDD start offset. */
     static Integer PolygonRDDStartOffset;
 
-    /**
-     * The Polygon RDD end offset.
-     */
+    /** The Polygon RDD end offset. */
     static Integer PolygonRDDEndOffset;
 
-    /**
-     * The Polygon RDD num partitions.
-     */
+    /** The Polygon RDD num partitions. */
     static Integer PolygonRDDNumPartitions;
 
-    /**
-     * The Polygon RDD splitter.
-     */
+    /** The Polygon RDD splitter. */
     static FileDataSplitter PolygonRDDSplitter;
 
-    /**
-     * The query window RDD.
-     */
+    /** The query window RDD. */
     static PolygonRDD queryWindowRDD;
 
-    /**
-     * The join query partitioning type.
-     */
+    /** The join query partitioning type. */
     static GridType joinQueryPartitioningType;
 
-    /**
-     * The each query loop times.
-     */
+    /** The each query loop times. */
     static int eachQueryLoopTimes;
 
-    /**
-     * The k NN query point.
-     */
+    /** The k NN query point. */
     static Point kNNQueryPoint;
 
-    /**
-     * The range query window.
-     */
+    /** The range query window. */
     static Envelope rangeQueryWindow;
 
     static String ShapeFileInputLocation;
@@ -150,8 +108,7 @@ public class Example
      *
      * @param args the arguments
      */
-    public static void main(String[] args)
-    {
+    public static void main(String[] args) {
         SparkConf conf = new SparkConf().setAppName("SedonaRunnableExample").setMaster("local[2]");
         conf.set("spark.serializer", KryoSerializer.class.getName());
         conf.set("spark.kryo.registrator", SedonaKryoRegistrator.class.getName());
@@ -192,8 +149,7 @@ public class Example
             testDistanceJoinQuery();
             testDistanceJoinQueryUsingIndex();
             testLoadShapefileIntoPolygonRDD();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
             System.out.println("DEMOs failed!");
             return;
@@ -207,13 +163,12 @@ public class Example
      *
      * @throws Exception the exception
      */
-    public static void testSpatialRangeQuery()
-            throws Exception
-    {
+    public static void testSpatialRangeQuery() throws Exception {
         objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true);
         objectRDD.rawSpatialRDD.persist(StorageLevel.MEMORY_ONLY());
         for (int i = 0; i < eachQueryLoopTimes; i++) {
-            long resultSize = RangeQuery.SpatialRangeQuery(objectRDD, rangeQueryWindow, false, false).count();
+            long resultSize =
+                    RangeQuery.SpatialRangeQuery(objectRDD, rangeQueryWindow, false, false).count();
             assert resultSize > -1;
         }
     }
@@ -223,14 +178,13 @@ public class Example
      *
      * @throws Exception the exception
      */
-    public static void testSpatialRangeQueryUsingIndex()
-            throws Exception
-    {
+    public static void testSpatialRangeQueryUsingIndex() throws Exception {
         objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true);
         objectRDD.buildIndex(PointRDDIndexType, false);
         objectRDD.indexedRawRDD.persist(StorageLevel.MEMORY_ONLY());
         for (int i = 0; i < eachQueryLoopTimes; i++) {
-            long resultSize = RangeQuery.SpatialRangeQuery(objectRDD, rangeQueryWindow, false, true).count();
+            long resultSize =
+                    RangeQuery.SpatialRangeQuery(objectRDD, rangeQueryWindow, false, true).count();
             assert resultSize > -1;
         }
     }
@@ -240,9 +194,7 @@ public class Example
      *
      * @throws Exception the exception
      */
-    public static void testSpatialKnnQuery()
-            throws Exception
-    {
+    public static void testSpatialKnnQuery() throws Exception {
         objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true);
         objectRDD.rawSpatialRDD.persist(StorageLevel.MEMORY_ONLY());
         for (int i = 0; i < eachQueryLoopTimes; i++) {
@@ -256,9 +208,7 @@ public class Example
      *
      * @throws Exception the exception
      */
-    public static void testSpatialKnnQueryUsingIndex()
-            throws Exception
-    {
+    public static void testSpatialKnnQueryUsingIndex() throws Exception {
         objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true);
         objectRDD.buildIndex(PointRDDIndexType, false);
         objectRDD.indexedRawRDD.persist(StorageLevel.MEMORY_ONLY());
@@ -273,10 +223,15 @@ public class Example
      *
      * @throws Exception the exception
      */
-    public static void testSpatialJoinQuery()
-            throws Exception
-    {
-        queryWindowRDD = new PolygonRDD(sc, PolygonRDDInputLocation, PolygonRDDStartOffset, PolygonRDDEndOffset, PolygonRDDSplitter, true);
+    public static void testSpatialJoinQuery() throws Exception {
+        queryWindowRDD =
+                new PolygonRDD(
+                        sc,
+                        PolygonRDDInputLocation,
+                        PolygonRDDStartOffset,
+                        PolygonRDDEndOffset,
+                        PolygonRDDSplitter,
+                        true);
         objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true);
 
         objectRDD.spatialPartitioning(joinQueryPartitioningType);
@@ -285,7 +240,8 @@ public class Example
         objectRDD.spatialPartitionedRDD.persist(StorageLevel.MEMORY_ONLY());
         queryWindowRDD.spatialPartitionedRDD.persist(StorageLevel.MEMORY_ONLY());
         for (int i = 0; i < eachQueryLoopTimes; i++) {
-            long resultSize = JoinQuery.SpatialJoinQuery(objectRDD, queryWindowRDD, false, true).count();
+            long resultSize =
+                    JoinQuery.SpatialJoinQuery(objectRDD, queryWindowRDD, false, true).count();
             assert resultSize > 0;
         }
     }
@@ -295,10 +251,15 @@ public class Example
      *
      * @throws Exception the exception
      */
-    public static void testSpatialJoinQueryUsingIndex()
-            throws Exception
-    {
-        queryWindowRDD = new PolygonRDD(sc, PolygonRDDInputLocation, PolygonRDDStartOffset, PolygonRDDEndOffset, PolygonRDDSplitter, true);
+    public static void testSpatialJoinQueryUsingIndex() throws Exception {
+        queryWindowRDD =
+                new PolygonRDD(
+                        sc,
+                        PolygonRDDInputLocation,
+                        PolygonRDDStartOffset,
+                        PolygonRDDEndOffset,
+                        PolygonRDDSplitter,
+                        true);
         objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true);
 
         objectRDD.spatialPartitioning(joinQueryPartitioningType);
@@ -310,7 +271,8 @@ public class Example
         queryWindowRDD.spatialPartitionedRDD.persist(StorageLevel.MEMORY_ONLY());
 
         for (int i = 0; i < eachQueryLoopTimes; i++) {
-            long resultSize = JoinQuery.SpatialJoinQuery(objectRDD, queryWindowRDD, true, false).count();
+            long resultSize =
+                    JoinQuery.SpatialJoinQuery(objectRDD, queryWindowRDD, true, false).count();
             assert resultSize > 0;
         }
     }
@@ -320,9 +282,7 @@ public class Example
      *
      * @throws Exception the exception
      */
-    public static void testDistanceJoinQuery()
-            throws Exception
-    {
+    public static void testDistanceJoinQuery() throws Exception {
         objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true);
         CircleRDD queryWindowRDD = new CircleRDD(objectRDD, 0.1);
 
@@ -334,7 +294,8 @@ public class Example
 
         for (int i = 0; i < eachQueryLoopTimes; i++) {
 
-            long resultSize = JoinQuery.DistanceJoinQuery(objectRDD, queryWindowRDD, false, true).count();
+            long resultSize =
+                    JoinQuery.DistanceJoinQuery(objectRDD, queryWindowRDD, false, true).count();
             assert resultSize > 0;
         }
     }
@@ -344,9 +305,7 @@ public class Example
      *
      * @throws Exception the exception
      */
-    public static void testDistanceJoinQueryUsingIndex()
-            throws Exception
-    {
+    public static void testDistanceJoinQueryUsingIndex() throws Exception {
         objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true);
         CircleRDD queryWindowRDD = new CircleRDD(objectRDD, 0.1);
 
@@ -359,20 +318,19 @@ public class Example
         queryWindowRDD.spatialPartitionedRDD.persist(StorageLevel.MEMORY_ONLY());
 
         for (int i = 0; i < eachQueryLoopTimes; i++) {
-            long resultSize = JoinQuery.DistanceJoinQuery(objectRDD, queryWindowRDD, true, true).count();
+            long resultSize =
+                    JoinQuery.DistanceJoinQuery(objectRDD, queryWindowRDD, true, true).count();
             assert resultSize > 0;
         }
     }
 
-    public static void testLoadShapefileIntoPolygonRDD()
-            throws Exception
-    {
+    public static void testLoadShapefileIntoPolygonRDD() throws Exception {
         ShapefileRDD shapefileRDD = new ShapefileRDD(sc, ShapeFileInputLocation);
         PolygonRDD spatialRDD = new PolygonRDD(shapefileRDD.getPolygonRDD());
         try {
-            RangeQuery.SpatialRangeQuery(spatialRDD, new Envelope(-180, 180, -90, 90), false, false).count();
-        }
-        catch (Exception e) {
+            RangeQuery.SpatialRangeQuery(spatialRDD, new Envelope(-180, 180, -90, 90), false, false)
+                    .count();
+        } catch (Exception e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }

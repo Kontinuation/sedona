@@ -16,10 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.shapes;
 
 import com.google.common.primitives.Longs;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.InputSplit;
@@ -29,31 +33,16 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.CombineFileSplit;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+public class ShapeInputFormat extends CombineFileInputFormat<ShapeKey, PrimitiveShape> {
+    /** suffix of attribute file */
+    private static final String DBF_SUFFIX = "dbf";
+    /** suffix of shape record file */
+    private static final String SHP_SUFFIX = "shp";
+    /** suffix of index file */
+    private static final String SHX_SUFFIX = "shx";
 
-public class ShapeInputFormat
-        extends CombineFileInputFormat<ShapeKey, PrimitiveShape>
-{
-    /**
-     * suffix of attribute file
-     */
-    private final static String DBF_SUFFIX = "dbf";
-    /**
-     * suffix of shape record file
-     */
-    private final static String SHP_SUFFIX = "shp";
-    /**
-     * suffix of index file
-     */
-    private final static String SHX_SUFFIX = "shx";
-
-    public RecordReader<ShapeKey, PrimitiveShape> createRecordReader(InputSplit split, TaskAttemptContext context)
-            throws IOException
-    {
+    public RecordReader<ShapeKey, PrimitiveShape> createRecordReader(
+            InputSplit split, TaskAttemptContext context) throws IOException {
         return new CombineShapeReader();
     }
 
@@ -65,15 +54,12 @@ public class ShapeInputFormat
      * @return
      */
     @Override
-    protected boolean isSplitable(JobContext context, Path file)
-    {
+    protected boolean isSplitable(JobContext context, Path file) {
         return false;
     }
 
     @Override
-    public List<InputSplit> getSplits(JobContext job)
-            throws IOException
-    {
+    public List<InputSplit> getSplits(JobContext job) throws IOException {
         // get input paths and assign a split for every single path
         String parentpath = job.getConfiguration().get("mapred.input.dir");
         String[] childpaths = parentpath.split(",");
@@ -81,7 +67,8 @@ public class ShapeInputFormat
         for (String childPath : childpaths) {
             job.getConfiguration().set("mapred.input.dir", childPath);
             // get all files in input file path and sort for filename order
-            CombineFileSplit combineChildPathFileSplit = (CombineFileSplit) super.getSplits(job).get(0);
+            CombineFileSplit combineChildPathFileSplit =
+                    (CombineFileSplit) super.getSplits(job).get(0);
             Path[] filePaths = combineChildPathFileSplit.getPaths();
             long[] fileSizes = combineChildPathFileSplit.getLengths();
 
@@ -101,14 +88,20 @@ public class ShapeInputFormat
                 String filename = FilenameUtils.removeExtension(filePath.getName()).toLowerCase();
                 String suffix = FilenameUtils.getExtension(filePath.getName()).toLowerCase();
 
-                if (!(suffix.equals(SHX_SUFFIX) || suffix.equals(DBF_SUFFIX) || suffix.equals(SHP_SUFFIX))) {
+                if (!(suffix.equals(SHX_SUFFIX)
+                        || suffix.equals(DBF_SUFFIX)
+                        || suffix.equals(SHP_SUFFIX))) {
                     // Currently we only support .shp, .shx, and .dbf files
                     continue;
                 }
 
                 if (!prevfilename.isEmpty() && !prevfilename.equals(filename)) {
-                    // compare file name and if it is different then all same filename is into CombineFileSplit
-                    splits.add(new CombineFileSplit(fileSplitPathParts.toArray(new Path[0]), Longs.toArray(fileSplitSizeParts)));
+                    // compare file name and if it is different then all same filename is into
+                    // CombineFileSplit
+                    splits.add(
+                            new CombineFileSplit(
+                                    fileSplitPathParts.toArray(new Path[0]),
+                                    Longs.toArray(fileSplitSizeParts)));
                     fileSplitPathParts.clear();
                     fileSplitSizeParts.clear();
                 }
@@ -119,7 +112,10 @@ public class ShapeInputFormat
             }
 
             if (fileSplitPathParts.size() != 0) {
-                splits.add(new CombineFileSplit(fileSplitPathParts.toArray(new Path[0]), Longs.toArray(fileSplitSizeParts)));
+                splits.add(
+                        new CombineFileSplit(
+                                fileSplitPathParts.toArray(new Path[0]),
+                                Longs.toArray(fileSplitSizeParts)));
             }
         }
         return splits;

@@ -1,23 +1,25 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.common.raster.serde;
 
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
-import org.junit.Assert;
-import org.junit.Test;
-
 import java.awt.image.DataBuffer;
 import java.awt.image.DataBufferByte;
 import java.awt.image.DataBufferDouble;
@@ -25,6 +27,8 @@ import java.awt.image.DataBufferFloat;
 import java.awt.image.DataBufferInt;
 import java.awt.image.DataBufferShort;
 import java.awt.image.DataBufferUShort;
+import org.junit.Assert;
+import org.junit.Test;
 
 public class DataBufferSerializerTest extends KryoSerializerTestBase {
     private static final DataBufferSerializer serializer = new DataBufferSerializer();
@@ -36,7 +40,8 @@ public class DataBufferSerializerTest extends KryoSerializerTestBase {
         Assert.assertArrayEquals(expected.getOffsets(), actual.getOffsets());
         for (int bank = 0; bank < expected.getNumBanks(); bank++) {
             for (int k = 0; k < expected.getSize(); k++) {
-                Assert.assertEquals(expected.getElemDouble(bank, k), actual.getElemDouble(bank, k), 1e-6);
+                Assert.assertEquals(
+                        expected.getElemDouble(bank, k), actual.getElemDouble(bank, k), 1e-6);
             }
         }
     }
@@ -44,8 +49,8 @@ public class DataBufferSerializerTest extends KryoSerializerTestBase {
     @Test
     public void serializeByteBuffer() {
         byte[][] dataArray = {
-                {1, 2, 3, 4, 5},
-                {6, 7, 8, 9, 0}
+            {1, 2, 3, 4, 5},
+            {6, 7, 8, 9, 0}
         };
         int size = 5;
         int[] offsets = {0, 0};
@@ -62,8 +67,8 @@ public class DataBufferSerializerTest extends KryoSerializerTestBase {
     @Test
     public void serializeShortBuffer() {
         short[][] dataArray = {
-                {1, 2, 3, 4, 5},
-                {6, 7, 8, 9, 0}
+            {1, 2, 3, 4, 5},
+            {6, 7, 8, 9, 0}
         };
         int size = 5;
         int[] offsets = {0, 0};
@@ -81,8 +86,8 @@ public class DataBufferSerializerTest extends KryoSerializerTestBase {
     @Test
     public void serializeUShortBuffer() {
         short[][] dataArray = {
-                {1, 2, 3, 4, 5},
-                {6, 7, 8, 9, 0}
+            {1, 2, 3, 4, 5},
+            {6, 7, 8, 9, 0}
         };
         int size = 5;
         int[] offsets = {0, 0};
@@ -100,8 +105,8 @@ public class DataBufferSerializerTest extends KryoSerializerTestBase {
     @Test
     public void serializeIntBuffer() {
         int[][] dataArray = {
-                {1, 2, 3, 4, 5},
-                {6, 7, 8, 9, 0}
+            {1, 2, 3, 4, 5},
+            {6, 7, 8, 9, 0}
         };
         int size = 5;
         int[] offsets = {0, 0};
@@ -118,8 +123,8 @@ public class DataBufferSerializerTest extends KryoSerializerTestBase {
     @Test
     public void serializeFloatBuffer() {
         float[][] dataArray = {
-                {1, 2, 3, 4, 5},
-                {6, 7, 8, 9, 0}
+            {1, 2, 3, 4, 5},
+            {6, 7, 8, 9, 0}
         };
         int size = 5;
         int[] offsets = {0, 0};
@@ -136,8 +141,8 @@ public class DataBufferSerializerTest extends KryoSerializerTestBase {
     @Test
     public void serializeDoubleBuffer() {
         double[][] dataArray = {
-                {1, 2, 3, 4, 5},
-                {6, 7, 8, 9, 0}
+            {1, 2, 3, 4, 5},
+            {6, 7, 8, 9, 0}
         };
         int size = 5;
         int[] offsets = {0, 0};

@@ -18,6 +18,9 @@
  */
 package org.apache.sedona.core.utils;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Properties;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.enums.FileDataSplitter;
@@ -35,86 +38,51 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.Properties;
-
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class CRSTransformationTest.
- */
-public class CRSTransformationTest
-{
+/** The Class CRSTransformationTest. */
+public class CRSTransformationTest {
 
-    /**
-     * The sc.
-     */
+    /** The sc. */
     public static JavaSparkContext sc;
 
-    /**
-     * The prop.
-     */
+    /** The prop. */
     static Properties prop;
 
-    /**
-     * The input.
-     */
+    /** The input. */
     static InputStream input;
 
-    /**
-     * The Input location.
-     */
+    /** The Input location. */
     static String InputLocation;
 
-    /**
-     * The offset.
-     */
+    /** The offset. */
     static Integer offset;
 
-    /**
-     * The splitter.
-     */
+    /** The splitter. */
     static FileDataSplitter splitter;
 
-    /**
-     * The index type.
-     */
+    /** The index type. */
     static IndexType indexType;
 
-    /**
-     * The num partitions.
-     */
+    /** The num partitions. */
     static Integer numPartitions;
 
-    /**
-     * The query envelope.
-     */
+    /** The query envelope. */
     static Envelope queryEnvelope;
 
-    /**
-     * The loop times.
-     */
+    /** The loop times. */
     static int loopTimes;
 
-    /**
-     * The query point.
-     */
+    /** The query point. */
     static Point queryPoint;
 
-    /**
-     * The grid type.
-     */
+    /** The grid type. */
     static GridType gridType;
 
-    /**
-     * The Input location query polygon.
-     */
+    /** The Input location query polygon. */
     static String InputLocationQueryPolygon;
 
-    /**
-     * The top K.
-     */
+    /** The top K. */
     static int topK;
 
     /**
@@ -123,15 +91,16 @@ public class CRSTransformationTest
      * @throws Exception the exception
      */
     @BeforeClass
-    public static void setUpBeforeClass()
-            throws Exception
-    {
+    public static void setUpBeforeClass() throws Exception {
         SparkConf conf = new SparkConf().setAppName("PointRange").setMaster("local[2]");
         sc = new JavaSparkContext(conf);
         Logger.getLogger("org").setLevel(Level.WARN);
         Logger.getLogger("akka").setLevel(Level.WARN);
         prop = new Properties();
-        input = CRSTransformationTest.class.getClassLoader().getResourceAsStream("crs.test.properties");
+        input =
+                CRSTransformationTest.class
+                        .getClassLoader()
+                        .getResourceAsStream("crs.test.properties");
 
         offset = 0;
         splitter = null;
@@ -143,8 +112,18 @@ public class CRSTransformationTest
             prop.load(input);
             // There is a field in the property file, you can edit your own file location there.
             // InputLocation = prop.getProperty("inputLocation");
-            InputLocation = "file://" + CRSTransformationTest.class.getClassLoader().getResource(prop.getProperty("inputLocation")).getPath();
-            InputLocationQueryPolygon = "file://" + CRSTransformationTest.class.getClassLoader().getResource(prop.getProperty("queryPolygonSet")).getPath();
+            InputLocation =
+                    "file://"
+                            + CRSTransformationTest.class
+                                    .getClassLoader()
+                                    .getResource(prop.getProperty("inputLocation"))
+                                    .getPath();
+            InputLocationQueryPolygon =
+                    "file://"
+                            + CRSTransformationTest.class
+                                    .getClassLoader()
+                                    .getResource(prop.getProperty("queryPolygonSet"))
+                                    .getPath();
             offset = Integer.parseInt(prop.getProperty("offset"));
             splitter = FileDataSplitter.getFileDataSplitter(prop.getProperty("splitter"));
             gridType = GridType.getGridType(prop.getProperty("gridType"));
@@ -152,16 +131,13 @@ public class CRSTransformationTest
             numPartitions = Integer.parseInt(prop.getProperty("numPartitions"));
             queryEnvelope = new Envelope(-90.01, -80.01, 30.01, 40.01);
             loopTimes = 1;
-        }
-        catch (IOException ex) {
+        } catch (IOException ex) {
             ex.printStackTrace();
-        }
-        finally {
+        } finally {
             if (input != null) {
                 try {
                     input.close();
-                }
-                catch (IOException e) {
+                } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
@@ -177,9 +153,7 @@ public class CRSTransformationTest
      * @throws Exception the exception
      */
     @AfterClass
-    public static void tearDown()
-            throws Exception
-    {
+    public static void tearDown() throws Exception {
         sc.stop();
     }
 
@@ -189,14 +163,18 @@ public class CRSTransformationTest
      * @throws Exception the exception
      */
     @Test
-    public void testSpatialRangeQuery()
-            throws Exception
-    {
+    public void testSpatialRangeQuery() throws Exception {
         PointRDD spatialRDD = new PointRDD(sc, InputLocation, offset, splitter, true);
         spatialRDD.flipCoordinates();
-        spatialRDD.CRSTransform( "epsg:4326", "epsg:3005");
-        long resultSize = RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, false).count();
+        spatialRDD.CRSTransform("epsg:4326", "epsg:3005");
+        long resultSize =
+                RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, false).count();
         assert resultSize == 3127;
-        assert RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, false).take(10).get(1).getUserData().toString() != null;
+        assert RangeQuery.SpatialRangeQuery(spatialRDD, queryEnvelope, false, false)
+                        .take(10)
+                        .get(1)
+                        .getUserData()
+                        .toString()
+                != null;
     }
 }

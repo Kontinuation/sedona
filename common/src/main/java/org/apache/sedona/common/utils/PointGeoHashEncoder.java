@@ -20,10 +20,9 @@ package org.apache.sedona.common.utils;
 
 import org.locationtech.jts.geom.Point;
 
-
 public class PointGeoHashEncoder {
     private static String base32 = "0123456789bcdefghjkmnpqrstuvwxyz";
-    private static int[] bits = new int[] { 16, 8, 4, 2, 1 };
+    private static int[] bits = new int[] {16, 8, 4, 2, 1};
 
     public static String calculateGeoHash(Point geom, long precision) {
         BBox bbox = new BBox(-180, 180, -90, 90);
@@ -32,11 +31,17 @@ public class PointGeoHashEncoder {
             return "";
         }
         return geoHashAggregate(geom, precisionUpdated, 0, "", true, bbox, 0, 0);
-
     }
 
-    private static String geoHashAggregate(Point point, long precision, long currentPrecision,
-        String geoHash, boolean isEven, BBox bbox, int bit, int ch) {
+    private static String geoHashAggregate(
+            Point point,
+            long precision,
+            long currentPrecision,
+            String geoHash,
+            boolean isEven,
+            BBox bbox,
+            int bit,
+            int ch) {
         if (currentPrecision >= precision) {
             return geoHash;
         }
@@ -68,27 +73,25 @@ public class PointGeoHashEncoder {
         }
         if (bit < 4) {
             return geoHashAggregate(
-                point,
-                precision,
-                currentPrecision,
-                geoHash,
-                !isEven,
-                updatedBbox,
-                bit + 1,
-                updatedCh
-            );
+                    point,
+                    precision,
+                    currentPrecision,
+                    geoHash,
+                    !isEven,
+                    updatedBbox,
+                    bit + 1,
+                    updatedCh);
         } else {
             String geoHashUpdated = geoHash + base32.charAt(updatedCh);
             return geoHashAggregate(
-                point,
-                precision,
-                currentPrecision + 1,
-                geoHashUpdated,
-                !isEven,
-                updatedBbox,
-                0,
-                0
-            );
+                    point,
+                    precision,
+                    currentPrecision + 1,
+                    geoHashUpdated,
+                    !isEven,
+                    updatedBbox,
+                    0,
+                    0);
         }
     }
 }

@@ -22,16 +22,10 @@ import org.apache.sedona.viz.core.PhotoFilter;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Class GaussianBlur.
- */
-public class GaussianBlur
-        extends PhotoFilter
-{
+/** The Class GaussianBlur. */
+public class GaussianBlur extends PhotoFilter {
 
-    /**
-     * The stdev.
-     */
+    /** The stdev. */
     double stdev = 0.5;
 
     /**
@@ -39,19 +33,23 @@ public class GaussianBlur
      *
      * @param blurRadius the blur radius
      */
-    public GaussianBlur(int blurRadius)
-    {
+    public GaussianBlur(int blurRadius) {
         super(blurRadius);
         double originalConvolutionMatrixSum = 0.0;
         for (int x = -filterRadius; x <= filterRadius; x++) {
             for (int y = -filterRadius; y <= filterRadius; y++) {
-                convolutionMatrix[x + filterRadius][y + filterRadius] = Math.exp(-(x * x + y * y) / (2.0 * stdev * stdev)) / (2 * stdev * stdev * Math.PI);
-                originalConvolutionMatrixSum += convolutionMatrix[x + filterRadius][y + filterRadius];
+                convolutionMatrix[x + filterRadius][y + filterRadius] =
+                        Math.exp(-(x * x + y * y) / (2.0 * stdev * stdev))
+                                / (2 * stdev * stdev * Math.PI);
+                originalConvolutionMatrixSum +=
+                        convolutionMatrix[x + filterRadius][y + filterRadius];
             }
         }
         for (int x = -filterRadius; x <= filterRadius; x++) {
             for (int y = -filterRadius; y <= filterRadius; y++) {
-                convolutionMatrix[x + filterRadius][y + filterRadius] = convolutionMatrix[x + filterRadius][y + filterRadius] / originalConvolutionMatrixSum;
+                convolutionMatrix[x + filterRadius][y + filterRadius] =
+                        convolutionMatrix[x + filterRadius][y + filterRadius]
+                                / originalConvolutionMatrixSum;
             }
         }
     }

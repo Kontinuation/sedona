@@ -16,54 +16,40 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.dbf;
-
-import org.apache.commons.io.EndianUtils;
-import org.apache.hadoop.io.Text;
-import org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.shp.ShapeFileConst;
 
 import java.io.DataInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.commons.io.EndianUtils;
+import org.apache.hadoop.io.Text;
+import org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.shp.ShapeFileConst;
 
-public class DbfParseUtil
-        implements ShapeFileConst
-{
+public class DbfParseUtil implements ShapeFileConst {
 
-    /**
-     * number of record get from header
-     */
+    /** number of record get from header */
     public int numRecord = 0;
 
-    /**
-     * number of bytes per record
-     */
+    /** number of bytes per record */
     public int numBytesRecord = 0;
 
-    /**
-     * number of records already read. Records that is ignored also counted in
-     */
+    /** number of records already read. Records that is ignored also counted in */
     public int numRecordRead;
-    /**
-     * fieldDescriptors of current .dbf file
-     */
+    /** fieldDescriptors of current .dbf file */
     private List<FieldDescriptor> fieldDescriptors = null;
 
     /**
-     * Copied from org.geotools.data.shapefile.dbf.fastParse
-     * Performs a faster byte[] to String conversion under the assumption the content
-     * is represented with one byte per char
+     * Copied from org.geotools.data.shapefile.dbf.fastParse Performs a faster byte[] to String
+     * conversion under the assumption the content is represented with one byte per char
      *
      * @param bytes
      * @param fieldOffset
      * @param fieldLen
      * @return
      */
-    private static String fastParse(final byte[] bytes, final int fieldOffset, final int fieldLen)
-    {
+    private static String fastParse(final byte[] bytes, final int fieldOffset, final int fieldLen) {
         // faster reading path, the decoder is for some reason slower,
         // probably because it has to make extra checks to support multibyte chars
         final char[] chars = new char[fieldLen];
@@ -74,18 +60,15 @@ public class DbfParseUtil
         return new String(chars);
     }
 
-    public boolean isDone()
-    {
+    public boolean isDone() {
         return numRecordRead >= numRecord;
     }
 
-    public float getProgress()
-    {
+    public float getProgress() {
         return (float) numRecordRead / (float) numRecord;
     }
 
-    public List<FieldDescriptor> getFieldDescriptors()
-    {
+    public List<FieldDescriptor> getFieldDescriptors() {
         return fieldDescriptors;
     }
 
@@ -96,9 +79,7 @@ public class DbfParseUtil
      * @return
      * @throws IOException
      */
-    public void parseFileHead(DataInputStream inputStream)
-            throws IOException
-    {
+    public void parseFileHead(DataInputStream inputStream) throws IOException {
         // version
         inputStream.readByte();
         // date YYMMDD format
@@ -129,12 +110,14 @@ public class DbfParseUtil
         byte terminator = inputStream.readByte();
         while (terminator != ShapeFileConst.FIELD_DESCRIPTOR_TERMINATOR) {
             FieldDescriptor descriptor = new FieldDescriptor();
-            //read field name
+            // read field name
             byte[] nameBytes = new byte[ShapeFileConst.FIELD_NAME_LENGTH];
             nameBytes[0] = terminator;
             inputStream.readFully(nameBytes, 1, 10);
             int zeroId = 0;
-            while (nameBytes[zeroId] != 0) { zeroId++; }
+            while (nameBytes[zeroId] != 0) {
+                zeroId++;
+            }
             Text fieldName = new Text();
             fieldName.append(nameBytes, 0, zeroId);
             descriptor.setFieldName(fieldName.toString());
@@ -160,21 +143,24 @@ public class DbfParseUtil
      * @return
      * @throws IOException
      */
-    public String parsePrimitiveRecord(DataInputStream inputStream)
-            throws IOException
-    {
-        if (isDone()) { return null; }
+    public String parsePrimitiveRecord(DataInputStream inputStream) throws IOException {
+        if (isDone()) {
+            return null;
+        }
         byte flag = inputStream.readByte();
-        final int recordLength = numBytesRecord - 1;//exclude skip the record flag when read and skip
+        final int recordLength =
+                numBytesRecord - 1; // exclude skip the record flag when read and skip
         while (flag == ShapeFileConst.RECORD_DELETE_FLAG) {
             inputStream.skipBytes(recordLength);
             numRecordRead++;
             flag = inputStream.readByte();
         }
-        if (flag == ShapeFileConst.FILE_END_FLAG) { return null; }
+        if (flag == ShapeFileConst.FILE_END_FLAG) {
+            return null;
+        }
         byte[] primitiveBytes = new byte[recordLength];
         inputStream.readFully(primitiveBytes);
-        numRecordRead++; //update number of record read
+        numRecordRead++; // update number of record read
         return primitiveToAttributes(ByteBuffer.wrap(primitiveBytes));
     }
 
@@ -185,19 +171,17 @@ public class DbfParseUtil
      * @return
      * @throws IOException
      */
-    public String primitiveToAttributes(DataInputStream inputStream)
-            throws IOException
-    {
+    public String primitiveToAttributes(DataInputStream inputStream) throws IOException {
         byte[] delimiter = {'\t'};
         Text attributes = new Text();
         for (int i = 0; i < fieldDescriptors.size(); ++i) {
             FieldDescriptor descriptor = fieldDescriptors.get(i);
             byte[] fldBytes = new byte[descriptor.getFieldLength()];
             inputStream.readFully(fldBytes);
-            //System.out.println(descriptor.getFiledName() + "  " + new String(fldBytes));
+            // System.out.println(descriptor.getFiledName() + "  " + new String(fldBytes));
             byte[] attr = new String(fldBytes).trim().getBytes();
             if (i > 0) {
-                attributes.append(delimiter, 0, 1);// first attribute doesn't append '\t'
+                attributes.append(delimiter, 0, 1); // first attribute doesn't append '\t'
             }
             attributes.append(attr, 0, attr.length);
         }
@@ -212,9 +196,7 @@ public class DbfParseUtil
      * @return
      * @throws IOException
      */
-    public String primitiveToAttributes(ByteBuffer buffer)
-            throws IOException
-    {
+    public String primitiveToAttributes(ByteBuffer buffer) throws IOException {
         byte[] delimiter = {'\t'};
         Text attributes = new Text();
         for (int i = 0; i < fieldDescriptors.size(); ++i) {
@@ -223,9 +205,10 @@ public class DbfParseUtil
             buffer.get(fldBytes, 0, fldBytes.length);
             String charset = System.getProperty("sedona.global.charset", "default");
             Boolean utf8flag = charset.equalsIgnoreCase("utf8");
-            byte[] attr = utf8flag ? fldBytes : fastParse(fldBytes, 0, fldBytes.length).trim().getBytes();
+            byte[] attr =
+                    utf8flag ? fldBytes : fastParse(fldBytes, 0, fldBytes.length).trim().getBytes();
             if (i > 0) {
-                attributes.append(delimiter, 0, 1);// first attribute doesn't append '\t'
+                attributes.append(delimiter, 0, 1); // first attribute doesn't append '\t'
             }
             attributes.append(attr, 0, attr.length);
         }

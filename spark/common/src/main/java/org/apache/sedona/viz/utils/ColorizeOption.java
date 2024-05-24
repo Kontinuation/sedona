@@ -22,31 +22,19 @@ import java.io.Serializable;
 
 // TODO: Auto-generated Javadoc
 
-/**
- * The Enum ColorizeOption.
- */
-public enum ColorizeOption
-        implements Serializable
-{
+/** The Enum ColorizeOption. */
+public enum ColorizeOption implements Serializable {
 
-    /**
-     * The earthobservation.
-     */
+    /** The earthobservation. */
     EARTHOBSERVATION("EARTHOBSERVATION"),
 
-    /**
-     * The spatialaggregation.
-     */
+    /** The spatialaggregation. */
     SPATIALAGGREGATION("spatialaggregation"),
 
-    /**
-     * The normal.
-     */
+    /** The normal. */
     NORMAL("normal");
 
-    /**
-     * The type name.
-     */
+    /** The type name. */
     private String typeName = "normal";
 
     /**
@@ -54,8 +42,7 @@ public enum ColorizeOption
      *
      * @param typeName the type name
      */
-    ColorizeOption(String typeName)
-    {
+    ColorizeOption(String typeName) {
         this.setTypeName(typeName);
     }
 
@@ -65,10 +52,11 @@ public enum ColorizeOption
      * @param str the str
      * @return the colorize option
      */
-    public static ColorizeOption getColorizeOption(String str)
-    {
+    public static ColorizeOption getColorizeOption(String str) {
         for (ColorizeOption me : ColorizeOption.values()) {
-            if (me.name().equalsIgnoreCase(str)) { return me; }
+            if (me.name().equalsIgnoreCase(str)) {
+                return me;
+            }
         }
         return null;
     }
@@ -78,8 +66,7 @@ public enum ColorizeOption
      *
      * @return the type name
      */
-    public String getTypeName()
-    {
+    public String getTypeName() {
         return typeName;
     }
 
@@ -88,8 +75,7 @@ public enum ColorizeOption
      *
      * @param typeName the new type name
      */
-    public void setTypeName(String typeName)
-    {
+    public void setTypeName(String typeName) {
         this.typeName = typeName;
     }
 }

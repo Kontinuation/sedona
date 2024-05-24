@@ -16,21 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-/*
- * The following content is a Java rewrite version of SciSpark NetCDFUtils.scala which is under Apache License.
- * SciSpark project is hosted on GitHub: https://github.com/SciSpark/SciSpark
- * Written by Jia Yu (jiayu@apache.org).
- * The Java version also contains more functions. Please refer to SerNetCDF README for more function details.
- * 1. getDataSym(): get an observation from a symmetric mapping. One observation maps one geo-location
- * 2. getDataAsym(): get an observation from a asymmetric mapping. One geolocation maps more than one observation.
- * Or, one observation maps more than one geolocation
- * 3. SerNetCDF doesn't force user to do 2D->1D array transformation. Because observations array does not follow
- *  asymmetric mapping, many of the observations are actually not used at all. It is no need to convert them at the
- *  beginning. It will directly jump to the desired array cell with O(1) complexity.
- * 4. SerNetCDF considers hdf increment and hdf offset. These two variables control the mapping between geolocations and observations.
- */
 package org.apache.sedona.core.formatMapper.netcdfParser;
 
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.Iterator;
 import ucar.ma2.Array;
 import ucar.ma2.Index;
 import ucar.nc2.Dimension;
@@ -39,37 +29,26 @@ import ucar.nc2.Variable;
 import ucar.nc2.dataset.NetcdfDataset;
 import ucar.nc2.dataset.NetcdfDatasets;
 
-import java.io.IOException;
-import java.io.Serializable;
-import java.util.Iterator;
-
-/**
- * The Class SerNetCDFUtils.
- */
-public class SerNetCDFUtils
-        implements Serializable
-{
+/** The Class SerNetCDFUtils. */
+public class SerNetCDFUtils implements Serializable {
 
     /**
      * Extracts a variable's data from a NetCDF.
-     * <p>
-     * If the variable is not found then an Array with the element 0.0
-     * is returned with shape (1,1). Note that all dimensions of size 1 are eliminated.
-     * For example the array shape (21, 5, 1, 2) is reduced to (21, 5, 2) since the 3rd dimension
-     * only ranges over a single value.
+     *
+     * <p>If the variable is not found then an Array with the element 0.0 is returned with shape
+     * (1,1). Note that all dimensions of size 1 are eliminated. For example the array shape (21, 5,
+     * 1, 2) is reduced to (21, 5, 2) since the 3rd dimension only ranges over a single value.
      *
      * @param netcdfFile The NetCDF file.
      * @param variable The variable whose data we want to extract.
      * @return 2D Data array.
      */
-    public static Array getNetCDF2DArray(NetcdfDataset netcdfFile, String variable)
-    {
+    public static Array getNetCDF2DArray(NetcdfDataset netcdfFile, String variable) {
         Variable netcdfVal = netcdfFile.findVariable(variable);
         Array searchVariable = null;
         try {
             searchVariable = netcdfVal.read();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
@@ -77,8 +56,8 @@ public class SerNetCDFUtils
     }
 
     /**
-     * Gets the data from asymmetric mapping. One geolocation maps more than one observation.
-     * Or, one observation maps more than one geolocation.
+     * Gets the data from asymmetric mapping. One geolocation maps more than one observation. Or,
+     * one observation maps more than one geolocation.
      *
      * @param array the array
      * @param i the i
@@ -87,8 +66,7 @@ public class SerNetCDFUtils
      * @param increment the increment
      * @return the data asym
      */
-    public static Double getDataAsym(Array array, int i, int j, int offset, int increment)
-    {
+    public static Double getDataAsym(Array array, int i, int j, int offset, int increment) {
         Index dataIndex = Index.factory(array.getShape());
         int[] location = {offset + i * increment, offset + j * increment};
         dataIndex.set(location);
@@ -116,8 +94,7 @@ public class SerNetCDFUtils
      * @param j the j
      * @return the data sym
      */
-    public static Double getDataSym(Array array, int i, int j)
-    {
+    public static Double getDataSym(Array array, int i, int j) {
         Index dataIndex = Index.factory(array.getShape());
         int[] location = {i, j};
         dataIndex.set(location);
@@ -143,16 +120,13 @@ public class SerNetCDFUtils
      * @param url the url
      * @return the netcdf dataset
      */
-    public static NetcdfDataset loadNetCDFDataSet(String url)
-    {
+    public static NetcdfDataset loadNetCDFDataSet(String url) {
         NetcdfDataset dataset = null;
         try {
             dataset = NetcdfDatasets.openDataset(url);
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return dataset;
@@ -166,17 +140,15 @@ public class SerNetCDFUtils
      * @param bufferSize The size of the buffer to be used
      * @return the netcdf dataset
      */
-    public static NetcdfDataset loadDFSNetCDFDataSet(String dfsUri, String location, Integer bufferSize)
-    {
+    public static NetcdfDataset loadDFSNetCDFDataSet(
+            String dfsUri, String location, Integer bufferSize) {
         NetcdfDataset dataset = null;
         try {
             HDFSRandomAccessFile raf = new HDFSRandomAccessFile(dfsUri, location, bufferSize);
             dataset = new NetcdfDataset(NetcdfFile.open(raf, location, null, null));
-        }
-        catch (IOException e) {
+        } catch (IOException e) {
             e.printStackTrace();
-        }
-        catch (Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
         return dataset;
@@ -189,16 +161,18 @@ public class SerNetCDFUtils
      * @param rowDim the row dim
      * @return the dimension size
      */
-    public static Integer getDimensionSize(NetcdfDataset netcdfFile, String rowDim)
-    {
+    public static Integer getDimensionSize(NetcdfDataset netcdfFile, String rowDim) {
         int dimSize = -1;
         Iterator<Dimension> it = netcdfFile.getDimensions().iterator();
         while (it.hasNext()) {
             Dimension d = it.next();
-			if (d.getShortName().equals(rowDim)) {dimSize = d.getLength();}
+            if (d.getShortName().equals(rowDim)) {
+                dimSize = d.getLength();
+            }
         }
-		if (dimSize < 0) {throw new IllegalStateException("Dimension does not exist!!!");}
+        if (dimSize < 0) {
+            throw new IllegalStateException("Dimension does not exist!!!");
+        }
         return dimSize;
     }
-
 }

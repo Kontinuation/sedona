@@ -48,8 +48,8 @@ public class ByteArrayImageInputStream extends ImageInputStreamImpl {
             throw new NullPointerException("b == null!");
         }
         if (off < 0 || len < 0 || off + len > b.length || off + len < 0) {
-            throw new IndexOutOfBoundsException
-                    ("off < 0 || len < 0 || off+len > b.length || off+len < 0!");
+            throw new IndexOutOfBoundsException(
+                    "off < 0 || len < 0 || off+len > b.length || off+len < 0!");
         }
 
         bitOffset = 0;

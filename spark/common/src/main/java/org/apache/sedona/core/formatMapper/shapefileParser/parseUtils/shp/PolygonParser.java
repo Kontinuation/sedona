@@ -16,9 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.shp;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.geotools.geometry.jts.coordinatesequence.CoordinateSequences;
 import org.locationtech.jts.geom.CoordinateSequence;
 import org.locationtech.jts.geom.Geometry;
@@ -26,21 +28,14 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LinearRing;
 import org.locationtech.jts.geom.Polygon;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-public class PolygonParser
-        extends ShapeParser
-{
+public class PolygonParser extends ShapeParser {
 
     /**
      * create a parser that can abstract a Polygon from input source with given GeometryFactory.
      *
      * @param geometryFactory the geometry factory
      */
-    public PolygonParser(GeometryFactory geometryFactory)
-    {
+    public PolygonParser(GeometryFactory geometryFactory) {
         super(geometryFactory);
     }
 
@@ -52,8 +47,7 @@ public class PolygonParser
      * @throws IOException Signals that an I/O exception has occurred.
      */
     @Override
-    public Geometry parseShape(ShapeReader reader)
-    {
+    public Geometry parseShape(ShapeReader reader) {
         reader.skip(4 * ShapeFileConst.DOUBLE_LENGTH);
 
         int numRings = reader.readInt();
@@ -79,13 +73,13 @@ public class PolygonParser
             if (shell == null) {
                 shell = ring;
                 shellsCCW = CoordinateSequences.isCCW(csRing);
-            }
-            else if (CoordinateSequences.isCCW(csRing) != shellsCCW) {
+            } else if (CoordinateSequences.isCCW(csRing) != shellsCCW) {
                 holes.add(ring);
-            }
-            else {
+            } else {
                 if (shell != null) {
-                    Polygon polygon = geometryFactory.createPolygon(shell, GeometryFactory.toLinearRingArray(holes));
+                    Polygon polygon =
+                            geometryFactory.createPolygon(
+                                    shell, GeometryFactory.toLinearRingArray(holes));
                     polygons.add(polygon);
                 }
 
@@ -95,7 +89,8 @@ public class PolygonParser
         }
 
         if (shell != null) {
-            Polygon polygon = geometryFactory.createPolygon(shell, GeometryFactory.toLinearRingArray(holes));
+            Polygon polygon =
+                    geometryFactory.createPolygon(shell, GeometryFactory.toLinearRingArray(holes));
             polygons.add(polygon);
         }
 

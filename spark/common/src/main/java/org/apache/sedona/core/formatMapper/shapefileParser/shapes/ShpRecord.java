@@ -16,26 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.shapes;
 
+import java.io.Serializable;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.shp.ShapeType;
 
-import java.io.Serializable;
+public class ShpRecord implements Serializable {
 
-public class ShpRecord
-        implements Serializable
-{
-
-    /**
-     * primitive byte contents
-     */
+    /** primitive byte contents */
     private BytesWritable bytes = null;
 
-    /**
-     * shape type
-     */
+    /** shape type */
     private int typeID = -1;
 
     /**
@@ -44,25 +36,21 @@ public class ShpRecord
      * @param byteArray
      * @param shapeTypeID
      */
-    public ShpRecord(byte[] byteArray, int shapeTypeID)
-    {
+    public ShpRecord(byte[] byteArray, int shapeTypeID) {
         bytes = new BytesWritable();
         bytes.set(byteArray, 0, byteArray.length);
         typeID = shapeTypeID;
     }
 
-    public BytesWritable getBytes()
-    {
+    public BytesWritable getBytes() {
         return bytes;
     }
 
-    public int getTypeID()
-    {
+    public int getTypeID() {
         return typeID;
     }
 
-    public ShapeType getType()
-    {
+    public ShapeType getType() {
         return ShapeType.getType(typeID);
     }
 }

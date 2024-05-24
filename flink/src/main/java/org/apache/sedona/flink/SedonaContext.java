@@ -18,6 +18,7 @@
  */
 package org.apache.sedona.flink;
 
+import java.util.Arrays;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.sedona.common.geometryObjects.Circle;
@@ -35,18 +36,16 @@ import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.index.quadtree.Quadtree;
 import org.locationtech.jts.index.strtree.STRtree;
 
-import java.util.Arrays;
-
-public class SedonaContext
-{
+public class SedonaContext {
     /**
      * This is the entry point of the entire Sedona system
+     *
      * @param env
      * @param tblEnv
      * @return
      */
-    public static StreamTableEnvironment create(StreamExecutionEnvironment env, StreamTableEnvironment tblEnv)
-    {
+    public static StreamTableEnvironment create(
+            StreamExecutionEnvironment env, StreamTableEnvironment tblEnv) {
         TelemetryCollector.send("flink", "java");
         GeometrySerde serializer = new GeometrySerde();
         SpatialIndexSerde indexSerializer = new SpatialIndexSerde(serializer);
@@ -62,12 +61,16 @@ public class SedonaContext
         env.getConfig().registerTypeWithKryoSerializer(Quadtree.class, indexSerializer);
         env.getConfig().registerTypeWithKryoSerializer(STRtree.class, indexSerializer);
 
-        Arrays.stream(Catalog.getFuncs()).forEach(
-                func -> tblEnv.createTemporarySystemFunction(func.getClass().getSimpleName(), func)
-        );
-        Arrays.stream(Catalog.getPredicates()).forEach(
-                func -> tblEnv.createTemporarySystemFunction(func.getClass().getSimpleName(), func)
-        );
+        Arrays.stream(Catalog.getFuncs())
+                .forEach(
+                        func ->
+                                tblEnv.createTemporarySystemFunction(
+                                        func.getClass().getSimpleName(), func));
+        Arrays.stream(Catalog.getPredicates())
+                .forEach(
+                        func ->
+                                tblEnv.createTemporarySystemFunction(
+                                        func.getClass().getSimpleName(), func));
         return tblEnv;
     }
 }

@@ -18,127 +18,83 @@
  */
 package org.apache.sedona.viz;
 
-import org.apache.sedona.common.enums.FileDataSplitter;
-import org.apache.sedona.viz.core.Serde.SedonaVizKryoRegistrator;
-import org.locationtech.jts.geom.Envelope;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.util.Properties;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
+import org.apache.sedona.common.enums.FileDataSplitter;
+import org.apache.sedona.viz.core.Serde.SedonaVizKryoRegistrator;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.serializer.KryoSerializer;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.locationtech.jts.geom.Envelope;
 
-import java.io.FileInputStream;
-import java.io.InputStream;
-import java.util.Properties;
-
-public class VizTestBase
-{
+public class VizTestBase {
     protected static SparkConf conf;
-    /**
-     * The spark context.
-     */
+    /** The spark context. */
     protected static JavaSparkContext sparkContext;
 
-    /**
-     * The prop.
-     */
+    /** The prop. */
     protected static Properties prop;
 
-    /**
-     * The input prop.
-     */
+    /** The input prop. */
     protected static InputStream inputProp;
 
-    /**
-     * The Point input location.
-     */
+    /** The Point input location. */
     protected static String PointInputLocation;
 
-    /**
-     * The Point offset.
-     */
+    /** The Point offset. */
     protected static Integer PointOffset;
 
-    /**
-     * The Point splitter.
-     */
+    /** The Point splitter. */
     protected static FileDataSplitter PointSplitter;
 
-    /**
-     * The Point num partitions.
-     */
+    /** The Point num partitions. */
     protected static Integer PointNumPartitions;
 
-    /**
-     * The Rectangle input location.
-     */
+    /** The Rectangle input location. */
     protected static String RectangleInputLocation;
 
-    /**
-     * The Rectangle offset.
-     */
+    /** The Rectangle offset. */
     protected static Integer RectangleOffset;
 
-    /**
-     * The Rectangle splitter.
-     */
+    /** The Rectangle splitter. */
     protected static FileDataSplitter RectangleSplitter;
 
-    /**
-     * The Rectangle num partitions.
-     */
+    /** The Rectangle num partitions. */
     protected static Integer RectangleNumPartitions;
 
-    /**
-     * The Polygon input location.
-     */
+    /** The Polygon input location. */
     protected static String PolygonInputLocation;
 
-    /**
-     * The Polygon offset.
-     */
+    /** The Polygon offset. */
     protected static Integer PolygonOffset;
 
-    /**
-     * The Polygon splitter.
-     */
+    /** The Polygon splitter. */
     protected static FileDataSplitter PolygonSplitter;
 
-    /**
-     * The Polygon num partitions.
-     */
+    /** The Polygon num partitions. */
     protected static Integer PolygonNumPartitions;
 
-    /**
-     * The Line string input location.
-     */
+    /** The Line string input location. */
     protected static String LineStringInputLocation;
 
-    /**
-     * The Line string offset.
-     */
+    /** The Line string offset. */
     protected static Integer LineStringOffset;
 
-    /**
-     * The Line string splitter.
-     */
+    /** The Line string splitter. */
     protected static FileDataSplitter LineStringSplitter;
 
-    /**
-     * The Line string num partitions.
-     */
+    /** The Line string num partitions. */
     protected static Integer LineStringNumPartitions;
 
     protected static Envelope USMainLandBoundary;
 
-    /**
-     * The US main land boundary.
-     */
-    protected static void initialize(final String testSuiteName)
-            throws Exception
-    {
+    /** The US main land boundary. */
+    protected static void initialize(final String testSuiteName) throws Exception {
         conf = new SparkConf().setAppName(testSuiteName).setMaster("local[*]");
         conf.set("spark.serializer", KryoSerializer.class.getName());
         conf.set("spark.kryo.registrator", SedonaVizKryoRegistrator.class.getName());
@@ -189,9 +145,7 @@ public class VizTestBase
      * @throws Exception the exception
      */
     @BeforeClass
-    public static void setUpBeforeClass()
-            throws Exception
-    {
+    public static void setUpBeforeClass() throws Exception {
         initialize(VizTestBase.class.getSimpleName());
     }
 
@@ -201,9 +155,7 @@ public class VizTestBase
      * @throws Exception the exception
      */
     @AfterClass
-    public static void tearDown()
-            throws Exception
-    {
+    public static void tearDown() throws Exception {
         sparkContext.stop();
     }
 }

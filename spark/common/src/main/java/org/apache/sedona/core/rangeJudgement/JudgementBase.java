@@ -16,18 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.rangeJudgement;
 
+import java.io.Serializable;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators;
 import org.locationtech.jts.geom.Geometry;
 
-import java.io.Serializable;
-
-public class JudgementBase<U extends Geometry>
-        implements Serializable
-{
+public class JudgementBase<U extends Geometry> implements Serializable {
     private final SpatialPredicateEvaluators.SpatialPredicateEvaluator evaluator;
     U queryGeometry;
 
@@ -35,10 +31,10 @@ public class JudgementBase<U extends Geometry>
      * Instantiates a new range filter using index.
      *
      * @param queryWindow the query window
-     * @param spatialPredicate spatial predicate in query criteria {@code geom <spatialPredicate> queryWindow}
+     * @param spatialPredicate spatial predicate in query criteria {@code geom <spatialPredicate>
+     *     queryWindow}
      */
-    public JudgementBase(U queryWindow, SpatialPredicate spatialPredicate)
-    {
+    public JudgementBase(U queryWindow, SpatialPredicate spatialPredicate) {
         this.queryGeometry = queryWindow;
         this.evaluator = SpatialPredicateEvaluators.create(spatialPredicate);
     }
@@ -49,24 +45,25 @@ public class JudgementBase<U extends Geometry>
      * @param queryWindow the query window
      * @param considerBoundaryIntersection the consider boundary intersection
      * @param leftCoveredByRight query window covered by geometry, or query window covers geometry.
-     *                           only effective when {@code considerBoundaryIntersection} was false
+     *     only effective when {@code considerBoundaryIntersection} was false
      */
-    public JudgementBase(U queryWindow, boolean considerBoundaryIntersection, boolean leftCoveredByRight)
-    {
-        this(queryWindow, resolveSpatialPredicate(considerBoundaryIntersection, leftCoveredByRight));
+    public JudgementBase(
+            U queryWindow, boolean considerBoundaryIntersection, boolean leftCoveredByRight) {
+        this(
+                queryWindow,
+                resolveSpatialPredicate(considerBoundaryIntersection, leftCoveredByRight));
     }
 
-    public boolean match(Geometry spatialObject, Geometry queryWindow)
-    {
+    public boolean match(Geometry spatialObject, Geometry queryWindow) {
         return evaluator.eval(spatialObject, queryWindow);
     }
 
-    public static SpatialPredicate resolveSpatialPredicate(boolean considerBoundaryIntersection, boolean leftCoveredByRight)
-    {
+    public static SpatialPredicate resolveSpatialPredicate(
+            boolean considerBoundaryIntersection, boolean leftCoveredByRight) {
         if (considerBoundaryIntersection) {
             return SpatialPredicate.INTERSECTS;
         } else {
-            return leftCoveredByRight? SpatialPredicate.COVERED_BY: SpatialPredicate.COVERS;
+            return leftCoveredByRight ? SpatialPredicate.COVERED_BY : SpatialPredicate.COVERS;
         }
     }
 }

@@ -18,26 +18,29 @@
  */
 package org.apache.sedona.common.utils;
 
-import java.util.Optional;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 
 public class GeometryGeoHashEncoder {
-  private static GeometryFactory geometryFactory = new GeometryFactory();
+    private static GeometryFactory geometryFactory = new GeometryFactory();
 
-  public static String calculate(Geometry geom, int precision) {
-    Envelope gbox = geom.getEnvelope().getEnvelopeInternal();
-    // Latitude can take values in [-90, 90]
-    // Longitude can take values in [-180, 180]
-    if (gbox.getMinX() < -180 || gbox.getMinY() < -90 || gbox.getMaxX() > 180 || gbox.getMaxY() > 90) {
-        return null;
+    public static String calculate(Geometry geom, int precision) {
+        Envelope gbox = geom.getEnvelope().getEnvelopeInternal();
+        // Latitude can take values in [-90, 90]
+        // Longitude can take values in [-180, 180]
+        if (gbox.getMinX() < -180
+                || gbox.getMinY() < -90
+                || gbox.getMaxX() > 180
+                || gbox.getMaxY() > 90) {
+            return null;
+        }
+
+        double lon = gbox.getMinX() + (gbox.getMaxX() - gbox.getMinX()) / 2;
+        double lat = gbox.getMinY() + (gbox.getMaxY() - gbox.getMinY()) / 2;
+
+        return PointGeoHashEncoder.calculateGeoHash(
+                geometryFactory.createPoint(new Coordinate(lon, lat)), precision);
     }
-
-    double lon = gbox.getMinX() + (gbox.getMaxX() - gbox.getMinX()) / 2;
-    double lat = gbox.getMinY() + (gbox.getMaxY() - gbox.getMinY()) / 2;
-
-    return PointGeoHashEncoder.calculateGeoHash(geometryFactory.createPoint(new Coordinate(lon, lat)), precision);
-  }
 }

@@ -18,20 +18,22 @@
  */
 package org.apache.sedona.core.utils;
 
+import static org.junit.Assert.*;
+
 import org.apache.spark.sql.SparkSession;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.locationtech.jts.geom.Envelope;
 
-import static org.junit.Assert.*;
-
 public class SedonaConfTest {
 
     @BeforeClass
     public static void setUp() {
-        SparkSession.builder().config("sedona.join.numpartition", "2").master("local").getOrCreate();
-
+        SparkSession.builder()
+                .config("sedona.join.numpartition", "2")
+                .master("local")
+                .getOrCreate();
     }
 
     @AfterClass

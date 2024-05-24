@@ -1,18 +1,30 @@
-/**
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * <p>
- * http://www.apache.org/licenses/LICENSE-2.0
- * <p>
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.common.utils;
 
+import static org.locationtech.jts.geom.Coordinate.NULL_ORDINATE;
+
+import java.nio.ByteOrder;
+import java.util.*;
+import org.locationtech.jts.algorithm.Angle;
+import org.locationtech.jts.algorithm.distance.DiscreteFrechetDistance;
+import org.locationtech.jts.algorithm.distance.DiscreteHausdorffDistance;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.impl.CoordinateArraySequence;
 import org.locationtech.jts.io.ByteOrderValues;
@@ -20,20 +32,12 @@ import org.locationtech.jts.io.WKBWriter;
 import org.locationtech.jts.io.WKTWriter;
 import org.locationtech.jts.operation.polygonize.Polygonizer;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
-import org.locationtech.jts.algorithm.Angle;
-import org.locationtech.jts.algorithm.distance.DiscreteFrechetDistance;
-import org.locationtech.jts.algorithm.distance.DiscreteHausdorffDistance;
 import org.locationtech.spatial4j.context.jts.JtsSpatialContext;
 import org.locationtech.spatial4j.shape.jts.JtsGeometry;
 
-import java.nio.ByteOrder;
-import java.util.*;
-
-import static org.locationtech.jts.geom.Coordinate.NULL_ORDINATE;
-
 public class GeomUtils {
     public static String printGeom(Geometry geom) {
-        if(geom.getUserData()!=null) return geom.toText() + "\t" + geom.getUserData();
+        if (geom.getUserData() != null) return geom.toText() + "\t" + geom.getUserData();
         else return geom.toText();
     }
 
@@ -43,15 +47,18 @@ public class GeomUtils {
     }
 
     public static int hashCode(Geometry geom) {
-        return geom.getUserData()==null? geom.hashCode():geom.hashCode()*31 + geom.getUserData().hashCode();
+        return geom.getUserData() == null
+                ? geom.hashCode()
+                : geom.hashCode() * 31 + geom.getUserData().hashCode();
     }
+
     public static boolean equalsTopoGeom(Geometry geom1, Geometry geom2) {
         if (Objects.equals(geom1.getUserData(), geom2.getUserData())) return geom1.equals(geom2);
         return false;
     }
 
     public static boolean equalsExactGeom(Geometry geom1, Object geom2) {
-        if (! (geom2 instanceof Geometry)) return false;
+        if (!(geom2 instanceof Geometry)) return false;
         Geometry g = (Geometry) geom2;
         if (Objects.equals(geom1.getUserData(), g.getUserData())) return geom1.equalsExact(g);
         else return false;
@@ -59,20 +66,22 @@ public class GeomUtils {
 
     /**
      * This is for verifying the correctness of two geometries loaded from geojson
+     *
      * @param geom1
      * @param geom2
      * @return
      */
     public static boolean equalsExactGeomUnsortedUserData(Geometry geom1, Object geom2) {
-        if (! (geom2 instanceof Geometry)) return false;
+        if (!(geom2 instanceof Geometry)) return false;
         Geometry g = (Geometry) geom2;
         if (equalsUserData(geom1.getUserData(), g.getUserData())) return geom1.equalsExact(g);
         else return false;
     }
 
     /**
-     * Use for check if two user data attributes are equal
-     * This is mainly used for GeoJSON parser as the column order is uncertain each time
+     * Use for check if two user data attributes are equal This is mainly used for GeoJSON parser as
+     * the column order is uncertain each time
+     *
      * @param userData1
      * @param userData2
      * @return
@@ -85,45 +94,44 @@ public class GeomUtils {
         return Arrays.equals(split1, split2);
     }
 
-    /**
-     * Swaps the XY coordinates of a geometry.
-     */
+    /** Swaps the XY coordinates of a geometry. */
     public static void flipCoordinates(Geometry g) {
-        g.apply(new CoordinateSequenceFilter() {
+        g.apply(
+                new CoordinateSequenceFilter() {
 
-            @Override
-            public void filter(CoordinateSequence seq, int i) {
-                double oldX = seq.getCoordinate(i).x;
-                double oldY = seq.getCoordinateCopy(i).y;
-                seq.getCoordinate(i).setX(oldY);
-                seq.getCoordinate(i).setY(oldX);
-            }
+                    @Override
+                    public void filter(CoordinateSequence seq, int i) {
+                        double oldX = seq.getCoordinate(i).x;
+                        double oldY = seq.getCoordinateCopy(i).y;
+                        seq.getCoordinate(i).setX(oldY);
+                        seq.getCoordinate(i).setY(oldX);
+                    }
 
-            @Override
-            public boolean isGeometryChanged() {
-                return true;
-            }
+                    @Override
+                    public boolean isGeometryChanged() {
+                        return true;
+                    }
 
-            @Override
-            public boolean isDone() {
-                return false;
-            }
-        });
+                    @Override
+                    public boolean isDone() {
+                        return false;
+                    }
+                });
     }
     /*
      * Returns a POINT that is guaranteed to lie on the surface.
      */
     public static Geometry getInteriorPoint(Geometry geometry) {
-        if(geometry==null) {
+        if (geometry == null) {
             return null;
         }
         return geometry.getInteriorPoint();
     }
 
     /**
-     * Return the nth point from the given geometry (which could be a linestring or a circular linestring)
-     * If the value of n is negative, return a point backwards
-     * E.g. if n = 1, return 1st point, if n = -1, return last point
+     * Return the nth point from the given geometry (which could be a linestring or a circular
+     * linestring) If the value of n is negative, return a point backwards E.g. if n = 1, return 1st
+     * point, if n = -1, return last point
      *
      * @param lineString from which the nth point is to be returned
      * @param n is the position of the point in the geometry
@@ -152,13 +160,13 @@ public class GeomUtils {
         try {
             Polygon polygon = (Polygon) geometry;
             return polygon.getExteriorRing();
-        } catch(ClassCastException e) {
+        } catch (ClassCastException e) {
             return null;
         }
     }
 
     public static String getEWKT(Geometry geometry) {
-        if(geometry==null) {
+        if (geometry == null) {
             return null;
         }
 
@@ -181,8 +189,12 @@ public class GeomUtils {
         if (geometry == null) {
             return null;
         }
-        int endian = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN ? ByteOrderValues.BIG_ENDIAN : ByteOrderValues.LITTLE_ENDIAN;
-        WKBWriter writer = new WKBWriter(GeomUtils.getDimension(geometry), endian, geometry.getSRID() != 0);
+        int endian =
+                ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN
+                        ? ByteOrderValues.BIG_ENDIAN
+                        : ByteOrderValues.LITTLE_ENDIAN;
+        WKBWriter writer =
+                new WKBWriter(GeomUtils.getDimension(geometry), endian, geometry.getSRID() != 0);
         return writer.write(geometry);
     }
 
@@ -190,7 +202,10 @@ public class GeomUtils {
         if (geometry == null) {
             return null;
         }
-        int endian = ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN ? ByteOrderValues.BIG_ENDIAN : ByteOrderValues.LITTLE_ENDIAN;
+        int endian =
+                ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN
+                        ? ByteOrderValues.BIG_ENDIAN
+                        : ByteOrderValues.LITTLE_ENDIAN;
         WKBWriter writer = new WKBWriter(GeomUtils.getDimension(geometry), endian, false);
         return writer.write(geometry);
     }
@@ -198,12 +213,13 @@ public class GeomUtils {
     public static Geometry get2dGeom(Geometry geom) {
         Coordinate[] coordinates = geom.getCoordinates();
         GeometryFactory geometryFactory = new GeometryFactory();
-        CoordinateSequence sequence = geometryFactory.getCoordinateSequenceFactory().create(coordinates);
-        if(sequence.getDimension() > 2) {
+        CoordinateSequence sequence =
+                geometryFactory.getCoordinateSequenceFactory().create(coordinates);
+        if (sequence.getDimension() > 2) {
             for (int i = 0; i < coordinates.length; i++) {
                 sequence.setOrdinate(i, 2, NULL_ORDINATE);
             }
-            if(sequence.getDimension() == 4) {
+            if (sequence.getDimension() == 4) {
                 for (int i = 0; i < coordinates.length; i++) {
                     sequence.setOrdinate(i, 3, NULL_ORDINATE);
                 }
@@ -244,16 +260,18 @@ public class GeomUtils {
     }
 
     public static int getDimension(Geometry geometry) {
-        return geometry.getCoordinate() != null && !java.lang.Double.isNaN(geometry.getCoordinate().getZ()) ? 3 : 2;
+        return geometry.getCoordinate() != null
+                        && !java.lang.Double.isNaN(geometry.getCoordinate().getZ())
+                ? 3
+                : 2;
     }
 
     /**
-     * Checks if the geometry only contains geometry of
-     * the same dimension. By dimension this refers to whether the
-     * geometries are all, for example, lines (1D).
+     * Checks if the geometry only contains geometry of the same dimension. By dimension this refers
+     * to whether the geometries are all, for example, lines (1D).
      *
-     * @param  geometry geometry to check
-     * @return          true iff geometry is homogeneous
+     * @param geometry geometry to check
+     * @return true iff geometry is homogeneous
      */
     public static boolean geometryIsHomogeneous(Geometry geometry) {
         int dimension = geometry.getDimension();
@@ -270,11 +288,11 @@ public class GeomUtils {
     }
 
     /**
-     * Checks if either the geometry is, or contains, only point geometry.
-     * GeometryCollections that only contain points will return true.
+     * Checks if either the geometry is, or contains, only point geometry. GeometryCollections that
+     * only contain points will return true.
      *
-     * @param  geometry geometry to check
-     * @return          true iff geometry is puntal
+     * @param geometry geometry to check
+     * @return true iff geometry is puntal
      */
     public static boolean geometryIsPuntal(Geometry geometry) {
         if (geometry instanceof Puntal) {
@@ -286,11 +304,11 @@ public class GeomUtils {
     }
 
     /**
-     * Checks if either the geometry is, or contains, only line geometry.
-     * GeometryCollections that only contain lines will return true.
+     * Checks if either the geometry is, or contains, only line geometry. GeometryCollections that
+     * only contain lines will return true.
      *
-     * @param  geometry geometry to check
-     * @return          true iff geometry is lineal
+     * @param geometry geometry to check
+     * @return true iff geometry is lineal
      */
     public static boolean geometryIsLineal(Geometry geometry) {
         if (geometry instanceof Lineal) {
@@ -302,11 +320,11 @@ public class GeomUtils {
     }
 
     /**
-     * Checks if either the geometry is, or contains, only polygon geometry.
-     * GeometryCollections that only contain polygons will return true.
+     * Checks if either the geometry is, or contains, only polygon geometry. GeometryCollections
+     * that only contain polygons will return true.
      *
-     * @param  geometry geometry to check
-     * @return          true iff geometry is polygonal
+     * @param geometry geometry to check
+     * @return true iff geometry is polygonal
      */
     public static boolean geometryIsPolygonal(Geometry geometry) {
         if (geometry instanceof Polygonal) {
@@ -318,7 +336,8 @@ public class GeomUtils {
     }
 
     /**
-     * Checks if the geoemetry pair - <code>left</code> and <code>right</code> - should be handled be the current partition - <code>extent</code>.
+     * Checks if the geoemetry pair - <code>left</code> and <code>right</code> - should be handled
+     * be the current partition - <code>extent</code>.
      *
      * @param left
      * @param right
@@ -341,7 +360,9 @@ public class GeomUtils {
                 left.getEnvelopeInternal().intersection(right.getEnvelopeInternal());
         if (!intersection.isNull()) {
             final Point referencePoint =
-                    left.getFactory().createPoint(new Coordinate(intersection.getMinX(), intersection.getMinY()));
+                    left.getFactory()
+                            .createPoint(
+                                    new Coordinate(intersection.getMinX(), intersection.getMinY()));
             if (!extent.contains(referencePoint)) {
                 return true;
             }
@@ -382,7 +403,8 @@ public class GeomUtils {
         return pCount;
     }
 
-    public static <T extends Geometry> List<Geometry> extractGeometryCollection(Geometry geom, Class<T> geomType){
+    public static <T extends Geometry> List<Geometry> extractGeometryCollection(
+            Geometry geom, Class<T> geomType) {
         ArrayList<Geometry> leafs = new ArrayList<>();
         if (!(geom instanceof GeometryCollection)) {
             if (geomType.isAssignableFrom(geom.getClass())) {
@@ -394,7 +416,7 @@ public class GeomUtils {
         parents.add((GeometryCollection) geom);
         while (!parents.isEmpty()) {
             GeometryCollection parent = parents.removeFirst();
-            for (int i = 0;i < parent.getNumGeometries(); i++) {
+            for (int i = 0; i < parent.getNumGeometries(); i++) {
                 Geometry child = parent.getGeometryN(i);
                 if (child instanceof GeometryCollection) {
                     parents.add((GeometryCollection) child);
@@ -408,13 +430,13 @@ public class GeomUtils {
         return leafs;
     }
 
-    public static List<Geometry> extractGeometryCollection(Geometry geom){
+    public static List<Geometry> extractGeometryCollection(Geometry geom) {
         return extractGeometryCollection(geom, Geometry.class);
     }
 
     public static Geometry[] getSubGeometries(Geometry geom) {
         Geometry[] geometries = new Geometry[geom.getNumGeometries()];
-        for ( int i = 0; i < geom.getNumGeometries() ; i++) {
+        for (int i = 0; i < geom.getNumGeometries(); i++) {
             geometries[i] = geom.getGeometryN(i);
         }
         return geometries;
@@ -423,9 +445,9 @@ public class GeomUtils {
     public static Geometry get3DGeom(Geometry geometry, double zValue) {
         Coordinate[] coordinates = geometry.getCoordinates();
         if (coordinates.length == 0) return geometry;
-        for(int i = 0; i < coordinates.length; i++) {
+        for (int i = 0; i < coordinates.length; i++) {
             boolean is3d = !Double.isNaN(coordinates[i].z);
-            if(!is3d) {
+            if (!is3d) {
                 coordinates[i].setZ(zValue);
             }
         }
@@ -437,12 +459,13 @@ public class GeomUtils {
         LinearRing shell = polygon.getExteriorRing();
         if (shell == null || shell.isEmpty()) {
             return 0;
-        }else {
+        } else {
             return 1 + polygon.getNumInteriorRing();
         }
     }
 
-    public static void translateGeom(Geometry geometry, double deltaX, double deltaY, double deltaZ) {
+    public static void translateGeom(
+            Geometry geometry, double deltaX, double deltaY, double deltaZ) {
         Coordinate[] coordinates = geometry.getCoordinates();
         for (int i = 0; i < coordinates.length; i++) {
             Coordinate currCoordinate = coordinates[i];
@@ -458,10 +481,8 @@ public class GeomUtils {
     }
 
     public static boolean isAnyGeomEmpty(Geometry... geometries) {
-        for (Geometry geometry: geometries) {
-            if (geometry != null)
-                if (geometry.isEmpty())
-                    return true;
+        for (Geometry geometry : geometries) {
+            if (geometry != null) if (geometry.isEmpty()) return true;
         }
         return false;
     }
@@ -472,7 +493,8 @@ public class GeomUtils {
         return new Coordinate[] {coordinates[0], coordinates[coordinates.length - 1]};
     }
 
-    public static double calcAngle(Coordinate start1, Coordinate end1, Coordinate start2, Coordinate end2) {
+    public static double calcAngle(
+            Coordinate start1, Coordinate end1, Coordinate start2, Coordinate end2) {
         double angle1 = normalizeAngle(Angle.angle(start1, end1));
         double angle2 = normalizeAngle(Angle.angle(start2, end2));
         return normalizeAngle(angle1 - angle2);
@@ -489,13 +511,26 @@ public class GeomUtils {
         return Angle.toDegrees(angleInRadian);
     }
 
-
-    public static void affineGeom(Geometry geometry, Double a, Double b, Double c, Double d, Double e, Double f, Double g, Double h, Double i, Double xOff, Double yOff,
-                                  Double zOff) {
+    public static void affineGeom(
+            Geometry geometry,
+            Double a,
+            Double b,
+            Double c,
+            Double d,
+            Double e,
+            Double f,
+            Double g,
+            Double h,
+            Double i,
+            Double xOff,
+            Double yOff,
+            Double zOff) {
 
         Coordinate[] coordinates = geometry.getCoordinates();
         for (Coordinate currCoordinate : coordinates) {
-            double x = currCoordinate.getX(), y = currCoordinate.getY(), z = Double.isNaN(currCoordinate.getZ()) ? 0 : currCoordinate.getZ();
+            double x = currCoordinate.getX(),
+                    y = currCoordinate.getY(),
+                    z = Double.isNaN(currCoordinate.getZ()) ? 0 : currCoordinate.getZ();
             double newX = a * x + b * y + xOff;
             if (c != null) newX += c * z;
             double newY = d * x + e * y + yOff;

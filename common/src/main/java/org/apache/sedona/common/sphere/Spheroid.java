@@ -18,6 +18,8 @@
  */
 package org.apache.sedona.common.sphere;
 
+import static java.lang.Math.abs;
+
 import net.sf.geographiclib.Geodesic;
 import net.sf.geographiclib.GeodesicData;
 import net.sf.geographiclib.PolygonArea;
@@ -26,11 +28,7 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 
-import static java.lang.Float.NaN;
-import static java.lang.Math.abs;
-
-public class Spheroid
-{
+public class Spheroid {
     // Standard EPSG Codes
     public static final int EPSG_WORLD_MERCATOR = 3395;
     public static final int EPSG_NORTH_UTM_START = 32601;
@@ -43,20 +41,26 @@ public class Spheroid
     public static final int EPSG_SOUTH_STEREO = 3031;
 
     /**
-     * Calculate the distance between two points on the earth using the Spheroid formula.
-     * This algorithm does not use the radius of the earth, but instead uses the WGS84 ellipsoid.
-     * This is similar to the Vincenty algorithm,but use the algorithm in
-     * C. F. F. Karney, Algorithms for geodesics, J. Geodesy 87(1), 43–55 (2013)
-     * It uses the implementation from GeographicLib so please expect a small difference
-     * This will produce almost identical result to PostGIS ST_DistanceSpheroid and
-     * PostGIS ST_Distance(useSpheroid=true)
+     * Calculate the distance between two points on the earth using the Spheroid formula. This
+     * algorithm does not use the radius of the earth, but instead uses the WGS84 ellipsoid. This is
+     * similar to the Vincenty algorithm,but use the algorithm in C. F. F. Karney, Algorithms for
+     * geodesics, J. Geodesy 87(1), 43–55 (2013) It uses the implementation from GeographicLib so
+     * please expect a small difference This will produce almost identical result to PostGIS
+     * ST_DistanceSpheroid and PostGIS ST_Distance(useSpheroid=true)
+     *
      * @param geom1
      * @param geom2
      * @return
      */
     public static double distance(Geometry geom1, Geometry geom2) {
-        Coordinate coordinate1 = geom1.getGeometryType().equals("Point")? geom1.getCoordinate():geom1.getCentroid().getCoordinate();
-        Coordinate coordinate2 = geom2.getGeometryType().equals("Point")? geom2.getCoordinate():geom2.getCentroid().getCoordinate();
+        Coordinate coordinate1 =
+                geom1.getGeometryType().equals("Point")
+                        ? geom1.getCoordinate()
+                        : geom1.getCentroid().getCoordinate();
+        Coordinate coordinate2 =
+                geom2.getGeometryType().equals("Point")
+                        ? geom2.getCoordinate()
+                        : geom2.getCentroid().getCoordinate();
         // Calculate the distance between the two points
         double lon1 = coordinate1.getX();
         double lat1 = coordinate1.getY();
@@ -67,9 +71,9 @@ public class Spheroid
     }
 
     /**
-     * Calculate the length of a geometry using the Spheroid formula.
-     * Equivalent to PostGIS ST_LengthSpheroid and PostGIS ST_Length(useSpheroid=true)
-     * WGS84 ellipsoid is used.
+     * Calculate the length of a geometry using the Spheroid formula. Equivalent to PostGIS
+     * ST_LengthSpheroid and PostGIS ST_Length(useSpheroid=true) WGS84 ellipsoid is used.
+     *
      * @param geom
      * @return
      */
@@ -85,23 +89,23 @@ public class Spheroid
             }
             PolygonResult compute = p.Compute();
             return compute.perimeter;
-        }
-        else if (geomType.equals("MultiPolygon") || geomType.equals("MultiLineString") || geomType.equals("GeometryCollection")) {
+        } else if (geomType.equals("MultiPolygon")
+                || geomType.equals("MultiLineString")
+                || geomType.equals("GeometryCollection")) {
             double length = 0.0;
             for (int i = 0; i < geom.getNumGeometries(); i++) {
                 length += length(geom.getGeometryN(i));
             }
             return length;
-        }
-        else {
+        } else {
             return 0.0;
         }
     }
 
     /**
-     * Calculate the area of a geometry using the Spheroid formula.
-     * Equivalent to PostGIS ST_Area(useSpheroid=true)
-     * WGS84 ellipsoid is used.
+     * Calculate the area of a geometry using the Spheroid formula. Equivalent to PostGIS
+     * ST_Area(useSpheroid=true) WGS84 ellipsoid is used.
+     *
      * @param geom
      * @return
      */
@@ -119,15 +123,13 @@ public class Spheroid
             // The area is negative if the polygon is oriented clockwise
             // We make sure that all area are positive
             return abs(compute.area);
-        }
-        else if (geomType.equals("MultiPolygon") || geomType.equals("GeometryCollection")) {
+        } else if (geomType.equals("MultiPolygon") || geomType.equals("GeometryCollection")) {
             double area = 0.0;
             for (int i = 0; i < geom.getNumGeometries(); i++) {
                 area += area(geom.getGeometryN(i));
             }
             return area;
-        }
-        else {
+        } else {
             return 0.0;
         }
     }
@@ -135,14 +137,16 @@ public class Spheroid
     public static Double angularWidth(Envelope envelope) {
         double lon1 = envelope.getMinX();
         double lon2 = envelope.getMaxX();
-        double lat = (envelope.getMinY() + envelope.getMaxY()) / 2; // Mid-latitude for width calculation
+        double lat =
+                (envelope.getMinY() + envelope.getMaxY()) / 2; // Mid-latitude for width calculation
 
         // Compute geodesic distance
         GeodesicData g = Geodesic.WGS84.Inverse(lat, lon1, lat, lon2);
         double distance = g.s12; // Distance in meters
 
         // Convert distance to angular width in degrees
-        Double angularWidth = Math.toDegrees(distance / (Geodesic.WGS84.EquatorialRadius() * Math.PI / 180));
+        Double angularWidth =
+                Math.toDegrees(distance / (Geodesic.WGS84.EquatorialRadius() * Math.PI / 180));
 
         return angularWidth;
     }
@@ -150,14 +154,17 @@ public class Spheroid
     public static Double angularHeight(Envelope envelope) {
         double lat1 = envelope.getMinY();
         double lat2 = envelope.getMaxY();
-        double lon = (envelope.getMinX() + envelope.getMaxX()) / 2; // Mid-longitude for height calculation
+        double lon =
+                (envelope.getMinX() + envelope.getMaxX())
+                        / 2; // Mid-longitude for height calculation
 
         // Compute geodesic distance
         GeodesicData g = Geodesic.WGS84.Inverse(lat1, lon, lat2, lon);
         double distance = g.s12; // Distance in meters
 
         // Convert distance to angular height in degrees
-        Double angularHeight = Math.toDegrees(distance / (Geodesic.WGS84.EquatorialRadius() * Math.PI / 180));
+        Double angularHeight =
+                Math.toDegrees(distance / (Geodesic.WGS84.EquatorialRadius() * Math.PI / 180));
 
         return angularHeight;
     }

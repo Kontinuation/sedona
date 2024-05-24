@@ -16,9 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.formatMapper.shapefileParser.shapes;
 
+import java.io.IOException;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -28,82 +28,57 @@ import org.apache.hadoop.mapreduce.TaskAttemptContext;
 import org.apache.hadoop.mapreduce.lib.input.FileSplit;
 import org.apache.sedona.core.formatMapper.shapefileParser.parseUtils.shp.ShpFileParser;
 
-import java.io.IOException;
+public class ShapeFileReader extends RecordReader<ShapeKey, ShpRecord> {
 
-public class ShapeFileReader
-        extends RecordReader<ShapeKey, ShpRecord>
-{
-
-    /**
-     * file parser
-     */
+    /** file parser */
     ShpFileParser parser = null;
-    /**
-     * record id
-     */
+    /** record id */
     private ShapeKey recordKey = null;
-    /**
-     * primitive bytes value
-     */
+    /** primitive bytes value */
     private ShpRecord recordContent = null;
-    /**
-     * inputstream for .shp file
-     */
+    /** inputstream for .shp file */
     private FSDataInputStream shpInputStream = null;
-    /**
-     * Iterator of indexes of records
-     */
+    /** Iterator of indexes of records */
     private int[] indexes;
 
-    /**
-     * whether use index, true when using indexes
-     */
+    /** whether use index, true when using indexes */
     private boolean useIndex = false;
 
-    /**
-     * current index id
-     */
+    /** current index id */
     private int indexId = 0;
 
-    /**
-     * empty constructor
-     */
-    public ShapeFileReader()
-    {
-    }
+    /** empty constructor */
+    public ShapeFileReader() {}
 
     /**
      * constructor with index
      *
      * @param indexes
      */
-    public ShapeFileReader(int[] indexes)
-    {
+    public ShapeFileReader(int[] indexes) {
         this.indexes = indexes;
         useIndex = true;
     }
 
     public void initialize(InputSplit split, TaskAttemptContext context)
-            throws IOException, InterruptedException
-    {
+            throws IOException, InterruptedException {
         FileSplit fileSplit = (FileSplit) split;
         Path filePath = fileSplit.getPath();
         FileSystem fileSys = filePath.getFileSystem(context.getConfiguration());
         shpInputStream = fileSys.open(filePath);
-        //assign inputstream to parser and parse file header to init;
+        // assign inputstream to parser and parse file header to init;
         parser = new ShpFileParser(shpInputStream);
         parser.parseShapeFileHead();
     }
 
-    public boolean nextKeyValue()
-            throws IOException, InterruptedException
-    {
+    public boolean nextKeyValue() throws IOException, InterruptedException {
         if (useIndex) {
-            /**
-             * with index, iterate until end and extract bytes with information from indexes
-             */
-            if (indexId == indexes.length) { return false; }
-            // check offset, if current offset in inputStream not match with information in shx, move it
+            /** with index, iterate until end and extract bytes with information from indexes */
+            if (indexId == indexes.length) {
+                return false;
+            }
+            // check offset, if current offset in inputStream not match with information in shx,
+            // move it
             if (shpInputStream.getPos() < indexes[indexId] * 2) {
                 shpInputStream.skip(indexes[indexId] * 2 - shpInputStream.getPos());
             }
@@ -113,9 +88,10 @@ public class ShapeFileReader
             recordContent = parser.parseRecordPrimitiveContent(currentLength);
             indexId += 2;
             return true;
-        }
-        else {
-            if (getProgress() >= 1) { return false; }
+        } else {
+            if (getProgress() >= 1) {
+                return false;
+            }
             recordKey = new ShapeKey();
             recordKey.setIndex(parser.parseRecordHeadID());
             recordContent = parser.parseRecordPrimitiveContent();
@@ -123,27 +99,19 @@ public class ShapeFileReader
         }
     }
 
-    public ShapeKey getCurrentKey()
-            throws IOException, InterruptedException
-    {
+    public ShapeKey getCurrentKey() throws IOException, InterruptedException {
         return recordKey;
     }
 
-    public ShpRecord getCurrentValue()
-            throws IOException, InterruptedException
-    {
+    public ShpRecord getCurrentValue() throws IOException, InterruptedException {
         return recordContent;
     }
 
-    public float getProgress()
-            throws IOException, InterruptedException
-    {
+    public float getProgress() throws IOException, InterruptedException {
         return parser.getProgress();
     }
 
-    public void close()
-            throws IOException
-    {
+    public void close() throws IOException {
         shpInputStream.close();
     }
 }

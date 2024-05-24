@@ -16,26 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
 
+import java.util.Iterator;
+import javax.annotation.Nullable;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.apache.sedona.core.spatialPartitioning.quadtree.StandardQuadTree;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
-import javax.annotation.Nullable;
-
-import java.util.Iterator;
-
-public class QuadTreePartitioner
-        extends SpatialPartitioner
-{
+public class QuadTreePartitioner extends SpatialPartitioner {
     private final StandardQuadTree<? extends Geometry> quadTree;
 
-    public QuadTreePartitioner(StandardQuadTree<? extends Geometry> quadTree)
-    {
+    public QuadTreePartitioner(StandardQuadTree<? extends Geometry> quadTree) {
         super(GridType.QUADTREE, quadTree.fetchLeafZones());
         this.quadTree = quadTree;
 
@@ -46,27 +40,23 @@ public class QuadTreePartitioner
 
     @Override
     public Iterator<Tuple2<Integer, Geometry>> placeObject(Geometry spatialObject)
-            throws Exception
-    {
+            throws Exception {
         return quadTree.placeObject(spatialObject);
     }
 
     @Nullable
     @Override
-    public DedupParams getDedupParams()
-    {
+    public DedupParams getDedupParams() {
         return new DedupParams(grids);
     }
 
     @Override
-    public int numPartitions()
-    {
+    public int numPartitions() {
         return grids.size();
     }
 
     @Override
-    public boolean equals(Object o)
-    {
+    public boolean equals(Object o) {
         if (o == null || !(o instanceof QuadTreePartitioner)) {
             return false;
         }

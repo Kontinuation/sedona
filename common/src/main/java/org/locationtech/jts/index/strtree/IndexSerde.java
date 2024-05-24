@@ -21,25 +21,24 @@ package org.locationtech.jts.index.strtree;
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.sedona.common.geometrySerde.GeometrySerde;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
- * Provides methods to efficiently serialize and deserialize the index.
- * trees are serialized recursively.
+ * Provides methods to efficiently serialize and deserialize the index. trees are serialized
+ * recursively.
  */
-public class IndexSerde
-{
+public class IndexSerde {
     GeometrySerde geometrySerde;
+
     public IndexSerde() {
         geometrySerde = new GeometrySerde();
     }
 
-    public Object read(Kryo kryo, Input input){
+    public Object read(Kryo kryo, Input input) {
         int nodeCapacity = input.readInt();
         boolean notEmpty = (input.readByte() & 0x01) == 1;
         if (notEmpty) {
@@ -48,8 +47,7 @@ public class IndexSerde
                 // if built, root is not null, set itemBoundables to null
                 STRtree index = new STRtree(nodeCapacity, readSTRtreeNode(kryo, input));
                 return index;
-            }
-            else {
+            } else {
                 // if not built, just read itemBoundables
                 ArrayList itemBoundables = new ArrayList();
                 int itemSize = input.readInt();
@@ -59,16 +57,16 @@ public class IndexSerde
                 STRtree index = new STRtree(nodeCapacity, itemBoundables);
                 return index;
             }
+        } else {
+            return new STRtree(nodeCapacity);
         }
-        else { return new STRtree(nodeCapacity); }
     }
 
     public void write(Kryo kryo, Output output, STRtree tree) {
         output.writeInt(tree.getNodeCapacity());
         if (tree.isEmpty()) {
             output.writeByte(0);
-        }
-        else {
+        } else {
             output.writeByte(1);
             // write head
             boolean isBuilt = tree.getItemBoundables() == null;
@@ -78,21 +76,22 @@ public class IndexSerde
                 ArrayList itemBoundables = tree.getItemBoundables();
                 output.writeInt(itemBoundables.size());
                 for (Object obj : itemBoundables) {
-                    if (!(obj instanceof ItemBoundable)) { throw new UnsupportedOperationException(" itemBoundables should only contain ItemBoundable objects "); }
+                    if (!(obj instanceof ItemBoundable)) {
+                        throw new UnsupportedOperationException(
+                                " itemBoundables should only contain ItemBoundable objects ");
+                    }
                     ItemBoundable itemBoundable = (ItemBoundable) obj;
                     // write envelope
                     writeItemBoundable(kryo, output, itemBoundable);
                 }
-            }
-            else {
+            } else {
                 // if built, write from root
                 writeSTRTreeNode(kryo, output, tree.getRoot());
             }
         }
     }
 
-    private void writeSTRTreeNode(Kryo kryo, Output output, AbstractNode node)
-    {
+    private void writeSTRTreeNode(Kryo kryo, Output output, AbstractNode node) {
         // write head
         output.writeInt(node.getLevel());
         // write children
@@ -108,23 +107,20 @@ public class IndexSerde
                     AbstractNode child = (AbstractNode) obj;
                     writeSTRTreeNode(kryo, output, child);
                 }
-            }
-            else if (children.get(0) instanceof ItemBoundable) {
+            } else if (children.get(0) instanceof ItemBoundable) {
                 // write type as 1, leaf node
                 output.writeByte(1);
                 // for leaf node, write items
                 for (Object obj : children) {
                     writeItemBoundable(kryo, output, (ItemBoundable) obj);
                 }
-            }
-            else {
+            } else {
                 throw new UnsupportedOperationException("wrong node type of STRtree");
             }
         }
     }
 
-    private STRtree.STRtreeNode readSTRtreeNode(Kryo kryo, Input input)
-    {
+    private STRtree.STRtreeNode readSTRtreeNode(Kryo kryo, Input input) {
         int level = input.readInt();
         STRtree.STRtreeNode node = new STRtree.STRtreeNode(level);
         int childrenSize = input.readInt();
@@ -134,8 +130,7 @@ public class IndexSerde
             for (int i = 0; i < childrenSize; ++i) {
                 children.add(readItemBoundable(kryo, input));
             }
-        }
-        else {
+        } else {
             for (int i = 0; i < childrenSize; ++i) {
                 children.add(readSTRtreeNode(kryo, input));
             }
@@ -144,17 +139,14 @@ public class IndexSerde
         return node;
     }
 
-    private void writeItemBoundable(Kryo kryo, Output output, ItemBoundable itemBoundable)
-    {
+    private void writeItemBoundable(Kryo kryo, Output output, ItemBoundable itemBoundable) {
         geometrySerde.write(kryo, output, itemBoundable.getBounds());
         geometrySerde.write(kryo, output, itemBoundable.getItem());
     }
 
-    private ItemBoundable readItemBoundable(Kryo kryo, Input input)
-    {
+    private ItemBoundable readItemBoundable(Kryo kryo, Input input) {
         return new ItemBoundable(
                 geometrySerde.read(kryo, input, Envelope.class),
-                geometrySerde.read(kryo, input, Geometry.class)
-        );
+                geometrySerde.read(kryo, input, Geometry.class));
     }
 }
