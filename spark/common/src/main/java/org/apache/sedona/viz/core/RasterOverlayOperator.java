@@ -123,8 +123,8 @@ public class RasterOverlayOperator {
                                                         != frontImage.getHeight()) {
                                             throw new Exception(
                                                     "[OverlayOperator][JoinImage] The two given"
-                                                        + " image don't have the same width or the"
-                                                        + " same height.");
+                                                            + " image don't have the same width or the"
+                                                            + " same height.");
                                         }
                                         int w =
                                                 Math.max(

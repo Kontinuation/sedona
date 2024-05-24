@@ -479,8 +479,11 @@ public class RasterUtils {
                 .transform(new GridCoordinates2D(colX - 1, rowY - 1), null);
     }
 
-    /***
-     * Returns the world coordinates of the given grid coordinate. The expected grid coordinates are 1 indexed. The function also enforces a range check to make sure given grid coordinates are actually inside the grid.
+    /**
+     * Returns the world coordinates of the given grid coordinate. The expected grid coordinates are
+     * 1 indexed. The function also enforces a range check to make sure given grid coordinates are
+     * actually inside the grid.
+     *
      * @param raster
      * @param colX
      * @param rowY
@@ -515,8 +518,9 @@ public class RasterUtils {
         return gridCoords;
     }
 
-    /***
+    /**
      * Throws an exception if band index is greater than the number of bands in a raster
+     *
      * @param raster
      * @param band
      * @return

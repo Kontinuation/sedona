@@ -104,9 +104,9 @@ public class FunctionTest extends TestBase {
                         first(
                                         tableEnv.sqlQuery(
                                                 "SELECT"
-                                                    + " ST_AsText(ST_ReducePrecision(ST_Buffer(ST_GeomFromWKT('LINESTRING(0"
-                                                    + " 0, 50 70, 100 100)'), 10, false,"
-                                                    + " 'side=left'), 4))"))
+                                                        + " ST_AsText(ST_ReducePrecision(ST_Buffer(ST_GeomFromWKT('LINESTRING(0"
+                                                        + " 0, 50 70, 100 100)'), 10, false,"
+                                                        + " 'side=left'), 4))"))
                                 .getField(0);
         String expected =
                 "POLYGON ((50 70, 0 0, -8.1373 5.8124, 41.8627 75.8124, 43.2167 77.3476, 44.855"
@@ -118,16 +118,16 @@ public class FunctionTest extends TestBase {
                         first(
                                         tableEnv.sqlQuery(
                                                 "SELECT"
-                                                    + " ST_AsText(ST_ReducePrecision(ST_Buffer(ST_GeomFromWKT('LINESTRING(0"
-                                                    + " 0, 50 70, 70 -3)'), 10, false,"
-                                                    + " 'endcap=square'), 4))"))
+                                                        + " ST_AsText(ST_ReducePrecision(ST_Buffer(ST_GeomFromWKT('LINESTRING(0"
+                                                        + " 0, 50 70, 70 -3)'), 10, false,"
+                                                        + " 'endcap=square'), 4))"))
                                 .getField(0);
         expected =
                 "POLYGON ((43.2156 77.3465, 44.8523 78.5733, 46.7044 79.4413, 48.6944 79.9144,"
-                    + " 50.739 79.9727, 52.7527 79.6137, 54.6512 78.8525, 56.3552 77.7209, 57.7932"
-                    + " 76.2663, 58.9052 74.5495, 59.6446 72.6424, 79.6446 -0.3576, 82.2869"
-                    + " -10.0022, 62.9978 -15.2869, 45.9128 47.0733, 8.1373 -5.8124, 2.325"
-                    + " -13.9497, -13.9497 -2.325, 41.8627 75.8124, 43.2156 77.3465))";
+                        + " 50.739 79.9727, 52.7527 79.6137, 54.6512 78.8525, 56.3552 77.7209, 57.7932"
+                        + " 76.2663, 58.9052 74.5495, 59.6446 72.6424, 79.6446 -0.3576, 82.2869"
+                        + " -10.0022, 62.9978 -15.2869, 45.9128 47.0733, 8.1373 -5.8124, 2.325"
+                        + " -13.9497, -13.9497 -2.325, 41.8627 75.8124, 43.2156 77.3465))";
         assertEquals(expected, actual);
 
         actual =
@@ -135,14 +135,14 @@ public class FunctionTest extends TestBase {
                         first(
                                         tableEnv.sqlQuery(
                                                 "SELECT"
-                                                    + " ST_AsText(ST_ReducePrecision(ST_Buffer(ST_Point(100,"
-                                                    + " 90), 200, false, 'quad_segs=4'), 4))"))
+                                                        + " ST_AsText(ST_ReducePrecision(ST_Buffer(ST_Point(100,"
+                                                        + " 90), 200, false, 'quad_segs=4'), 4))"))
                                 .getField(0);
         expected =
                 "POLYGON ((284.7759 13.4633, 241.4214 -51.4214, 176.5367 -94.7759, 100 -110,"
-                    + " 23.4633 -94.7759, -41.4214 -51.4214, -84.7759 13.4633, -100 90, -84.7759"
-                    + " 166.5367, -41.4214 231.4214, 23.4633 274.7759, 100 290, 176.5367 274.7759,"
-                    + " 241.4214 231.4214, 284.7759 166.5367, 300 90, 284.7759 13.4633))";
+                        + " 23.4633 -94.7759, -41.4214 -51.4214, -84.7759 13.4633, -100 90, -84.7759"
+                        + " 166.5367, -41.4214 231.4214, 23.4633 274.7759, 100 290, 176.5367 274.7759,"
+                        + " 241.4214 231.4214, 284.7759 166.5367, 300 90, 284.7759 13.4633))";
         assertEquals(expected, actual);
 
         actual =
@@ -150,9 +150,9 @@ public class FunctionTest extends TestBase {
                         first(
                                         tableEnv.sqlQuery(
                                                 "SELECT"
-                                                    + " ST_AsText(ST_ReducePrecision(ST_Buffer(ST_GeomFromWKT('LINESTRING(0"
-                                                    + " 0, 50 70, 70 -3)'), 10, true,"
-                                                    + " 'endcap=square'), 4))"))
+                                                        + " ST_AsText(ST_ReducePrecision(ST_Buffer(ST_GeomFromWKT('LINESTRING(0"
+                                                        + " 0, 50 70, 70 -3)'), 10, true,"
+                                                        + " 'endcap=square'), 4))"))
                                 .getField(0);
         expected =
                 "POLYGON ((50 70, 50.0001 70, 70.0001 -3, 70.0001 -3.0001, 69.9999 -3.0001, 50"
@@ -164,16 +164,16 @@ public class FunctionTest extends TestBase {
                         first(
                                         tableEnv.sqlQuery(
                                                 "SELECT"
-                                                    + " ST_AsText(ST_ReducePrecision(ST_Buffer(ST_GeomFromWKT('POLYGON((-120"
-                                                    + " 30, -80 30, -80 50, -120 50, -120 30))'),"
-                                                    + " 200, true, 'quad_segs=4'), 4))"))
+                                                        + " ST_AsText(ST_ReducePrecision(ST_Buffer(ST_GeomFromWKT('POLYGON((-120"
+                                                        + " 30, -80 30, -80 50, -120 50, -120 30))'),"
+                                                        + " 200, true, 'quad_segs=4'), 4))"))
                                 .getField(0);
         expected =
                 "POLYGON ((-120.0018 50, -120.0017 50.0004, -120.0013 50.0008, -120.0007 50.0011,"
-                    + " -120 50.0012, -80 50.0012, -79.9993 50.0011, -79.9987 50.0008, -79.9983"
-                    + " 50.0004, -79.9982 50, -79.9982 30, -79.9983 29.9994, -79.9987 29.9989,"
-                    + " -79.9993 29.9986, -80 29.9984, -120 29.9984, -120.0007 29.9986, -120.0013"
-                    + " 29.9989, -120.0017 29.9994, -120.0018 30, -120.0018 50))";
+                        + " -120 50.0012, -80 50.0012, -79.9993 50.0011, -79.9987 50.0008, -79.9983"
+                        + " 50.0004, -79.9982 50, -79.9982 30, -79.9983 29.9994, -79.9987 29.9989,"
+                        + " -79.9993 29.9986, -80 29.9984, -120 29.9984, -120.0007 29.9986, -120.0013"
+                        + " 29.9989, -120.0017 29.9994, -120.0018 30, -120.0018 50))";
         assertEquals(expected, actual);
     }
 
@@ -208,9 +208,9 @@ public class FunctionTest extends TestBase {
                         first(
                                         tableEnv.sqlQuery(
                                                 "SELECT"
-                                                    + " ST_AsText(ST_ShiftLongitude(ST_GeomFromWKT('POLYGON((179"
-                                                    + " 10, -179 10, -179 20, 179 20, 179"
-                                                    + " 10))')))"))
+                                                        + " ST_AsText(ST_ShiftLongitude(ST_GeomFromWKT('POLYGON((179"
+                                                        + " 10, -179 10, -179 20, 179 20, 179"
+                                                        + " 10))')))"))
                                 .getField(0);
         String expected = "POLYGON ((179 10, 181 10, 181 20, 179 20, 179 10))";
         assertEquals(expected, actual);
@@ -220,10 +220,10 @@ public class FunctionTest extends TestBase {
                         first(
                                         tableEnv.sqlQuery(
                                                 "SELECT"
-                                                    + " ST_AsText(ST_ShiftLongitude(ST_GeomFromWKT('MULTIPOLYGON(((179"
-                                                    + " 10, -179 10, -179 20, 179 20, 179 10)),"
-                                                    + " ((-185 10, -185 20, -175 20, -175 10, -185"
-                                                    + " 10)))')))"))
+                                                        + " ST_AsText(ST_ShiftLongitude(ST_GeomFromWKT('MULTIPOLYGON(((179"
+                                                        + " 10, -179 10, -179 20, 179 20, 179 10)),"
+                                                        + " ((-185 10, -185 20, -175 20, -175 10, -185"
+                                                        + " 10)))')))"))
                                 .getField(0);
         expected =
                 "MULTIPOLYGON (((179 10, 181 10, 181 20, 179 20, 179 10)), ((175 10, 175 20, 185"
@@ -235,8 +235,8 @@ public class FunctionTest extends TestBase {
                         first(
                                         tableEnv.sqlQuery(
                                                 "SELECT"
-                                                    + " ST_AsText(ST_ShiftLongitude(ST_GeomFromWKT('LINESTRING(179"
-                                                    + " 10, 181 10)')))"))
+                                                        + " ST_AsText(ST_ShiftLongitude(ST_GeomFromWKT('LINESTRING(179"
+                                                        + " 10, 181 10)')))"))
                                 .getField(0);
         expected = "LINESTRING (179 10, -179 10)";
         assertEquals(expected, actual);
@@ -816,8 +816,8 @@ public class FunctionTest extends TestBase {
         Table polygonTable =
                 tableEnv.sqlQuery(
                         "SELECT ST_GeomFromText('POLYGON((7 9,8 7,11 6,15 8,16 6,17 7,17 10,18"
-                            + " 12,17 14,15 15,11 15,10 13,9 12,7 9),(9 9,10 10,11 11,11 10,10 8,9"
-                            + " 9),(12 14,15 14,13 11,12 14))') AS polygon");
+                                + " 12,17 14,15 15,11 15,10 13,9 12,7 9),(9 9,10 10,11 11,11 10,10 8,9"
+                                + " 9),(12 14,15 14,13 11,12 14))') AS polygon");
         Table resultTable =
                 polygonTable.select(
                         call(Functions.ST_InteriorRingN.class.getSimpleName(), $("polygon"), 1));
@@ -885,8 +885,8 @@ public class FunctionTest extends TestBase {
         Table polygonTable =
                 tableEnv.sqlQuery(
                         "SELECT ST_GeomFromText('POLYGON((7 9,8 7,11 6,15 8,16 6,17 7,17 10,18"
-                            + " 12,17 14,15 15,11 15,10 13,9 12,7 9),(9 9,10 10,11 11,11 10,10 8,9"
-                            + " 9),(12 14,15 14,13 11,12 14))') AS polygon");
+                                + " 12,17 14,15 15,11 15,10 13,9 12,7 9),(9 9,10 10,11 11,11 10,10 8,9"
+                                + " 9),(12 14,15 14,13 11,12 14))') AS polygon");
         Table resultTable =
                 polygonTable.select(
                         call(Functions.ST_NumInteriorRings.class.getSimpleName(), $("polygon")));
@@ -1416,11 +1416,11 @@ public class FunctionTest extends TestBase {
         Table table =
                 tableEnv.sqlQuery(
                         "SELECT ST_GeomFromEWKT('GEOMETRYCOLLECTION (LINESTRING (180 40, 30 20, 20"
-                            + " 90), LINESTRING (180 40, 160 160), LINESTRING (80 60, 120 130, 150"
-                            + " 80), LINESTRING (80 60, 150 80), LINESTRING (20 90, 70 70, 80"
-                            + " 130), LINESTRING (80 130, 160 160), LINESTRING (20 90, 20 160, 70"
-                            + " 190), LINESTRING (70 190, 80 130), LINESTRING (70 190, 160 160))')"
-                            + " AS geom");
+                                + " 90), LINESTRING (180 40, 160 160), LINESTRING (80 60, 120 130, 150"
+                                + " 80), LINESTRING (80 60, 150 80), LINESTRING (20 90, 70 70, 80"
+                                + " 130), LINESTRING (80 130, 160 160), LINESTRING (20 90, 20 160, 70"
+                                + " 190), LINESTRING (70 190, 80 130), LINESTRING (70 190, 160 160))')"
+                                + " AS geom");
         table = table.select(call(Functions.ST_Polygonize.class.getSimpleName(), $("geom")));
         Geometry result = (Geometry) first(table).getField(0);
         result.normalize();
@@ -1447,8 +1447,8 @@ public class FunctionTest extends TestBase {
         Table table =
                 tableEnv.sqlQuery(
                         "SELECT ST_GeomFromText('LINESTRING (0 0, 1 0, 1 1, 0 0)') AS"
-                            + " line,array[ST_GeomFromText('LINESTRING (0.5 0.1, 0.7 0.1, 0.7 0.3,"
-                            + " 0.5 0.1)')] AS holes");
+                                + " line,array[ST_GeomFromText('LINESTRING (0.5 0.1, 0.7 0.1, 0.7 0.3,"
+                                + " 0.5 0.1)')] AS holes");
         table =
                 table.select(
                         call(
@@ -1516,8 +1516,8 @@ public class FunctionTest extends TestBase {
         Table base =
                 tableEnv.sqlQuery(
                         "SELECT ST_GeomFromWKT('POLYGON((2.6 12.5, 2.6 20.0, 12.6 20.0, 12.6 12.5,"
-                            + " 2.6 12.5 ))') AS poly, ST_GeomFromWKT('LINESTRING (0.5 10.7, 5.4"
-                            + " 8.4, 10.1 10.0)') AS line");
+                                + " 2.6 12.5 ))') AS poly, ST_GeomFromWKT('LINESTRING (0.5 10.7, 5.4"
+                                + " 8.4, 10.1 10.0)') AS line");
         Table table =
                 base.select(
                         call(Functions.ST_Snap.class.getSimpleName(), $("poly"), $("line"), 2.525)
@@ -1631,8 +1631,8 @@ public class FunctionTest extends TestBase {
                         String.format(
                                 initExplodeQuery,
                                 "(1, ST_GeomFromWKT('POLYGON ((0 0, 0.2 0, 0.2 0.2, 0 0.2, 0"
-                                    + " 0))'), ST_S2CellIDs(ST_GeomFromWKT('POLYGON ((0 0, 0.2 0,"
-                                    + " 0.2 0.2, 0 0.2, 0 0))'), 10))")));
+                                        + " 0))'), ST_S2CellIDs(ST_GeomFromWKT('POLYGON ((0 0, 0.2 0,"
+                                        + " 0.2 0.2, 0 0.2, 0 0))'), 10))")));
         // points for test
         String points =
                 String.join(
@@ -1672,8 +1672,8 @@ public class FunctionTest extends TestBase {
         Table joinCleanedTable =
                 tableEnv.sqlQuery(
                         "select lefts.id, rights.id from lefts join rights on lefts.cell ="
-                            + " rights.cell where ST_Intersects(lefts.geom, rights.geom) is true"
-                            + " group by (lefts.id, rights.id)");
+                                + " rights.cell where ST_Intersects(lefts.geom, rights.geom) is true"
+                                + " group by (lefts.id, rights.id)");
         // after filter by ST_Intersects, only id =2 point
         assertEquals(1, count(joinCleanedTable));
         assertEquals(2, first(joinCleanedTable).getField(1));
@@ -1710,8 +1710,8 @@ public class FunctionTest extends TestBase {
                         String.format(
                                 initExplodeQuery,
                                 "(1, ST_GeomFromWKT('POLYGON ((0 0, 0.2 0, 0.2 0.2, 0 0.2, 0"
-                                    + " 0))'), ST_H3CellIDs(ST_GeomFromWKT('POLYGON ((0 0, 0.2 0,"
-                                    + " 0.2 0.2, 0 0.2, 0 0))'), 8, true))")));
+                                        + " 0))'), ST_H3CellIDs(ST_GeomFromWKT('POLYGON ((0 0, 0.2 0,"
+                                        + " 0.2 0.2, 0 0.2, 0 0))'), 8, true))")));
         // points for test
         String points =
                 String.join(
@@ -1753,8 +1753,8 @@ public class FunctionTest extends TestBase {
         Table joinCleanedTable =
                 tableEnv.sqlQuery(
                         "select lefts_h3.id, rights_h3.id from lefts_h3 join rights_h3 on"
-                            + " lefts_h3.cell = rights_h3.cell where ST_Intersects(lefts_h3.geom,"
-                            + " rights_h3.geom) is true group by (lefts_h3.id, rights_h3.id)");
+                                + " lefts_h3.cell = rights_h3.cell where ST_Intersects(lefts_h3.geom,"
+                                + " rights_h3.geom) is true group by (lefts_h3.id, rights_h3.id)");
         // after filter by ST_Intersects, only id =2 point
         assertEquals(1, count(joinCleanedTable));
         assertEquals(2, first(joinCleanedTable).getField(1));
@@ -1777,8 +1777,8 @@ public class FunctionTest extends TestBase {
         Table pointTable =
                 tableEnv.sqlQuery(
                         "select ST_H3KRing(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'), 8, true)[1],"
-                            + " 3, false), ST_H3KRing(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'),"
-                            + " 8, true)[1], 3, true)");
+                                + " 3, false), ST_H3KRing(ST_H3CellIDs(ST_GeomFromWKT('POINT(1 2)'),"
+                                + " 8, true)[1], 3, true)");
         List<Long> full =
                 Arrays.asList((Long[]) Objects.requireNonNull(first(pointTable).getField(0)));
         List<Long> exactRing =
@@ -1898,7 +1898,7 @@ public class FunctionTest extends TestBase {
         Table polyTable =
                 tableEnv.sqlQuery(
                         "SELECT ST_ForcePolygonCW(ST_GeomFromWKT('POLYGON ((20 35, 10 30, 10 10,"
-                            + " 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))')) AS polyCW");
+                                + " 30 5, 45 20, 20 35),(30 20, 20 15, 20 25, 30 20))')) AS polyCW");
         String actual =
                 (String)
                         first(
@@ -1960,7 +1960,7 @@ public class FunctionTest extends TestBase {
         Table polyTable =
                 tableEnv.sqlQuery(
                         "SELECT ST_ForcePolygonCCW(ST_GeomFromWKT('POLYGON ((20 35, 45 20, 30 5,"
-                            + " 10 10, 10 30, 20 35), (30 20, 20 25, 20 15, 30 20))')) AS polyCW");
+                                + " 10 10, 10 30, 20 35), (30 20, 20 25, 20 15, 30 20))')) AS polyCW");
         String actual =
                 (String)
                         first(

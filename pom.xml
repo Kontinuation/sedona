@@ -627,9 +627,8 @@
                 <configuration>
                     <java>
                         <googleJavaFormat>
-                            <version>1.8</version>
+                            <version>1.7</version>
                             <style>AOSP</style>
-                            <reflowLongStrings>true</reflowLongStrings>
                         </googleJavaFormat>
                         <licenseHeader>
                             <file>${project.rootdir}/dev/license-header.txt</file>

@@ -56,7 +56,7 @@ public class GeometryUtilTest {
                         GEOMETRY_FACTORY.createGeometryCollection(
                                 geoms.toArray(new Geometry[geoms.size()]))),
                 "GEOMETRYCOLLECTION (POLYGON ((0 1, 3 0, 4 3, 0 4, 0 1)), POLYGON ((3 4, 6 3, 5 5,"
-                    + " 3 4)), POINT (5 8), POLYGON ((0 1, 3 0, 4 3, 0 4, 0 1)), POLYGON ((3 4, 6"
-                    + " 3, 5 5, 3 4)))"));
+                        + " 3 4)), POINT (5 8), POLYGON ((0 1, 3 0, 4 3, 0 4, 0 1)), POLYGON ((3 4, 6"
+                        + " 3, 5 5, 3 4)))"));
     }
 }

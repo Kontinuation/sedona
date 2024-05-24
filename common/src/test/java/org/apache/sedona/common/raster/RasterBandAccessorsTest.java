@@ -124,9 +124,9 @@ public class RasterBandAccessorsTest extends RasterTestBase {
         geom =
                 Constructors.geomFromWKT(
                         "POLYGON ((-77.96672569800863073 37.91971182746296876,"
-                            + " -77.9688630154902711 37.89620133516485367, -77.93936803424354309"
-                            + " 37.90517806858776595, -77.96672569800863073"
-                            + " 37.91971182746296876))",
+                                + " -77.9688630154902711 37.89620133516485367, -77.93936803424354309"
+                                + " 37.90517806858776595, -77.96672569800863073"
+                                + " 37.91971182746296876))",
                         0);
         Double statValue = RasterBandAccessors.getZonalStats(raster, geom, 1, "sum", false, true);
         assertNotNull(statValue);
@@ -134,9 +134,9 @@ public class RasterBandAccessorsTest extends RasterTestBase {
         Geometry nonIntersectingGeom =
                 Constructors.geomFromWKT(
                         "POLYGON ((-78.22106647832458748 37.76411511479908967,"
-                            + " -78.20183062098976734 37.72863564460374874, -78.18088490966962922"
-                            + " 37.76753482276972562, -78.22106647832458748"
-                            + " 37.76411511479908967))",
+                                + " -78.20183062098976734 37.72863564460374874, -78.18088490966962922"
+                                + " 37.76753482276972562, -78.22106647832458748"
+                                + " 37.76411511479908967))",
                         0);
         statValue =
                 RasterBandAccessors.getZonalStats(
@@ -208,9 +208,9 @@ public class RasterBandAccessorsTest extends RasterTestBase {
         geom =
                 Constructors.geomFromWKT(
                         "POLYGON ((-77.96672569800863073 37.91971182746296876,"
-                            + " -77.9688630154902711 37.89620133516485367, -77.93936803424354309"
-                            + " 37.90517806858776595, -77.96672569800863073"
-                            + " 37.91971182746296876))",
+                                + " -77.9688630154902711 37.89620133516485367, -77.93936803424354309"
+                                + " 37.90517806858776595, -77.96672569800863073"
+                                + " 37.91971182746296876))",
                         0);
         actual = RasterBandAccessors.getZonalStatsAll(raster, geom, 1, false);
         assertNotNull(actual);
@@ -218,9 +218,9 @@ public class RasterBandAccessorsTest extends RasterTestBase {
         Geometry nonIntersectingGeom =
                 Constructors.geomFromWKT(
                         "POLYGON ((-78.22106647832458748 37.76411511479908967,"
-                            + " -78.20183062098976734 37.72863564460374874, -78.18088490966962922"
-                            + " 37.76753482276972562, -78.22106647832458748"
-                            + " 37.76411511479908967))",
+                                + " -78.20183062098976734 37.72863564460374874, -78.18088490966962922"
+                                + " 37.76753482276972562, -78.22106647832458748"
+                                + " 37.76411511479908967))",
                         0);
         actual = RasterBandAccessors.getZonalStatsAll(raster, nonIntersectingGeom, 1, false, true);
         assertNull(actual);

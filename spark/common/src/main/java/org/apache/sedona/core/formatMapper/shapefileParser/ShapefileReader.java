@@ -250,8 +250,8 @@ public class ShapefileReader {
                                         } else {
                                             throw new Exception(
                                                     "[ShapefileRDD][getPolygonRDD] the object type"
-                                                        + " is not Polygon or MultiPolygon type."
-                                                        + " It is "
+                                                            + " is not Polygon or MultiPolygon type."
+                                                            + " It is "
                                                             + spatialObject.getGeometryType());
                                         }
                                         return result.iterator();
@@ -315,8 +315,8 @@ public class ShapefileReader {
                                         } else {
                                             throw new Exception(
                                                     "[ShapefileRDD][getPointRDD] the object type"
-                                                        + " is not Point or MultiPoint type. It is"
-                                                        + " "
+                                                            + " is not Point or MultiPoint type. It is"
+                                                            + " "
                                                             + spatialObject.getGeometryType());
                                         }
                                         return result.iterator();

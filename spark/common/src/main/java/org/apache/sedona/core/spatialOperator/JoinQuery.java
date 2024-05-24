@@ -83,8 +83,8 @@ public class JoinQuery {
         if (!queryPartitioner.equals(spatialPartitioner)) {
             throw new IllegalArgumentException(
                     "[JoinQuery] queryRDD is not partitioned by the same grids with spatialRDD."
-                        + " Please make sure they both use the same grids otherwise wrong results"
-                        + " will appear.");
+                            + " Please make sure they both use the same grids otherwise wrong results"
+                            + " will appear.");
         }
 
         final int spatialNumPart = spatialRDD.spatialPartitionedRDD.getNumPartitions();

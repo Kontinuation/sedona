@@ -82,8 +82,8 @@ public class RasterInterpolate {
             if (mode.equalsIgnoreCase("variable") && strtree.size() < numPointsOrRadius) {
                 throw new IllegalArgumentException(
                         "Parameter 'numPoints' defaulted to 12 which is larger than no. of valid"
-                            + " pixels within the max search radius. Please choose an appropriate"
-                            + " value");
+                                + " pixels within the max search radius. Please choose an appropriate"
+                                + " value");
             }
             for (RasterPoint rasterPoint : queryResult) {
                 if (numPoints <= 0) {

@@ -399,12 +399,12 @@ public class ConstructorTest extends TestBase {
         List<Row> data = new ArrayList<>();
         String kml =
                 "<Polygon>\n"
-                    + "  <outerBoundaryIs>\n"
-                    + "    <LinearRing>\n"
-                    + "      <coordinates>0.0,0.0 0.0,1.0 1.0,1.0 1.0,0.0 0.0,0.0</coordinates>\n"
-                    + "    </LinearRing>\n"
-                    + "  </outerBoundaryIs>\n"
-                    + "</Polygon>";
+                        + "  <outerBoundaryIs>\n"
+                        + "    <LinearRing>\n"
+                        + "      <coordinates>0.0,0.0 0.0,1.0 1.0,1.0 1.0,0.0 0.0,0.0</coordinates>\n"
+                        + "    </LinearRing>\n"
+                        + "  </outerBoundaryIs>\n"
+                        + "</Polygon>";
         data.add(Row.of(kml, "polygon", 0L));
 
         Table wktTable = createTextTable(data, polygonColNames);

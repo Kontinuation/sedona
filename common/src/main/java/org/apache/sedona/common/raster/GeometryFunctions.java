@@ -30,8 +30,9 @@ import org.opengis.referencing.operation.TransformException;
 
 public class GeometryFunctions {
 
-    /***
+    /**
      * Returns the convex hull of the input raster
+     *
      * @param raster
      * @return Geometry: convex hull of the input raster
      * @throws FactoryException

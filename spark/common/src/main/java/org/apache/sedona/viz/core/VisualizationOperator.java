@@ -373,10 +373,10 @@ public abstract class VisualizationOperator implements Serializable {
                                                         < 0) {
                                                     throw new Exception(
                                                             "[VisualizationOperator][ApplyPhotoFilter]"
-                                                                + " this pixel doesn't have"
-                                                                + " currentPartitionId that is"
-                                                                + " assigned in"
-                                                                + " VisualizationPartitioner.");
+                                                                    + " this pixel doesn't have"
+                                                                    + " currentPartitionId that is"
+                                                                    + " assigned in"
+                                                                    + " VisualizationPartitioner.");
                                                 }
                                                 if (neighborPixelX < 0
                                                         || neighborPixelX >= resolutionX
