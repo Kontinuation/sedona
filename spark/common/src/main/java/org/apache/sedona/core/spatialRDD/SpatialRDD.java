@@ -704,8 +704,13 @@ public class SpatialRDD<T extends Geometry>
                     }
                     return (Iterator<AdvancedStatCollector>) new SingletonIterator(statCalculator);
                 };
-        JavaRDD<AdvancedStatCollector> perPartitionStatsRdd = this.rawSpatialRDD.mapPartitionsWithIndex(aggregatePerPartitionStats, true);
-        AdvancedStatCollector agg = perPartitionStatsRdd.reduce(AdvancedStatCollector::combine);
+        AdvancedStatCollector agg;
+        if (numPartitions > 0) {
+            JavaRDD<AdvancedStatCollector> perPartitionStatsRdd = this.rawSpatialRDD.mapPartitionsWithIndex(aggregatePerPartitionStats, true);
+            agg = perPartitionStatsRdd.reduce(AdvancedStatCollector::combine);
+        } else {
+            agg = new AdvancedStatCollector(minSamples, maxSamples, minSamplingRate, sizeEstimationSampleGrowthRate, false, seed);
+        }
 
         // Set the boundary and count
         this.stat = agg;
