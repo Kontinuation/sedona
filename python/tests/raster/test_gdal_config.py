@@ -76,3 +76,19 @@ class TestGdalConfig:
         assert session.unsigned
         assert 'aws_access_key_id' not in session.credentials
         assert 'aws_secret_access_key' not in session.credentials
+
+    def test_export_to_env(self):
+        gdal_conf._set_spark_conf_in_test({
+            'spark.hadoop.fs.s3a.aws.credentials.provider': 'com.amazonaws.auth.WebIdentityTokenCredentialsProvider',
+            'spark.hadoop.fs.s3a.bucket.pub-bucket.aws.credentials.provider': 'org.apache.hadoop.fs.s3a.AnonymousAWSCredentialsProvider',
+        })
+        gdal_conf.export_gdal_conf_to_env()
+        try:
+            # clear spark conf and reload config from environment variables
+            gdal_conf._set_spark_conf_in_test({})
+            session = gdal_conf.get_rasterio_aws_session('s3://test-bucket/test/path')
+            assert not session.unsigned
+            session = gdal_conf.get_rasterio_aws_session('s3://pub-bucket/test/path')
+            assert session.unsigned
+        finally:
+            gdal_conf.clear_gdal_conf_from_env()

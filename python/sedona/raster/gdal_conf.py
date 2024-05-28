@@ -16,6 +16,8 @@
 #  under the License.
 
 from typing import List, Dict, Optional, Tuple, Any
+import json
+import os
 import re
 
 from rasterio.session import AWSSession  # type: ignore
@@ -32,6 +34,10 @@ _per_bucket_s3a_conf: Optional[Dict[str, Dict[str, str]]] = None
 
 _base_gdal_conf: Optional[Dict[str, str]] = None
 _per_bucket_gdal_conf: Optional[Dict[str, Dict[str, str]]] = None
+
+
+BASE_GDAL_CONF_ENV_KEY = '__SEDONA_BASE_GDAL_CONF__'
+PER_BUCKET_GDAL_CONF_ENV_KEY = '__SEDONA_PER_BUCKET_GDAL_CONF__'
 
 
 S3A_CONFIG_TO_GDAL_CONFIG_MAP = {
@@ -62,6 +68,21 @@ def get_gdal_conf(path: str) -> Dict[str, str]:
     if bucket_name is None:
         return {}
     return get_gdal_conf_for_s3_bucket(bucket_name)
+
+
+def export_gdal_conf_to_env():
+    _load_gdal_conf()
+    if _base_gdal_conf is None and _per_bucket_gdal_conf is None:
+        return
+    if BASE_GDAL_CONF_ENV_KEY not in os.environ:
+        os.environ[BASE_GDAL_CONF_ENV_KEY] = json.dumps(_base_gdal_conf)
+    if PER_BUCKET_GDAL_CONF_ENV_KEY not in os.environ:
+        os.environ[PER_BUCKET_GDAL_CONF_ENV_KEY] = json.dumps(_per_bucket_gdal_conf)
+
+
+def clear_gdal_conf_from_env():
+    del os.environ[BASE_GDAL_CONF_ENV_KEY]
+    del os.environ[PER_BUCKET_GDAL_CONF_ENV_KEY]
 
 
 def get_rasterio_aws_session(path: str) -> Optional[AWSSession]:
@@ -159,9 +180,22 @@ def _load_gdal_conf():
     if _base_gdal_conf is not None and _per_bucket_gdal_conf is not None:
         return
 
+    # try loading gdal config from env
+    if BASE_GDAL_CONF_ENV_KEY in os.environ or PER_BUCKET_GDAL_CONF_ENV_KEY in os.environ:
+        _base_gdal_conf = (
+            json.loads(os.environ[BASE_GDAL_CONF_ENV_KEY])
+            if BASE_GDAL_CONF_ENV_KEY in os.environ else {}
+        )
+        _per_bucket_gdal_conf = (
+            json.loads(os.environ[PER_BUCKET_GDAL_CONF_ENV_KEY])
+            if PER_BUCKET_GDAL_CONF_ENV_KEY in os.environ else {}
+        )
+        return
+
+    # try loading gdal config from spark config
     spark_conf = _load_spark_conf()
     if spark_conf is None:
-        return None
+        return
 
     global _base_s3a_conf, _per_bucket_s3a_conf
     _base_s3a_conf, _per_bucket_s3a_conf = _parse_s3a_conf(spark_conf)
