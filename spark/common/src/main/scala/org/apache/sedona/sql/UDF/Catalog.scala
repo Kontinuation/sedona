@@ -158,6 +158,7 @@ object Catalog {
     function[ST_LineSubstring](),
     function[ST_LineInterpolatePoint](),
     function[ST_LineLocatePoint](),
+    function[ST_LocateAlong](),
     function[ST_LongestLine](),
     function[ST_SubDivideExplode](),
     function[ST_SubDivide](),
