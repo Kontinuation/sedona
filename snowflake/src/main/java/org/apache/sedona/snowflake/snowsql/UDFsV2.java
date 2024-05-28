@@ -684,26 +684,6 @@ public class UDFsV2
         );
     }
 
-    @UDFAnnotations.ParamMeta(argNames = {"geom", "measure", "offset"}, argTypes = {"Geometry", "double", "double"}, returnTypes = "Geometry")
-    public static String ST_LocateAlong(String geom, double measure, double offset) {
-        return GeometrySerde.serGeoJson(
-                Functions.locateAlong(
-                        GeometrySerde.deserGeoJson(geom),
-                        measure, offset
-                )
-        );
-    }
-
-    @UDFAnnotations.ParamMeta(argNames = {"geom", "measure"}, argTypes = {"Geometry", "double"}, returnTypes = "Geometry")
-    public static String ST_LocateAlong(String geom, double measure) {
-        return GeometrySerde.serGeoJson(
-                Functions.locateAlong(
-                        GeometrySerde.deserGeoJson(geom),
-                        measure
-                )
-        );
-    }
-
     @UDFAnnotations.ParamMeta(argNames = {"geom1", "geom2"}, argTypes = {"Geometry", "Geometry"}, returnTypes = "Geometry")
     public static String ST_LongestLine(String geom1, String geom2) {
         return GeometrySerde.serGeoJson(

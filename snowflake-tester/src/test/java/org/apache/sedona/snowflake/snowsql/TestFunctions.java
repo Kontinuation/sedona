@@ -592,21 +592,6 @@ public class TestFunctions extends TestBase {
     }
 
     @Test
-    public void test_ST_LocateAlong() {
-        registerUDF("ST_LocateAlong", byte[].class, double.class);
-        verifySqlSingleRes(
-                "SELECT sedona.ST_AsText(sedona.ST_LocateAlong(sedona.ST_GeomFromText('MULTILINESTRING M((1 2 3, 3 4 2, 9 4 3),(1 2 3, 5 4 5))'), 2))",
-                "MULTIPOINT M((3 4 2))"
-        );
-
-        registerUDF("ST_LocateAlong", byte[].class, double.class, double.class);
-        verifySqlSingleRes(
-                "SELECT sedona.ST_AsText(sedona.ST_LocateAlong(sedona.ST_GeomFromText('MULTILINESTRING M((1 2 3, 3 4 2, 9 4 3),(1 2 3, 5 4 5))'), 2, -3))",
-                "MULTIPOINT M((5.121320343559642 1.8786796564403572 2), (3 1 2))"
-        );
-    }
-
-    @Test
     public void test_ST_LongestLine() {
         registerUDF("ST_LongestLine", byte[].class, byte[].class);
         verifySqlSingleRes(

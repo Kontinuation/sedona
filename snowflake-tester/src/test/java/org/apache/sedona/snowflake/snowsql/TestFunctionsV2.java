@@ -590,22 +590,6 @@ public class TestFunctionsV2
                 "LINESTRING(45.173118104 45.743370112,50 20,90 80,112.975930502 49.365425998)"
         );
     }
-
-    @Test
-    public void test_ST_LocateAlong() {
-        registerUDF("ST_LocateAlong", String.class, double.class);
-        verifySqlSingleRes(
-                "SELECT ST_AsText(sedona.ST_LocateAlong(ST_GeomFromText('MULTILINESTRING M((1 2 3, 3 4 2, 9 4 3),(1 2 3, 5 4 5))'), 2))",
-                "MULTIPOINTM((3 4 2))"
-        );
-
-        registerUDF("ST_LocateAlong", String.class, double.class, double.class);
-        verifySqlSingleRes(
-                "SELECT ST_AsText(sedona.ST_LocateAlong(ST_GeomFromText('MULTILINESTRING M((1 2 3, 3 4 2, 9 4 3),(1 2 3, 5 4 5))'), 2, -3))",
-                "MULTIPOINTM((5.121320343559642 1.8786796564403572 2),(3 1 2))"
-        );
-    }
-
     @Test
     public void test_ST_LongestLine() {
         registerUDFV2("ST_LongestLine", String.class, String.class);

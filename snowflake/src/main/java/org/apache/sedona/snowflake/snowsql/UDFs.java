@@ -767,26 +767,6 @@ public class UDFs {
         );
     }
 
-    @UDFAnnotations.ParamMeta(argNames = {"geom", "measure", "offset"})
-    public static byte[] ST_LocateAlong(byte[] geom, double measure, double offset) {
-        return GeometrySerde.serialize(
-                Functions.locateAlong(
-                        GeometrySerde.deserialize(geom),
-                        measure, offset
-                )
-        );
-    }
-
-    @UDFAnnotations.ParamMeta(argNames = {"geom", "measure"})
-    public static byte[] ST_LocateAlong(byte[] geom, double measure) {
-        return GeometrySerde.serialize(
-                Functions.locateAlong(
-                        GeometrySerde.deserialize(geom),
-                        measure
-                )
-        );
-    }
-
     @UDFAnnotations.ParamMeta(argNames = {"geom1", "geom2"})
     public static byte[] ST_LongestLine(byte[] geom1, byte[] geom2) {
         return GeometrySerde.serialize(
