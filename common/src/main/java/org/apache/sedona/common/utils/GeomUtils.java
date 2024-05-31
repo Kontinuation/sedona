@@ -556,6 +556,7 @@ public class GeomUtils {
             return locateAlongPoint(geometry, measure, offset);
         }
         if (geometry instanceof MultiPoint) {
+            // iterating through Points in MultiPoint object
             Point[] points = new Point[geometry.getNumGeometries()];
             for (int i = 0; i < geometry.getNumGeometries(); i++) {
                 points[i] = locateAlongPoint(geometry.getGeometryN(i), measure, offset);
@@ -566,6 +567,7 @@ public class GeomUtils {
             return locateAlongLinestring(geometry, measure, offset);
         }
         if (geometry instanceof MultiLineString) {
+            // iterating through LineStrings in MultiLineString object
             List<Point> points = new ArrayList<>();
             for (int i = 0; i < geometry.getNumGeometries(); i++) {
                 MultiPoint mPoint = (MultiPoint) locateAlongLinestring(geometry.getGeometryN(i), measure, offset);
@@ -598,6 +600,7 @@ public class GeomUtils {
             }
 
             if (measure1 == measure2) {
+                // If the measures are equal then there is no valid interpolation range
                 if (coordinate1.equals(coordinate2)) {
                     newCoordinate.setX(coordinate1.getX());
                     newCoordinate.setY(coordinate1.getY());
@@ -606,18 +609,25 @@ public class GeomUtils {
                     coordinateList.add(newCoordinate, false);
                     continue;
                 }
+                // the point will be in the midpoint of coordinate1 and coordinate2 as measure1 and measure2 are same
                 position = 0.5;
             } else {
+                // calculate the interpolation factor / position
                 position = (measure - measure1) / (measure2 - measure1);
             }
 
+            // apply linear interpolation to find the point along the line
             newCoordinate.setX(coordinate1.x + (coordinate2.x - coordinate1.x) * position);
             newCoordinate.setY(coordinate1.y + (coordinate2.y - coordinate1.y) * position);
             newCoordinate.setZ(coordinate1.z + (coordinate2.z - coordinate1.z) * position);
             newCoordinate.setM(measure);
 
             if (offset != 0D) {
+                // calculate the angle of the line segment
                 double theta = Math.atan2(coordinate2.y - coordinate1.y, coordinate2.x - coordinate1.x);
+                // shift the coordinate left or right by the offset
+                // if the offset is positive then shift to left
+                // else the offset is negative then shift to right
                 newCoordinate.setX(newCoordinate.x - Math.sin(theta) * offset);
                 newCoordinate.setY(newCoordinate.y + Math.cos(theta) * offset);
             }
