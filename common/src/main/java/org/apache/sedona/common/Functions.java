@@ -25,13 +25,7 @@ import org.apache.sedona.common.sphere.Spheroid;
 import org.apache.sedona.common.subDivide.ExtentBasedGeometrySubDivider;
 import org.apache.sedona.common.subDivide.GeometrySubDivider;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
-import org.apache.sedona.common.utils.GeomUtils;
-import org.apache.sedona.common.utils.GeometryForce3DMTransformer;
-import org.apache.sedona.common.utils.GeometryForce4DTransformer;
-import org.apache.sedona.common.utils.GeometryGeoHashEncoder;
-import org.apache.sedona.common.utils.GeometrySplitter;
-import org.apache.sedona.common.utils.H3Utils;
-import org.apache.sedona.common.utils.S2Utils;
+import org.apache.sedona.common.utils.*;
 import org.locationtech.jts.algorithm.MinimumBoundingCircle;
 import org.locationtech.jts.algorithm.Orientation;
 import org.locationtech.jts.algorithm.hull.ConcaveHull;
@@ -1017,7 +1011,7 @@ public class Functions {
     }
 
     public static Geometry locateAlong(Geometry linear, double measure, double offset) {
-        return GeomUtils.locateAlong(linear, measure, offset);
+        return GeometryLocateAlongProcessor.processGeometry(linear, measure, offset);
     }
 
     public static Geometry locateAlong(Geometry linear, double measure) {
