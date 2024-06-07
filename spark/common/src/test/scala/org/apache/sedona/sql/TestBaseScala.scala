@@ -26,11 +26,13 @@ import org.apache.sedona.common.Functions.{frechetDistance, hausdorffDistance}
 import org.apache.sedona.common.Predicates.dWithin
 import org.apache.sedona.common.sphere.{Haversine, Spheroid}
 import org.apache.sedona.spark.SedonaContext
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.SparkContext
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.locationtech.jts.geom._
 import org.scalatest.{BeforeAndAfterAll, FunSpec}
 
 import java.io.File
+
 
 trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
   Logger.getRootLogger.setLevel(Level.WARN)
@@ -39,22 +41,30 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
   Logger.getLogger("akka").setLevel(Level.WARN)
   Logger.getLogger("org.apache.sedona.core").setLevel(Level.WARN)
 
+  // Default Spark configurations
   val resourceFolder = System.getProperty("user.dir") + "/src/test/resources/"
-  val warehouseLocation = System.getProperty("user.dir") + "/target/"
-  val sparkSession = SedonaContext.builder().
-    master("local[*]").appName("sedonasqlScalaTest")
-    .config("spark.sql.warehouse.dir", warehouseLocation)
-    // We need to be explicit about broadcasting in tests.
-    .config("sedona.join.autoBroadcastJoinThreshold", "-1")
-    .config("spark.kryoserializer.buffer.max", "64m")
-    .config("spark.wherobots.inference.entrance", resourceFolder + "python/udfEntrance.py")
-    .config("spark.wherobots.inference.files", resourceFolder + "python/udfDefinition.py")
-    // This arg is for the batch parameter used in the Python Pandas UDF test.
-    .config("spark.wherobots.inference.args", "3")
-    //    .config("spark.metrics.conf.*.sink.console.class", "org.apache.spark.metrics.sink.ConsoleSink")
-    .getOrCreate()
+  // Override sparkConfig to provide additional configurations if needed, for example:
+  // override def sparkConfig: Map[String, String] = defaultSparkConfig ++ Map(...)
+  def defaultSparkConfig: Map[String, String] = Map(
+    "spark.sql.warehouse.dir" -> (System.getProperty("user.dir") + "/target/"),
+    "sedona.join.autoBroadcastJoinThreshold" -> "-1",
+    "spark.kryoserializer.buffer.max" -> "64m"
+  )
 
-  val sc = sparkSession.sparkContext
+  // Method to be overridden by subclasses to provide additional configurations
+  def sparkConfig: Map[String, String] = defaultSparkConfig
+
+  // Lazy initialization of Spark session using configurations
+  lazy val sparkSession: SparkSession = {
+    val builder = SedonaContext.builder()
+      .master("local[*]")
+      .appName("sedonasqlScalaTest")
+    sparkConfig.foreach { case (key, value) => builder.config(key, value) }
+    builder.getOrCreate()
+  }
+
+  // Lazy initialization of Spark context from the Spark session
+  lazy val sc: SparkContext = sparkSession.sparkContext
 
   val mixedWkbGeometryInputLocation = resourceFolder + "county_small_wkb.tsv"
   val mixedWktGeometryInputLocation = resourceFolder + "county_small.tsv"
@@ -85,6 +95,7 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
   private val factory = new GeometryFactory()
 
   override def beforeAll(): Unit = {
+    super.beforeAll()
     SedonaContext.create(sparkSession)
   }
 

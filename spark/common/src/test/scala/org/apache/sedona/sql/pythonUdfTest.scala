@@ -23,6 +23,12 @@ import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.{BeforeAndAfter, GivenWhenThen}
 
 class pythonUdfTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen {
+  // Override sparkConfig to provide additional configurations
+  override def sparkConfig: Map[String, String] = defaultSparkConfig ++ Map(
+        "spark.wherobots.inference.entrance" -> (resourceFolder + "python/udfEntrance.py"),
+        "spark.wherobots.inference.files" -> (resourceFolder + "python/udfDefinition.py"),
+        "spark.wherobots.inference.args" -> "3"
+  )
 
   describe("Python UDF test") {
     it("should find the standalone Python UDF in the correct location and register it") {
