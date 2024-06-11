@@ -34,6 +34,8 @@ public class SpatialPartitionerBuilder {
     private final PartitioningUtils tree;
     private final GridType gridType;
     private final Envelope boundary;
+    private int neighborSampleNumber = -1;
+    private double samplingProbability = 0.01f;
 
     /**
      * Construct a spatial partitioner builder.
@@ -73,6 +75,11 @@ public class SpatialPartitionerBuilder {
                 tree = new KDB(maxItemsPerNode, numPartitions, boundary);
                 break;
             }
+            case ZORDER: {
+                tree = new IntervalTree(boundary, numPartitions);
+                break;
+            }
+
             default:
                 throw new IllegalArgumentException("Unsupported spatial partitioning method " + gridType);
         }
@@ -109,6 +116,18 @@ public class SpatialPartitionerBuilder {
                     }
                 }
                 break;
+
+            case ZORDER:
+                IntervalTree linearTree = (IntervalTree) tree;
+                for (final Envelope sample : samples) {
+                    if (boundary.covers(sample)) {
+                        linearTree.insert(sample);
+                    } else if (boundary.intersects(sample)) {
+                        Envelope truncatedSample = boundary.intersection(sample);
+                        linearTree.insert(truncatedSample);
+                    }
+                }
+                break;
         }
     }
 
@@ -129,6 +148,11 @@ public class SpatialPartitionerBuilder {
                 KDB kdbTree = (KDB) tree;
                 kdbTree.assignLeafIds();
                 return new KDBTreePartitioner(kdbTree);
+
+            case ZORDER:
+                IntervalTree linearTree = (IntervalTree) tree;
+                linearTree.build(neighborSampleNumber, samplingProbability);
+                return new ZOrderPartitioner(linearTree);
 
             default:
                 throw new IllegalStateException("Unknown spatial partitioning method " + gridType);
@@ -212,5 +236,13 @@ public class SpatialPartitionerBuilder {
             }
         }
         return subSamples;
+    }
+
+    public void setNeighborSampleNumber(int neighborSampleNumber) {
+        this.neighborSampleNumber = neighborSampleNumber;
+    }
+
+    public void setSamplingProbability(double samplingProbability) {
+        this.samplingProbability = samplingProbability;
     }
 }

@@ -131,6 +131,11 @@ public class SpatialRDD<T extends Geometry>
     private int sampleNumber = -1;
 
     /**
+     * The neighbor sample number.
+     */
+    private int neighborSampleNumber = -1;
+
+    /**
      * Comprehensive statistics of the spatial RDD with random samples collected for creating the spatial
      * partitioning grid.
      */
@@ -149,6 +154,16 @@ public class SpatialRDD<T extends Geometry>
     public void setSampleNumber(int sampleNumber)
     {
         this.sampleNumber = sampleNumber;
+    }
+
+    /**
+     * Sets the neighbor sample number.
+     *
+     * @param neighborSampleNumber the new neighbor sample number
+     */
+    public void setNeighborSampleNumber(int neighborSampleNumber)
+    {
+        this.neighborSampleNumber = neighborSampleNumber;
     }
 
     /**
@@ -227,6 +242,8 @@ public class SpatialRDD<T extends Geometry>
 
         SpatialPartitionerBuilder builder = new SpatialPartitionerBuilder(gridType, numPartitions, samples.size(), paddedBoundary);
         builder.addSamples(samples);
+        builder.setNeighborSampleNumber(neighborSampleNumber);
+        builder.setSamplingProbability((double) samples.size() / (double) this.approximateTotalCount);
         partitioner = builder.build();
     }
 

@@ -355,6 +355,7 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     val metricPrepareBuildTasks = longMetric("prepareBuildTasks")
     val metricPrepareStreamTasks = longMetric("prepareStreamTasks")
     val joinParams = new JoinParams(true, spatialPredicate, IndexType.RTREE, sedonaConf.getJoinBuildSide,
+      -1, null, null,
       metricBuildCount, metricStreamCount, metricResultCount, metricCandidateCount, metricBuildTime,
       metricBuildLeftTasks, metricBuildRightTasks,
       metricPrepareBuildTasks, metricPrepareStreamTasks)

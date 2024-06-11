@@ -46,8 +46,12 @@ public enum GridType
     /**
      * K-D-B-tree partitioning (k-dimensional B-tree)
      */
-    KDBTREE;
+    KDBTREE,
 
+    /**
+     * Z-ORDER based partitioning (morton space-filling curve)
+     */
+    ZORDER;
 
     /**
      * Gets the grid type.

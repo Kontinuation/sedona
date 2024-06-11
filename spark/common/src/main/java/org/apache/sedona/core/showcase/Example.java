@@ -22,6 +22,7 @@ package org.apache.sedona.core.showcase;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.enums.FileDataSplitter;
+import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.formatMapper.shapefileParser.ShapefileReader;
@@ -41,6 +42,7 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
 import org.apache.sedona.core.spatialRDD.SpatialRDD;
+import scala.Tuple2;
 
 import java.io.Serializable;
 import java.util.List;
@@ -192,6 +194,7 @@ public class Example
             testSpatialJoinQueryUsingIndex();
             testDistanceJoinQuery();
             testDistanceJoinQueryUsingIndex();
+            testZOrderKnnJoinQuery();
             testLoadShapefileIntoPolygonRDD();
         }
         catch (Exception e) {
@@ -363,6 +366,51 @@ public class Example
             long resultSize = JoinQuery.DistanceJoinQuery(objectRDD, queryWindowRDD, true, true).count();
             assert resultSize > 0;
         }
+    }
+
+    private static void testZOrderKnnJoinQuery()
+            throws Exception
+    {
+        // this test uses the same dataset for both object and query RDD
+        // object RDD holds the data (neighbors) to be queried
+        objectRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true, 4);
+        // query RDD holds the data to be used as query points
+        PointRDD queryRDD = new PointRDD(sc, PointRDDInputLocation, PointRDDOffset, PointRDDSplitter, true, 4);
+
+        objectRDD.setNeighborSampleNumber(0);
+        objectRDD.spatialPartitioning(GridType.ZORDER);
+        queryRDD.setNeighborSampleNumber(0);
+        queryRDD.spatialPartitioning(objectRDD.getPartitioner());
+
+        objectRDD.buildIndex(IndexType.RTREE, true);
+        queryRDD.buildIndex(IndexType.RTREE, true);
+
+        objectRDD.indexedRDD.persist(StorageLevel.MEMORY_ONLY());
+        queryRDD.indexedRDD.persist(StorageLevel.MEMORY_ONLY());
+        queryRDD.spatialPartitionedRDD.persist(StorageLevel.MEMORY_ONLY());
+
+        List<Tuple2<Point, List<Point>>> knnOutputs = JoinQuery.KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, 10, DistanceMetric.EUCLIDEAN).collect();
+        StringBuilder output = getListContent(knnOutputs);
+        assert !output.toString().isEmpty();
+        long resultSize = knnOutputs.size();
+        assert resultSize > 0;
+    }
+
+    private static StringBuilder getListContent(List<Tuple2<Point, List<Point>>> collect) {
+        // Use StringBuilder to accumulate the output
+        StringBuilder output = new StringBuilder();
+        // Iterate over the list and accumulate each tuple into the StringBuilder
+        for (Tuple2<Point, List<Point>> tuple : collect) {
+            Point queryPoint = tuple._1();
+            List<Point> neighbors = tuple._2();
+            output.append("Query Point: ").append(queryPoint).append("\n");
+            output.append("Neighbors:\n");
+            for (Point neighbor : neighbors) {
+                output.append("\t").append(neighbor).append("\n");
+            }
+            output.append("\n"); // Add an empty line for better readability
+        }
+        return output;
     }
 
     public static void testLoadShapefileIntoPolygonRDD()
