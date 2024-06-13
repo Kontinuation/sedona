@@ -1036,6 +1036,10 @@ public class Functions {
     LinearRing exteriorRing = geom.getExteriorRing();
     boolean isExteriorRingCW = !Orientation.isCCW(exteriorRing.getCoordinateSequence());
 
+    if (geom.getNumInteriorRing() == 0) {
+      return isExteriorRingCW;
+    }
+
     boolean isInteriorRingCW = Orientation.isCCW(geom.getInteriorRingN(0).getCoordinateSequence());
     for (int i = 1; i < geom.getNumInteriorRing(); i++) {
       isInteriorRingCW =
@@ -1144,6 +1148,10 @@ public class Functions {
   private static boolean checkIfPolygonCCW(Polygon geom) {
     LinearRing exteriorRing = geom.getExteriorRing();
     boolean isExteriorRingCCW = Orientation.isCCW(exteriorRing.getCoordinateSequence());
+
+    if (geom.getNumInteriorRing() == 0) {
+      return isExteriorRingCCW;
+    }
 
     boolean isInteriorRingCCW =
         !Orientation.isCCW(geom.getInteriorRingN(0).getCoordinateSequence());
