@@ -33,7 +33,9 @@ public enum SpatialPredicate {
     TOUCHES,
     OVERLAPS,
     CROSSES,
-    EQUALS;
+    EQUALS,
+    KNN,
+    AKNN;
 
     /**
      * Get inverse predicate of given spatial predicate

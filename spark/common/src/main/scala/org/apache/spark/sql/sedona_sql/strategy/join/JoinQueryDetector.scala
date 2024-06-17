@@ -169,6 +169,10 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       }
     }
 
+    // Check if the filters in the plans are supported
+    checkPlanFilters(left)
+    checkPlanFilters(right)
+
     val joinConditionMatcher = OptimizableJoinCondition(left, right)
     val queryDetection: Option[JoinQueryDetection] = condition.flatMap {
       case joinConditionMatcher(predicate, extraCondition) =>
@@ -232,6 +236,24 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
             Some(JoinQueryDetection(left, right, leftShape, rightShape, SpatialPredicate.INTERSECTS, false,
               condition.get, condition, Some(distance)))
 
+          // ST_KNN
+          case ST_KNN(Seq(leftShape, rightShape, k)) =>
+            Some(JoinQueryDetection(left, right, leftShape, rightShape, spatialPredicate = SpatialPredicate.KNN,
+              isGeography = false, condition.get, condition, Some(k)))
+          case ST_KNN(Seq(leftShape, rightShape, k, useSpheroid)) =>
+            val useSpheroidUnwrapped = useSpheroid.eval().asInstanceOf[Boolean]
+            Some(JoinQueryDetection(left, right, leftShape, rightShape, spatialPredicate = SpatialPredicate.KNN,
+              isGeography = useSpheroidUnwrapped, condition.get, condition, Some(k)))
+
+          // ST_AKNN
+          case ST_AKNN(Seq(leftShape, rightShape, k)) =>
+            Some(JoinQueryDetection(left, right, leftShape, rightShape, spatialPredicate = SpatialPredicate.AKNN,
+              isGeography = false, condition.get, condition, Some(k)))
+          case ST_AKNN(Seq(leftShape, rightShape, k, useSpheroid)) =>
+            val useSpheroidUnwrapped = useSpheroid.eval().asInstanceOf[Boolean]
+            Some(JoinQueryDetection(left, right, leftShape, rightShape, spatialPredicate = SpatialPredicate.AKNN,
+              isGeography = useSpheroidUnwrapped, condition.get, condition, Some(k)))
+
           case _ => None
         }
       case _ => None
@@ -255,7 +277,16 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
           planRangeJoin(left, right, Seq(leftShape, rightShape), joinType, spatialPredicate, condition, extraCondition,
             unneededLeftAttributes, unneededRightAttributes)
         case Some(JoinQueryDetection(left, right, leftShape, rightShape, spatialPredicate, isGeography, condition, extraCondition, Some(distance))) =>
-          planDistanceJoin(left, right, Seq(leftShape, rightShape), joinType, distance, spatialPredicate, isGeography, condition, extraCondition)
+          Option(spatialPredicate) match {
+            case Some(SpatialPredicate.KNN) =>
+              planKNNJoin(left, right, Seq(leftShape, rightShape), joinType, useApproximate = false, distance, isGeography, condition, extraCondition)
+            case Some(SpatialPredicate.AKNN) =>
+              planKNNJoin(left, right, Seq(leftShape, rightShape), joinType, useApproximate = true, distance, isGeography, condition, extraCondition)
+            case Some(predicate) =>
+              planDistanceJoin(left, right, Seq(leftShape, rightShape), joinType, distance, predicate, isGeography, condition, extraCondition)
+            case None =>
+              Nil
+          }
         case None =>
           Nil
       }
@@ -357,6 +388,29 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
     }
   }
 
+  private def planKNNJoin(
+    left: LogicalPlan,
+    right: LogicalPlan,
+    children: Seq[Expression],
+    joinType: JoinType,
+    useApproximate: Boolean,
+    distance: Expression,
+    isGeography: Boolean,
+    condition: Expression,
+    extraCondition: Option[Expression] = None): Seq[SparkPlan] = {
+
+    if (joinType != Inner) {
+      return Nil
+    }
+
+    val a = children.head
+    val b = children.tail.head
+
+    logInfo("Planning knn join, left side is for queries and right size is for the object to be searched")
+    KNNJoinExec(planLater(left), planLater(right), a, b, distance, useApproximate = useApproximate, spatialPredicate = null,
+      isGeography, condition, extraCondition) :: Nil
+  }
+
   private def planBroadcastJoin(
     left: LogicalPlan,
     right: LogicalPlan,
@@ -383,6 +437,9 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
     if (broadcastSide.isEmpty) {
       return Nil
     }
+
+    // Check if the filters in the plans are supported
+    checkPredicatesInBroadcastHint(spatialPredicate)
 
     val a = children.head
     val b = children.tail.head
@@ -458,6 +515,49 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       case EqualNullSafe(l, r) if matches(l, left) && matches(r, right) => true
       case EqualNullSafe(l, r) if matches(l, right) && matches(r, left) => true
       case _ => false
+    }
+  }
+
+  /**
+   * Find the first filter expression in the given plan.
+   * @param plan logical plan
+   * @return filter expression if found, None otherwise
+   */
+  private def findFilterExpression(plan: LogicalPlan): Option[String] = {
+    plan match {
+      case Filter(condition, _) => Some(condition.getClass.getSimpleName)
+      case _ => plan.children.flatMap(findFilterExpression).headOption
+    }
+  }
+
+  /**
+   * Check if the filters in the given plan are supported.
+   * @param plan logical plan
+   */
+  private def checkPlanFilters(plan: LogicalPlan): Unit = {
+    val unsupportedFilters = Map(
+      "ST_KNN" -> "ST_KNN filter is not yet supported in the join query",
+      "ST_AKNN" -> "ST_AKNN filter is not yet supported in the join query"
+    )
+
+    val filterInExpression: Option[String] = findFilterExpression(plan)
+
+    filterInExpression match {
+      case Some(filter) if unsupportedFilters.contains(filter) =>
+        throw new UnsupportedOperationException(unsupportedFilters(filter))
+      case _ => // Do nothing
+    }
+  }
+
+  /**
+   * Check if the given spatial predicate is supported with broadcast hint.
+   * @param spatialPredicate
+   */
+  def checkPredicatesInBroadcastHint(spatialPredicate: SpatialPredicate): Unit = {
+    val unsupportedPredicates = Set(SpatialPredicate.KNN, SpatialPredicate.AKNN)
+
+    if (unsupportedPredicates.contains(spatialPredicate)) {
+      throw new UnsupportedOperationException(s"$spatialPredicate joins are not supported with broadcast hint")
     }
   }
 }

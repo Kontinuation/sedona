@@ -66,6 +66,8 @@ case class OptimizableJoinCondition(left: LogicalPlan, right: LogicalPlan) {
            _: ST_Touches |
            _: ST_Equals |
            _: ST_Crosses |
+           _: ST_KNN |
+           _: ST_AKNN |
            _: RS_Predicate =>
         val leftShape = expression.children.head
         val rightShape = expression.children(1)

@@ -33,10 +33,7 @@ import org.junit.runners.Parameterized;
 import org.locationtech.jts.geom.Geometry;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RunWith(Parameterized.class)
@@ -54,7 +51,10 @@ public class JoinQueryTest extends SpatialQueryTestBase {
 
     @Parameterized.Parameters(name = "JoinQueryTest-{index}: {0}")
     public static SpatialPredicate[] spatialPredicates() {
-        return SpatialPredicate.values();
+        return Arrays.stream(SpatialPredicate.values())
+                .filter(predicate -> predicate != SpatialPredicate.KNN)
+                .filter(predicate -> predicate != SpatialPredicate.AKNN)
+                .toArray(SpatialPredicate[]::new);
     }
 
     private final SpatialPredicate spatialPredicate;

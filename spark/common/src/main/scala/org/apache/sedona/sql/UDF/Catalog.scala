@@ -225,6 +225,8 @@ object Catalog {
     function[ST_DelaunayTriangles](),
     function[ST_HausdorffDistance](-1),
     function[ST_DWithin](),
+    function[ST_KNN](),
+    function[ST_AKNN](),
     function[ST_IsValidReason](),
     // Expression for rasters
     function[RS_NormalizedDifference](),

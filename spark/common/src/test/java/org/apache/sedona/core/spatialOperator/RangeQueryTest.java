@@ -32,6 +32,7 @@ import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -51,7 +52,10 @@ public class RangeQueryTest extends SpatialQueryTestBase {
 
     @Parameterized.Parameters(name = "RangeQueryTest-{index}: {0}")
     public static SpatialPredicate[] spatialPredicates() {
-        return SpatialPredicate.values();
+        return Arrays.stream(SpatialPredicate.values())
+                .filter(predicate -> predicate != SpatialPredicate.KNN)
+                .filter(predicate -> predicate != SpatialPredicate.AKNN)
+                .toArray(SpatialPredicate[]::new);
     }
 
     private final SpatialPredicate spatialPredicate;
