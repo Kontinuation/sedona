@@ -51,32 +51,32 @@ class SubdividedSpatialJoinSuite extends TestBaseScala with TableDrivenPropertyC
       subdivideConfigs.foreach { case (subdivideLeft, subdivideRight, localSubdivideLeft, localSubdivideRight, keepRowDataLeft, keepRowDataRight) =>
         it(s"$left - $right, left: $subdivideLeft, right: $subdivideRight, keep-left: $keepRowDataLeft, keep-right: $keepRowDataRight") {
           val expected = withConf(Map(
-            "sedona.join.subdivideLeft" -> "never",
-            "sedona.join.subdivideRight" -> "never",
-            "sedona.join.subdivideLeftInLocalJoin" -> "never",
-            "sedona.join.subdivideRightInLocalJoin" -> "never")) {
+            "spark.sedona.join.subdivideLeft" -> "never",
+            "spark.sedona.join.subdivideRight" -> "never",
+            "spark.sedona.join.subdivideLeftInLocalJoin" -> "never",
+            "spark.sedona.join.subdivideRightInLocalJoin" -> "never")) {
             sparkSession.sql(
               s"SELECT $left.id, $right.id, $left.geometry, $right.geometry " +
                 s"FROM $left JOIN $right ON ST_Intersects($left.geometry, $right.geometry)").collect()
           }
 
           withConf(Map(
-            "sedona.join.debug.enableMetricsForSpatialPartitioning" -> "true",
+            "spark.sedona.join.debug.enableMetricsForSpatialPartitioning" -> "true",
             "sedona.join.numpartition" -> "20",
-            "sedona.join.subdivideLeft" -> subdivideLeft,
-            "sedona.join.subdivideLeft.maxWidth" -> "0.1",
-            "sedona.join.subdivideLeft.maxHeight" -> "0.1",
-            "sedona.join.subdivideRight" -> subdivideRight,
-            "sedona.join.subdivideRight.maxWidth" -> "0.1",
-            "sedona.join.subdivideRight.maxHeight" -> "0.1",
-            "sedona.join.subdivideLeftInLocalJoin" -> localSubdivideLeft,
-            "sedona.join.subdivideLeftInLocalJoin.maxWidth" -> "0.05",
-            "sedona.join.subdivideLeftInLocalJoin.maxHeight" -> "0.05",
-            "sedona.join.subdivideRightInLocalJoin" -> localSubdivideRight,
-            "sedona.join.subdivideRightInLocalJoin.maxWidth" -> "0.05",
-            "sedona.join.subdivideRightInLocalJoin.maxHeight" -> "0.05",
-            "sedona.join.subdivideLeft.keepRowData" -> keepRowDataLeft,
-            "sedona.join.subdivideRight.keepRowData" -> keepRowDataRight)) {
+            "spark.sedona.join.subdivideLeft" -> subdivideLeft,
+            "spark.sedona.join.subdivideLeft.maxWidth" -> "0.1",
+            "spark.sedona.join.subdivideLeft.maxHeight" -> "0.1",
+            "spark.sedona.join.subdivideRight" -> subdivideRight,
+            "spark.sedona.join.subdivideRight.maxWidth" -> "0.1",
+            "spark.sedona.join.subdivideRight.maxHeight" -> "0.1",
+            "spark.sedona.join.subdivideLeftInLocalJoin" -> localSubdivideLeft,
+            "spark.sedona.join.subdivideLeftInLocalJoin.maxWidth" -> "0.05",
+            "spark.sedona.join.subdivideLeftInLocalJoin.maxHeight" -> "0.05",
+            "spark.sedona.join.subdivideRightInLocalJoin" -> localSubdivideRight,
+            "spark.sedona.join.subdivideRightInLocalJoin.maxWidth" -> "0.05",
+            "spark.sedona.join.subdivideRightInLocalJoin.maxHeight" -> "0.05",
+            "spark.sedona.join.subdivideLeft.keepRowData" -> keepRowDataLeft,
+            "spark.sedona.join.subdivideRight.keepRowData" -> keepRowDataRight)) {
 
             // Result has both geometry columns
             var result = sparkSession.sql(

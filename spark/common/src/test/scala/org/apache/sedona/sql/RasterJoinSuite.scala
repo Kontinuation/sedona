@@ -29,7 +29,7 @@ import org.scalatest.prop.TableDrivenPropertyChecks
 class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
 
   private val spatialJoinPartitionSideConfKey = "sedona.join.spatitionside"
-  private val advancedSpatialJoinConfKey = "sedona.join.advanced"
+  private val advancedSpatialJoinConfKey = "spark.sedona.join.advanced"
 
   private val rasters: Seq[(GridCoverage2D, Int)] = Seq(
     // Japan
@@ -158,10 +158,10 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
   override def sparkConfig: Map[String, String] =
     defaultSparkConfig ++ Map(
       // Being explicit about subdivided spatial join in tests.
-      "sedona.join.subdivideLeft" -> "never",
-      "sedona.join.subdivideRight" -> "never",
-      "sedona.join.subdivideLeftInLocalJoin" -> "never",
-      "sedona.join.subdivideRightInLocalJoin" -> "never"
+      "spark.sedona.join.subdivideLeft" -> "never",
+      "spark.sedona.join.subdivideRight" -> "never",
+      "spark.sedona.join.subdivideLeftInLocalJoin" -> "never",
+      "spark.sedona.join.subdivideRightInLocalJoin" -> "never"
     )
 
   override def beforeAll(): Unit = {
@@ -217,10 +217,10 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       }
       it(s"$joinClause ON $joinCondition, using subdivided join") {
         withConf(Map(advancedSpatialJoinConfKey -> "true",
-          "sedona.join.subdivideLeft" -> "always",
-          "sedona.join.subdivideRight" -> "always",
-          "sedona.join.subdivideLeftInLocalJoin" -> "always",
-          "sedona.join.subdivideRightInLocalJoin" -> "always")) {
+          "spark.sedona.join.subdivideLeft" -> "always",
+          "spark.sedona.join.subdivideRight" -> "always",
+          "spark.sedona.join.subdivideLeftInLocalJoin" -> "always",
+          "spark.sedona.join.subdivideRightInLocalJoin" -> "always")) {
           val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM $joinClause ON $joinCondition")
           verifyResult(expected, result)
         }
@@ -228,10 +228,10 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       it(s"$joinClause ON $joinCondition, using auto tuned subdivided join") {
         withConf(Map(
           advancedSpatialJoinConfKey -> "true",
-          "sedona.join.subdivideLeft" -> "auto",
-          "sedona.join.subdivideRight" -> "auto",
-          "sedona.join.subdivideLeftInLocalJoin" -> "auto",
-          "sedona.join.subdivideRightInLocalJoin" -> "auto")) {
+          "spark.sedona.join.subdivideLeft" -> "auto",
+          "spark.sedona.join.subdivideRight" -> "auto",
+          "spark.sedona.join.subdivideLeftInLocalJoin" -> "auto",
+          "spark.sedona.join.subdivideRightInLocalJoin" -> "auto")) {
           val result = sparkSession.sql(s"SELECT df1.id, df2.id FROM $joinClause ON $joinCondition")
           verifyResult(expected, result)
         }
@@ -273,10 +273,10 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     }
     it("raster-raster join, using subdivided join") {
       withConf(Map(advancedSpatialJoinConfKey -> "true",
-        "sedona.join.subdivideLeft" -> "always",
-        "sedona.join.subdivideRight" -> "always",
-        "sedona.join.subdivideLeftInLocalJoin" -> "always",
-        "sedona.join.subdivideRightInLocalJoin" -> "always")) {
+        "spark.sedona.join.subdivideLeft" -> "always",
+        "spark.sedona.join.subdivideRight" -> "always",
+        "spark.sedona.join.subdivideLeftInLocalJoin" -> "always",
+        "spark.sedona.join.subdivideRightInLocalJoin" -> "always")) {
         val result = sparkSession.sql("SELECT df1.id, df3.id FROM df1 JOIN df3 ON RS_Intersects(df1.rast, df3.rast)")
         verifyResult(expected, result)
       }

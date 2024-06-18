@@ -534,6 +534,8 @@ public class Subdivide {
                     double factor = 1.0 / meanCollisionFactor;
                     double localSubdivideWidth = stat.getMeanEnvelopeWidth() * factor;
                     double localSubdivideHeight = stat.getMeanEnvelopeHeight() * factor;
+                    // Extent of subdivided geometries should not be too small, otherwise the polygon subdividing will
+                    // be very slow. Extent size small enough compared to the spatial partitioning grid should be good.
                     localSubdivideWidth = Math.max(localSubdivideWidth, boundary.getWidth() / Math.sqrt(numPartitions) * 0.03);
                     localSubdivideHeight = Math.max(localSubdivideHeight, boundary.getHeight() / Math.sqrt(numPartitions) * 0.03);
                     localOptions = new SubdivideOptions(localSubdivideWidth, localSubdivideHeight);
@@ -546,14 +548,7 @@ public class Subdivide {
                     // Extent of subdivided geometries should be small enough compared to the partitioning grid size
                     localSubdivideWidth = Math.min(localSubdivideWidth, boundary.getWidth() / Math.sqrt(numPartitions) * 0.03);
                     localSubdivideHeight = Math.min(localSubdivideHeight, boundary.getHeight() / Math.sqrt(numPartitions) * 0.03);
-                    localSubdivideWidth = Math.min(localSubdivideWidth, stat.getMeanEnvelopeWidth());
-                    localSubdivideHeight = Math.min(localSubdivideHeight, stat.getMeanEnvelopeHeight());
-                    // If the inferred local subdivide width/height is not small enough compared to the envelope size
-                    // of original geometries, it may not be necessary to subdivide in local join phase.
-                    double subdivideArea = localSubdivideWidth * localSubdivideHeight;
-                    if (subdivideArea == 0 || stat.getMeanEnvelopeArea() / subdivideArea > 4) {
-                        localOptions = new SubdivideOptions(localSubdivideWidth, localSubdivideHeight);
-                    }
+                    localOptions = new SubdivideOptions(localSubdivideWidth, localSubdivideHeight);
                 }
             }
         } else if (dominantGeometryType == GeometryType.LINESTRING) {

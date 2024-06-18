@@ -124,7 +124,11 @@ public class SedonaConf
         );
         this.spatialJoinOptimizationMode = SpatialJoinOptimizationMode.getSpatialJoinOptimizationMode(
                 runtimeConfig.get("sedona.join.optimizationmode", "nonequi"));
-        this.useAdvancedSpatialJoin = Boolean.parseBoolean(runtimeConfig.get("sedona.join.advanced", "true"));
+
+        // Above are Apache Sedona parameters.
+        // Everything below are Wherobots-DB parameters
+
+        this.useAdvancedSpatialJoin = Boolean.parseBoolean(runtimeConfig.get("spark.sedona.join.advanced", "true"));
         if (this.useAdvancedSpatialJoin) {
             // Always use R-Tree index for advanced spatial join, even for broadcast indexed join.
             this.useIndex = true;
@@ -164,26 +168,26 @@ public class SedonaConf
 
         // Parameters for enabling auto-subdividing when running spatial joins
         this.spatialJoinSubdivideLeft = JoinSubdivideMode.getJoinSubdivideMode(
-                runtimeConfig.get("sedona.join.subdivideLeft", "auto"));
-        boolean keepRowData = Boolean.parseBoolean(runtimeConfig.get("sedona.join.subdivideLeft.keepRowData", "false"));
+                runtimeConfig.get("spark.sedona.join.subdivideLeft", "auto"));
+        boolean keepRowData = Boolean.parseBoolean(runtimeConfig.get("spark.sedona.join.subdivideLeft.keepRowData", "false"));
         // Options for pre-spatial-partitioning subdivide
-        SubdivideOptions options = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideLeft");
+        SubdivideOptions options = readSubdivideOptions(runtimeConfig, "spark.sedona.join.subdivideLeft");
         this.leftSubdivideRDDOptions = new Subdivide.SubdivideRDDOptions(options, false, keepRowData);
         // Options for local join subdivide
         this.localJoinSubdivideLeft = JoinSubdivideMode.getJoinSubdivideMode(
-                runtimeConfig.get("sedona.join.subdivideLeftInLocalJoin", "auto"));
-        this.leftLocalJoinSubdivideOptions = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideLeftInLocalJoin");
+                runtimeConfig.get("spark.sedona.join.subdivideLeftInLocalJoin", "auto"));
+        this.leftLocalJoinSubdivideOptions = readSubdivideOptions(runtimeConfig, "spark.sedona.join.subdivideLeftInLocalJoin");
 
         this.spatialJoinSubdivideRight = JoinSubdivideMode.getJoinSubdivideMode(
-                runtimeConfig.get("sedona.join.subdivideRight", "auto"));
-        keepRowData = Boolean.parseBoolean(runtimeConfig.get("sedona.join.subdivideRight.keepRowData", "false"));
+                runtimeConfig.get("spark.sedona.join.subdivideRight", "auto"));
+        keepRowData = Boolean.parseBoolean(runtimeConfig.get("spark.sedona.join.subdivideRight.keepRowData", "false"));
         // Options for pre-spatial-partitioning subdivide
-        options = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideRight");
+        options = readSubdivideOptions(runtimeConfig, "spark.sedona.join.subdivideRight");
         this.rightSubdivideRDDOptions = new Subdivide.SubdivideRDDOptions(options, false, keepRowData);
         // Options for local join subdivide
         this.localJoinSubdivideRight = JoinSubdivideMode.getJoinSubdivideMode(
-                runtimeConfig.get("sedona.join.subdivideRightInLocalJoin", "auto"));
-        this.rightLocalJoinSubdivideOptions = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideRightInLocalJoin");
+                runtimeConfig.get("spark.sedona.join.subdivideRightInLocalJoin", "auto"));
+        this.rightLocalJoinSubdivideOptions = readSubdivideOptions(runtimeConfig, "spark.sedona.join.subdivideRightInLocalJoin");
 
         // Internal parameters for automatic subdivide parameter tuning
         this.subdivideDuplicationFactorThreshold = Integer.parseInt(
@@ -201,8 +205,8 @@ public class SedonaConf
 
         // Parameters for debugging
         this.enableMetricsForSpatialPartitioning = Boolean.parseBoolean(
-                runtimeConfig.get("sedona.join.debug.enableMetricsForSpatialPartitioning", "false"));
-        this.spatialPartitionerSavePath = runtimeConfig.get("sedona.join.debug.spatialPartitionerSavePath", "");
+                runtimeConfig.get("spark.sedona.join.debug.enableMetricsForSpatialPartitioning", "false"));
+        this.spatialPartitionerSavePath = runtimeConfig.get("spark.sedona.join.debug.spatialPartitionerSavePath", "");
     }
 
     private SubdivideOptions readSubdivideOptions(RuntimeConfig runtimeConfig, String prefix) {
