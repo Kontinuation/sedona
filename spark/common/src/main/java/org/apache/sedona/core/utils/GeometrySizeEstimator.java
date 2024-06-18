@@ -29,6 +29,8 @@ import org.locationtech.jts.geom.Geometry;
 public class GeometrySizeEstimator {
     private GeometrySizeEstimator() {}
 
+    public static final int BYTES_PER_COORDINATE = 48;
+
     /**
      * Estimate the size of a geometry object. User data is also included in the estimation.
      * @param geom The geometry object.
@@ -99,6 +101,6 @@ public class GeometrySizeEstimator {
         if (numPoints == -1) {
             numPoints = geom.getNumPoints();
         }
-        return 200L + numPoints * 48L;  // This estimation is verified by experiments.
+        return 300L + numPoints * (long) BYTES_PER_COORDINATE;  // This estimation is verified by experiments.
     }
 }

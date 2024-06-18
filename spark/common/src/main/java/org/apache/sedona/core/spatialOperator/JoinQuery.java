@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.geometryObjects.Circle;
+import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.enums.IndexType;
@@ -630,8 +631,8 @@ public class JoinQuery
                                     partitionMinX, partitionMinY, partitionMaxX, partitionMaxY,
                                     joinParams.buildCount, joinParams.streamCount, joinParams.resultCount,
                                     joinParams.candidateCount, joinParams.buildTime, joinParams.buildLeftTasks,
-                                    joinParams.buildRightTasks, joinParams.prepareBuildTasks,
-                                    joinParams.prepareStreamTasks);
+                                    joinParams.buildRightTasks, joinParams.prepareBuildTasks, joinParams.prepareStreamTasks,
+                                    joinParams.localSubdivideLeftOptions, joinParams.localSubdivideRightOptions);
                     return runAdvancedSpatialJoin(leftRDD, rightRDD, judgement);
                 } else {
                     log.warn("UseIndex is true, but no index exists. Will build index on the fly.");
@@ -730,12 +731,16 @@ public class JoinQuery
         public final SQLMetric prepareBuildTasks;
         public final SQLMetric prepareStreamTasks;
 
+        // Local subdivide join parameters
+        public final SubdivideOptions localSubdivideLeftOptions;
+        public final SubdivideOptions localSubdivideRightOptions;
+
         public JoinParams(boolean useIndex, SpatialPredicate spatialPredicate, IndexType polygonIndexType, JoinBuildSide joinBuildSide)
         {
             this(useIndex, spatialPredicate, polygonIndexType, joinBuildSide,
                     -1, null, null,
                     null, null, null, null, null,
-                    null, null, null, null);
+                    null, null, null, null, null, null);
         }
 
         public JoinParams(boolean useIndex, SpatialPredicate spatialPredicate, IndexType polygonIndexType,
@@ -743,7 +748,8 @@ public class JoinQuery
                           int k, DistanceMetric distanceMetric, Double searchRadius,
                           SQLMetric buildCount, SQLMetric streamCount, SQLMetric resultCount, SQLMetric candidateCount,
                           SQLMetric buildTime, SQLMetric buildLeftTasks, SQLMetric buildRightTasks,
-                          SQLMetric prepareBuildTasks, SQLMetric prepareStreamTasks)
+                          SQLMetric prepareBuildTasks, SQLMetric prepareStreamTasks,
+                          SubdivideOptions localSubdivideLeftOptions, SubdivideOptions localSubdivideRightOptions)
         {
             this.useIndex = useIndex;
             this.spatialPredicate = spatialPredicate;
@@ -761,6 +767,8 @@ public class JoinQuery
             this.buildRightTasks = buildRightTasks;
             this.prepareBuildTasks = prepareBuildTasks;
             this.prepareStreamTasks = prepareStreamTasks;
+            this.localSubdivideLeftOptions = localSubdivideLeftOptions;
+            this.localSubdivideRightOptions = localSubdivideRightOptions;
         }
 
         public JoinParams(boolean useIndex, SpatialPredicate spatialPredicate)
@@ -773,7 +781,7 @@ public class JoinQuery
             this(true, null, indexType, null,
                     k, distanceMetric, null,
                     null, null, null, null, null,
-                    null, null, null, null);
+                    null, null, null, null, null, null);
         }
 
         @Deprecated

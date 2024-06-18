@@ -180,7 +180,7 @@ class ST_Analyze_Aggr extends Aggregator[Geometry, AdvancedStatCollector, Row] {
     // Create a collector with envelope sampling disabled
     new AdvancedStatCollector(
       0, 0, 0,
-      AdvancedStatCollector.DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE, false, 0)
+      AdvancedStatCollector.DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE, 0, 0)
   }
 
   override def reduce(stat: AdvancedStatCollector, geom: Geometry): AdvancedStatCollector = {

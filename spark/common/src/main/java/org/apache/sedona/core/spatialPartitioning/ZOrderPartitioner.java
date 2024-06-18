@@ -21,11 +21,13 @@ package org.apache.sedona.core.spatialPartitioning;
 
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.joinJudgement.DedupParams;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
 import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 
 public class ZOrderPartitioner extends SpatialPartitioner {
     private final IntervalTree intervalTree;
@@ -33,7 +35,7 @@ public class ZOrderPartitioner extends SpatialPartitioner {
     protected ZOrderPartitioner(IntervalTree intervalTree) {
         // ZOrderPartitioner does not have grids
         // It has ranges instead
-        super(GridType.ZORDER, Collections.emptyList());
+        super(GridType.ZORDER);
         this.intervalTree = intervalTree;
     }
 
@@ -54,6 +56,11 @@ public class ZOrderPartitioner extends SpatialPartitioner {
     @Override
     public DedupParams getDedupParams() {
         return new DedupParams(getGrids());
+    }
+
+    @Override
+    public List<Envelope> getGrids() {
+        return Collections.emptyList();
     }
 
     @Override

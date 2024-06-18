@@ -36,17 +36,19 @@ class SubdividedSpatialJoinSuite extends TestBaseScala with TableDrivenPropertyC
     )
 
     val subdivideConfigs = Seq(
-      // subdivideLeft, subdivideRight, keepRowDataLeft, keepRowDataRight
-      ("always", "always", "true", "true"),
-      ("always", "always", "false", "false"),
-      ("always", "never", "true", "false"),
-      ("always", "never", "false", "false"),
-      ("never", "always", "false", "true"),
-      ("never", "always", "false", "false")
+      // subdivideLeft, subdivideRight, localSubdivideLeft, localSubdivideRight, keepRowDataLeft, keepRowDataRight
+      ("always", "always", "always", "always", "true", "true"),
+      ("always", "always", "always", "always", "false", "false"),
+      ("always", "never", "always", "always", "true", "false"),
+      ("always", "never", "always", "always", "false", "false"),
+      ("never", "always", "always", "always", "false", "true"),
+      ("never", "always", "always", "always", "false", "false"),
+      ("auto", "auto", "auto", "auto", "false", "false"),
+      ("auto", "auto", "auto", "auto", "true", "true")
     )
 
     forAll(joinedTables) { (left, right) =>
-      subdivideConfigs.foreach { case (subdivideLeft, subdivideRight, keepRowDataLeft, keepRowDataRight) =>
+      subdivideConfigs.foreach { case (subdivideLeft, subdivideRight, localSubdivideLeft, localSubdivideRight, keepRowDataLeft, keepRowDataRight) =>
         it(s"$left - $right, left: $subdivideLeft, right: $subdivideRight, keep-left: $keepRowDataLeft, keep-right: $keepRowDataRight") {
           val expected = withConf(Map(
             "sedona.join.subdivideLeft" -> "never",
@@ -60,14 +62,19 @@ class SubdividedSpatialJoinSuite extends TestBaseScala with TableDrivenPropertyC
 
           withConf(Map(
             "sedona.join.debug.enableMetricsForSpatialPartitioning" -> "true",
+            "sedona.join.numpartition" -> "20",
             "sedona.join.subdivideLeft" -> subdivideLeft,
             "sedona.join.subdivideLeft.maxWidth" -> "0.1",
             "sedona.join.subdivideLeft.maxHeight" -> "0.1",
             "sedona.join.subdivideRight" -> subdivideRight,
             "sedona.join.subdivideRight.maxWidth" -> "0.1",
             "sedona.join.subdivideRight.maxHeight" -> "0.1",
-            "sedona.join.subdivideLeftInLocalJoin" -> "always",
-            "sedona.join.subdivideRightInLocalJoin" -> "always",
+            "sedona.join.subdivideLeftInLocalJoin" -> localSubdivideLeft,
+            "sedona.join.subdivideLeftInLocalJoin.maxWidth" -> "0.05",
+            "sedona.join.subdivideLeftInLocalJoin.maxHeight" -> "0.05",
+            "sedona.join.subdivideRightInLocalJoin" -> localSubdivideRight,
+            "sedona.join.subdivideRightInLocalJoin.maxWidth" -> "0.05",
+            "sedona.join.subdivideRightInLocalJoin.maxHeight" -> "0.05",
             "sedona.join.subdivideLeft.keepRowData" -> keepRowDataLeft,
             "sedona.join.subdivideRight.keepRowData" -> keepRowDataRight)) {
 
@@ -112,7 +119,7 @@ class SubdividedSpatialJoinSuite extends TestBaseScala with TableDrivenPropertyC
   private def loadGeoJson(path: String): DataFrame = {
     val df = sparkSession.read.format("geojson").load(path)
     df.selectExpr("inline(features)").selectExpr(
-      "geometry", "properties.*", "monotonically_increasing_id() as id")
+      "geometry", "properties.*", "monotonically_increasing_id() as id").repartition(10)
   }
 
   private def validateResult(expected: Array[org.apache.spark.sql.Row],

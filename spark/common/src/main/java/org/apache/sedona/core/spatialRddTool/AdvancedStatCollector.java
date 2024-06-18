@@ -18,6 +18,11 @@
  */
 package org.apache.sedona.core.spatialRddTool;
 
+import com.esotericsoftware.kryo.Kryo;
+import com.esotericsoftware.kryo.KryoSerializable;
+import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
+import org.apache.sedona.common.enums.GeometryType;
 import org.apache.sedona.core.utils.GeometrySizeEstimator;
 import org.apache.spark.util.random.XORShiftRandom;
 import org.locationtech.jts.geom.Envelope;
@@ -29,7 +34,9 @@ import org.locationtech.jts.geom.Puntal;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.Random;
 
 /**
@@ -41,12 +48,7 @@ public class AdvancedStatCollector implements Serializable {
     public static final long DEFAULT_MAX_SAMPLES = 1000000;  // roughly 50 MB
     public static final double DEFAULT_MIN_SAMPLING_RATE = 0.01;
     public static final double DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE = 1.2;
-
-    /**
-     * Whether to collect rich statistics, such as the standard deviation of the size of geometries, which is
-     * not necessary for running spatial join, but somewhat useful when analyzing performance issues.
-     */
-    private final boolean enableRichStatistics;
+    public static final int DEFAULT_TOP_K_LARGEST_GEOMETRIES = 10;
 
     /**
      * The minimum number of samples to collect in {@link AdvancedStatCollector#update(Geometry)}.
@@ -77,6 +79,12 @@ public class AdvancedStatCollector implements Serializable {
     private final double sizeEstimationSampleGrowthRate;
 
     private final long reservoirSamplingMaxCount;
+
+    /**
+     * Keep the basic info of top K large geometries by extent area, width and height. This is for determining the
+     * subdividing parameters.
+     */
+    private final int topKLargestGeometries;
 
     /**
      * A deterministic random number generator for sampling geometries for collecting samples and size estimation.
@@ -144,21 +152,96 @@ public class AdvancedStatCollector implements Serializable {
      */
     private List<Envelope> samples = new ArrayList<>();
 
+    /**
+     * Top K geometry extents by area, width and height. This is for determining the subdividing parameters
+     */
+    private final PriorityQueue<LargeGeometryInfo> topAreaInfos = new PriorityQueue<>(new CompareByArea());
+    private final PriorityQueue<LargeGeometryInfo> topWidthInfos = new PriorityQueue<>(new CompareByWidth());
+    private final PriorityQueue<LargeGeometryInfo> topHeightInfos = new PriorityQueue<>(new CompareByHeight());
+
+    private static class CompareByArea implements Comparator<LargeGeometryInfo>, Serializable {
+        @Override
+        public int compare(LargeGeometryInfo o1, LargeGeometryInfo o2) {
+            return Double.compare(o1.area, o2.area);
+        }
+    }
+
+    private static class CompareByWidth implements Comparator<LargeGeometryInfo>, Serializable {
+        @Override
+        public int compare(LargeGeometryInfo o1, LargeGeometryInfo o2) {
+            return Double.compare(o1.width, o2.width);
+        }
+    }
+
+    private static class CompareByHeight implements Comparator<LargeGeometryInfo>, Serializable {
+        @Override
+        public int compare(LargeGeometryInfo o1, LargeGeometryInfo o2) {
+            return Double.compare(o1.height, o2.height);
+        }
+    }
+
+    /**
+     * A class for storing the information of a geometry with large extent. We don't store the geometry itself since
+     * it could be very large, we only store the extent and some statistics of the geometry.
+     */
+    public static class LargeGeometryInfo implements KryoSerializable, Serializable {
+        public Envelope extent;
+        public int numPoints;
+        public GeometryType geometryType;
+        public double width;
+        public double height;
+        public double area;
+
+        private static final GeometryType[] geometryTypes = GeometryType.values();
+
+        public LargeGeometryInfo(Envelope envelope, int numPoints, GeometryType geometryType) {
+            this.extent = envelope;
+            this.numPoints = numPoints;
+            this.geometryType = geometryType;
+            this.width = this.extent.getWidth();
+            this.height = this.extent.getHeight();
+            this.area = this.extent.getArea();
+        }
+
+        @Override
+        public void write(Kryo kryo, Output output) {
+            output.writeDouble(extent.getMinX());
+            output.writeDouble(extent.getMaxX());
+            output.writeDouble(extent.getMinY());
+            output.writeDouble(extent.getMaxY());
+            output.writeInt(numPoints);
+            output.writeByte(geometryType.ordinal());
+        }
+
+        @Override
+        public void read(Kryo kryo, Input input) {
+            double minX = input.readDouble();
+            double maxX = input.readDouble();
+            double minY = input.readDouble();
+            double maxY = input.readDouble();
+            this.extent = new Envelope(minX, maxX, minY, maxY);
+            this.numPoints = input.readInt();
+            this.geometryType = geometryTypes[input.readByte()];
+            this.width = this.extent.getWidth();
+            this.height = this.extent.getHeight();
+            this.area = this.extent.getArea();
+        }
+    }
+
     public AdvancedStatCollector(long minNumSamples, long maxNumSamples, double minSamplingRate,
-                                 double sizeEstimationSampleGrowthRate,
-                                 boolean enableRichStatistics, long seed) {
+                                 double sizeEstimationSampleGrowthRate, int topKLargestGeometries, long seed) {
         this.minNumSamples = minNumSamples;
         this.maxNumSamples = maxNumSamples;
         this.minSamplingRate = minSamplingRate;
         this.sizeEstimationSampleGrowthRate = sizeEstimationSampleGrowthRate;
-        this.enableRichStatistics = enableRichStatistics;
+        this.topKLargestGeometries = topKLargestGeometries;
         this.random = new XORShiftRandom(seed);
         this.reservoirSamplingMaxCount = (long) (minNumSamples / minSamplingRate);
     }
 
     public AdvancedStatCollector(long seed) {
         this(DEFAULT_MIN_SAMPLES, DEFAULT_MAX_SAMPLES, DEFAULT_MIN_SAMPLING_RATE,
-                DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE, false, seed);
+                DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE, DEFAULT_TOP_K_LARGEST_GEOMETRIES, seed);
     }
 
     /**
@@ -173,17 +256,22 @@ public class AdvancedStatCollector implements Serializable {
         Envelope envelope = geom.getEnvelopeInternal();
         boundary.expandToInclude(envelope);
 
+        GeometryType geometryType;
         if (geom instanceof Puntal) {
             puntalCount += 1;
             if (geom instanceof MultiPoint) {
                 multiPointCount += 1;
             }
+            geometryType = GeometryType.POINT;
         } else if (geom instanceof Lineal) {
             linealCount += 1;
+            geometryType = GeometryType.LINESTRING;
         } else if (geom instanceof Polygonal) {
             polygonalCount += 1;
+            geometryType = GeometryType.POLYGON;
         } else {
             geometryCollectionCount += 1;
+            geometryType = GeometryType.GEOMETRYCOLLECTION;
         }
 
         // Sample the envelope. Here we want to keep at least minNumSamples samples, but not more than maxNumSamples.
@@ -229,6 +317,14 @@ public class AdvancedStatCollector implements Serializable {
             // Update the number of sampled geometries, and set up a marker for the next estimation
             numEstimatedGeometries += 1;
             nextEstimateNum = (long) Math.ceil(nextEstimateNum * sizeEstimationSampleGrowthRate);
+        }
+
+        // Update the largest geometries info
+        if (topKLargestGeometries > 0) {
+            LargeGeometryInfo info = new LargeGeometryInfo(envelope, numPoints, geometryType);
+            updateLargeGeometryInfo(topAreaInfos, info);
+            updateLargeGeometryInfo(topWidthInfos, info);
+            updateLargeGeometryInfo(topHeightInfos, info);
         }
     }
 
@@ -305,11 +401,36 @@ public class AdvancedStatCollector implements Serializable {
         totalEstimatedSizeInBytes += other.totalEstimatedSizeInBytes;
         totalEstimatedUserDataSizeInBytes += other.totalEstimatedUserDataSizeInBytes;
         numEstimatedGeometries += other.numEstimatedGeometries;
+
+        // Merge the largest geometries info
+        if (topKLargestGeometries > 0) {
+            for (LargeGeometryInfo info : other.topAreaInfos) {
+                updateLargeGeometryInfo(topAreaInfos, info);
+            }
+            for (LargeGeometryInfo info : other.topWidthInfos) {
+                updateLargeGeometryInfo(topWidthInfos, info);
+            }
+            for (LargeGeometryInfo info : other.topHeightInfos) {
+                updateLargeGeometryInfo(topHeightInfos, info);
+            }
+        }
     }
 
     public static AdvancedStatCollector combine(AdvancedStatCollector stat1, AdvancedStatCollector stat2) {
         stat1.combineWith(stat2);
         return stat1;
+    }
+
+    private void updateLargeGeometryInfo(PriorityQueue<LargeGeometryInfo> infos, LargeGeometryInfo info) {
+        if (topKLargestGeometries <= 0) {
+            return;
+        }
+        if (infos.size() < topKLargestGeometries || infos.comparator().compare(info, infos.peek()) > 0) {
+            infos.add(info);
+            if (infos.size() > topKLargestGeometries) {
+                infos.poll();
+            }
+        }
     }
 
     public Envelope getBoundary() {
@@ -358,6 +479,10 @@ public class AdvancedStatCollector implements Serializable {
         return totalEstimatedUserDataSizeInBytes / numEstimatedGeometries;
     }
 
+    public long getEstimatedSizeWithoutUserDataInBytes() {
+        return getEstimatedSizeInBytes() - getEstimatedUserDataSizeInBytes();
+    }
+
     public double getMeanNumPoints() {
         if (count == 0) {
             return 0;
@@ -388,5 +513,34 @@ public class AdvancedStatCollector implements Serializable {
 
     public List<Envelope> getSampledEnvelopes() {
         return samples;
+    }
+
+    public PriorityQueue<LargeGeometryInfo> getTopAreaInfos() {
+        return topAreaInfos;
+    }
+
+    public PriorityQueue<LargeGeometryInfo> getTopWidthInfos() {
+        return topWidthInfos;
+    }
+
+    public PriorityQueue<LargeGeometryInfo> getTopHeightInfos() {
+        return topHeightInfos;
+    }
+
+    /**
+     * Get the dominant geometry type of the RDD.
+     * @return The dominant geometry type.
+     */
+    public GeometryType getDominantGeometryType() {
+        long numPoints = getPuntalCount();
+        long numLines = getLinealCount();
+        long numPolygons = getPolygonalCount() + getGeometryCollectionCount();
+        if (numPoints > numPolygons && numPoints > numLines) {
+            return GeometryType.POINT;
+        } else if (numLines > numPoints && numLines > numPolygons) {
+            return GeometryType.LINESTRING;
+        } else {
+            return GeometryType.POLYGON;
+        }
     }
 }

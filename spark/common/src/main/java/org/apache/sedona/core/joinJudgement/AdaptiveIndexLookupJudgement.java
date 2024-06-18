@@ -29,7 +29,6 @@ import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.common.utils.HalfOpenRectangle;
 import org.apache.sedona.core.enums.IndexType;
-import org.apache.sedona.core.enums.JoinSubdivideMode;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner;
@@ -221,7 +220,9 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
             SQLMetric sqlBuildLeftTasks,
             SQLMetric sqlBuildRightTasks,
             SQLMetric sqlPrepareBuildTasks,
-            SQLMetric sqlPrepareStreamTasks) {
+            SQLMetric sqlPrepareStreamTasks,
+            SubdivideOptions leftSubdivideOptions,
+            SubdivideOptions rightSubdivideOptions) {
         this.spatialPredicate = spatialPredicate;
         this.buildCount = new SpatialJoinMetric(sqlBuildCount, buildCount);
         this.streamCount = new SpatialJoinMetric(sqlStreamCount, streamCount);
@@ -237,7 +238,7 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
         this.partitionMaxX = partitionMaxX;
         this.partitionMaxY = partitionMaxY;
         this.localSpatialJoinExecParamsList = generatePerPartitionPlan(leftStat, rightStat, partitioner,
-                spatialPredicate, sedonaConf);
+                spatialPredicate, leftSubdivideOptions, rightSubdivideOptions);
     }
 
     // Constructor for testing
@@ -279,13 +280,15 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
      * @param rightStat Statistics of the right RDD.
      * @param spatialPredicate The spatial predicate.
      * @param partitioner The spatial partitioner.
-     * @param sedonaConf The Sedona configuration.
+     * @param leftSubdivideOptions The subdivide options for the left geometries.
+     * @param rightSubdivideOptions The subdivide options for the right geometries.
      */
     private static List<LocalSpatialJoinExecParams> generatePerPartitionPlan(
             AdvancedStatCollector leftStat, AdvancedStatCollector rightStat, SpatialPartitioner partitioner,
-            SpatialPredicate spatialPredicate, SedonaConf sedonaConf) {
-        GeometryType leftGeomType = getDominantGeometryType(leftStat);
-        GeometryType rightGeomType = getDominantGeometryType(rightStat);
+            SpatialPredicate spatialPredicate,
+            SubdivideOptions leftSubdivideOptions, SubdivideOptions rightSubdivideOptions) {
+        GeometryType leftGeomType = leftStat.getDominantGeometryType();
+        GeometryType rightGeomType = rightStat.getDominantGeometryType();
         long[] leftPerPartitionCount = getPerPartitionGeometryCount(leftStat, partitioner);
         long[] rightPerPartitionCount = getPerPartitionGeometryCount(rightStat, partitioner);
         int numPartitions = partitioner.numPartitions();
@@ -299,7 +302,7 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
             LocalSpatialJoinExecParams plan = determineSpatialJoinExecParams(
                     leftGeomType, leftCount, leftStat.getMeanNumPoints(),
                     rightGeomType, rightCount, rightStat.getMeanNumPoints(),
-                    spatialPredicate, extent, sedonaConf);
+                    spatialPredicate, extent, leftSubdivideOptions, rightSubdivideOptions);
             plans.add(plan);
         }
         return plans;
@@ -315,13 +318,15 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
      * @param rightMeanNumPoints The mean number of points of geometries in the right RDD.
      * @param predicate The spatial predicate.
      * @param extent The extent of the partition.
-     * @param sedonaConf The Sedona configuration.
+     * @param leftSubdivideOptions The subdivide options for the left geometries.
+     * @param rightSubdivideOptions The subdivide options for the right geometries.
      * @return The spatial join execution parameters.
      */
     private static LocalSpatialJoinExecParams determineSpatialJoinExecParams(
             GeometryType leftGeomType, long leftCount, double leftMeanNumPoints,
             GeometryType rightGeomType, long rightCount, double rightMeanNumPoints,
-            SpatialPredicate predicate, Envelope extent, SedonaConf sedonaConf) {
+            SpatialPredicate predicate, Envelope extent,
+            SubdivideOptions leftSubdivideOptions, SubdivideOptions rightSubdivideOptions) {
         // Always use STR-tree since it has better performance for most of the cases
         IndexType indexType = IndexType.RTREE;
 
@@ -331,16 +336,22 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
         GeometryType streamGeomType;
         double indexMeanNumPoints;
         double streamMeanNumPoints;
+        SubdivideOptions subdivideBuildOptions;
+        SubdivideOptions subdivideStreamOptions;
         if (buildSide == IndexBuildSide.LEFT) {
             indexGeomType = leftGeomType;
             streamGeomType = rightGeomType;
             indexMeanNumPoints = leftMeanNumPoints;
             streamMeanNumPoints = rightMeanNumPoints;
+            subdivideBuildOptions = leftSubdivideOptions;
+            subdivideStreamOptions = rightSubdivideOptions;
         } else {
             indexGeomType = rightGeomType;
             streamGeomType = leftGeomType;
             indexMeanNumPoints = rightMeanNumPoints;
             streamMeanNumPoints = leftMeanNumPoints;
+            subdivideBuildOptions = rightSubdivideOptions;
+            subdivideStreamOptions = leftSubdivideOptions;
 
             // Make sure that the predicate is always applied as `predicate(indexSide, streamSide)`
             predicate = SpatialPredicate.inverse(predicate);
@@ -385,32 +396,8 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
                 executionMode = ExecutionMode.PREPARE_NONE;
         }
 
-        // TODO: Determine the subdivide options when join subdivide mode is AUTO
-        SubdivideOptions subdivideBuildOptions = (sedonaConf.getLocalJoinSubdivideLeft() == JoinSubdivideMode.ALWAYS)?
-                sedonaConf.getLeftLocalJoinSubdivideOptions(): null;
-        SubdivideOptions subdivideStreamOptions = (sedonaConf.getLocalJoinSubdivideRight() == JoinSubdivideMode.ALWAYS)?
-                sedonaConf.getRightLocalJoinSubdivideOptions(): null;
-
         return new LocalSpatialJoinExecParams(indexType, buildSide, executionMode, extent,
                 subdivideBuildOptions, subdivideStreamOptions);
-    }
-
-    /**
-     * Get the dominant geometry type of the RDD.
-     * @param stat The statistics of the RDD.
-     * @return The dominant geometry type.
-     */
-    private static GeometryType getDominantGeometryType(AdvancedStatCollector stat) {
-        long numPoints = stat.getPuntalCount();
-        long numLines = stat.getLinealCount();
-        long numPolygons = stat.getPolygonalCount() + stat.getGeometryCollectionCount();
-        if (numPoints > numPolygons && numPoints > numLines) {
-            return GeometryType.POINT;
-        } else if (numLines > numPoints && numLines > numPolygons) {
-            return GeometryType.LINESTRING;
-        } else {
-            return GeometryType.POLYGON;
-        }
     }
 
     /**

@@ -21,21 +21,24 @@ package org.apache.sedona.core.spatialPartitioning;
 
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.joinJudgement.DedupParams;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
 import javax.annotation.Nullable;
 
 import java.util.Iterator;
+import java.util.List;
 
 public class KDBTreePartitioner
         extends SpatialPartitioner
 {
     private final KDB tree;
+    private transient List<Envelope> grids;
 
     public KDBTreePartitioner(KDB tree)
     {
-        super(GridType.KDBTREE, tree.fetchLeafZones());
+        super(GridType.KDBTREE);
         this.tree = tree;
         this.tree.dropElements();
     }
@@ -43,7 +46,7 @@ public class KDBTreePartitioner
     @Override
     public int numPartitions()
     {
-        return grids.size();
+        return getGrids().size();
     }
 
     @Override
@@ -57,6 +60,14 @@ public class KDBTreePartitioner
     @Override
     public DedupParams getDedupParams()
     {
-        return new DedupParams(grids);
+        return new DedupParams(getGrids());
+    }
+
+    @Override
+    public List<Envelope> getGrids() {
+        if (grids == null) {
+            grids = tree.fetchLeafZones();
+        }
+        return grids;
     }
 }

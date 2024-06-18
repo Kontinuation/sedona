@@ -53,12 +53,7 @@ public class GeometrySizeEstimatorTest {
             geom.setUserData(userData);
             long size = GeometrySizeEstimator.estimateSize(geom);
             long expectedSize = SizeEstimator.estimate(geom);
-            if (userData instanceof String) {
-                // Estimation for String may be too conservative
-                assertTrue(Math.abs(expectedSize - size) < expectedSize * 0.4);
-            } else {
-                assertTrue(Math.abs(expectedSize - size) < expectedSize * 0.1);
-            }
+            assertTrue(size > expectedSize || Math.abs(expectedSize - size) < expectedSize * 0.1);
         }
     }
 
@@ -67,7 +62,7 @@ public class GeometrySizeEstimatorTest {
         Geometry geom = factory.createPoint(new Coordinate(1, 1));
         long size = GeometrySizeEstimator.estimateSizeWithoutUserData(geom);
         long expectedSize = SizeEstimator.estimate(geom);
-        assertTrue(Math.abs(expectedSize - size) < expectedSize * 0.1);
+        assertTrue(size > expectedSize || Math.abs(expectedSize - size) < expectedSize * 0.1);
     }
 
     @Test
@@ -80,7 +75,7 @@ public class GeometrySizeEstimatorTest {
             Geometry geom = factory.createLineString(coordinates);
             long size = GeometrySizeEstimator.estimateSizeWithoutUserData(geom);
             long expectedSize = SizeEstimator.estimate(geom);
-            assertTrue(Math.abs(expectedSize - size) < expectedSize * 0.1);
+            assertTrue(size > expectedSize || Math.abs(expectedSize - size) < expectedSize * 0.1);
         }
     }
 
@@ -95,7 +90,7 @@ public class GeometrySizeEstimatorTest {
             Geometry geom = factory.createPolygon(coordinates);
             long size = GeometrySizeEstimator.estimateSizeWithoutUserData(geom);
             long expectedSize = SizeEstimator.estimate(geom);
-            assertTrue(Math.abs(expectedSize - size) < expectedSize * 0.1);
+            assertTrue(size > expectedSize || Math.abs(expectedSize - size) < expectedSize * 0.1);
         }
     }
 

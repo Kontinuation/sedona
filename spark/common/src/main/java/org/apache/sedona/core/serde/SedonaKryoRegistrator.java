@@ -24,8 +24,10 @@ import org.apache.log4j.Logger;
 import org.apache.sedona.common.geometryObjects.Circle;
 import org.apache.sedona.common.geometrySerde.GeometrySerde;
 import org.apache.sedona.common.geometrySerde.SpatialIndexSerde;
+import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.joinJudgement.AdaptiveIndexLookupJudgement;
 import org.apache.sedona.core.spatialOperator.Subdivide;
+import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector;
 import org.apache.spark.serializer.KryoRegistrator;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.GeometryCollection;
@@ -65,6 +67,8 @@ public class SedonaKryoRegistrator
         kryo.register(Quadtree.class, indexSerializer);
         kryo.register(STRtree.class, indexSerializer);
         kryo.register(AdaptiveIndexLookupJudgement.LocalSpatialJoinExecParams.class);
+        kryo.register(SubdivideOptions.class);
+        kryo.register(AdvancedStatCollector.LargeGeometryInfo.class);
         kryo.register(Subdivide.SubdividedPart.class);
     }
 }

@@ -298,14 +298,14 @@ public class SpatialRDD<T extends Geometry>
     }
 
     /**
-     * Partition this spatial RDD and another spatial RDD using the same spatial partitioning grid. The spatial
-     * partitioning grid is built to balance both RDDs.
+     * Create a spatial partitioner for this spatial RDD. The spatial partitioner is built to balance the RDD.
      * @param gridType Grid type
      * @param otherRdd Another spatial RDD
      * @param numPartitions Number of partitions
-     * @param <U> Geometry type of the other spatial RDD
+     * @param conf Sedona configuration
+     * @return Spatial partitioner
      */
-    public <U extends Geometry> void spatialPartitioning(GridType gridType, SpatialRDD<U> otherRdd, int numPartitions) {
+    public <U extends Geometry> SpatialPartitioner createSpatialPartitioner(GridType gridType, SpatialRDD<U> otherRdd, int numPartitions, SedonaConf conf) {
         if (this.stat == null) {
             throw new IllegalArgumentException("[SpatialRDD][spatialPartitioning] SpatialRDD stat is null. Please call advancedAnalyze() first.");
         }
@@ -318,7 +318,7 @@ public class SpatialRDD<T extends Geometry>
         Envelope boundary = thisBoundary.intersection(otherBoundary);
         if (boundary.isNull()) {
             // The two datasets do not overlap. No need to partition. Running spatial join will return empty result.
-            return;
+            return null;
         }
 
         // Add some padding at the top and right of the boundaryEnvelope to make sure all geometries lie within
@@ -329,8 +329,6 @@ public class SpatialRDD<T extends Geometry>
 
         SampledEnvelopesInBoundary thisSamplesInBoundary = filterSampledEnvelopesInBoundary(this.stat, boundary);
         SampledEnvelopesInBoundary otherSamplesInBoundary = filterSampledEnvelopesInBoundary(otherRdd.stat, boundary);
-
-        SedonaConf conf = SedonaConf.fromActiveSession();
         SpatialPartitionBuildingStrategy strategy = conf.getSpatialPartitionBuildingStrategy();
         if (numPartitions == -1) {
             // Determine the number of partitions according to the statistics of both datasets.
@@ -338,8 +336,24 @@ public class SpatialRDD<T extends Geometry>
             int otherPartitions = determineNumPartitions(otherRdd, otherSamplesInBoundary, conf);
             numPartitions = Math.max(thisPartitions, otherPartitions);
         }
-        spatialPartitioning(gridType, strategy, otherRdd, numPartitions, thisSamplesInBoundary, otherSamplesInBoundary,
-                conf);
+        return calc_partitioner(gridType, strategy, numPartitions, thisSamplesInBoundary, otherSamplesInBoundary);
+    }
+
+    /**
+     * Partition this spatial RDD and another spatial RDD using the same spatial partitioning grid. The spatial
+     * partitioning grid is built to balance both RDDs.
+     * @param gridType Grid type
+     * @param otherRdd Another spatial RDD
+     * @param numPartitions Number of partitions
+     * @param <U> Geometry type of the other spatial RDD
+     */
+    public <U extends Geometry> void spatialPartitioning(GridType gridType, SpatialRDD<U> otherRdd, int numPartitions) {
+        SedonaConf conf = SedonaConf.fromActiveSession();
+        partitioner = createSpatialPartitioner(gridType, otherRdd, numPartitions, conf);
+        if (partitioner != null) {
+            this.spatialPartitionedRDD = partition(this.partitioner, conf);
+            otherRdd.spatialPartitioning(this.partitioner, conf);
+        }
     }
 
     /**
@@ -707,6 +721,7 @@ public class SpatialRDD<T extends Geometry>
         long maxSamples = conf.getMaxSamplesForSpatialPartitioning();
         double minSamplingRate = conf.getMinSamplingRate();
         double sizeEstimationSampleGrowthRate = conf.getSizeEstimationSampleGrowthRate();
+        int topKLargest = conf.getSubdivideConsiderTopKLargestGeometries();
         long seed = System.nanoTime();
 
         // Collect statistics of the raw spatial RDD
@@ -714,7 +729,7 @@ public class SpatialRDD<T extends Geometry>
                 (partitionId, iterator) -> {
                     AdvancedStatCollector statCalculator = new AdvancedStatCollector(
                             minSamples, maxSamples, minSamplingRate, sizeEstimationSampleGrowthRate,
-                            false, seed + partitionId);
+                            topKLargest, seed + partitionId);
                     while (iterator.hasNext()) {
                         Geometry geom = iterator.next();
                         statCalculator.update(geom);
@@ -726,7 +741,7 @@ public class SpatialRDD<T extends Geometry>
             JavaRDD<AdvancedStatCollector> perPartitionStatsRdd = this.rawSpatialRDD.mapPartitionsWithIndex(aggregatePerPartitionStats, true);
             agg = perPartitionStatsRdd.reduce(AdvancedStatCollector::combine);
         } else {
-            agg = new AdvancedStatCollector(minSamples, maxSamples, minSamplingRate, sizeEstimationSampleGrowthRate, false, seed);
+            agg = new AdvancedStatCollector(minSamples, maxSamples, minSamplingRate, sizeEstimationSampleGrowthRate, topKLargest, seed);
         }
 
         // Set the boundary and count

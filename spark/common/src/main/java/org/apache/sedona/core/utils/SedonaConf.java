@@ -73,6 +73,7 @@ public class SedonaConf
     private long minSamplesForSpatialPartitioning;
     private double minSamplingRate;
     private double sizeEstimationSampleGrowthRate;
+    private int considerTopKLargestGeometries;
     private long expectedPerPartitionCount;
     private int maxGuessedPartitionNumber;
     private SpatialPartitionBuildingStrategy spatialPartitionBuildingStrategy;
@@ -87,10 +88,17 @@ public class SedonaConf
     private SubdivideOptions leftLocalJoinSubdivideOptions;
     private SubdivideOptions rightLocalJoinSubdivideOptions;
 
+    // Internal Parameters for automatic subdivide parameter tuning
+    private int subdivideDuplicationFactorThreshold;
+    private long subdivideDupGeomSizeThreshold;
+    private int subdivideNumPointsThreshold;
+    private double subdivideCollisionFactorThreshold;
+    private double subdivideNonPolygonalCollisionFactorThreshold;
+    private double subdivideExtentSizeRatioThreshold;
+
     // Parameters for debugging spatial partitioning
     private boolean enableMetricsForSpatialPartitioning;
     private String spatialPartitionerSavePath;
-
 
     public static SedonaConf fromActiveSession() {
         return new SedonaConf(SparkSession.active().conf());
@@ -126,20 +134,23 @@ public class SedonaConf
         // Internal parameters for advanced, self-driving optimized spatial join. Users usually do not need to
         // tune these parameters.
         this.maxSamplesForSpatialPartitioning = Long.parseLong(
-                runtimeConfig.get("sedona.join.maxSamplesForSpatialPartitioning",
+                runtimeConfig.get("spark.sedona.join.maxSamplesForSpatialPartitioning",
                         Long.toString(AdvancedStatCollector.DEFAULT_MAX_SAMPLES)));
         this.minSamplesForSpatialPartitioning = Long.parseLong(
                 runtimeConfig.get("spark.sedona.join.minSamplesForSpatialPartitioning", "10000"));
         this.minSamplingRate = Double.parseDouble(
-            runtimeConfig.get("sedona.join.minSamplingRate",
+            runtimeConfig.get("spark.sedona.join.minSamplingRate",
                     Double.toString(AdvancedStatCollector.DEFAULT_MIN_SAMPLING_RATE)));
         this.sizeEstimationSampleGrowthRate = Double.parseDouble(
-                runtimeConfig.get("sedona.join.sizeEstimationSampleGrowthRate",
+                runtimeConfig.get("spark.sedona.join.sizeEstimationSampleGrowthRate",
                         Double.toString(AdvancedStatCollector.DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE)));
+        this.considerTopKLargestGeometries = Integer.parseInt(
+                runtimeConfig.get("spark.sedona.join.subdivide.considerTopKLargestGeometries",
+                        Integer.toString(AdvancedStatCollector.DEFAULT_TOP_K_LARGEST_GEOMETRIES)));
         this.expectedPerPartitionCount = Long.parseLong(
-                runtimeConfig.get("sedona.join.expectedPerPartitionCount", "10000000"));
+                runtimeConfig.get("spark.sedona.join.expectedPerPartitionCount", "10000000"));
         this.maxGuessedPartitionNumber = Integer.parseInt(
-                runtimeConfig.get("sedona.join.maxGuessedPartitionNumber", "-1"));
+                runtimeConfig.get("spark.sedona.join.maxGuessedPartitionNumber", "-1"));
         if (this.maxGuessedPartitionNumber == -1) {
             // If maxGuessedPartitionNumber is not set, we use 10 times the total number of executor cores as the default value.
             int totalExecutorCores = Integer.parseInt(runtimeConfig.get("spark.executor.instances", "1")) *
@@ -148,31 +159,45 @@ public class SedonaConf
         }
         this.spatialPartitionBuildingStrategy =
                 SpatialPartitionBuildingStrategy.valueOf(
-                        runtimeConfig.get("sedona.join.spatialPartitionBuildingStrategy", "subsampling")
+                        runtimeConfig.get("spark.sedona.join.spatialPartitionBuildingStrategy", "subsampling")
                                 .toUpperCase(Locale.ROOT));
 
         // Parameters for enabling auto-subdividing when running spatial joins
         this.spatialJoinSubdivideLeft = JoinSubdivideMode.getJoinSubdivideMode(
-                runtimeConfig.get("sedona.join.subdivideLeft", "never"));
+                runtimeConfig.get("sedona.join.subdivideLeft", "auto"));
         boolean keepRowData = Boolean.parseBoolean(runtimeConfig.get("sedona.join.subdivideLeft.keepRowData", "false"));
         // Options for pre-spatial-partitioning subdivide
         SubdivideOptions options = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideLeft");
         this.leftSubdivideRDDOptions = new Subdivide.SubdivideRDDOptions(options, false, keepRowData);
         // Options for local join subdivide
         this.localJoinSubdivideLeft = JoinSubdivideMode.getJoinSubdivideMode(
-                runtimeConfig.get("sedona.join.subdivideLeftInLocalJoin", "never"));
+                runtimeConfig.get("sedona.join.subdivideLeftInLocalJoin", "auto"));
         this.leftLocalJoinSubdivideOptions = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideLeftInLocalJoin");
 
         this.spatialJoinSubdivideRight = JoinSubdivideMode.getJoinSubdivideMode(
-                runtimeConfig.get("sedona.join.subdivideRight", "never"));
+                runtimeConfig.get("sedona.join.subdivideRight", "auto"));
         keepRowData = Boolean.parseBoolean(runtimeConfig.get("sedona.join.subdivideRight.keepRowData", "false"));
         // Options for pre-spatial-partitioning subdivide
         options = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideRight");
         this.rightSubdivideRDDOptions = new Subdivide.SubdivideRDDOptions(options, false, keepRowData);
         // Options for local join subdivide
         this.localJoinSubdivideRight = JoinSubdivideMode.getJoinSubdivideMode(
-                runtimeConfig.get("sedona.join.subdivideRightInLocalJoin", "never"));
+                runtimeConfig.get("sedona.join.subdivideRightInLocalJoin", "auto"));
         this.rightLocalJoinSubdivideOptions = readSubdivideOptions(runtimeConfig, "sedona.join.subdivideRightInLocalJoin");
+
+        // Internal parameters for automatic subdivide parameter tuning
+        this.subdivideDuplicationFactorThreshold = Integer.parseInt(
+                runtimeConfig.get("spark.sedona.join.subdivideDuplicationFactorThreshold", "5"));
+        this.subdivideDupGeomSizeThreshold = Long.parseLong(
+                runtimeConfig.get("spark.sedona.join.subdivideDupGeomSizeThreshold", Long.toString(1024 * 1024 * 500)));
+        this.subdivideNumPointsThreshold = Integer.parseInt(
+                runtimeConfig.get("spark.sedona.join.subdivideNumPointsThreshold", "100"));
+        this.subdivideCollisionFactorThreshold = Double.parseDouble(
+                runtimeConfig.get("spark.sedona.join.localSubdivideCollisionFactorThreshold", "5"));
+        this.subdivideNonPolygonalCollisionFactorThreshold = Double.parseDouble(
+                runtimeConfig.get("spark.sedona.join.localSubdivideNonPolygonalCollisionFactorThreshold", "0.5"));
+        this.subdivideExtentSizeRatioThreshold = Double.parseDouble(
+                runtimeConfig.get("spark.sedona.join.localSubdivideExtentSizeRatioThreshold", "0"));
 
         // Parameters for debugging
         this.enableMetricsForSpatialPartitioning = Boolean.parseBoolean(
@@ -335,6 +360,34 @@ public class SedonaConf
 
     public SubdivideOptions getRightLocalJoinSubdivideOptions() {
         return rightLocalJoinSubdivideOptions;
+    }
+
+    public int getSubdivideConsiderTopKLargestGeometries() {
+        return considerTopKLargestGeometries;
+    }
+
+    public int getSubdivideDuplicationFactorThreshold() {
+        return subdivideDuplicationFactorThreshold;
+    }
+
+    public long getSubdivideDupGeomSizeThreshold() {
+        return subdivideDupGeomSizeThreshold;
+    }
+
+    public int getSubdivideNumPointsThreshold() {
+        return subdivideNumPointsThreshold;
+    }
+
+    public double getSubdivideCollisionFactorThreshold() {
+        return subdivideCollisionFactorThreshold;
+    }
+
+    public double getSubdivideNonPolygonalCollisionFactorThreshold() {
+        return subdivideNonPolygonalCollisionFactorThreshold;
+    }
+
+    public double getSubdivideExtentSizeRatioThreshold() {
+        return subdivideExtentSizeRatioThreshold;
     }
 
     public boolean metricsForSpatialPartitioningEnabled() {

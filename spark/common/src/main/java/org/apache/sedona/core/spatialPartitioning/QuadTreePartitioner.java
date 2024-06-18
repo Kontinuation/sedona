@@ -22,22 +22,26 @@ package org.apache.sedona.core.spatialPartitioning;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.apache.sedona.core.spatialPartitioning.quadtree.StandardQuadTree;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
 import javax.annotation.Nullable;
 
 import java.util.Iterator;
+import java.util.List;
 
 public class QuadTreePartitioner
         extends SpatialPartitioner
 {
     private final StandardQuadTree<?> quadTree;
+    private transient List<Envelope> grids;
 
     public QuadTreePartitioner(StandardQuadTree<?> quadTree)
     {
-        super(GridType.QUADTREE, quadTree.fetchLeafZones());
+        super(GridType.QUADTREE);
         this.quadTree = quadTree;
+        this.grids = null;
 
         // Make sure not to broadcast all the samples used to build the Quad
         // tree to all nodes which are doing partitioning
@@ -55,13 +59,21 @@ public class QuadTreePartitioner
     @Override
     public DedupParams getDedupParams()
     {
-        return new DedupParams(grids);
+        return new DedupParams(getGrids());
+    }
+
+    @Override
+    public List<Envelope> getGrids() {
+        if (grids == null) {
+            grids = quadTree.fetchLeafZones();
+        }
+        return grids;
     }
 
     @Override
     public int numPartitions()
     {
-        return grids.size();
+        return getGrids().size();
     }
 
     @Override

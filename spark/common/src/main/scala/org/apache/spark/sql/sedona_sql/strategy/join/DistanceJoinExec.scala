@@ -96,6 +96,8 @@ case class DistanceJoinExec(left: SparkPlan,
     }
   }
 
+  override def isDistanceJoin: Boolean = true
+
   protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): SparkPlan = {
     copy(left = newLeft, right = newRight)
   }

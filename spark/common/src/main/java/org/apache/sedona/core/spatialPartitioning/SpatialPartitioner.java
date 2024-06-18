@@ -31,20 +31,16 @@ import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Objects;
 
 abstract public class SpatialPartitioner
         extends Partitioner
         implements Serializable
 {
-
     protected final GridType gridType;
-    protected final List<Envelope> grids;
 
-    protected SpatialPartitioner(GridType gridType, List<Envelope> grids)
+    protected SpatialPartitioner(GridType gridType)
     {
         this.gridType = gridType;
-        this.grids = Objects.requireNonNull(grids, "grids");
     }
 
     /**
@@ -65,10 +61,7 @@ abstract public class SpatialPartitioner
         return gridType;
     }
 
-    public List<Envelope> getGrids()
-    {
-        return grids;
-    }
+    abstract public List<Envelope> getGrids();
 
     @Override
     public int getPartition(Object key)

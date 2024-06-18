@@ -18,24 +18,34 @@
  */
 package org.apache.spark.sql.sedona_sql.strategy.join
 
+import org.apache.sedona.common.subDivide.SubdivideOptions
 import org.apache.sedona.core.enums.{IndexType, JoinSubdivideMode}
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
 import org.apache.sedona.core.spatialOperator.Subdivide.{SubdivideRDDOptions, SubdividedPart, isSubdivideAccurate}
 import org.apache.sedona.core.spatialOperator.{JoinQuery, SpatialPredicate, Subdivide}
+import org.apache.sedona.core.spatialPartitioning.BroadcastedSpatialPartitioner
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.utils.SedonaConf
+import org.apache.spark.{SparkEnv, TaskContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, Literal, Predicate, UnsafeRow}
+import org.apache.spark.sql.execution.UnsafeExternalRowSorter.PrefixComputer
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.{SQLExecution, SparkPlan}
+import org.apache.spark.sql.execution.{SQLExecution, SparkPlan, UnsafeExternalRowSorter}
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.projectUnsafeRow
 import org.locationtech.jts.geom.Geometry
 import org.apache.spark.sql.sedona_sql.expressions.implicits._
+import org.apache.spark.sql.sedona_sql.utils.UnsafeRowRDDSorter.sortUnsafeRowRDD
+import org.apache.spark.sql.types.StructType
+import org.apache.spark.util.collection.unsafe.sort.PrefixComparators.UnsignedPrefixComparator
+import org.apache.spark.util.collection.unsafe.sort.{PrefixComparator, RecordComparator}
 import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
 
+import java.util.concurrent.TimeUnit.NANOSECONDS
+import java.util.function.Supplier
 import scala.concurrent.duration.{Duration, MILLISECONDS}
 import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
 import scala.util.Try
@@ -64,7 +74,7 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
 
   override lazy val metrics: Map[String, SQLMetric] = if (sedonaConf.useAdvancedSpatialJoin) {
     Map(
-      "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"),
+      "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows (without dedup)"),
       "buildCount" -> SQLMetrics.createMetric(sparkContext, "number of build side"),
       "streamCount" -> SQLMetrics.createMetric(sparkContext, "number of stream side"),
       "candidateCount" -> SQLMetrics.createMetric(sparkContext, "number of candidates"),
@@ -72,10 +82,17 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       "buildLeftTasks" -> SQLMetrics.createMetric(sparkContext, "number of tasks building the left side"),
       "buildRightTasks" -> SQLMetrics.createMetric(sparkContext, "number of tasks building the right side"),
       "prepareBuildTasks" -> SQLMetrics.createMetric(sparkContext, "number of tasks preparing the build side"),
-      "prepareStreamTasks" -> SQLMetrics.createMetric(sparkContext, "number of tasks preparing the stream side"))
+      "prepareStreamTasks" -> SQLMetrics.createMetric(sparkContext, "number of tasks preparing the stream side"),
+      "subdivideLeft" -> SQLMetrics.createMetric(sparkContext, "subdivide left side"),
+      "subdivideRight" -> SQLMetrics.createMetric(sparkContext, "subdivide right side"),
+      "localSubdivideLeft" -> SQLMetrics.createMetric(sparkContext, "subdivide left side in local join"),
+      "localSubdivideRight" -> SQLMetrics.createMetric(sparkContext, "subdivide right side in local join")
+    )
   } else {
     Map.empty
   }
+
+  def isDistanceJoin: Boolean = false
 
   override protected def doExecute(): RDD[InternalRow] = {
     if (sedonaConf.useAdvancedSpatialJoin) {
@@ -90,51 +107,87 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     val boundRightShape = BindReferences.bindReference(rightShape, right.output)
     val leftResultsRaw = left.execute().asInstanceOf[RDD[UnsafeRow]]
     val rightResultsRaw = right.execute().asInstanceOf[RDD[UnsafeRow]]
+    val sortedLeftResultsRaw = sortUnsafeRowRDD(leftResultsRaw, left.schema)
+    val sortedRightResultsRaw = sortUnsafeRowRDD(rightResultsRaw, right.schema)
 
     // Convert the input data to SpatialRDD
     var subdivideLeftRDDOptions: Option[SubdivideRDDOptions] = None
     var subdivideRightRDDOptions: Option[SubdivideRDDOptions] = None
+    var localSubdivideLeftOptions: Option[SubdivideOptions] = None
+    var localSubdivideRightOptions: Option[SubdivideOptions] = None
     var isLeftGeometryAccurate = true
     var isRightGeometryAccurate = true
     var (leftShapes, rightShapes) = toSpatialRddPair(leftResultsRaw, boundLeftShape, rightResultsRaw, boundRightShape)
+    var (sortedLeftShapes, sortedRightShapes) = toSpatialRddPair(sortedLeftResultsRaw, boundLeftShape,
+      sortedRightResultsRaw, boundRightShape)
 
     // Subdivide the RDD when subdivide mode is ALWAYS.
     if (sedonaConf.getSpatialJoinSubdivideLeft == JoinSubdivideMode.ALWAYS) {
       log.info("Subdividing left RDD, as the mode is set to ALWAYS")
       subdivideLeftRDDOptions = Some(sedonaConf.getLeftSubdivideRDDOptions)
-      leftShapes = Subdivide.subdivideSpatialRDD(leftShapes, subdivideLeftRDDOptions.get)
+      leftShapes = Subdivide.subdivideSpatialRDD(sortedLeftShapes, subdivideLeftRDDOptions.get)
     }
     if (sedonaConf.getSpatialJoinSubdivideRight == JoinSubdivideMode.ALWAYS) {
       log.info("Subdividing right RDD, as the mode is set to ALWAYS")
       subdivideRightRDDOptions = Some(sedonaConf.getRightSubdivideRDDOptions)
-      rightShapes = Subdivide.subdivideSpatialRDD(rightShapes, subdivideRightRDDOptions.get)
+      rightShapes = Subdivide.subdivideSpatialRDD(sortedRightShapes, subdivideRightRDDOptions.get)
+    }
+    if (sedonaConf.getLocalJoinSubdivideLeft == JoinSubdivideMode.ALWAYS) {
+      log.info("Subdividing left geometries in local join, as the mode is set to ALWAYS")
+      localSubdivideLeftOptions = Some(sedonaConf.getLeftLocalJoinSubdivideOptions)
+    }
+    if (sedonaConf.getLocalJoinSubdivideRight == JoinSubdivideMode.ALWAYS) {
+      log.info("Subdividing right geometries in local join, as the mode is set to ALWAYS")
+      localSubdivideRightOptions = Some(sedonaConf.getRightLocalJoinSubdivideOptions)
     }
 
     // Analyze both sides for doing spatial partitioning, and probably subdivide the datasets
     analyzeLeftAndRight(leftShapes, rightShapes)
+    sortedLeftShapes.setStatistics(leftShapes.getStatistics)
+    sortedRightShapes.setStatistics(rightShapes.getStatistics)
+    var spatialPartitioner = leftShapes.createSpatialPartitioner(
+      sedonaConf.getJoinGridType, rightShapes, sedonaConf.getFallbackPartitionNum, sedonaConf)
+    if (spatialPartitioner == null) {
+      return sparkContext.emptyRDD
+    }
 
-    // Subdivide the spatial RDD if necessary
-    var (needReAnalyzeLeft, needReAnalyzeRight) = (false, false)
-    if (sedonaConf.getSpatialJoinSubdivideLeft == JoinSubdivideMode.AUTO) {
-      val options = Subdivide.determineSubdivideOptions(leftShapes, sedonaConf)
-      if (options.isPresent) {
+    // Try subdivide the spatial RDD if auto subdivide is enabled
+    if (sedonaConf.getSpatialJoinSubdivideLeft == JoinSubdivideMode.AUTO ||
+      sedonaConf.getSpatialJoinSubdivideRight == JoinSubdivideMode.AUTO) {
+      val canDiscardLeftGeometry = unneededLeftAttributes.nonEmpty && spatialPredicate == SpatialPredicate.INTERSECTS
+      val canDiscardRightGeometry = unneededRightAttributes.nonEmpty && spatialPredicate == SpatialPredicate.INTERSECTS
+      val options = Subdivide.determineSubdivideOptions(leftShapes, rightShapes, spatialPartitioner,
+        canDiscardLeftGeometry, canDiscardRightGeometry, sedonaConf)
+      if (options.getLeft.globalOptions != null && sedonaConf.getSpatialJoinSubdivideLeft == JoinSubdivideMode.AUTO) {
         log.info("Subdividing left RDD as automatically determined")
-        leftShapes = Subdivide.subdivideSpatialRDD(leftShapes, options.get)
-        subdivideLeftRDDOptions = Some(options.get)
-        needReAnalyzeLeft = leftShapes.getStatistics == null
+        leftShapes = Subdivide.subdivideSpatialRDD(sortedLeftShapes, options.getLeft.globalOptions)
+        subdivideLeftRDDOptions = Some(options.getLeft.globalOptions)
       }
-    }
-    if (sedonaConf.getSpatialJoinSubdivideRight == JoinSubdivideMode.AUTO) {
-      val options = Subdivide.determineSubdivideOptions(rightShapes, sedonaConf)
-      if (options.isPresent) {
+      if (options.getRight.globalOptions != null && sedonaConf.getSpatialJoinSubdivideRight == JoinSubdivideMode.AUTO) {
         log.info("Subdividing right RDD as automatically determined")
-        rightShapes = Subdivide.subdivideSpatialRDD(rightShapes, options.get)
-        subdivideRightRDDOptions = Some(options.get)
-        needReAnalyzeRight = rightShapes.getStatistics == null
+        rightShapes = Subdivide.subdivideSpatialRDD(sortedRightShapes, options.getRight.globalOptions)
+        subdivideRightRDDOptions = Some(options.getRight.globalOptions)
+      }
+      if (options.getLeft.localOptions != null && sedonaConf.getLocalJoinSubdivideLeft == JoinSubdivideMode.AUTO) {
+        log.info("Subdividing left geometries in local join as automatically determined")
+        localSubdivideLeftOptions = Some(options.getLeft.localOptions)
+      }
+      if (options.getRight.localOptions != null && sedonaConf.getLocalJoinSubdivideRight == JoinSubdivideMode.AUTO) {
+        log.info("Subdividing right geometries in local join as automatically determined")
+        localSubdivideRightOptions = Some(options.getRight.localOptions)
       }
     }
+
+    // Update subdivide metrics
+    subdivideLeftRDDOptions.foreach { _ => metrics("subdivideLeft").set(1) }
+    subdivideRightRDDOptions.foreach { _ => metrics("subdivideRight").set(1) }
+    localSubdivideLeftOptions.foreach { _ => metrics("localSubdivideLeft").set(1) }
+    localSubdivideRightOptions.foreach { _ => metrics("localSubdivideRight").set(1) }
+    val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
+    SQLMetrics.postDriverMetricUpdates(sparkContext, executionId, metrics.values.toSeq)
 
     // Re-analyze the subdivided datasets if necessary
+    val needReAnalyze = leftShapes.getStatistics == null || rightShapes.getStatistics == null
     (leftShapes.getStatistics, rightShapes.getStatistics) match {
       case (null, null) => analyzeLeftAndRight(leftShapes, rightShapes, reAnalyze = true)
       case (null, _) => withJobDescription("Re-analyzing left shapes") { leftShapes.advancedAnalyze() }
@@ -142,10 +195,19 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       case _ => // Do nothing
     }
 
+    // Recompute the spatial partitioner using re-analyzed data, which is more balanced for subdivided
+    // geometries
+    if (needReAnalyze) {
+      spatialPartitioner = leftShapes.createSpatialPartitioner(
+        sedonaConf.getJoinGridType, rightShapes, sedonaConf.getFallbackPartitionNum, sedonaConf)
+      sortedLeftShapes.setStatistics(leftShapes.getStatistics)
+      sortedRightShapes.setStatistics(rightShapes.getStatistics)
+    }
+
     // Decide whether we can discard the geometry attributes from the user data to reduce the amount of
     // shuffle-write/read as well as memory usage.
-    subdivideLeftRDDOptions.foreach { options => isLeftGeometryAccurate = isSubdivideAccurate(leftShapes, options) }
-    subdivideRightRDDOptions.foreach { options => isRightGeometryAccurate = isSubdivideAccurate(rightShapes, options) }
+    subdivideLeftRDDOptions.foreach { options => isLeftGeometryAccurate = isSubdivideAccurate(leftShapes, options.options) }
+    subdivideRightRDDOptions.foreach { options => isRightGeometryAccurate = isSubdivideAccurate(rightShapes, options.options) }
     if (isLeftGeometryAccurate && isRightGeometryAccurate) {
       leftShapes = discardUnneededAttributes(
         leftShapes, subdivideLeftRDDOptions, left, unneededLeftAttributes, "left")
@@ -164,17 +226,18 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       case (None, None) => // Do nothing
       case (Some(_), Some(_)) => // Do nothing
       case (Some(_), None) =>
-        rightShapes = Subdivide.noOpSubdivideSpatialRDD(rightShapes)
+        rightShapes = Subdivide.noOpSubdivideSpatialRDD(sortedRightShapes)
       case (None, Some(_)) =>
-        leftShapes = Subdivide.noOpSubdivideSpatialRDD(leftShapes)
+        leftShapes = Subdivide.noOpSubdivideSpatialRDD(sortedLeftShapes)
     }
 
     // Spatial partitioning
-    if (sedonaConf.getFallbackPartitionNum == -1) {
-      leftShapes.spatialPartitioning(sedonaConf.getJoinGridType, rightShapes)
-    } else {
-      leftShapes.spatialPartitioning(sedonaConf.getJoinGridType, rightShapes, sedonaConf.getFallbackPartitionNum)
+    if (spatialPartitioner.numPartitions > 100) {
+      // Reduce the size of serialized task closure by broadcasting the spatial partitioner
+      spatialPartitioner = new BroadcastedSpatialPartitioner(sparkContext.broadcast(spatialPartitioner))
     }
+    leftShapes.spatialPartitioning(spatialPartitioner, sedonaConf)
+    rightShapes.spatialPartitioning(spatialPartitioner, sedonaConf)
 
     // Perform spatial join
     if (leftShapes.spatialPartitionedRDD == null) {
@@ -184,10 +247,11 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       if (sedonaConf.getSpatialPartitionerSavePath.nonEmpty) {
         saveSpatialPartitionerToFile(leftShapes.getPartitioner, sedonaConf.getSpatialPartitionerSavePath)
       }
-      (subdivideLeftRDDOptions, subdivideRightRDDOptions) match {
+      val resultRdd = (subdivideLeftRDDOptions, subdivideRightRDDOptions) match {
         case (None, None) =>
           // No subdivision applied, so we can run the join directly
-          val joinedRdd = runSpatialJoin(sedonaConf, leftShapes, rightShapes, spatialPredicate)
+          val joinedRdd = runSpatialJoin(sedonaConf, leftShapes, rightShapes, spatialPredicate,
+            localSubdivideLeftOptions, localSubdivideRightOptions)
           joinedRddToRowRdd(joinedRdd)
         case _ =>
           // When subdivide kicks in, the spatial predicate for running join must be INTERSECTS. If
@@ -197,18 +261,26 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
             case SpatialPredicate.INTERSECTS => extraCondition
             case _ => Some(condition)
           }
-          // If we're running simple ST_Intersects/ST_Contains/ST_Within join but something like a distance join or
-          // raster join, and the subdivided geometries are not accurate, we need to refine the join result using
+          // If the subdivided geometries are not accurate, we need to refine the INTERSECTS join result using
           // the original geometries. This refinement could use prepared geometries so it will be faster than
           // simply leaving everything to evaluating the extra condition.
           val refineIntersectsUsingOriginalGeometries =
-            !(isLeftGeometryAccurate && isRightGeometryAccurate) && extraCondition.isEmpty
-          val joinedRdd = runSpatialJoin(sedonaConf, leftShapes, rightShapes, SpatialPredicate.INTERSECTS)
-          joinedSubdividedRddToRowRdd(joinedRdd, leftResultsRaw, rightResultsRaw,
+            !(isLeftGeometryAccurate && isRightGeometryAccurate) && !isDistanceJoin && !isRasterJoin(boundLeftShape, boundRightShape)
+          val joinedRdd = runSpatialJoin(sedonaConf, leftShapes, rightShapes, SpatialPredicate.INTERSECTS,
+            localSubdivideLeftOptions, localSubdivideRightOptions)
+          joinedSubdividedRddToRowRdd(joinedRdd, sortedLeftResultsRaw, sortedRightResultsRaw,
             subdivideLeftRDDOptions, subdivideRightRDDOptions, refineIntersectsUsingOriginalGeometries,
             boundLeftShape, boundRightShape,
             newExtraCondition)
       }
+
+      // We've already built the joined RDD. Now it is safe to free up memory used by the statistics data,
+      // especially sampled envelopes on both sides
+      leftShapes.forgetStatistics()
+      rightShapes.forgetStatistics()
+      sortedLeftShapes.forgetStatistics()
+      sortedRightShapes.forgetStatistics()
+      resultRdd
     }
   }
 
@@ -259,7 +331,10 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
         if (!refineIntersectsUsingOriginalGeometries) {
           (_: Long, _: Long, l: UnsafeRow, r: UnsafeRow) => Some(joiner.join(l, r))
         } else {
-          // If either side is in-accurate, we have to re-evaluate INTERSECTS predicate using the original geometries
+          // If either side is in-accurate, we have to re-evaluate INTERSECTS predicate using the original geometries.
+          // This is good to have even we have extraCondition to evaluate, because this will be using prepared
+          // geometries, so it will reduce the amount of false-positives for extraCondition very fast and improve the
+          // overall speed than simply relying on evaluating extraCondition.
           lastJoinedSide match {
             case Some(LeftSide) =>
               // Prepare the left side
@@ -342,8 +417,9 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
   }
 
   private def runSpatialJoin(sedonaConf: SedonaConf,
-    leftShapes: SpatialRDD[Geometry], rightShapes: SpatialRDD[Geometry],
-    spatialPredicate: SpatialPredicate) = {
+    leftShapes: SpatialRDD[Geometry], rightShapes: SpatialRDD[Geometry], spatialPredicate: SpatialPredicate,
+    localSubdivideLeftOptions: Option[SubdivideOptions],
+    localSubdivideRightOptions: Option[SubdivideOptions]) = {
     // Run spatial join
     val metricBuildCount = longMetric("buildCount")
     val metricCandidateCount = longMetric("candidateCount")
@@ -358,12 +434,10 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       -1, null, null,
       metricBuildCount, metricStreamCount, metricResultCount, metricCandidateCount, metricBuildTime,
       metricBuildLeftTasks, metricBuildRightTasks,
-      metricPrepareBuildTasks, metricPrepareStreamTasks)
+      metricPrepareBuildTasks, metricPrepareStreamTasks,
+      localSubdivideLeftOptions.orNull, localSubdivideRightOptions.orNull
+    )
     val joinedRdd = JoinQuery.spatialJoin(leftShapes, rightShapes, joinParams).rdd
-    // We've already built the joined RDD. Now it is safe to free up memory used by the statistics data,
-    // especially sampled envelopes on both sides
-    leftShapes.forgetStatistics()
-    rightShapes.forgetStatistics()
     joinedRdd
   }
 

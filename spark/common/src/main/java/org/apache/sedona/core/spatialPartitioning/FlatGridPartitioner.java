@@ -33,15 +33,19 @@ import java.util.List;
 public class FlatGridPartitioner
         extends SpatialPartitioner
 {
+    private final List<Envelope> grids;
+
     public FlatGridPartitioner(GridType gridType, List<Envelope> grids)
     {
-        super(gridType, grids);
+        super(gridType);
+        this.grids = grids;
     }
 
     // For backwards compatibility (see SpatialRDD.spatialPartitioning(otherGrids))
     public FlatGridPartitioner(List<Envelope> grids)
     {
-        super(null, grids);
+        super(null);
+        this.grids = grids;
     }
 
     @Override
@@ -67,6 +71,11 @@ public class FlatGridPartitioner
          */
 
         return null;
+    }
+
+    @Override
+    public List<Envelope> getGrids() {
+        return grids;
     }
 
     @Override
