@@ -34,22 +34,22 @@ jobs:
         shell: bash
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up QEMU
-      if: runner.os == 'Linux'
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: all
-    - name: Build wheels
-      uses: pypa/cibuildwheel@v2.18.1
-      env:
-        CIBW_SKIP: 'pp* *musl*'
-        CIBW_ARCHS_LINUX: 'x86_64 aarch64'
-        CIBW_ARCHS_WINDOWS: 'AMD64 ARM64'
-        CIBW_ARCHS_MACOS: 'x86_64 arm64'
-      with:
-        package-dir: python
-    - uses: actions/upload-artifact@v3
-      with:
-        name: wheels
-        path: ./wheelhouse/*.whl
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.18.1
+        env:
+          CIBW_SKIP: 'pp* *musl*'
+          CIBW_ARCHS_LINUX: 'x86_64 aarch64'
+          CIBW_ARCHS_WINDOWS: 'AMD64 ARM64'
+          CIBW_ARCHS_MACOS: 'x86_64 arm64'
+        with:
+          package-dir: python
+      - uses: actions/upload-artifact@v3
+        with:
+          name: wheels
+          path: ./wheelhouse/*.whl
