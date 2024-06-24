@@ -16,26 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.enums;
 
 /**
- * The DistanceMetric enum represents the different distance metrics that can be used in the application.
+ * The DistanceMetric enum represents the different distance metrics that can be used in the
+ * application.
  */
-public enum DistanceMetric
-{
-    /**
-     * The Euclidean distance metric, also known as straight line distance.
-     */
-    EUCLIDEAN,
+public enum DistanceMetric {
+  /** The Euclidean distance metric, also known as straight line distance. */
+  EUCLIDEAN,
 
-    /**
-     * The Haversine distance metric, which measures the shortest distance between two points on the surface of a sphere.
-     */
-    HAVERSINE,
+  /**
+   * The Haversine distance metric, which measures the shortest distance between two points on the
+   * surface of a sphere.
+   */
+  HAVERSINE,
 
-    /**
-     * The Spheroid distance metric, which measures the shortest distance between two points on the surface of a spheroid.
-     */
-    SPHEROID
+  /**
+   * The Spheroid distance metric, which measures the shortest distance between two points on the
+   * surface of a spheroid.
+   */
+  SPHEROID
 }

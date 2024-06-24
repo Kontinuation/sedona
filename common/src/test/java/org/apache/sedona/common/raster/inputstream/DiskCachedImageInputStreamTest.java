@@ -28,7 +28,6 @@ import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.util.Random;
 import javax.imageio.stream.ImageInputStream;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.junit.Assert;
@@ -41,86 +40,83 @@ import org.junit.runners.Parameterized;
 
 @RunWith(Parameterized.class)
 public class DiskCachedImageInputStreamTest {
-    @Rule
-    public TemporaryFolder temp = new TemporaryFolder();
+  @Rule public TemporaryFolder temp = new TemporaryFolder();
 
-    @Parameterized.Parameters(name = "disable cache for local file: {0}")
-    public static Object[] testConfig() {
-        return new Object[]{
-                new Object[]{true},
-                new Object[]{false}
-        };
-    }
+  @Parameterized.Parameters(name = "disable cache for local file: {0}")
+  public static Object[] testConfig() {
+    return new Object[] {new Object[] {true}, new Object[] {false}};
+  }
 
-    private static final int TEST_FILE_SIZE = 1000;
-    private final Configuration conf = new Configuration();
-    private final Random random = new Random();
-    private File testFile;
+  private static final int TEST_FILE_SIZE = 1000;
+  private final Configuration conf = new Configuration();
+  private final Random random = new Random();
+  private File testFile;
 
-    public DiskCachedImageInputStreamTest(boolean disableCacheForLocalFile) {
-        conf.set(HadoopImageInputStreamFactory.READ_AHEAD_SIZE_CONF_KEY, "10B");
-        conf.setBoolean(HadoopImageInputStreamFactory.DONT_CACHE_LOCAL_FILE_CONF_KEY, disableCacheForLocalFile);
-    }
+  public DiskCachedImageInputStreamTest(boolean disableCacheForLocalFile) {
+    conf.set(HadoopImageInputStreamFactory.READ_AHEAD_SIZE_CONF_KEY, "10B");
+    conf.setBoolean(
+        HadoopImageInputStreamFactory.DONT_CACHE_LOCAL_FILE_CONF_KEY, disableCacheForLocalFile);
+  }
 
-    @Before
-    public void setup() throws IOException {
-        testFile = temp.newFile();
-        prepareTestData(testFile);
-    }
+  @Before
+  public void setup() throws IOException {
+    testFile = temp.newFile();
+    prepareTestData(testFile);
+  }
 
-    @Test
-    public void testReadSequentially() throws IOException {
-        Path path = new Path(testFile.getPath());
-        try (ImageInputStream stream = HadoopImageInputStreamFactory.create(path, conf);
-             InputStream in = new BufferedInputStream(Files.newInputStream(testFile.toPath()))) {
-            byte[] bActual = new byte[8];
-            byte[] bExpected = new byte[bActual.length];
-            while (true) {
-                int len = random.nextInt(bActual.length + 1);
-                int lenActual = stream.read(bActual, 0, len);
-                int lenExpected = in.read(bExpected, 0, len);
-                Assert.assertEquals(lenExpected, lenActual);
-                if (lenActual < 0) {
-                    break;
-                }
-                Assert.assertArrayEquals(bExpected, bActual);
-            }
+  @Test
+  public void testReadSequentially() throws IOException {
+    Path path = new Path(testFile.getPath());
+    try (ImageInputStream stream = HadoopImageInputStreamFactory.create(path, conf);
+        InputStream in = new BufferedInputStream(Files.newInputStream(testFile.toPath()))) {
+      byte[] bActual = new byte[8];
+      byte[] bExpected = new byte[bActual.length];
+      while (true) {
+        int len = random.nextInt(bActual.length + 1);
+        int lenActual = stream.read(bActual, 0, len);
+        int lenExpected = in.read(bExpected, 0, len);
+        Assert.assertEquals(lenExpected, lenActual);
+        if (lenActual < 0) {
+          break;
         }
+        Assert.assertArrayEquals(bExpected, bActual);
+      }
     }
+  }
 
-    @Test
-    public void testReadRandomly() throws IOException {
-        Path path = new Path(testFile.getPath());
-        try (ImageInputStream stream = HadoopImageInputStreamFactory.create(path, conf);
-             RandomAccessFile raf = new RandomAccessFile(testFile, "r")) {
-            byte[] bActual = new byte[8];
-            byte[] bExpected = new byte[bActual.length];
-            for (int k = 0; k < 1000; k++) {
-                int offset = random.nextInt(TEST_FILE_SIZE + 1);
-                int len = random.nextInt(bActual.length + 1);
-                stream.seek(offset);
-                raf.seek(offset);
-                int lenActual = stream.read(bActual, 0, len);
-                int lenExpected = raf.read(bExpected, 0, len);
-                Assert.assertEquals(lenExpected, lenActual);
-                if (lenActual < 0) {
-                    continue;
-                }
-                Assert.assertArrayEquals(bExpected, bActual);
-            }
-
-            // Test seek to EOF.
-            stream.seek(TEST_FILE_SIZE);
-            int len = stream.read(bActual, 0, bActual.length);
-            Assert.assertEquals(-1, len);
+  @Test
+  public void testReadRandomly() throws IOException {
+    Path path = new Path(testFile.getPath());
+    try (ImageInputStream stream = HadoopImageInputStreamFactory.create(path, conf);
+        RandomAccessFile raf = new RandomAccessFile(testFile, "r")) {
+      byte[] bActual = new byte[8];
+      byte[] bExpected = new byte[bActual.length];
+      for (int k = 0; k < 1000; k++) {
+        int offset = random.nextInt(TEST_FILE_SIZE + 1);
+        int len = random.nextInt(bActual.length + 1);
+        stream.seek(offset);
+        raf.seek(offset);
+        int lenActual = stream.read(bActual, 0, len);
+        int lenExpected = raf.read(bExpected, 0, len);
+        Assert.assertEquals(lenExpected, lenActual);
+        if (lenActual < 0) {
+          continue;
         }
-    }
+        Assert.assertArrayEquals(bExpected, bActual);
+      }
 
-    private void prepareTestData(File testFile) throws IOException {
-        try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(testFile.toPath()))) {
-            for (int k = 0; k < TEST_FILE_SIZE; k++) {
-                out.write(random.nextInt());
-            }
-        }
+      // Test seek to EOF.
+      stream.seek(TEST_FILE_SIZE);
+      int len = stream.read(bActual, 0, bActual.length);
+      Assert.assertEquals(-1, len);
     }
+  }
+
+  private void prepareTestData(File testFile) throws IOException {
+    try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(testFile.toPath()))) {
+      for (int k = 0; k < TEST_FILE_SIZE; k++) {
+        out.write(random.nextInt());
+      }
+    }
+  }
 }

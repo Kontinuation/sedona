@@ -28,20 +28,19 @@ class RasterAISuite extends TestBaseScala with BeforeAndAfter with GivenWhenThen
 
   describe("Raster AI helper functions should work") {
     it("Passed RS_SEGMENT_TO_GEOMS") {
-      val confidenceDf = Seq(Seq(
-        0.1, 0.1, 0.1, 0.1, 0.1,
-        0.1, 0.1, 0.1, 0.9, 0.1,
-        0.1, 0.9, 0.1, 0.9, 0.1,
-        0.1, 0.9, 0.1, 0.1, 0.1,
-        0.1, 0.1, 0.1, 0.1, 0.1
-        )).toDF("confidence_array")
+      val confidenceDf = Seq(
+        Seq(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.9, 0.1, 0.1, 0.9, 0.1, 0.9, 0.1, 0.1, 0.9,
+          0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)).toDF("confidence_array")
       val df = confidenceDf
         .withColumn("rast", expr("RS_MakeEmptyRaster(1, 'B', 5, 5, 0, 5, 1)"))
         .withColumn("class_map", expr("map('building', 10)"))
         .withColumn("labels", expr("array(10)"))
         .withColumn("threshold", lit(0.5))
 
-      val row = df.selectExpr("RS_SEGMENT_TO_GEOMS(rast, confidence_array, labels, class_map, threshold) as result").first()
+      val row = df
+        .selectExpr(
+          "RS_SEGMENT_TO_GEOMS(rast, confidence_array, labels, class_map, threshold) as result")
+        .first()
       val result = row.getStruct(0)
       val geometries = result.getSeq(0)
       val averageScores = result.getSeq(1)
@@ -52,28 +51,28 @@ class RasterAISuite extends TestBaseScala with BeforeAndAfter with GivenWhenThen
       assert(labels.size == 1)
       assert(classNames.size == 1)
       val wktReader = new WKTReader()
-      assert(geometries.head.asInstanceOf[Geometry] == wktReader.read(
-        "MULTIPOLYGON (((3 4, 3 2, 4 2, 4 4, 3 4)), ((1 3, 1 1, 2 1, 2 3, 1 3)))"))
+      assert(
+        geometries.head.asInstanceOf[Geometry] == wktReader.read(
+          "MULTIPOLYGON (((3 4, 3 2, 4 2, 4 4, 3 4)), ((1 3, 1 1, 2 1, 2 3, 1 3)))"))
       assert(averageScores.head.asInstanceOf[Double] == 0.9)
       assert(labels.head.asInstanceOf[Int] == 10)
       assert(classNames.head.toString == "building")
     }
 
     it("Passed RS_SEGMENT_TO_GEOMS for empty results") {
-      val confidenceDf = Seq(Seq(
-        0.1, 0.1, 0.1, 0.1, 0.1,
-        0.1, 0.1, 0.1, 0.2, 0.1,
-        0.1, 0.2, 0.1, 0.2, 0.1,
-        0.1, 0.2, 0.1, 0.1, 0.1,
-        0.1, 0.1, 0.1, 0.1, 0.1
-      )).toDF("confidence_array")
+      val confidenceDf = Seq(
+        Seq(0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.2, 0.1, 0.1, 0.2, 0.1, 0.2, 0.1, 0.1, 0.2,
+          0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)).toDF("confidence_array")
       val df = confidenceDf
         .withColumn("rast", expr("RS_MakeEmptyRaster(1, 'B', 5, 5, 0, 5, 1)"))
         .withColumn("class_map", expr("map('building', 10)"))
         .withColumn("labels", expr("array(10)"))
         .withColumn("threshold", lit(0.5))
 
-      val row = df.selectExpr("RS_SEGMENT_TO_GEOMS(rast, confidence_array, labels, class_map, threshold) as result").first()
+      val row = df
+        .selectExpr(
+          "RS_SEGMENT_TO_GEOMS(rast, confidence_array, labels, class_map, threshold) as result")
+        .first()
       val result = row.getStruct(0)
       val geometries = result.getSeq(0)
       val averageScores = result.getSeq(1)
@@ -86,28 +85,25 @@ class RasterAISuite extends TestBaseScala with BeforeAndAfter with GivenWhenThen
     }
 
     it("Passed RS_SEGMENT_TO_GEOMS for multiple classes") {
-      val confidenceDf = Seq(Seq(
-        // confidence array for class 10
-        0.1, 0.1, 0.1, 0.1, 0.1,
-        0.1, 0.9, 0.9, 0.1, 0.1,
-        0.1, 0.9, 0.9, 0.8, 0.1,
-        0.1, 0.1, 0.8, 0.8, 0.1,
-        0.1, 0.1, 0.1, 0.1, 0.1,
+      val confidenceDf = Seq(
+        Seq(
+          // confidence array for class 10
+          0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.9, 0.9, 0.1, 0.1, 0.1, 0.9, 0.9, 0.8, 0.1, 0.1, 0.1,
+          0.8, 0.8, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1,
 
-        // confidence array for class 7
-        0.1, 0.1, 0.1, 0.1, 0.1,
-        0.1, 0.8, 0.8, 0.1, 0.1,
-        0.1, 0.8, 0.8, 0.9, 0.1,
-        0.1, 0.1, 0.9, 0.9, 0.1,
-        0.1, 0.1, 0.1, 0.1, 0.1
-      )).toDF("confidence_array")
+          // confidence array for class 7
+          0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.8, 0.8, 0.1, 0.1, 0.1, 0.8, 0.8, 0.9, 0.1, 0.1, 0.1,
+          0.9, 0.9, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1)).toDF("confidence_array")
       val df = confidenceDf
         .withColumn("rast", expr("RS_MakeEmptyRaster(1, 'B', 5, 5, 0, 5, 1)"))
         .withColumn("class_map", expr("map('class_7', 7, 'class_10', 10)"))
         .withColumn("labels", expr("array(10, 7)"))
         .withColumn("threshold", lit(0.5))
 
-      val row = df.selectExpr("RS_SEGMENT_TO_GEOMS(rast, confidence_array, labels, class_map, threshold) as result").first()
+      val row = df
+        .selectExpr(
+          "RS_SEGMENT_TO_GEOMS(rast, confidence_array, labels, class_map, threshold) as result")
+        .first()
       val result = row.getStruct(0)
       val geometries = result.getSeq(0)
       val averageScores = result.getSeq(1)
@@ -119,12 +115,16 @@ class RasterAISuite extends TestBaseScala with BeforeAndAfter with GivenWhenThen
       assert(classNames.size == 2)
 
       val wktReader = new WKTReader()
-      assert(geometries.head.asInstanceOf[Geometry] == wktReader.read("POLYGON ((1 4, 1 2, 3 2, 3 4, 1 4))"))
+      assert(
+        geometries.head.asInstanceOf[Geometry] == wktReader.read(
+          "POLYGON ((1 4, 1 2, 3 2, 3 4, 1 4))"))
       assert(averageScores.head.asInstanceOf[Double] == 0.9)
       assert(labels.head.asInstanceOf[Int] == 10)
       assert(classNames.head.toString == "class_10")
 
-      assert(geometries(1).asInstanceOf[Geometry] == wktReader.read("POLYGON ((3 3, 3 2, 2 2, 2 1, 4 1, 4 3, 3 3))"))
+      assert(
+        geometries(1).asInstanceOf[Geometry] == wktReader.read(
+          "POLYGON ((3 3, 3 2, 2 2, 2 1, 4 1, 4 3, 3 3))"))
       assert(averageScores(1).asInstanceOf[Double] == 0.9)
       assert(labels(1).asInstanceOf[Int] == 7)
       assert(classNames(1).toString == "class_7")

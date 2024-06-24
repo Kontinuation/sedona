@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.spark.sql.sedona_sql.expressions.raster
 
 import org.apache.sedona.common.raster.RasterAIFunctions
@@ -37,7 +36,9 @@ import scala.collection.JavaConverters._
  * @param inputExpressions
  */
 case class RS_SEGMENT_TO_GEOMS(inputExpressions: Seq[Expression])
-  extends Expression with CodegenFallback with ImplicitCastInputTypes {
+    extends Expression
+    with CodegenFallback
+    with ImplicitCastInputTypes {
 
   override def nullable: Boolean = true
 
@@ -57,7 +58,8 @@ case class RS_SEGMENT_TO_GEOMS(inputExpressions: Seq[Expression])
   override def eval(input: InternalRow): Any = {
     val ref = inputExpressions.head.toRaster(input)
     try {
-      val confidenceArray = inputExpressions(1).eval(input).asInstanceOf[ArrayData].toDoubleArray()
+      val confidenceArray =
+        inputExpressions(1).eval(input).asInstanceOf[ArrayData].toDoubleArray()
       val labelArray = inputExpressions(2).eval(input).asInstanceOf[ArrayData].toIntArray()
       val classMap = inputExpressions(3).eval(input).asInstanceOf[MapData]
       val classMapScala = (classMap.valueArray.toIntArray zip
@@ -85,7 +87,8 @@ case class RS_SEGMENT_TO_GEOMS(inputExpressions: Seq[Expression])
 
   override def children: Seq[Expression] = inputExpressions
 
-  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): RS_SEGMENT_TO_GEOMS = {
+  protected def withNewChildrenInternal(
+      newChildren: IndexedSeq[Expression]): RS_SEGMENT_TO_GEOMS = {
     copy(inputExpressions = newChildren)
   }
 }

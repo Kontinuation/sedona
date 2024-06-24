@@ -1,16 +1,20 @@
-/**
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 package org.apache.sedona.core.monitoring
 
@@ -25,10 +29,18 @@ class listenerTest extends TestBaseScala {
     val iterations = 10
     val startTimeMillis = System.currentTimeMillis()
     for (i <- 1 to iterations) {
-      var df = sparkSession.read.format("csv").option("delimiter", ",").option("header", "false").load(csvPointInputLocation)
-      df = df.selectExpr("ST_Point(cast(_c0 as Decimal(24,20)), cast(_c1 as Decimal(24,20))) as geom")
+      var df = sparkSession.read
+        .format("csv")
+        .option("delimiter", ",")
+        .option("header", "false")
+        .load(csvPointInputLocation)
+      df = df.selectExpr(
+        "ST_Point(cast(_c0 as Decimal(24,20)), cast(_c1 as Decimal(24,20))) as geom")
       df = df.filter("ST_Area(geom) >=0")
-      df = df.as("df1").join(df.as("df2")).filter("ST_Distance(df1.geom, df2.geom) <= 0") // Return the points themselves
+      df = df
+        .as("df1")
+        .join(df.as("df2"))
+        .filter("ST_Distance(df1.geom, df2.geom) <= 0") // Return the points themselves
       assert(df.count() == 1000)
     }
     val endTimeMillis = System.currentTimeMillis()
@@ -38,10 +50,18 @@ class listenerTest extends TestBaseScala {
   }
 
   it("Should find function calls and join") {
-    var df = sparkSession.read.format("csv").option("delimiter", ",").option("header", "false").load(csvPointInputLocation)
-    df = df.selectExpr("ST_Point(cast(_c0 as Decimal(24,20)), cast(_c1 as Decimal(24,20))) as geom")
+    var df = sparkSession.read
+      .format("csv")
+      .option("delimiter", ",")
+      .option("header", "false")
+      .load(csvPointInputLocation)
+    df =
+      df.selectExpr("ST_Point(cast(_c0 as Decimal(24,20)), cast(_c1 as Decimal(24,20))) as geom")
     df = df.filter("ST_Area(geom) >=0")
-    df = df.as("df1").join(df.as("df2")).filter("ST_Distance(df1.geom, df2.geom) <= 0") // Return the points themselves
+    df = df
+      .as("df1")
+      .join(df.as("df2"))
+      .filter("ST_Distance(df1.geom, df2.geom) <= 0") // Return the points themselves
     val functions = TreeTraversal.execute(df.queryExecution)
     val funcStat = functions.toList.groupBy(identity).mapValues(_.size)
     assertEquals(2, funcStat.getOrElse("st_point", 0))
@@ -51,8 +71,13 @@ class listenerTest extends TestBaseScala {
   }
 
   it("Should find aggregate functions") {
-    var df = sparkSession.read.format("csv").option("delimiter", ",").option("header", "false").load(csvPointInputLocation)
-    df = df.selectExpr("ST_Point(cast(_c0 as Decimal(24,20)), cast(_c1 as Decimal(24,20))) as geom")
+    var df = sparkSession.read
+      .format("csv")
+      .option("delimiter", ",")
+      .option("header", "false")
+      .load(csvPointInputLocation)
+    df =
+      df.selectExpr("ST_Point(cast(_c0 as Decimal(24,20)), cast(_c1 as Decimal(24,20))) as geom")
     df = df.groupBy("geom").agg("geom" -> "ST_Envelope_Aggr")
     val functions = TreeTraversal.execute(df.queryExecution)
     val funcStat = functions.toList.groupBy(identity).mapValues(_.size)

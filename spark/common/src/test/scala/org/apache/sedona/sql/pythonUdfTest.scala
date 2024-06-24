@@ -25,19 +25,18 @@ import org.scalatest.{BeforeAndAfter, GivenWhenThen}
 class pythonUdfTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen {
   // Override sparkConfig to provide additional configurations
   override def sparkConfig: Map[String, String] = defaultSparkConfig ++ Map(
-        "spark.wherobots.inference.entrance" -> (resourceFolder + "python/udfEntrance.py"),
-        "spark.wherobots.inference.files" -> (resourceFolder + "python/udfDefinition.py"),
-        "spark.wherobots.inference.args" -> "3"
-  )
+    "spark.wherobots.inference.entrance" -> (resourceFolder + "python/udfEntrance.py"),
+    "spark.wherobots.inference.files" -> (resourceFolder + "python/udfDefinition.py"),
+    "spark.wherobots.inference.args" -> "3")
 
   describe("Python UDF test") {
     it("should find the standalone Python UDF in the correct location and register it") {
-      sparkSession.sql("SELECT py_concat_of2('a', 'b')").take(1)(0)(0) should be ("ab")
+      sparkSession.sql("SELECT py_concat_of2('a', 'b')").take(1)(0)(0) should be("ab")
     }
 
     it("should find the custom Python Pandas UDF from a separate module and register it") {
-      sparkSession.sql("SELECT custom_pandas_udf('abc')").take(1)(0)(0) should be ("ABC")
-      sparkSession.sql("SELECT custom_pandas_udf('abcd')").take(1)(0)(0) should be ("abcd")
+      sparkSession.sql("SELECT custom_pandas_udf('abc')").take(1)(0)(0) should be("ABC")
+      sparkSession.sql("SELECT custom_pandas_udf('abcd')").take(1)(0)(0) should be("abcd")
     }
   }
 }

@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.spark.sql.sedona_sql.expressions
 
 import org.apache.sedona.sql.utils.GeometrySerializer
@@ -28,18 +27,21 @@ import org.apache.spark.sql.types.{AbstractDataType, BooleanType, DataType}
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
 
-
 /**
- * Spatial predicate that uses PreparedGeometry. [[ST_Predicate]] will be transformed to [[ST_PreparedPredicate]] if
- * one side of the expression can be evaluated to a literal, and that geometry literal will be evaluated to a
- * PreparedGeometry and being reused when evaluating this expression with other left hand side geometries.
+ * Spatial predicate that uses PreparedGeometry. [[ST_Predicate]] will be transformed to
+ * [[ST_PreparedPredicate]] if one side of the expression can be evaluated to a literal, and that
+ * geometry literal will be evaluated to a PreparedGeometry and being reused when evaluating this
+ * expression with other left hand side geometries.
  *
- * [[ST_PreparedPredicate]] can also simply spatial filter pushdown rules. Since the right hand side is always a
- * literal, the spatial filter pushdown rule only need to check if the left hand side is an attribute reference to the
- * geometry column of the table.
+ * [[ST_PreparedPredicate]] can also simply spatial filter pushdown rules. Since the right hand
+ * side is always a literal, the spatial filter pushdown rule only need to check if the left hand
+ * side is an attribute reference to the geometry column of the table.
  */
-abstract class ST_PreparedPredicate extends Expression with FoldableExpression
-  with ExpectsInputTypes with NullIntolerant {
+abstract class ST_PreparedPredicate
+    extends Expression
+    with FoldableExpression
+    with ExpectsInputTypes
+    with NullIntolerant {
   def left: Expression
   def right: Literal
 
@@ -83,7 +85,8 @@ abstract class ST_PreparedPredicate extends Expression with FoldableExpression
 
   def evalGeom(leftGeometry: Geometry, rightPreparedGeom: PreparedGeometry): Boolean
 
-  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): ST_PreparedPredicate = {
+  protected def withNewChildrenInternal(
+      newChildren: IndexedSeq[Expression]): ST_PreparedPredicate = {
     withNewChildrenInternal(newChildren(0), newChildren(1).asInstanceOf[Literal])
   }
 
@@ -91,7 +94,8 @@ abstract class ST_PreparedPredicate extends Expression with FoldableExpression
 }
 
 case class ST_PreparedContains(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.within(left)
   }
@@ -102,7 +106,8 @@ case class ST_PreparedContains(left: Expression, right: Literal)
 }
 
 case class ST_PreparedIntersects(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.intersects(left)
   }
@@ -113,7 +118,8 @@ case class ST_PreparedIntersects(left: Expression, right: Literal)
 }
 
 case class ST_PreparedWithin(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.contains(left)
   }
@@ -124,7 +130,8 @@ case class ST_PreparedWithin(left: Expression, right: Literal)
 }
 
 case class ST_PreparedCovers(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.coveredBy(left)
   }
@@ -135,7 +142,8 @@ case class ST_PreparedCovers(left: Expression, right: Literal)
 }
 
 case class ST_PreparedCoveredBy(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.covers(left)
   }
@@ -146,7 +154,8 @@ case class ST_PreparedCoveredBy(left: Expression, right: Literal)
 }
 
 case class ST_PreparedCrosses(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
 
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.crosses(left)
@@ -158,7 +167,8 @@ case class ST_PreparedCrosses(left: Expression, right: Literal)
 }
 
 case class ST_PreparedOverlaps(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
 
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.overlaps(left)
@@ -170,7 +180,8 @@ case class ST_PreparedOverlaps(left: Expression, right: Literal)
 }
 
 case class ST_PreparedTouches(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
 
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.touches(left)
@@ -182,7 +193,8 @@ case class ST_PreparedTouches(left: Expression, right: Literal)
 }
 
 case class ST_PreparedEquals(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
 
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     // We are not using the prepared geometry. However reusing the original geometry saves us some
@@ -197,7 +209,8 @@ case class ST_PreparedEquals(left: Expression, right: Literal)
 }
 
 case class ST_PreparedDisjoint(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
 
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.disjoint(left)
@@ -209,7 +222,8 @@ case class ST_PreparedDisjoint(left: Expression, right: Literal)
 }
 
 case class ST_PreparedOrderingEquals(left: Expression, right: Literal)
-  extends ST_PreparedPredicate with CodegenFallback {
+    extends ST_PreparedPredicate
+    with CodegenFallback {
 
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     left.equalsExact(rightGeom)

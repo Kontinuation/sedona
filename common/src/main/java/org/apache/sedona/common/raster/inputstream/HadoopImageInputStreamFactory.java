@@ -21,7 +21,6 @@ package org.apache.sedona.common.raster.inputstream;
 import java.io.File;
 import java.io.IOException;
 import javax.imageio.stream.ImageInputStream;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileSystem;
@@ -33,62 +32,62 @@ import org.apache.hadoop.fs.Path;
  */
 public class HadoopImageInputStreamFactory {
 
-    private HadoopImageInputStreamFactory() {
+  private HadoopImageInputStreamFactory() {}
+
+  public static final String READ_AHEAD_SIZE_CONF_KEY = "wherobots.raster.outdb.readahead";
+  public static final String ENABLE_CACHE_CONF_KEY = "wherobots.raster.outdb.enablecache";
+  public static final String CACHE_DIR_CONF_KEY = "wherobots.raster.outdb.cache.dir";
+  public static final String DONT_CACHE_LOCAL_FILE_CONF_KEY =
+      "wherobots.raster.outdb.dont.cache.local.file";
+  public static final int DEFAULT_READ_AHEAD_SIZE = 64 * 1024;
+
+  /**
+   * Create a HadoopImageInputStream for the given path.
+   *
+   * @param path the path to read from
+   * @param conf the Hadoop configuration
+   * @return a HadoopImageInputStream
+   * @throws IOException if failed to create the input stream
+   */
+  public static ImageInputStream create(Path path, Configuration conf) throws IOException {
+    Configuration tunedConf = new Configuration(conf);
+    String scheme = path.toUri().getScheme();
+
+    if ("s3a".equals(scheme)) {
+      tunedConf.set("fs.s3a.experimental.input.fadvise", "random");
     }
 
-    public static final String READ_AHEAD_SIZE_CONF_KEY = "wherobots.raster.outdb.readahead";
-    public static final String ENABLE_CACHE_CONF_KEY = "wherobots.raster.outdb.enablecache";
-    public static final String CACHE_DIR_CONF_KEY = "wherobots.raster.outdb.cache.dir";
-    public static final String DONT_CACHE_LOCAL_FILE_CONF_KEY = "wherobots.raster.outdb.dont.cache.local.file";
-    public static final int DEFAULT_READ_AHEAD_SIZE = 64 * 1024;
+    HadoopImageInputStream stream = new HadoopImageInputStream(path, tunedConf);
+    boolean isCached = tunedConf.getBoolean(ENABLE_CACHE_CONF_KEY, true);
+    if (!isCached) {
+      return stream;
+    }
 
-    /**
-     * Create a HadoopImageInputStream for the given path.
-     *
-     * @param path     the path to read from
-     * @param conf     the Hadoop configuration
-     * @return a HadoopImageInputStream
-     * @throws IOException if failed to create the input stream
-     */
-    public static ImageInputStream create(Path path, Configuration conf) throws IOException {
-        Configuration tunedConf = new Configuration(conf);
-        String scheme = path.toUri().getScheme();
+    boolean dontCacheLocalFile = tunedConf.getBoolean(DONT_CACHE_LOCAL_FILE_CONF_KEY, true);
+    FileSystem fs = path.getFileSystem(tunedConf);
+    if (dontCacheLocalFile && fs.getScheme().equals("file")) {
+      return stream;
+    }
 
+    String cacheDirString = tunedConf.get(CACHE_DIR_CONF_KEY, null);
+    File cacheDir = cacheDirString != null ? new File(cacheDirString) : null;
+
+    try {
+      int readAhead =
+          (int) tunedConf.getStorageSize(READ_AHEAD_SIZE_CONF_KEY, -1, StorageUnit.BYTES);
+      if (readAhead < 0) {
         if ("s3a".equals(scheme)) {
-            tunedConf.set("fs.s3a.experimental.input.fadvise", "random");
+          readAhead =
+              (int) tunedConf.getStorageSize("fs.s3a.readahead.range", -1, StorageUnit.BYTES);
         }
-
-        HadoopImageInputStream stream = new HadoopImageInputStream(path, tunedConf);
-        boolean isCached = tunedConf.getBoolean(ENABLE_CACHE_CONF_KEY, true);
-        if (!isCached) {
-            return stream;
-        }
-
-        boolean dontCacheLocalFile = tunedConf.getBoolean(DONT_CACHE_LOCAL_FILE_CONF_KEY, true);
-        FileSystem fs = path.getFileSystem(tunedConf);
-        if (dontCacheLocalFile && fs.getScheme().equals("file")) {
-            return stream;
-        }
-
-        String cacheDirString = tunedConf.get(CACHE_DIR_CONF_KEY, null);
-        File cacheDir = cacheDirString != null? new File(cacheDirString): null;
-
-        try {
-            int readAhead = (int) tunedConf.getStorageSize(READ_AHEAD_SIZE_CONF_KEY, -1,
-                    StorageUnit.BYTES);
-            if (readAhead < 0) {
-                if ("s3a".equals(scheme)) {
-                    readAhead = (int) tunedConf.getStorageSize("fs.s3a.readahead.range", -1,
-                            StorageUnit.BYTES);
-                }
-            }
-            if (readAhead < 0) {
-                readAhead = DEFAULT_READ_AHEAD_SIZE;
-            }
-            return new DiskCachedImageInputStream(stream, readAhead, cacheDir);
-        } catch (Exception e) {
-            stream.close();
-            throw e;
-        }
+      }
+      if (readAhead < 0) {
+        readAhead = DEFAULT_READ_AHEAD_SIZE;
+      }
+      return new DiskCachedImageInputStream(stream, readAhead, cacheDir);
+    } catch (Exception e) {
+      stream.close();
+      throw e;
     }
+  }
 }

@@ -28,37 +28,50 @@ import org.apache.spark.sql.sedona_sql.execution.SedonaBinaryExecNode
 import org.locationtech.jts.geom.Geometry
 
 /**
- * Distance joins requires matching geometries to be in the same partition, despite not necessarily overlapping.
- * To create an overlap and guarantee matching geometries end up in the same partition, the left geometry is expanded
- * before partitioning. It's the logical equivalent of:
+ * Distance joins requires matching geometries to be in the same partition, despite not
+ * necessarily overlapping. To create an overlap and guarantee matching geometries end up in the
+ * same partition, the left geometry is expanded before partitioning. It's the logical equivalent
+ * of:
  *
  * select * from a join b on ST_Distance(a.geom, b.geom) <= 1
  *
  * becomes
  *
- * select * from a join b on ST_Intersects(ST_Envelope(ST_Buffer(a.geom, 1)), b.geom) and ST_Distance(a.geom, b.geom) <= 1
+ * select * from a join b on ST_Intersects(ST_Envelope(ST_Buffer(a.geom, 1)), b.geom) and
+ * ST_Distance(a.geom, b.geom) <= 1
  *
- * @param left left side of the join
- * @param right right side of the join
- * @param leftShape expression for the first argument of spatialPredicate
- * @param rightShape expression for the second argument of spatialPredicate
- * @param distance - ST_Distance(left, right) <= distance. Distance can be literal or a computation over 'left' or 'right'.
- * @param distanceBoundToLeft whether distance expression references attributes from left relation or right relation
- * @param spatialPredicate spatial predicate as join condition
- * @param condition full join condition
- * @param extraCondition extra join condition other than spatialPredicate
+ * @param left
+ *   left side of the join
+ * @param right
+ *   right side of the join
+ * @param leftShape
+ *   expression for the first argument of spatialPredicate
+ * @param rightShape
+ *   expression for the second argument of spatialPredicate
+ * @param distance
+ *   \- ST_Distance(left, right) <= distance. Distance can be literal or a computation over 'left'
+ *   or 'right'.
+ * @param distanceBoundToLeft
+ *   whether distance expression references attributes from left relation or right relation
+ * @param spatialPredicate
+ *   spatial predicate as join condition
+ * @param condition
+ *   full join condition
+ * @param extraCondition
+ *   extra join condition other than spatialPredicate
  */
-case class DistanceJoinExec(left: SparkPlan,
-                            right: SparkPlan,
-                            leftShape: Expression,
-                            rightShape: Expression,
-                            distance: Expression,
-                            distanceBoundToLeft: Boolean,
-                            spatialPredicate: SpatialPredicate,
-                            isGeography: Boolean,
-                            condition: Expression,
-                            extraCondition: Option[Expression] = None)
-  extends SedonaBinaryExecNode
+case class DistanceJoinExec(
+    left: SparkPlan,
+    right: SparkPlan,
+    leftShape: Expression,
+    rightShape: Expression,
+    distance: Expression,
+    distanceBoundToLeft: Boolean,
+    spatialPredicate: SpatialPredicate,
+    isGeography: Boolean,
+    condition: Expression,
+    extraCondition: Option[Expression] = None)
+    extends SedonaBinaryExecNode
     with TraitAdvancedJoinQueryExec
     with Logging {
 
@@ -68,18 +81,21 @@ case class DistanceJoinExec(left: SparkPlan,
     BindReferences.bindReference(distance, right.output)
   }
 
-  override def toSpatialRddPair(leftRdd: RDD[UnsafeRow],
-                                leftShapeExpr: Expression,
-                                rightRdd: RDD[UnsafeRow],
-                                rightShapeExpr: Expression): (SpatialRDD[Geometry], SpatialRDD[Geometry]) = {
+  override def toSpatialRddPair(
+      leftRdd: RDD[UnsafeRow],
+      leftShapeExpr: Expression,
+      rightRdd: RDD[UnsafeRow],
+      rightShapeExpr: Expression): (SpatialRDD[Geometry], SpatialRDD[Geometry]) = {
     if (isRasterJoin(leftShapeExpr, rightShapeExpr)) {
       throw new UnsupportedOperationException("Raster join is not supported by DistanceJoinExec.")
     }
     (leftToSpatialRDD(leftRdd, leftShapeExpr), rightToSpatialRDD(rightRdd, rightShapeExpr))
   }
 
-  override def leftToSpatialRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression,
-    projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
+  override def leftToSpatialRDD(
+      rdd: RDD[UnsafeRow],
+      shapeExpression: Expression,
+      projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
     if (distanceBoundToLeft) {
       toExpandedEnvelopeRDD(rdd, shapeExpression, boundRadius, isGeography, projection)
     } else {
@@ -87,8 +103,10 @@ case class DistanceJoinExec(left: SparkPlan,
     }
   }
 
-  override def rightToSpatialRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression,
-    projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
+  override def rightToSpatialRDD(
+      rdd: RDD[UnsafeRow],
+      shapeExpression: Expression,
+      projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
     if (distanceBoundToLeft) {
       toSpatialRDD(rdd, shapeExpression, projection)
     } else {

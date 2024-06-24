@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core
 
 import org.apache.sedona.common.enums.FileDataSplitter
@@ -37,7 +36,14 @@ class KnnJoinQueryTest extends TestBaseScala {
 
   val testRootPath: String = System.getProperty("user.dir") + "/src/test/resources/knn/"
 
-  case class KnnTestCase(id: Int, desc: String, p: Int, k: Int, objectLocation: String, queryLocation: String, resultLocation: String)
+  case class KnnTestCase(
+      id: Int,
+      desc: String,
+      p: Int,
+      k: Int,
+      objectLocation: String,
+      queryLocation: String,
+      resultLocation: String)
 
   // Function to read and parse the external file
   def readKnnTestCases(filePath: String): Seq[KnnTestCase] = {
@@ -45,10 +51,19 @@ class KnnJoinQueryTest extends TestBaseScala {
       source.getLines().drop(1).toList
     }
     lines match {
-      case scala.util.Success(l) => l.map { line =>
-        val Array(id, desc, p, k, objectLocation, queryLocation, resultLocation) = line.split(",")
-        KnnTestCase(id.toInt, desc, p.toInt, k.toInt, objectLocation, queryLocation, resultLocation)
-      }
+      case scala.util.Success(l) =>
+        l.map { line =>
+          val Array(id, desc, p, k, objectLocation, queryLocation, resultLocation) =
+            line.split(",")
+          KnnTestCase(
+            id.toInt,
+            desc,
+            p.toInt,
+            k.toInt,
+            objectLocation,
+            queryLocation,
+            resultLocation)
+        }
       case scala.util.Failure(exception) =>
         println(s"Error reading file: ${exception.getMessage}")
         Seq.empty
@@ -60,32 +75,48 @@ class KnnJoinQueryTest extends TestBaseScala {
 
   val knnTestCases: TableFor7[Int, String, Int, Int, String, String, String] = Table(
     ("id", "desc", "p", "k", "objectLocation", "queryLocation", "resultLocation"),
-    knnTestCasesList.map(tc => (tc.id, tc.desc, tc.p, tc.k, tc.objectLocation, tc.queryLocation, tc.resultLocation)): _*
-  )
+    knnTestCasesList.map(tc =>
+      (tc.id, tc.desc, tc.p, tc.k, tc.objectLocation, tc.queryLocation, tc.resultLocation)): _*)
 
-  forAll(knnTestCases) { (id: Int, desc: String, p: Int, k: Int, objectLocation: String, queryLocation: String, resultLocation: String) =>
-    it(s"$id - $desc: p=$p, k=$k") {
-      val objectRDD = new PointRDD(sc, testRootPath + objectLocation, 0, FileDataSplitter.CSV, true, p)
-      val queryRDD = new PointRDD(sc, testRootPath + queryLocation, 0, FileDataSplitter.CSV, true, p)
+  forAll(knnTestCases) {
+    (
+        id: Int,
+        desc: String,
+        p: Int,
+        k: Int,
+        objectLocation: String,
+        queryLocation: String,
+        resultLocation: String) =>
+      it(s"$id - $desc: p=$p, k=$k") {
+        val objectRDD =
+          new PointRDD(sc, testRootPath + objectLocation, 0, FileDataSplitter.CSV, true, p)
+        val queryRDD =
+          new PointRDD(sc, testRootPath + queryLocation, 0, FileDataSplitter.CSV, true, p)
 
-      objectRDD.setNeighborSampleNumber(k)
-      objectRDD.spatialPartitioning(GridType.ZORDER)
-      queryRDD.spatialPartitioning(objectRDD.getPartitioner.asInstanceOf[ZOrderPartitioner].nonOverlappedPartitioner())
+        objectRDD.setNeighborSampleNumber(k)
+        objectRDD.spatialPartitioning(GridType.ZORDER)
+        queryRDD.spatialPartitioning(
+          objectRDD.getPartitioner.asInstanceOf[ZOrderPartitioner].nonOverlappedPartitioner())
 
-      objectRDD.buildIndex(IndexType.RTREE, true)
-      queryRDD.buildIndex(IndexType.RTREE, true)
+        objectRDD.buildIndex(IndexType.RTREE, true)
+        queryRDD.buildIndex(IndexType.RTREE, true)
 
-      val knnOutputs = JoinQuery.KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, k, DistanceMetric.EUCLIDEAN).collect().asScala.toList
-      val output = knnOutputs.map { case (queryPoint, neighbors) =>
-        val neighborsString = neighbors.asScala.mkString(",")
-        s"$queryPoint,$neighborsString\n"
-      }.mkString
+        val knnOutputs = JoinQuery
+          .KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, k, DistanceMetric.EUCLIDEAN)
+          .collect()
+          .asScala
+          .toList
+        val output = knnOutputs.map { case (queryPoint, neighbors) =>
+          val neighborsString = neighbors.asScala.mkString(",")
+          s"$queryPoint,$neighborsString\n"
+        }.mkString
 
-      val expectedOutput = new String(Files.readAllBytes(Paths.get(testRootPath + resultLocation)))
-      print(output)
-      assert(expectedOutput == output)
+        val expectedOutput =
+          new String(Files.readAllBytes(Paths.get(testRootPath + resultLocation)))
+        print(output)
+        assert(expectedOutput == output)
 
-      //java.lang.Thread.sleep(100*1000) // for debugging
-    }
+        // java.lang.Thread.sleep(100*1000) // for debugging
+      }
   }
 }

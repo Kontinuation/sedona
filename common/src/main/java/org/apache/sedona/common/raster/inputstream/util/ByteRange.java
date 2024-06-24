@@ -27,58 +27,62 @@ import java.util.Objects;
  */
 public class ByteRange {
 
-    public long inclusiveStart;
-    public long exclusiveEnd;
+  public long inclusiveStart;
+  public long exclusiveEnd;
 
-    public ByteRange(long inclusiveStart, long exclusiveEnd) {
-        if (inclusiveStart >= exclusiveEnd) {
-            throw new IllegalArgumentException("ByteRange inclusiveStart >= exclusiveEnd");
-        }
-        this.inclusiveStart = inclusiveStart;
-        this.exclusiveEnd = exclusiveEnd;
+  public ByteRange(long inclusiveStart, long exclusiveEnd) {
+    if (inclusiveStart >= exclusiveEnd) {
+      throw new IllegalArgumentException("ByteRange inclusiveStart >= exclusiveEnd");
     }
+    this.inclusiveStart = inclusiveStart;
+    this.exclusiveEnd = exclusiveEnd;
+  }
 
-    public boolean contains(long pos) {
-        return pos >= inclusiveStart && pos < exclusiveEnd;
-    }
+  public boolean contains(long pos) {
+    return pos >= inclusiveStart && pos < exclusiveEnd;
+  }
 
-    public boolean containsOrAdjacent(long pos) {
-        return pos >= inclusiveStart && pos <= exclusiveEnd;
-    }
+  public boolean containsOrAdjacent(long pos) {
+    return pos >= inclusiveStart && pos <= exclusiveEnd;
+  }
 
-    public boolean contains(ByteRange other) {
-        return other.inclusiveStart >= inclusiveStart && other.exclusiveEnd <= exclusiveEnd;
-    }
+  public boolean contains(ByteRange other) {
+    return other.inclusiveStart >= inclusiveStart && other.exclusiveEnd <= exclusiveEnd;
+  }
 
-    public boolean overlaps(ByteRange other) {
-        return contains(other.inclusiveStart) || contains(other.exclusiveEnd - 1) ||
-                other.contains(inclusiveStart) || other.contains(exclusiveEnd - 1);
-    }
+  public boolean overlaps(ByteRange other) {
+    return contains(other.inclusiveStart)
+        || contains(other.exclusiveEnd - 1)
+        || other.contains(inclusiveStart)
+        || other.contains(exclusiveEnd - 1);
+  }
 
-    public boolean overlapsOrAdjacent(ByteRange other) {
-        return containsOrAdjacent(other.inclusiveStart) || containsOrAdjacent(other.exclusiveEnd) ||
-                other.containsOrAdjacent(inclusiveStart) || other.containsOrAdjacent(exclusiveEnd);
-    }
+  public boolean overlapsOrAdjacent(ByteRange other) {
+    return containsOrAdjacent(other.inclusiveStart)
+        || containsOrAdjacent(other.exclusiveEnd)
+        || other.containsOrAdjacent(inclusiveStart)
+        || other.containsOrAdjacent(exclusiveEnd);
+  }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
-        ByteRange byteRange = (ByteRange) o;
-        return inclusiveStart == byteRange.inclusiveStart && exclusiveEnd == byteRange.exclusiveEnd;
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
     }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    ByteRange byteRange = (ByteRange) o;
+    return inclusiveStart == byteRange.inclusiveStart && exclusiveEnd == byteRange.exclusiveEnd;
+  }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(inclusiveStart, exclusiveEnd);
-    }
+  @Override
+  public int hashCode() {
+    return Objects.hash(inclusiveStart, exclusiveEnd);
+  }
 
-    @Override
-    public String toString() {
-        return String.format("[%d, %d)", inclusiveStart, exclusiveEnd);
-    }
+  @Override
+  public String toString() {
+    return String.format("[%d, %d)", inclusiveStart, exclusiveEnd);
+  }
 }

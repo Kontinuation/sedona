@@ -28,7 +28,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
 import java.util.Random;
-
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -42,162 +41,161 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 public class HadoopImageInputStreamTest {
-    @Rule
-    public TemporaryFolder temp = new TemporaryFolder();
+  @Rule public TemporaryFolder temp = new TemporaryFolder();
 
-    private static final int TEST_FILE_SIZE = 1000;
-    private final Random random = new Random();
-    private File testFile;
+  private static final int TEST_FILE_SIZE = 1000;
+  private final Random random = new Random();
+  private File testFile;
 
-    @Before
-    public void setup() throws IOException {
-        testFile = temp.newFile();
-        prepareTestData(testFile);
+  @Before
+  public void setup() throws IOException {
+    testFile = temp.newFile();
+    prepareTestData(testFile);
+  }
+
+  @Test
+  public void testReadSequentially() throws IOException {
+    Path path = new Path(testFile.getPath());
+    try (HadoopImageInputStream stream = new HadoopImageInputStream(path);
+        InputStream in = new BufferedInputStream(new FileInputStream(testFile))) {
+      byte[] bActual = new byte[8];
+      byte[] bExpected = new byte[bActual.length];
+      while (true) {
+        int len = random.nextInt(bActual.length + 1);
+        int lenActual = stream.read(bActual, 0, len);
+        int lenExpected = in.read(bExpected, 0, len);
+        Assert.assertEquals(lenExpected, lenActual);
+        if (lenActual < 0) {
+          break;
+        }
+        Assert.assertArrayEquals(bExpected, bActual);
+      }
+    }
+  }
+
+  @Test
+  public void testReadRandomly() throws IOException {
+    Path path = new Path(testFile.getPath());
+    try (HadoopImageInputStream stream = new HadoopImageInputStream(path);
+        RandomAccessFile raf = new RandomAccessFile(testFile, "r")) {
+      byte[] bActual = new byte[8];
+      byte[] bExpected = new byte[bActual.length];
+      for (int k = 0; k < 1000; k++) {
+        int offset = random.nextInt(TEST_FILE_SIZE + 1);
+        int len = random.nextInt(bActual.length + 1);
+        stream.seek(offset);
+        raf.seek(offset);
+        int lenActual = stream.read(bActual, 0, len);
+        int lenExpected = raf.read(bExpected, 0, len);
+        Assert.assertEquals(lenExpected, lenActual);
+        if (lenActual < 0) {
+          continue;
+        }
+        Assert.assertArrayEquals(bExpected, bActual);
+      }
+
+      // Test seek to EOF.
+      stream.seek(TEST_FILE_SIZE);
+      int len = stream.read(bActual, 0, bActual.length);
+      Assert.assertEquals(-1, len);
+    }
+  }
+
+  @Test
+  public void testFromUnstableStream() throws IOException {
+    Path path = new Path(testFile.getPath());
+    FileSystem fs = path.getFileSystem(new Configuration());
+    try (FSDataInputStream unstable = new UnstableFSDataInputStream(fs.open(path));
+        HadoopImageInputStream stream = new HadoopImageInputStream(unstable);
+        InputStream in = new BufferedInputStream(new FileInputStream(testFile))) {
+      byte[] bActual = new byte[8];
+      byte[] bExpected = new byte[bActual.length];
+      while (true) {
+        int len = random.nextInt(bActual.length);
+        int lenActual = stream.read(bActual, 0, len);
+        int lenExpected = in.read(bExpected, 0, len);
+        Assert.assertEquals(lenExpected, lenActual);
+        if (lenActual < 0) {
+          break;
+        }
+        Assert.assertArrayEquals(bExpected, bActual);
+      }
+    }
+  }
+
+  private void prepareTestData(File testFile) throws IOException {
+    try (OutputStream out = new BufferedOutputStream(new FileOutputStream(testFile))) {
+      for (int k = 0; k < TEST_FILE_SIZE; k++) {
+        out.write(random.nextInt());
+      }
+    }
+  }
+
+  /**
+   * An FSDataInputStream that sometimes return less data than requested when calling read(byte[],
+   * int, int).
+   */
+  private static class UnstableFSDataInputStream extends FSDataInputStream {
+    public UnstableFSDataInputStream(FSDataInputStream in) {
+      super(new UnstableInputStream(in.getWrappedStream()));
     }
 
-    @Test
-    public void testReadSequentially() throws IOException {
-        Path path = new Path(testFile.getPath());
-        try (HadoopImageInputStream stream = new HadoopImageInputStream(path);
-             InputStream in = new BufferedInputStream(new FileInputStream(testFile))) {
-            byte[] bActual = new byte[8];
-            byte[] bExpected = new byte[bActual.length];
-            while (true) {
-                int len = random.nextInt(bActual.length + 1);
-                int lenActual = stream.read(bActual, 0, len);
-                int lenExpected = in.read(bExpected, 0, len);
-                Assert.assertEquals(lenExpected, lenActual);
-                if (lenActual < 0) {
-                    break;
-                }
-                Assert.assertArrayEquals(bExpected, bActual);
-            }
-        }
+    private static class UnstableInputStream extends InputStream
+        implements Seekable, PositionedReadable {
+      private final InputStream wrapped;
+      private final Random random = new Random();
+
+      UnstableInputStream(InputStream in) {
+        wrapped = in;
+      }
+
+      @Override
+      public void close() throws IOException {
+        wrapped.close();
+      }
+
+      @Override
+      public int read() throws IOException {
+        return wrapped.read();
+      }
+
+      @Override
+      public int read(byte[] b, int off, int len) throws IOException {
+        // Make this read unstable, i.e. sometimes return less data than requested.
+        int unstableLen = random.nextInt(len + 1);
+        return wrapped.read(b, off, unstableLen);
+      }
+
+      @Override
+      public void seek(long pos) throws IOException {
+        ((Seekable) wrapped).seek(pos);
+      }
+
+      @Override
+      public long getPos() throws IOException {
+        return ((Seekable) wrapped).getPos();
+      }
+
+      @Override
+      public boolean seekToNewSource(long targetPos) throws IOException {
+        return ((Seekable) wrapped).seekToNewSource(targetPos);
+      }
+
+      @Override
+      public int read(long position, byte[] buffer, int offset, int length) throws IOException {
+        return ((PositionedReadable) wrapped).read(position, buffer, offset, length);
+      }
+
+      @Override
+      public void readFully(long position, byte[] buffer, int offset, int length)
+          throws IOException {
+        ((PositionedReadable) wrapped).readFully(position, buffer, offset, length);
+      }
+
+      @Override
+      public void readFully(long position, byte[] buffer) throws IOException {
+        ((PositionedReadable) wrapped).readFully(position, buffer);
+      }
     }
-
-    @Test
-    public void testReadRandomly() throws IOException {
-        Path path = new Path(testFile.getPath());
-        try (HadoopImageInputStream stream = new HadoopImageInputStream(path);
-             RandomAccessFile raf = new RandomAccessFile(testFile, "r")) {
-            byte[] bActual = new byte[8];
-            byte[] bExpected = new byte[bActual.length];
-            for (int k = 0; k < 1000; k++) {
-                int offset = random.nextInt(TEST_FILE_SIZE + 1);
-                int len = random.nextInt(bActual.length + 1);
-                stream.seek(offset);
-                raf.seek(offset);
-                int lenActual = stream.read(bActual, 0, len);
-                int lenExpected = raf.read(bExpected, 0, len);
-                Assert.assertEquals(lenExpected, lenActual);
-                if (lenActual < 0) {
-                    continue;
-                }
-                Assert.assertArrayEquals(bExpected, bActual);
-            }
-
-            // Test seek to EOF.
-            stream.seek(TEST_FILE_SIZE);
-            int len = stream.read(bActual, 0, bActual.length);
-            Assert.assertEquals(-1, len);
-        }
-    }
-
-    @Test
-    public void testFromUnstableStream() throws IOException {
-        Path path = new Path(testFile.getPath());
-        FileSystem fs = path.getFileSystem(new Configuration());
-        try (FSDataInputStream unstable = new UnstableFSDataInputStream(fs.open(path));
-             HadoopImageInputStream stream = new HadoopImageInputStream(unstable);
-             InputStream in = new BufferedInputStream(new FileInputStream(testFile))) {
-            byte[] bActual = new byte[8];
-            byte[] bExpected = new byte[bActual.length];
-            while (true) {
-                int len = random.nextInt(bActual.length);
-                int lenActual = stream.read(bActual, 0, len);
-                int lenExpected = in.read(bExpected, 0, len);
-                Assert.assertEquals(lenExpected, lenActual);
-                if (lenActual < 0) {
-                    break;
-                }
-                Assert.assertArrayEquals(bExpected, bActual);
-            }
-        }
-    }
-
-    private void prepareTestData(File testFile) throws IOException {
-        try (OutputStream out = new BufferedOutputStream(new FileOutputStream(testFile))) {
-            for (int k = 0; k < TEST_FILE_SIZE; k++) {
-                out.write(random.nextInt());
-            }
-        }
-    }
-
-    /**
-     * An FSDataInputStream that sometimes return less data than requested when calling
-     * read(byte[], int, int).
-     */
-    private static class UnstableFSDataInputStream extends FSDataInputStream {
-        public UnstableFSDataInputStream(FSDataInputStream in) {
-            super(new UnstableInputStream(in.getWrappedStream()));
-        }
-
-        private static class UnstableInputStream extends InputStream implements Seekable,
-                PositionedReadable {
-            private final InputStream wrapped;
-            private final Random random = new Random();
-
-            UnstableInputStream(InputStream in) {
-                wrapped = in;
-            }
-
-            @Override
-            public void close() throws IOException {
-                wrapped.close();
-            }
-
-            @Override
-            public int read() throws IOException {
-                return wrapped.read();
-            }
-
-            @Override
-            public int read(byte[] b, int off, int len) throws IOException {
-                // Make this read unstable, i.e. sometimes return less data than requested.
-                int unstableLen = random.nextInt(len + 1);
-                return wrapped.read(b, off, unstableLen);
-            }
-
-            @Override
-            public void seek(long pos) throws IOException {
-                ((Seekable) wrapped).seek(pos);
-            }
-
-            @Override
-            public long getPos() throws IOException {
-                return ((Seekable) wrapped).getPos();
-            }
-
-            @Override
-            public boolean seekToNewSource(long targetPos) throws IOException {
-                return ((Seekable) wrapped).seekToNewSource(targetPos);
-            }
-
-            @Override
-            public int read(long position, byte[] buffer, int offset, int length) throws IOException {
-                return ((PositionedReadable) wrapped).read(position, buffer, offset, length);
-            }
-
-            @Override
-            public void readFully(long position, byte[] buffer, int offset, int length)
-                    throws IOException {
-                ((PositionedReadable) wrapped).readFully(position, buffer, offset, length);
-            }
-
-            @Override
-            public void readFully(long position, byte[] buffer) throws IOException {
-                ((PositionedReadable) wrapped).readFully(position, buffer);
-            }
-        }
-    }
+  }
 }

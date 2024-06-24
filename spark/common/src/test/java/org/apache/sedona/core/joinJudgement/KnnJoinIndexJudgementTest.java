@@ -16,9 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.joinJudgement;
 
+import static org.junit.Assert.*;
+
+import java.util.*;
 import org.apache.commons.collections.iterators.SingletonIterator;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.core.enums.DistanceMetric;
@@ -29,137 +31,148 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.index.strtree.STRtree;
-
-import java.util.*;
-
 import org.mockito.Mockito;
-
-import static org.junit.Assert.*;
 
 public class KnnJoinIndexJudgementTest {
 
-    private KnnJoinIndexJudgement<Geometry, Geometry> judgement;
-    private LongAccumulator buildCount;
-    private LongAccumulator streamCount;
-    private LongAccumulator resultCount;
-    private LongAccumulator candidateCount;
-    private GeometryFactory factory;
+  private KnnJoinIndexJudgement<Geometry, Geometry> judgement;
+  private LongAccumulator buildCount;
+  private LongAccumulator streamCount;
+  private LongAccumulator resultCount;
+  private LongAccumulator candidateCount;
+  private GeometryFactory factory;
 
-    @Before
-    public void setUp() {
-        buildCount = Mockito.mock(LongAccumulator.class);
-        streamCount = Mockito.mock(LongAccumulator.class);
-        resultCount = Mockito.mock(LongAccumulator.class);
-        candidateCount = Mockito.mock(LongAccumulator.class);
-        factory = new GeometryFactory();
-        judgement = new KnnJoinIndexJudgement<>(5, DistanceMetric.EUCLIDEAN, buildCount, streamCount, resultCount, candidateCount);
+  @Before
+  public void setUp() {
+    buildCount = Mockito.mock(LongAccumulator.class);
+    streamCount = Mockito.mock(LongAccumulator.class);
+    resultCount = Mockito.mock(LongAccumulator.class);
+    candidateCount = Mockito.mock(LongAccumulator.class);
+    factory = new GeometryFactory();
+    judgement =
+        new KnnJoinIndexJudgement<>(
+            5, DistanceMetric.EUCLIDEAN, buildCount, streamCount, resultCount, candidateCount);
+  }
+
+  @Test
+  public void testCallWithEmptyIterators() throws Exception {
+    Iterator<Pair<Geometry, Geometry>> resultIterator =
+        judgement.call(Collections.emptyIterator(), Collections.emptyIterator());
+    assertFalse(resultIterator.hasNext());
+  }
+
+  @Test
+  public void testCallWithNonEmptyIterators() throws Exception {
+    // Create an STRtree spatial index
+    STRtree strTree = new STRtree();
+
+    // Insert multiple points into the spatial index
+    strTree.insert(
+        factory.createPoint(new Coordinate(0, 0)).getEnvelopeInternal(),
+        factory.createPoint(new Coordinate(0, 0)));
+    strTree.insert(
+        factory.createPoint(new Coordinate(1, 1)).getEnvelopeInternal(),
+        factory.createPoint(new Coordinate(1, 1)));
+    strTree.insert(
+        factory.createPoint(new Coordinate(2, 2)).getEnvelopeInternal(),
+        factory.createPoint(new Coordinate(2, 2)));
+    strTree.insert(
+        factory.createPoint(new Coordinate(3, 3)).getEnvelopeInternal(),
+        factory.createPoint(new Coordinate(3, 3)));
+    strTree.insert(
+        factory.createPoint(new Coordinate(4, 4)).getEnvelopeInternal(),
+        factory.createPoint(new Coordinate(4, 4)));
+
+    // Create a test point
+    Geometry testPoint = factory.createPoint(new Coordinate(0, 0));
+
+    // Perform a KNN search using the test point
+    Iterator<Pair<Geometry, Geometry>> resultIterator =
+        judgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
+
+    // Assert that there are results
+    assertTrue(resultIterator.hasNext());
+
+    // Assert that the results are correct
+    for (int i = 0; i < 5; i++) {
+      Pair<Geometry, Geometry> pair = resultIterator.next();
+      assertEquals(testPoint, pair.getKey());
+      assertEquals(factory.createPoint(new Coordinate(i, i)), pair.getValue());
     }
 
-    @Test
-    public void testCallWithEmptyIterators() throws Exception {
-        Iterator<Pair<Geometry, Geometry>> resultIterator =
-                judgement.call(Collections.emptyIterator(), Collections.emptyIterator());
-        assertFalse(resultIterator.hasNext());
+    // Assert that there are no more results
+    assertFalse(resultIterator.hasNext());
+  }
+
+  @Test
+  public void testCallWithRandomSpatialIndexData() throws Exception {
+    // Create an STRtree spatial index
+    STRtree strTree = new STRtree();
+
+    // Create a Random object
+    Random random = new Random();
+
+    // Insert multiple random points into the spatial index
+    for (int i = 0; i < 100; i++) {
+      double x = random.nextDouble() * 10; // generate random x-coordinate within range [0, 10)
+      double y = random.nextDouble() * 10; // generate random y-coordinate within range [0, 10)
+      Geometry point = factory.createPoint(new Coordinate(x, y));
+      strTree.insert(point.getEnvelopeInternal(), point);
     }
 
-    @Test
-    public void testCallWithNonEmptyIterators() throws Exception {
-        // Create an STRtree spatial index
-        STRtree strTree = new STRtree();
-
-        // Insert multiple points into the spatial index
-        strTree.insert(factory.createPoint(new Coordinate(0, 0)).getEnvelopeInternal(), factory.createPoint(new Coordinate(0, 0)));
-        strTree.insert(factory.createPoint(new Coordinate(1, 1)).getEnvelopeInternal(), factory.createPoint(new Coordinate(1, 1)));
-        strTree.insert(factory.createPoint(new Coordinate(2, 2)).getEnvelopeInternal(), factory.createPoint(new Coordinate(2, 2)));
-        strTree.insert(factory.createPoint(new Coordinate(3, 3)).getEnvelopeInternal(), factory.createPoint(new Coordinate(3, 3)));
-        strTree.insert(factory.createPoint(new Coordinate(4, 4)).getEnvelopeInternal(), factory.createPoint(new Coordinate(4, 4)));
-
-        // Create a test point
-        Geometry testPoint = factory.createPoint(new Coordinate(0, 0));
-
-        // Perform a KNN search using the test point
-        Iterator<Pair<Geometry, Geometry>> resultIterator =
-                judgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
-
-        // Assert that there are results
-        assertTrue(resultIterator.hasNext());
-
-        // Assert that the results are correct
-        for (int i = 0; i < 5; i++) {
-            Pair<Geometry, Geometry> pair = resultIterator.next();
-            assertEquals(testPoint, pair.getKey());
-            assertEquals(factory.createPoint(new Coordinate(i, i)), pair.getValue());
-        }
-
-        // Assert that there are no more results
-        assertFalse(resultIterator.hasNext());
+    // Create a list of test points
+    List<Geometry> testPoints = new ArrayList<>();
+    for (int i = 0; i < 10; i++) {
+      double x = random.nextDouble() * 10; // generate random x-coordinate within range [0, 10)
+      double y = random.nextDouble() * 10; // generate random y-coordinate within range [0, 10)
+      testPoints.add(factory.createPoint(new Coordinate(x, y)));
     }
 
-    @Test
-    public void testCallWithRandomSpatialIndexData() throws Exception {
-        // Create an STRtree spatial index
-        STRtree strTree = new STRtree();
+    // Perform a KNN search using each test point
+    for (Geometry testPoint : testPoints) {
+      Iterator<Pair<Geometry, Geometry>> resultIterator =
+          judgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
 
-        // Create a Random object
-        Random random = new Random();
+      // Assert that there are results
+      assertTrue(resultIterator.hasNext());
 
-        // Insert multiple random points into the spatial index
-        for (int i = 0; i < 100; i++) {
-            double x = random.nextDouble() * 10; // generate random x-coordinate within range [0, 10)
-            double y = random.nextDouble() * 10; // generate random y-coordinate within range [0, 10)
-            Geometry point = factory.createPoint(new Coordinate(x, y));
-            strTree.insert(point.getEnvelopeInternal(), point);
-        }
+      // Assert that the results are correct
+      while (resultIterator.hasNext()) {
+        Pair<Geometry, Geometry> pair = resultIterator.next();
+        assertEquals(testPoint, pair.getKey());
+        assertTrue(pair.getValue() instanceof Geometry);
+      }
 
-        // Create a list of test points
-        List<Geometry> testPoints = new ArrayList<>();
-        for (int i = 0; i < 10; i++) {
-            double x = random.nextDouble() * 10; // generate random x-coordinate within range [0, 10)
-            double y = random.nextDouble() * 10; // generate random y-coordinate within range [0, 10)
-            testPoints.add(factory.createPoint(new Coordinate(x, y)));
-        }
+      // Assert that there are no more results
+      assertFalse(resultIterator.hasNext());
+    }
+  }
 
-        // Perform a KNN search using each test point
-        for (Geometry testPoint : testPoints) {
-            Iterator<Pair<Geometry, Geometry>> resultIterator =
-                    judgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
+  @Test
+  public void testCase1() throws Exception {
+    // Create an STRtree spatial index
+    STRtree strTree = new STRtree();
 
-            // Assert that there are results
-            assertTrue(resultIterator.hasNext());
-
-            // Assert that the results are correct
-            while (resultIterator.hasNext()) {
-                Pair<Geometry, Geometry> pair = resultIterator.next();
-                assertEquals(testPoint, pair.getKey());
-                assertTrue(pair.getValue() instanceof Geometry);
-            }
-
-            // Assert that there are no more results
-            assertFalse(resultIterator.hasNext());
-        }
+    KnnJoinIndexJudgement thisJudgement =
+        new KnnJoinIndexJudgement<>(
+            4, DistanceMetric.EUCLIDEAN, buildCount, streamCount, resultCount, candidateCount);
+    // Points forming a grid
+    for (int i = 0; i <= 7; i++) {
+      for (int j = 0; j <= 4; j++) {
+        strTree.insert(
+            factory.createPoint(new Coordinate(i, j)).getEnvelopeInternal(),
+            factory.createPoint(new Coordinate(i, j)));
+      }
     }
 
-    @Test
-    public void testCase1() throws Exception {
-        // Create an STRtree spatial index
-        STRtree strTree = new STRtree();
+    // Create a test point
+    Geometry testPoint = factory.createPoint(new Coordinate(3.3, 4.4));
 
-        KnnJoinIndexJudgement thisJudgement = new KnnJoinIndexJudgement<>(4, DistanceMetric.EUCLIDEAN, buildCount, streamCount, resultCount, candidateCount);
-        // Points forming a grid
-        for (int i = 0; i <= 7; i++) {
-            for (int j = 0; j <= 4; j++) {
-                strTree.insert(factory.createPoint(new Coordinate(i, j)).getEnvelopeInternal(), factory.createPoint(new Coordinate(i, j)));
-            }
-        }
+    // Perform a KNN search using the test point
+    Iterator<Pair<Geometry, Geometry>> resultIterator =
+        thisJudgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
 
-        // Create a test point
-        Geometry testPoint = factory.createPoint(new Coordinate(3.3, 4.4));
-
-        // Perform a KNN search using the test point
-        Iterator<Pair<Geometry, Geometry>> resultIterator =
-                thisJudgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
-
-        // Assert that there are results
-        assertTrue(resultIterator.hasNext());
-    }
+    // Assert that there are results
+    assertTrue(resultIterator.hasNext());
+  }
 }

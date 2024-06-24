@@ -16,55 +16,54 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
 
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-
 public class ZOrderPartitioner extends SpatialPartitioner {
-    private final IntervalTree intervalTree;
+  private final IntervalTree intervalTree;
 
-    protected ZOrderPartitioner(IntervalTree intervalTree) {
-        // ZOrderPartitioner does not have grids
-        // It has ranges instead
-        super(GridType.ZORDER);
-        this.intervalTree = intervalTree;
-    }
+  protected ZOrderPartitioner(IntervalTree intervalTree) {
+    // ZOrderPartitioner does not have grids
+    // It has ranges instead
+    super(GridType.ZORDER);
+    this.intervalTree = intervalTree;
+  }
 
-    /**
-     * Get a new partitioner with non-overlapped range.
-     * @return
-     */
-    public ZOrderPartitioner nonOverlappedPartitioner() {
-        IntervalTree nonOverlappedTree = new IntervalTree(intervalTree, true);
-        return new ZOrderPartitioner(nonOverlappedTree);
-    }
+  /**
+   * Get a new partitioner with non-overlapped range.
+   *
+   * @return
+   */
+  public ZOrderPartitioner nonOverlappedPartitioner() {
+    IntervalTree nonOverlappedTree = new IntervalTree(intervalTree, true);
+    return new ZOrderPartitioner(nonOverlappedTree);
+  }
 
-    @Override
-    public Iterator<Tuple2<Integer, Geometry>> placeObject(Geometry spatialObject) {
-        return intervalTree.placeObject(spatialObject);
-    }
+  @Override
+  public Iterator<Tuple2<Integer, Geometry>> placeObject(Geometry spatialObject) {
+    return intervalTree.placeObject(spatialObject);
+  }
 
-    @Override
-    public DedupParams getDedupParams() {
-        return new DedupParams(getGrids());
-    }
+  @Override
+  public DedupParams getDedupParams() {
+    return new DedupParams(getGrids());
+  }
 
-    @Override
-    public List<Envelope> getGrids() {
-        return Collections.emptyList();
-    }
+  @Override
+  public List<Envelope> getGrids() {
+    return Collections.emptyList();
+  }
 
-    @Override
-    public int numPartitions() {
-        return intervalTree.getPartitionNum();
-    }
+  @Override
+  public int numPartitions() {
+    return intervalTree.getPartitionNum();
+  }
 }

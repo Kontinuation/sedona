@@ -24,16 +24,18 @@ import org.apache.sedona.common.raster.outdb.ThreadLocalOutDbResourcePool
 import org.apache.spark.SparkConf
 
 /**
- * We need to call some package-private functions in SparkHadoopUtil to retrieve
- * Hadoop Configuration from SparkConf, so we need this util as an indirection.
+ * We need to call some package-private functions in SparkHadoopUtil to retrieve Hadoop
+ * Configuration from SparkConf, so we need this util as an indirection.
  */
 object SparkHadoopUtil {
 
   /**
    * Create a new Hadoop Configuration based on the given SparkConf. This will also add the
    * wherobots specific configurations to the Hadoop configuration.
-   * @param sparkConf SparkConf
-   * @return Hadoop Configuration
+   * @param sparkConf
+   *   SparkConf
+   * @return
+   *   Hadoop Configuration
    */
   def newConfiguration(sparkConf: SparkConf): Configuration = {
     val hadoopConf = org.apache.spark.deploy.SparkHadoopUtil.get.newConfiguration(sparkConf)
@@ -51,6 +53,5 @@ object SparkHadoopUtil {
     HadoopImageInputStreamFactory.READ_AHEAD_SIZE_CONF_KEY,
     HadoopImageInputStreamFactory.ENABLE_CACHE_CONF_KEY,
     HadoopImageInputStreamFactory.CACHE_DIR_CONF_KEY,
-    HadoopImageInputStreamFactory.DONT_CACHE_LOCAL_FILE_CONF_KEY
-  )
+    HadoopImageInputStreamFactory.DONT_CACHE_LOCAL_FILE_CONF_KEY)
 }

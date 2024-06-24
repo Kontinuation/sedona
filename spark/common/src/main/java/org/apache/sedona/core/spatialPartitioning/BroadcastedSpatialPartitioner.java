@@ -18,56 +18,57 @@
  */
 package org.apache.sedona.core.spatialPartitioning;
 
+import java.util.Iterator;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.apache.spark.broadcast.Broadcast;
-import javax.annotation.Nullable;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
-import java.util.Iterator;
-import java.util.List;
-
 /**
- * The SpatialPartitioner may contain a large number of grids, which may make the serialized tasks to be
- * larger than 1MB and trigger a warning: "WARN DAGScheduler: Broadcasting large task binary with size XXXX KB".
- * This class is a wrapper around a SpatialPartitioner that is broadcasted to reduce the size of serialized tasks.
+ * The SpatialPartitioner may contain a large number of grids, which may make the serialized tasks
+ * to be larger than 1MB and trigger a warning: "WARN DAGScheduler: Broadcasting large task binary
+ * with size XXXX KB". This class is a wrapper around a SpatialPartitioner that is broadcasted to
+ * reduce the size of serialized tasks.
  */
 public class BroadcastedSpatialPartitioner extends SpatialPartitioner {
-    private final Broadcast<SpatialPartitioner> bPartitioner;
-    private transient SpatialPartitioner partitioner;
+  private final Broadcast<SpatialPartitioner> bPartitioner;
+  private transient SpatialPartitioner partitioner;
 
-    public BroadcastedSpatialPartitioner(Broadcast<SpatialPartitioner> partitioner) {
-        super(partitioner.value().gridType);
-        this.bPartitioner = partitioner;
-        this.partitioner = null;
-    }
+  public BroadcastedSpatialPartitioner(Broadcast<SpatialPartitioner> partitioner) {
+    super(partitioner.value().gridType);
+    this.bPartitioner = partitioner;
+    this.partitioner = null;
+  }
 
-    private SpatialPartitioner getPartitioner() {
-        if (partitioner == null) {
-            partitioner = bPartitioner.value();
-        }
-        return partitioner;
+  private SpatialPartitioner getPartitioner() {
+    if (partitioner == null) {
+      partitioner = bPartitioner.value();
     }
+    return partitioner;
+  }
 
-    @Override
-    public <T extends Geometry> Iterator<Tuple2<Integer, T>> placeObject(T spatialObject) throws Exception {
-        return getPartitioner().placeObject(spatialObject);
-    }
+  @Override
+  public <T extends Geometry> Iterator<Tuple2<Integer, T>> placeObject(T spatialObject)
+      throws Exception {
+    return getPartitioner().placeObject(spatialObject);
+  }
 
-    @Nullable
-    @Override
-    public DedupParams getDedupParams() {
-        return getPartitioner().getDedupParams();
-    }
+  @Nullable
+  @Override
+  public DedupParams getDedupParams() {
+    return getPartitioner().getDedupParams();
+  }
 
-    @Override
-    public List<Envelope> getGrids() {
-        return getPartitioner().getGrids();
-    }
+  @Override
+  public List<Envelope> getGrids() {
+    return getPartitioner().getGrids();
+  }
 
-    @Override
-    public int numPartitions() {
-        return getPartitioner().numPartitions();
-    }
+  @Override
+  public int numPartitions() {
+    return getPartitioner().numPartitions();
+  }
 }

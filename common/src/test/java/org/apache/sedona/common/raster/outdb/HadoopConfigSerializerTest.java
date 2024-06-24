@@ -18,37 +18,39 @@
  */
 package org.apache.sedona.common.raster.outdb;
 
+import java.io.IOException;
 import org.apache.hadoop.conf.Configuration;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.io.IOException;
-
 public class HadoopConfigSerializerTest {
-    @Test
-    public void testSerializeDefaultHadoopConfig() throws IOException {
-        Configuration conf = new Configuration();
-        Configuration conf2 = HadoopConfigSerializer.deserialize(HadoopConfigSerializer.serialize(conf));
-        Assert.assertNotNull(conf.get("io.file.buffer.size"));
-        Assert.assertEquals(conf.get("io.file.buffer.size"), conf2.get("io.file.buffer.size"));
-    }
+  @Test
+  public void testSerializeDefaultHadoopConfig() throws IOException {
+    Configuration conf = new Configuration();
+    Configuration conf2 =
+        HadoopConfigSerializer.deserialize(HadoopConfigSerializer.serialize(conf));
+    Assert.assertNotNull(conf.get("io.file.buffer.size"));
+    Assert.assertEquals(conf.get("io.file.buffer.size"), conf2.get("io.file.buffer.size"));
+  }
 
-    @Test
-    public void testSerializeEmptyHadoopConfig() throws IOException {
-        Configuration conf = new Configuration(false);
-        Configuration conf2 = HadoopConfigSerializer.deserialize(HadoopConfigSerializer.serialize(conf));
-        Assert.assertNull(conf.get("io.file.buffer.size"));
-        Assert.assertNull(conf2.get("io.file.buffer.size"));
-    }
+  @Test
+  public void testSerializeEmptyHadoopConfig() throws IOException {
+    Configuration conf = new Configuration(false);
+    Configuration conf2 =
+        HadoopConfigSerializer.deserialize(HadoopConfigSerializer.serialize(conf));
+    Assert.assertNull(conf.get("io.file.buffer.size"));
+    Assert.assertNull(conf2.get("io.file.buffer.size"));
+  }
 
-    @Test
-    public void testSerializeHadoopConfig() throws IOException {
-        Configuration conf = new Configuration();
-        conf.set("test_key1", "test_value1");
-        conf.set("test_key2", "test_value2");
-        Configuration conf2 = HadoopConfigSerializer.deserialize(HadoopConfigSerializer.serialize(conf));
-        Assert.assertEquals(conf.get("io.file.buffer.size"), conf2.get("io.file.buffer.size"));
-        Assert.assertEquals("test_value1", conf2.get("test_key1"));
-        Assert.assertEquals("test_value2", conf2.get("test_key2"));
-    }
+  @Test
+  public void testSerializeHadoopConfig() throws IOException {
+    Configuration conf = new Configuration();
+    conf.set("test_key1", "test_value1");
+    conf.set("test_key2", "test_value2");
+    Configuration conf2 =
+        HadoopConfigSerializer.deserialize(HadoopConfigSerializer.serialize(conf));
+    Assert.assertEquals(conf.get("io.file.buffer.size"), conf2.get("io.file.buffer.size"));
+    Assert.assertEquals("test_value1", conf2.get("test_key1"));
+    Assert.assertEquals("test_value2", conf2.get("test_key2"));
+  }
 }

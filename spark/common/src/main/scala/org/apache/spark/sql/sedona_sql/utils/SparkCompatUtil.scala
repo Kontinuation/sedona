@@ -25,6 +25,7 @@ import org.apache.spark.sql.types.StructType
  * Work with internal data types of Spark SQL in a way compatible with multiple Spark versions.
  */
 object SparkCompatUtil {
+
   /**
    * Creates a [[Row]] encoder for schema `schema`.
    */

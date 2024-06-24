@@ -16,58 +16,48 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
 
+import java.util.Iterator;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
-import javax.annotation.Nullable;
+public class KDBTreePartitioner extends SpatialPartitioner {
+  private final KDB tree;
+  private transient List<Envelope> grids;
 
-import java.util.Iterator;
-import java.util.List;
+  public KDBTreePartitioner(KDB tree) {
+    super(GridType.KDBTREE);
+    this.tree = tree;
+    this.tree.dropElements();
+  }
 
-public class KDBTreePartitioner
-        extends SpatialPartitioner
-{
-    private final KDB tree;
-    private transient List<Envelope> grids;
+  @Override
+  public int numPartitions() {
+    return getGrids().size();
+  }
 
-    public KDBTreePartitioner(KDB tree)
-    {
-        super(GridType.KDBTREE);
-        this.tree = tree;
-        this.tree.dropElements();
+  @Override
+  public Iterator<Tuple2<Integer, Geometry>> placeObject(Geometry spatialObject) throws Exception {
+    return tree.placeObject(spatialObject);
+  }
+
+  @Nullable
+  @Override
+  public DedupParams getDedupParams() {
+    return new DedupParams(getGrids());
+  }
+
+  @Override
+  public List<Envelope> getGrids() {
+    if (grids == null) {
+      grids = tree.fetchLeafZones();
     }
-
-    @Override
-    public int numPartitions()
-    {
-        return getGrids().size();
-    }
-
-    @Override
-    public Iterator<Tuple2<Integer, Geometry>> placeObject(Geometry spatialObject)
-            throws Exception
-    {
-        return tree.placeObject(spatialObject);
-    }
-
-    @Nullable
-    @Override
-    public DedupParams getDedupParams()
-    {
-        return new DedupParams(getGrids());
-    }
-
-    @Override
-    public List<Envelope> getGrids() {
-        if (grids == null) {
-            grids = tree.fetchLeafZones();
-        }
-        return grids;
-    }
+    return grids;
+  }
 }

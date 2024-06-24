@@ -23,84 +23,92 @@ import org.apache.spark.sql.catalyst.expressions.UnsafeRow;
 import org.apache.spark.util.SizeEstimator;
 import org.locationtech.jts.geom.Geometry;
 
-/**
- * Estimate the size of a geometry object.
- */
+/** Estimate the size of a geometry object. */
 public class GeometrySizeEstimator {
-    private GeometrySizeEstimator() {}
+  private GeometrySizeEstimator() {}
 
-    public static final int BYTES_PER_COORDINATE = 48;
+  public static final int BYTES_PER_COORDINATE = 48;
 
-    /**
-     * Estimate the size of a geometry object. User data is also included in the estimation.
-     * @param geom The geometry object.
-     * @return The estimated size of the geometry object.
-     */
-    public static long estimateSize(Geometry geom) {
-        return estimateSize(geom, geom.getNumPoints());
+  /**
+   * Estimate the size of a geometry object. User data is also included in the estimation.
+   *
+   * @param geom The geometry object.
+   * @return The estimated size of the geometry object.
+   */
+  public static long estimateSize(Geometry geom) {
+    return estimateSize(geom, geom.getNumPoints());
+  }
+
+  /**
+   * Estimate the size of a geometry object. User data is also included in the estimation.
+   *
+   * @param geom The geometry object.
+   * @param numPoints The number of points in the geometry object.
+   * @return The estimated size of the geometry object.
+   */
+  public static long estimateSize(Geometry geom, int numPoints) {
+    long geomSize = estimateSizeWithoutUserData(geom, numPoints);
+    long userDataSize = estimateUserDataSize(geom.getUserData());
+    return geomSize + userDataSize;
+  }
+
+  public static long estimateUserDataSize(Object userData) {
+    if (userData == null) {
+      return 0;
+    } else if (userData instanceof UnsafeRow) {
+      // We can use a fast estimation if the user data is an UnsafeRow, which is the case when we
+      // run spatial join
+      // on DataFrame. 64 is an estimated overhead of UnsafeRow object.
+      return ((UnsafeRow) userData).getSizeInBytes() + 64;
+    } else if (userData instanceof String) {
+      // We can use a fast estimation if the user data is a String, which is usually the case when
+      // using the
+      // RDD API. 64 is an estimated overhead of String object.
+      // We multiply the length of the string by 2 for conservative estimation (assuming internal
+      // usage of
+      // UTF-16 encoding)
+      return ((String) userData).length() * 2L + 64;
+    } else if (userData instanceof byte[]) {
+      return ((byte[]) userData).length + 16;
+    } else if (userData instanceof Subdivide.SubdividedPart) {
+      long size = 64; // Overhead of the SubdividedPart object
+      Subdivide.SubdividedPart part = (Subdivide.SubdividedPart) userData;
+      if (part.origGeomWithoutUserData != null) {
+        size += estimateSize(part.origGeomWithoutUserData);
+      }
+      size += estimateUserDataSize(part.userData);
+      return size;
+    } else {
+      // Here we use the SizeEstimator from Spark to estimate the size of the geometry. This is very
+      // expensive
+      // since it involves lots of reflection, unless the user has implemented the
+      // KnownSizeEstimation trait.
+      return SizeEstimator.estimate(userData);
     }
+  }
 
-    /**
-     * Estimate the size of a geometry object. User data is also included in the estimation.
-     * @param geom The geometry object.
-     * @param numPoints The number of points in the geometry object.
-     * @return The estimated size of the geometry object.
-     */
-    public static long estimateSize(Geometry geom, int numPoints) {
-        long geomSize = estimateSizeWithoutUserData(geom, numPoints);
-        long userDataSize = estimateUserDataSize(geom.getUserData());
-        return geomSize + userDataSize;
-    }
+  /**
+   * Estimate the size of a geometry object. User data is not included in the estimation.
+   *
+   * @param geom The geometry object.
+   * @return The estimated size of the geometry object.
+   */
+  public static long estimateSizeWithoutUserData(Geometry geom) {
+    return estimateSizeWithoutUserData(geom, geom.getNumPoints());
+  }
 
-    public static long estimateUserDataSize(Object userData) {
-        if (userData == null) {
-            return 0;
-        } else if (userData instanceof UnsafeRow) {
-            // We can use a fast estimation if the user data is an UnsafeRow, which is the case when we run spatial join
-            // on DataFrame. 64 is an estimated overhead of UnsafeRow object.
-            return ((UnsafeRow) userData).getSizeInBytes() + 64;
-        } else if (userData instanceof String) {
-            // We can use a fast estimation if the user data is a String, which is usually the case when using the
-            // RDD API. 64 is an estimated overhead of String object.
-            // We multiply the length of the string by 2 for conservative estimation (assuming internal usage of
-            // UTF-16 encoding)
-            return ((String) userData).length() * 2L + 64;
-        } else if (userData instanceof byte[]) {
-            return ((byte[]) userData).length + 16;
-        } else if (userData instanceof Subdivide.SubdividedPart) {
-            long size = 64;  // Overhead of the SubdividedPart object
-            Subdivide.SubdividedPart part = (Subdivide.SubdividedPart) userData;
-            if (part.origGeomWithoutUserData != null) {
-                size += estimateSize(part.origGeomWithoutUserData);
-            }
-            size += estimateUserDataSize(part.userData);
-            return size;
-        } else {
-            // Here we use the SizeEstimator from Spark to estimate the size of the geometry. This is very expensive
-            // since it involves lots of reflection, unless the user has implemented the KnownSizeEstimation trait.
-            return SizeEstimator.estimate(userData);
-        }
+  /**
+   * Estimate the size of a geometry object. User data is not included in the estimation.
+   *
+   * @param geom The geometry object.
+   * @param numPoints The number of points in the geometry object.
+   * @return The estimated size of the geometry object.
+   */
+  public static long estimateSizeWithoutUserData(Geometry geom, int numPoints) {
+    if (numPoints == -1) {
+      numPoints = geom.getNumPoints();
     }
-
-    /**
-     * Estimate the size of a geometry object. User data is not included in the estimation.
-     * @param geom The geometry object.
-     * @return The estimated size of the geometry object.
-     */
-    public static long estimateSizeWithoutUserData(Geometry geom) {
-        return estimateSizeWithoutUserData(geom, geom.getNumPoints());
-    }
-
-    /**
-     * Estimate the size of a geometry object. User data is not included in the estimation.
-     * @param geom The geometry object.
-     * @param numPoints The number of points in the geometry object.
-     * @return The estimated size of the geometry object.
-     */
-    public static long estimateSizeWithoutUserData(Geometry geom, int numPoints) {
-        if (numPoints == -1) {
-            numPoints = geom.getNumPoints();
-        }
-        return 300L + numPoints * (long) BYTES_PER_COORDINATE;  // This estimation is verified by experiments.
-    }
+    return 300L
+        + numPoints * (long) BYTES_PER_COORDINATE; // This estimation is verified by experiments.
+  }
 }

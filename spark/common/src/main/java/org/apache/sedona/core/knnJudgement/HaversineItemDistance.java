@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.knnJudgement;
 
 import org.apache.sedona.common.sphere.Haversine;
@@ -26,17 +25,16 @@ import org.locationtech.jts.index.strtree.ItemDistance;
 
 public class HaversineItemDistance implements ItemDistance {
 
-    public HaversineItemDistance() {
-    }
+  public HaversineItemDistance() {}
 
-    @Override
-    public double distance(ItemBoundable item1, ItemBoundable item2) {
-        if (item1 == item2) {
-            return Double.MAX_VALUE;
-        } else {
-            Geometry g1 = (Geometry)item1.getItem();
-            Geometry g2 = (Geometry)item2.getItem();
-            return Haversine.distance(g1, g2);
-        }
+  @Override
+  public double distance(ItemBoundable item1, ItemBoundable item2) {
+    if (item1 == item2) {
+      return Double.MAX_VALUE;
+    } else {
+      Geometry g1 = (Geometry) item1.getItem();
+      Geometry g2 = (Geometry) item2.getItem();
+      return Haversine.distance(g1, g2);
     }
+  }
 }

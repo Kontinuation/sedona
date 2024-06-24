@@ -18,7 +18,6 @@
  */
 package org.apache.spark.sql.sedona_sql.UDT
 
-
 import org.apache.sedona.sql.utils.RasterSerializer
 import org.apache.spark.sql.types.{BinaryType, DataType, UserDefinedType}
 import org.geotools.coverage.grid.GridCoverage2D

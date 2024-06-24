@@ -27,8 +27,8 @@ import org.apache.spark.sql.{Encoder, Encoders, Row}
 import org.locationtech.jts.geom.{Coordinate, Geometry, GeometryFactory}
 
 /**
-  * traits for creating Aggregate Function
-  */
+ * traits for creating Aggregate Function
+ */
 
 trait TraitSTAggregateExec {
   val initialGeometry: Geometry = {
@@ -55,8 +55,8 @@ trait TraitSTAggregateExec {
 }
 
 /**
-  * Return the polygon union of all Polygon in the given column
-  */
+ * Return the polygon union of all Polygon in the given column
+ */
 class ST_Union_Aggr extends Aggregator[Geometry, Geometry, Geometry] with TraitSTAggregateExec {
 
   def reduce(buffer: Geometry, input: Geometry): Geometry = {
@@ -70,14 +70,14 @@ class ST_Union_Aggr extends Aggregator[Geometry, Geometry, Geometry] with TraitS
     else buffer1.union(buffer2)
   }
 
-
 }
 
-
 /**
-  * Return the envelope boundary of the entire column
-  */
-class ST_Envelope_Aggr extends Aggregator[Geometry, Geometry, Geometry] with TraitSTAggregateExec {
+ * Return the envelope boundary of the entire column
+ */
+class ST_Envelope_Aggr
+    extends Aggregator[Geometry, Geometry, Geometry]
+    with TraitSTAggregateExec {
 
   def reduce(buffer: Geometry, input: Geometry): Geometry = {
     val accumulateEnvelope = buffer.getEnvelopeInternal
@@ -93,14 +93,12 @@ class ST_Envelope_Aggr extends Aggregator[Geometry, Geometry, Geometry] with Tra
       minY = newEnvelope.getMinY
       maxX = newEnvelope.getMaxX
       maxY = newEnvelope.getMaxY
-    }
-    else if (newEnvelope.equals(initialGeometry.getEnvelopeInternal)) {
+    } else if (newEnvelope.equals(initialGeometry.getEnvelopeInternal)) {
       minX = accumulateEnvelope.getMinX
       minY = accumulateEnvelope.getMinY
       maxX = accumulateEnvelope.getMaxX
       maxY = accumulateEnvelope.getMaxY
-    }
-    else {
+    } else {
       minX = Math.min(accumulateEnvelope.getMinX, newEnvelope.getMinX)
       minY = Math.min(accumulateEnvelope.getMinY, newEnvelope.getMinY)
       maxX = Math.max(accumulateEnvelope.getMaxX, newEnvelope.getMaxX)
@@ -129,14 +127,12 @@ class ST_Envelope_Aggr extends Aggregator[Geometry, Geometry, Geometry] with Tra
       minY = rightEnvelope.getMinY
       maxX = rightEnvelope.getMaxX
       maxY = rightEnvelope.getMaxY
-    }
-    else if (rightEnvelope.equals(initialGeometry.getEnvelopeInternal)) {
+    } else if (rightEnvelope.equals(initialGeometry.getEnvelopeInternal)) {
       minX = leftEnvelope.getMinX
       minY = leftEnvelope.getMinY
       maxX = leftEnvelope.getMaxX
       maxY = leftEnvelope.getMaxY
-    }
-    else {
+    } else {
       minX = Math.min(leftEnvelope.getMinX, rightEnvelope.getMinX)
       minY = Math.min(leftEnvelope.getMinY, rightEnvelope.getMinY)
       maxX = Math.max(leftEnvelope.getMaxX, rightEnvelope.getMaxX)
@@ -152,13 +148,14 @@ class ST_Envelope_Aggr extends Aggregator[Geometry, Geometry, Geometry] with Tra
     geometryFactory.createPolygon(coordinates)
   }
 
-
 }
 
 /**
-  * Return the polygon intersection of all Polygon in the given column
-  */
-class ST_Intersection_Aggr extends Aggregator[Geometry, Geometry, Geometry] with TraitSTAggregateExec {
+ * Return the polygon intersection of all Polygon in the given column
+ */
+class ST_Intersection_Aggr
+    extends Aggregator[Geometry, Geometry, Geometry]
+    with TraitSTAggregateExec {
   def reduce(buffer: Geometry, input: Geometry): Geometry = {
     if (buffer.isEmpty) input
     else if (buffer.equalsExact(initialGeometry)) input
@@ -179,8 +176,12 @@ class ST_Analyze_Aggr extends Aggregator[Geometry, AdvancedStatCollector, Row] {
   override def zero: AdvancedStatCollector = {
     // Create a collector with envelope sampling disabled
     new AdvancedStatCollector(
-      0, 0, 0,
-      AdvancedStatCollector.DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE, 0, 0)
+      0,
+      0,
+      0,
+      AdvancedStatCollector.DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE,
+      0,
+      0)
   }
 
   override def reduce(stat: AdvancedStatCollector, geom: Geometry): AdvancedStatCollector = {
@@ -188,7 +189,9 @@ class ST_Analyze_Aggr extends Aggregator[Geometry, AdvancedStatCollector, Row] {
     stat
   }
 
-  override def merge(stat1: AdvancedStatCollector, stat2: AdvancedStatCollector): AdvancedStatCollector = {
+  override def merge(
+      stat1: AdvancedStatCollector,
+      stat2: AdvancedStatCollector): AdvancedStatCollector = {
     stat1.combineWith(stat2)
     stat1
   }
@@ -207,25 +210,26 @@ class ST_Analyze_Aggr extends Aggregator[Geometry, AdvancedStatCollector, Row] {
     stat.getGeometryCollectionCount,
     stat.getMeanEnvelopeWidth,
     stat.getMeanEnvelopeHeight,
-    stat.getMeanEnvelopeArea
-  )
+    stat.getMeanEnvelopeArea)
 
-  override def bufferEncoder: Encoder[AdvancedStatCollector] = Encoders.kryo[AdvancedStatCollector]
+  override def bufferEncoder: Encoder[AdvancedStatCollector] =
+    Encoders.kryo[AdvancedStatCollector]
 
-  override def outputEncoder: Encoder[Row] = SparkCompatUtil.rowEncoderFor(StructType(Seq(
-    StructField("count", LongType, nullable = false),
-    StructField("minx", DoubleType, nullable = false),
-    StructField("miny", DoubleType, nullable = false),
-    StructField("maxx", DoubleType, nullable = false),
-    StructField("maxy", DoubleType, nullable = false),
-    StructField("mean_size_in_bytes", LongType, nullable = false),
-    StructField("mean_points_per_geometry", DoubleType, nullable = false),
-    StructField("puntal_count", LongType, nullable = false),
-    StructField("lineal_count", LongType, nullable = false),
-    StructField("polygonal_count", LongType, nullable = false),
-    StructField("geometrycollection_count", LongType, nullable = false),
-    StructField("mean_envelope_width", DoubleType, nullable = false),
-    StructField("mean_envelope_height", DoubleType, nullable = false),
-    StructField("mean_envelope_area", DoubleType, nullable = false)
-  )))
+  override def outputEncoder: Encoder[Row] = SparkCompatUtil.rowEncoderFor(
+    StructType(
+      Seq(
+        StructField("count", LongType, nullable = false),
+        StructField("minx", DoubleType, nullable = false),
+        StructField("miny", DoubleType, nullable = false),
+        StructField("maxx", DoubleType, nullable = false),
+        StructField("maxy", DoubleType, nullable = false),
+        StructField("mean_size_in_bytes", LongType, nullable = false),
+        StructField("mean_points_per_geometry", DoubleType, nullable = false),
+        StructField("puntal_count", LongType, nullable = false),
+        StructField("lineal_count", LongType, nullable = false),
+        StructField("polygonal_count", LongType, nullable = false),
+        StructField("geometrycollection_count", LongType, nullable = false),
+        StructField("mean_envelope_width", DoubleType, nullable = false),
+        StructField("mean_envelope_height", DoubleType, nullable = false),
+        StructField("mean_envelope_area", DoubleType, nullable = false))))
 }

@@ -28,13 +28,14 @@ import org.apache.spark.sql.catalyst.expressions.{BindReferences, UnsafeRow}
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.locationtech.jts.geom.Geometry
-/**
- * TraitKNNJoinQueryExec is a trait that extends the TraitJoinQueryExec trait
- * and provides the necessary functionality to execute a KNN join operation.
 
- * It is used by the KNNJoinExec class to execute a KNN join operation.
- * The KNN join operation is a k-nearest neighbors join that finds the k-nearest
- * neighbors of each object in the right dataset for each query in the left dataset.
+/**
+ * TraitKNNJoinQueryExec is a trait that extends the TraitJoinQueryExec trait and provides the
+ * necessary functionality to execute a KNN join operation.
+ *
+ * It is used by the KNNJoinExec class to execute a KNN join operation. The KNN join operation is
+ * a k-nearest neighbors join that finds the k-nearest neighbors of each object in the right
+ * dataset for each query in the left dataset.
  */
 trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
   self: SparkPlan =>
@@ -53,18 +54,21 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
   /**
    * Executes a KNN (k-nearest neighbors) join operation using the Sedona spatial library.
    *
-   * This method binds the left and right shape references to their respective outputs,
-   * executes the left and right datasets as RDDs, converts them to spatial RDDs,
-   * and performs spatial partitioning based on Sedona configuration.
+   * This method binds the left and right shape references to their respective outputs, executes
+   * the left and right datasets as RDDs, converts them to spatial RDDs, and performs spatial
+   * partitioning based on Sedona configuration.
    *
    * The number of partitions is determined either by a predefined fallback value or optimized
-   * based on the sizes of the object and query shapes. If the partitioning fails, it uses the fallback value.
+   * based on the sizes of the object and query shapes. If the partitioning fails, it uses the
+   * fallback value.
    *
    * It saves the spatial partitioner to a file if specified, gets the KNN join parameters,
    * performs the KNN join, and finally converts the matched RDD to RowRDD.
    *
-   * @param sedonaConf The Sedona configuration settings.
-   * @return RDD[InternalRow] The result of the KNN join as an RDD of InternalRows.
+   * @param sedonaConf
+   *   The Sedona configuration settings.
+   * @return
+   *   RDD[InternalRow] The result of the KNN join as an RDD of InternalRows.
    */
   private def executeKNNJoin(sedonaConf: SedonaConf): RDD[InternalRow] = {
     val boundLeftShape = BindReferences.bindReference(leftShape, left.output)
@@ -75,10 +79,12 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
 
     val sedonaConf = SedonaConf.fromActiveSession
 
-    val (queryShapes, objectShapes) = toSpatialRddPair(leftResultsRaw, boundLeftShape, rightResultsRaw, boundRightShape)
+    val (queryShapes, objectShapes) =
+      toSpatialRddPair(leftResultsRaw, boundLeftShape, rightResultsRaw, boundRightShape)
 
     objectShapes.analyze()
-    log.info("[SedonaSQL] Number of partitions on the objectShapes (right): " + rightResultsRaw.partitions.size)
+    log.info(
+      "[SedonaSQL] Number of partitions on the objectShapes (right): " + rightResultsRaw.partitions.size)
 
     // calculate the optimized or predefined number of partitions
     // and do spatial partitioning
@@ -86,16 +92,16 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
     try {
       if (sedonaConf.getFallbackPartitionNum != -1) {
         numPartitions = sedonaConf.getFallbackPartitionNum
-      }
-      else {
+      } else {
         // object shapes are the dominant side
-        numPartitions = joinPartitionNumOptimizer(objectShapes.rawSpatialRDD.partitions.size(), queryShapes.rawSpatialRDD.partitions.size(),
+        numPartitions = joinPartitionNumOptimizer(
+          objectShapes.rawSpatialRDD.partitions.size(),
+          queryShapes.rawSpatialRDD.partitions.size(),
           objectShapes.approximateTotalCount)
       }
       // object shapes are the dominant side
       doSpatialPartitioning(objectShapes, queryShapes, numPartitions, sedonaConf)
-    }
-    catch {
+    } catch {
       case e: IllegalArgumentException => {
         print(e.getMessage)
         // Partition number are not qualified
@@ -107,16 +113,19 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
 
     // Save the spatial partitioner to file if the path is set
     if (sedonaConf.getSpatialPartitionerSavePath.nonEmpty) {
-      saveSpatialPartitionerToFile(queryShapes.getPartitioner, sedonaConf.getSpatialPartitionerSavePath)
+      saveSpatialPartitionerToFile(
+        queryShapes.getPartitioner,
+        sedonaConf.getSpatialPartitionerSavePath)
     }
 
     val joinParams: JoinParams = getKNNJoinParams
 
-    val matchesRDD: RDD[(Geometry, Geometry)] = (queryShapes.spatialPartitionedRDD, objectShapes.spatialPartitionedRDD) match {
-      case (null, null) =>
-        sparkContext.parallelize(Seq[(Geometry, Geometry)]())
-      case _ => JoinQuery.knnJoin(queryShapes, objectShapes, joinParams).rdd
-    }
+    val matchesRDD: RDD[(Geometry, Geometry)] =
+      (queryShapes.spatialPartitionedRDD, objectShapes.spatialPartitionedRDD) match {
+        case (null, null) =>
+          sparkContext.parallelize(Seq[(Geometry, Geometry)]())
+        case _ => JoinQuery.knnJoin(queryShapes, objectShapes, joinParams).rdd
+      }
 
     // Convert the matchesRDD to RowRDD
     joinedRddToRowRdd(matchesRDD)
@@ -125,16 +134,19 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
   /**
    * Converts the joined RDD of geometries to an RDD of InternalRows.
    *
-   * This method maps over the partitions of the joined RDD, creating an UnsafeRow joiner
-   * that combines the left and right rows based on the given schemas.
+   * This method maps over the partitions of the joined RDD, creating an UnsafeRow joiner that
+   * combines the left and right rows based on the given schemas.
    *
-   * Each geometry's user data is expected to be an UnsafeRow, and the joiner is used to
-   * produce joined rows from the left and right geometry pairs.
+   * Each geometry's user data is expected to be an UnsafeRow, and the joiner is used to produce
+   * joined rows from the left and right geometry pairs.
    *
-   * @param joinedRdd The RDD containing pairs of joined geometries.
-   * @return RDD[InternalRow] The resulting RDD of joined InternalRows.
+   * @param joinedRdd
+   *   The RDD containing pairs of joined geometries.
+   * @return
+   *   RDD[InternalRow] The resulting RDD of joined InternalRows.
    */
-  override protected def joinedRddToRowRdd(joinedRdd: RDD[(Geometry, Geometry)]): RDD[InternalRow] = {
+  override protected def joinedRddToRowRdd(
+      joinedRdd: RDD[(Geometry, Geometry)]): RDD[InternalRow] = {
     joinedRdd.mapPartitions { iter =>
       val joinRow = {
         val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)

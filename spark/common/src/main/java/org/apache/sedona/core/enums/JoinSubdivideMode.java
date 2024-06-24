@@ -19,25 +19,24 @@
 package org.apache.sedona.core.enums;
 
 public enum JoinSubdivideMode {
-    /**
-     * Never subdivide the geometries before running spatial join.
-     */
-    NEVER,
+  /** Never subdivide the geometries before running spatial join. */
+  NEVER,
 
-    /**
-     * Always subdivide the geometries using subdivide options defined in SedonaConf before running spatial join.
-     */
-    ALWAYS,
+  /**
+   * Always subdivide the geometries using subdivide options defined in SedonaConf before running
+   * spatial join.
+   */
+  ALWAYS,
 
-    /**
-     * Automatically decide whether to subdivide the geometries before running spatial join.
-     */
-    AUTO;
+  /** Automatically decide whether to subdivide the geometries before running spatial join. */
+  AUTO;
 
-    public static JoinSubdivideMode getJoinSubdivideMode(String str) {
-        for (JoinSubdivideMode me : JoinSubdivideMode.values()) {
-            if (me.name().equalsIgnoreCase(str)) { return me; }
-        }
-        return null;
+  public static JoinSubdivideMode getJoinSubdivideMode(String str) {
+    for (JoinSubdivideMode me : JoinSubdivideMode.values()) {
+      if (me.name().equalsIgnoreCase(str)) {
+        return me;
+      }
     }
+    return null;
+  }
 }

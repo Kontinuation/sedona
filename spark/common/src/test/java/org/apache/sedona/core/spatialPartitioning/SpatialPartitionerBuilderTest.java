@@ -18,51 +18,53 @@
  */
 package org.apache.sedona.core.spatialPartitioning;
 
+import static org.junit.Assert.*;
+
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.sedona.core.enums.GridType;
 import org.junit.Test;
 import org.locationtech.jts.geom.Envelope;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import static org.junit.Assert.*;
-
 public class SpatialPartitionerBuilderTest {
 
-    @Test
-    public void buildEqualGrid() {
-        SpatialPartitionerBuilder builder = new SpatialPartitionerBuilder(GridType.EQUALGRID, 4, 100, new Envelope(0, 100, 0, 100));
-        List<Envelope> samples = new ArrayList<>();
-        for (int k = -100; k < 200; k++) {
-            samples.add(new Envelope(k, k, k, k));
-        }
-        builder.addSamples(samples);
-        SpatialPartitioner partitioner = builder.build();
-        assertEquals(4, partitioner.numPartitions());
+  @Test
+  public void buildEqualGrid() {
+    SpatialPartitionerBuilder builder =
+        new SpatialPartitionerBuilder(GridType.EQUALGRID, 4, 100, new Envelope(0, 100, 0, 100));
+    List<Envelope> samples = new ArrayList<>();
+    for (int k = -100; k < 200; k++) {
+      samples.add(new Envelope(k, k, k, k));
     }
+    builder.addSamples(samples);
+    SpatialPartitioner partitioner = builder.build();
+    assertEquals(4, partitioner.numPartitions());
+  }
 
-    @Test
-    public void buildQuadTree() {
-        SpatialPartitionerBuilder builder = new SpatialPartitionerBuilder(GridType.QUADTREE, 4, 100, new Envelope(0, 100, 0, 100));
-        List<Envelope> samples = new ArrayList<>();
-        for (int k = -100; k < 200; k++) {
-            samples.add(new Envelope(k, k, k, k));
-        }
-        builder.addSamples(samples);
-        SpatialPartitioner partitioner = builder.build();
-        int numPartitions = partitioner.numPartitions();
-        assertTrue(numPartitions >= 4);
+  @Test
+  public void buildQuadTree() {
+    SpatialPartitionerBuilder builder =
+        new SpatialPartitionerBuilder(GridType.QUADTREE, 4, 100, new Envelope(0, 100, 0, 100));
+    List<Envelope> samples = new ArrayList<>();
+    for (int k = -100; k < 200; k++) {
+      samples.add(new Envelope(k, k, k, k));
     }
+    builder.addSamples(samples);
+    SpatialPartitioner partitioner = builder.build();
+    int numPartitions = partitioner.numPartitions();
+    assertTrue(numPartitions >= 4);
+  }
 
-    @Test
-    public void buildKDBTree() {
-        SpatialPartitionerBuilder builder = new SpatialPartitionerBuilder(GridType.KDBTREE, 4, 100, new Envelope(0, 100, 0, 100));
-        List<Envelope> samples = new ArrayList<>();
-        for (int k = -100; k < 200; k++) {
-            samples.add(new Envelope(k, k, k, k));
-        }
-        builder.addSamples(samples);
-        SpatialPartitioner partitioner = builder.build();
-        assertTrue(partitioner.numPartitions() >= 4);
+  @Test
+  public void buildKDBTree() {
+    SpatialPartitionerBuilder builder =
+        new SpatialPartitionerBuilder(GridType.KDBTREE, 4, 100, new Envelope(0, 100, 0, 100));
+    List<Envelope> samples = new ArrayList<>();
+    for (int k = -100; k < 200; k++) {
+      samples.add(new Envelope(k, k, k, k));
     }
+    builder.addSamples(samples);
+    SpatialPartitioner partitioner = builder.build();
+    assertTrue(partitioner.numPartitions() >= 4);
+  }
 }

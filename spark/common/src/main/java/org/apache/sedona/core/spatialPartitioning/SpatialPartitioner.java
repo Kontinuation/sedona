@@ -16,9 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.core.spatialPartitioning;
 
+import java.io.Serializable;
+import java.util.Iterator;
+import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.apache.spark.Partitioner;
@@ -26,46 +29,33 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
-import javax.annotation.Nullable;
+public abstract class SpatialPartitioner extends Partitioner implements Serializable {
+  protected final GridType gridType;
 
-import java.io.Serializable;
-import java.util.Iterator;
-import java.util.List;
+  protected SpatialPartitioner(GridType gridType) {
+    this.gridType = gridType;
+  }
 
-abstract public class SpatialPartitioner
-        extends Partitioner
-        implements Serializable
-{
-    protected final GridType gridType;
+  /**
+   * Given a geometry, returns a list of partitions it overlaps.
+   *
+   * <p>For points, returns exactly one partition as long as grid type is non-overlapping. For other
+   * geometry types or for overlapping grid types, may return multiple partitions.
+   */
+  public abstract <T extends Geometry> Iterator<Tuple2<Integer, T>> placeObject(T spatialObject)
+      throws Exception;
 
-    protected SpatialPartitioner(GridType gridType)
-    {
-        this.gridType = gridType;
-    }
+  @Nullable
+  public abstract DedupParams getDedupParams();
 
-    /**
-     * Given a geometry, returns a list of partitions it overlaps.
-     * <p>
-     * For points, returns exactly one partition as long as grid type is non-overlapping.
-     * For other geometry types or for overlapping grid types, may return multiple partitions.
-     */
-    abstract public <T extends Geometry> Iterator<Tuple2<Integer, T>>
-    placeObject(T spatialObject)
-            throws Exception;
+  public GridType getGridType() {
+    return gridType;
+  }
 
-    @Nullable
-    abstract public DedupParams getDedupParams();
+  public abstract List<Envelope> getGrids();
 
-    public GridType getGridType()
-    {
-        return gridType;
-    }
-
-    abstract public List<Envelope> getGrids();
-
-    @Override
-    public int getPartition(Object key)
-    {
-        return (int) key;
-    }
+  @Override
+  public int getPartition(Object key) {
+    return (int) key;
+  }
 }

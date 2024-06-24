@@ -46,20 +46,20 @@ object InferredRasterExpression {
 
   val rasterExtractor: Expression => InternalRow => Any = if (isGeoToolsAvailable) {
     InferrableRasterTypes.rasterExtractor
-  } else {
-    _ => _ => null
+  } else { _ => _ =>
+    null
   }
 
   val rasterSerializer: Any => Any = if (isGeoToolsAvailable) {
     InferrableRasterTypes.rasterSerializer
-  } else {
-    (_: Any) => null
+  } else { (_: Any) =>
+    null
   }
 
   val rasterArraySerializer: Any => Any = if (isGeoToolsAvailable) {
     InferrableRasterTypes.rasterArraySerializer
-  } else {
-    (_: Any) => null
+  } else { (_: Any) =>
+    null
   }
 
   def disposeInputRasters(inputRasters: Array[AnyRef], result: Any): Unit = {

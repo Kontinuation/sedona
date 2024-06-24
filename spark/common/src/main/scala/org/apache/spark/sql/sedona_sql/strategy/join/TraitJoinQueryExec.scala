@@ -55,15 +55,15 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
 
     val sedonaConf = SedonaConf.fromActiveSession
 
-    val (leftShapes, rightShapes) = toSpatialRddPair(leftResultsRaw, boundLeftShape, rightResultsRaw, boundRightShape)
+    val (leftShapes, rightShapes) =
+      toSpatialRddPair(leftResultsRaw, boundLeftShape, rightResultsRaw, boundRightShape)
 
     // Only do SpatialRDD analyze when the user doesn't know approximate total count of the spatial partitioning
     // dominant side rdd
     if (sedonaConf.getJoinApproximateTotalCount == -1) {
       if (sedonaConf.getJoinSparitionDominantSide == JoinSparitionDominantSide.LEFT) {
         leftShapes.analyze()
-      }
-      else {
+      } else {
         rightShapes.analyze()
       }
     }
@@ -75,25 +75,25 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
       if (sedonaConf.getJoinSparitionDominantSide == JoinSparitionDominantSide.LEFT) {
         if (sedonaConf.getFallbackPartitionNum != -1) {
           numPartitions = sedonaConf.getFallbackPartitionNum
-        }
-        else {
-          numPartitions = joinPartitionNumOptimizer(leftShapes.rawSpatialRDD.partitions.size(), rightShapes.rawSpatialRDD.partitions.size(),
+        } else {
+          numPartitions = joinPartitionNumOptimizer(
+            leftShapes.rawSpatialRDD.partitions.size(),
+            rightShapes.rawSpatialRDD.partitions.size(),
             leftShapes.approximateTotalCount)
         }
         doSpatialPartitioning(leftShapes, rightShapes, numPartitions, sedonaConf)
-      }
-      else {
+      } else {
         if (sedonaConf.getFallbackPartitionNum != -1) {
           numPartitions = sedonaConf.getFallbackPartitionNum
-        }
-        else {
-          numPartitions = joinPartitionNumOptimizer(rightShapes.rawSpatialRDD.partitions.size(), leftShapes.rawSpatialRDD.partitions.size(),
+        } else {
+          numPartitions = joinPartitionNumOptimizer(
+            rightShapes.rawSpatialRDD.partitions.size(),
+            leftShapes.rawSpatialRDD.partitions.size(),
             rightShapes.approximateTotalCount)
         }
         doSpatialPartitioning(rightShapes, leftShapes, numPartitions, sedonaConf)
       }
-    }
-    catch {
+    } catch {
       case e: IllegalArgumentException => {
         print(e.getMessage)
         // Partition number are not qualified
@@ -101,8 +101,7 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
         if (sedonaConf.getJoinSparitionDominantSide == JoinSparitionDominantSide.LEFT) {
           numPartitions = sedonaConf.getFallbackPartitionNum
           doSpatialPartitioning(leftShapes, rightShapes, numPartitions, sedonaConf)
-        }
-        else {
+        } else {
           numPartitions = sedonaConf.getFallbackPartitionNum
           doSpatialPartitioning(rightShapes, leftShapes, numPartitions, sedonaConf)
         }
@@ -110,17 +109,24 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
     }
 
     if (sedonaConf.getSpatialPartitionerSavePath.nonEmpty) {
-      saveSpatialPartitionerToFile(leftShapes.getPartitioner, sedonaConf.getSpatialPartitionerSavePath)
+      saveSpatialPartitionerToFile(
+        leftShapes.getPartitioner,
+        sedonaConf.getSpatialPartitionerSavePath)
     }
 
-    val joinParams = new JoinParams(sedonaConf.getUseIndex, spatialPredicate, sedonaConf.getIndexType, sedonaConf.getJoinBuildSide)
+    val joinParams = new JoinParams(
+      sedonaConf.getUseIndex,
+      spatialPredicate,
+      sedonaConf.getIndexType,
+      sedonaConf.getJoinBuildSide)
 
-    val matchesRDD: RDD[(Geometry, Geometry)] = (leftShapes.spatialPartitionedRDD, rightShapes.spatialPartitionedRDD) match {
-      case (null, null) =>
-        // Dominant side is empty, skipped creating partitioned RDDs. Result of join should also be empty.
-        sparkContext.parallelize(Seq[(Geometry, Geometry)]())
-      case _ => JoinQuery.spatialJoin(leftShapes, rightShapes, joinParams).rdd
-    }
+    val matchesRDD: RDD[(Geometry, Geometry)] =
+      (leftShapes.spatialPartitionedRDD, rightShapes.spatialPartitionedRDD) match {
+        case (null, null) =>
+          // Dominant side is empty, skipped creating partitioned RDDs. Result of join should also be empty.
+          sparkContext.parallelize(Seq[(Geometry, Geometry)]())
+        case _ => JoinQuery.spatialJoin(leftShapes, rightShapes, joinParams).rdd
+      }
 
     joinedRddToRowRdd(matchesRDD)
   }
@@ -147,35 +153,42 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
     }
   }
 
-  def joinPartitionNumOptimizer(dominantSidePartNum: Int, followerSidePartNum: Int, dominantSideCount: Long): Int = {
+  def joinPartitionNumOptimizer(
+      dominantSidePartNum: Int,
+      followerSidePartNum: Int,
+      dominantSideCount: Long): Int = {
     log.info("[SedonaSQL] Dominant side count: " + dominantSideCount)
     var numPartition = -1
     var candidatePartitionNum = (dominantSideCount / 2).intValue()
     if (dominantSidePartNum * 2 > dominantSideCount) {
-      log.warn(s"[SedonaSQL] Join dominant side partition number $dominantSidePartNum is larger than 1/2 of the dominant side count $dominantSideCount")
+      log.warn(
+        s"[SedonaSQL] Join dominant side partition number $dominantSidePartNum is larger than 1/2 of the dominant side count $dominantSideCount")
       log.warn(s"[SedonaSQL] Try to use follower side partition number $followerSidePartNum")
       if (followerSidePartNum * 2 > dominantSideCount) {
-        log.warn(s"[SedonaSQL] Join follower side partition number is also larger than 1/2 of the dominant side count $dominantSideCount")
-        log.warn(s"[SedonaSQL] Try to use 1/2 of the dominant side count $candidatePartitionNum as the partition number of both sides")
+        log.warn(
+          s"[SedonaSQL] Join follower side partition number is also larger than 1/2 of the dominant side count $dominantSideCount")
+        log.warn(
+          s"[SedonaSQL] Try to use 1/2 of the dominant side count $candidatePartitionNum as the partition number of both sides")
         if (candidatePartitionNum == 0) {
-          log.warn(s"[SedonaSQL] 1/2 of $candidatePartitionNum is equal to 0. Use 1 as the partition number of both sides instead.")
+          log.warn(
+            s"[SedonaSQL] 1/2 of $candidatePartitionNum is equal to 0. Use 1 as the partition number of both sides instead.")
           numPartition = 1
-        }
-        else numPartition = candidatePartitionNum
-      }
-      else numPartition = followerSidePartNum
-    }
-    else numPartition = dominantSidePartNum
+        } else numPartition = candidatePartitionNum
+      } else numPartition = followerSidePartNum
+    } else numPartition = dominantSidePartNum
     return numPartition
   }
 
-  protected def saveSpatialPartitionerToFile(partitioner: SpatialPartitioner, savePath: String): Unit = {
+  protected def saveSpatialPartitionerToFile(
+      partitioner: SpatialPartitioner,
+      savePath: String): Unit = {
     partitioner match {
       case null => log.warn("[SedonaSQL] Spatial partitioner is null. Skip saving to file.")
       case _ =>
         val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
         Paths.get(savePath).toFile.mkdirs()
-        val filePath = Paths.get(savePath, s"partitioner-$executionId-${System.currentTimeMillis()}")
+        val filePath =
+          Paths.get(savePath, s"partitioner-$executionId-${System.currentTimeMillis()}")
         log.info(s"[SedonaSQL] Saving spatial partitioner to file: $filePath")
         val writer = new PrintWriter(filePath.toString)
         try {

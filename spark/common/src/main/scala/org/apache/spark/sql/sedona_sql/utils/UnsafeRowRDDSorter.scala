@@ -35,13 +35,19 @@ object UnsafeRowRDDSorter {
     // Most of the code is taken from org.apache.spark.sql.execution.SortExec.
     unsafeRowRdd.mapPartitions { iter =>
       val numFields = schema.size
-      val recordComparatorSupplier: Supplier[RecordComparator] = () => UnsafeRowComparator(numFields)
+      val recordComparatorSupplier: Supplier[RecordComparator] =
+        () => UnsafeRowComparator(numFields)
       val pageSize = SparkEnv.get.memoryManager.pageSizeBytes
       val canUseRadixSort = false
       val prefixComputer: UnsafeExternalRowSorter.PrefixComputer = new UnsafeRowPrefixComputer
       val prefixComparator: PrefixComparator = new UnsignedPrefixComparator
       val sorter = UnsafeExternalRowSorter.createWithRecordComparator(
-        schema, recordComparatorSupplier, prefixComparator, prefixComputer, pageSize, canUseRadixSort)
+        schema,
+        recordComparatorSupplier,
+        prefixComparator,
+        prefixComputer,
+        pageSize,
+        canUseRadixSort)
 
       val metrics = TaskContext.get().taskMetrics()
       // Remember spill data size of this task before execute this operator so that we can
@@ -54,8 +60,13 @@ object UnsafeRowRDDSorter {
   }
 
   case class UnsafeRowComparator(numFields: Int) extends RecordComparator {
-    override def compare(leftBaseObject: Any, leftBaseOffset: Long, leftBaseLength: Int,
-      rightBaseObject: Any, rightBaseOffset: Long, rightBaseLength: Int): Int = {
+    override def compare(
+        leftBaseObject: Any,
+        leftBaseOffset: Long,
+        leftBaseLength: Int,
+        rightBaseObject: Any,
+        rightBaseOffset: Long,
+        rightBaseLength: Int): Int = {
       val leftRow = new UnsafeRow(numFields)
       leftRow.pointTo(leftBaseObject, leftBaseOffset, leftBaseLength)
       val rightRow = new UnsafeRow(numFields)

@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.sedona.sql
 
 import org.apache.sedona.sql.PreparedPredicateSuite.{LeftSide, QueryWindowSide, RightSide}
@@ -30,14 +29,16 @@ import org.locationtech.jts.io.WKTReader
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 /**
- * Test if prepared predicates were correctly populated by the optimizer, and if they evaluates to the correct result.
+ * Test if prepared predicates were correctly populated by the optimizer, and if they evaluates to
+ * the correct result.
  */
 class PreparedPredicateSuite extends TestBaseScala with TableDrivenPropertyChecks {
 
   val testDataDelimiter = "\t"
 
   describe("Sedona-SQL prepared predicate test") {
-    val predicates = Table("predicate",
+    val predicates = Table(
+      "predicate",
       ("ST_Contains", "POINT (10 10)", RightSide),
       ("ST_Contains", "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))", LeftSide),
       ("ST_Within", "POINT (10 10)", LeftSide),
@@ -52,11 +53,11 @@ class PreparedPredicateSuite extends TestBaseScala with TableDrivenPropertyCheck
       ("ST_Crosses", "LINESTRING (9 9, 11 11)", RightSide),
       ("ST_Overlaps", "POLYGON ((0 0, 5 0, 5 5, 0 5, 0 0))", RightSide),
       ("ST_Equals", "POINT (10 10)", RightSide),
-      ("ST_OrderingEquals", "POINT (10 10)", RightSide)
-    )
+      ("ST_OrderingEquals", "POINT (10 10)", RightSide))
 
     forAll(predicates) { case (predicate, queryWindow, queryWindowSide) =>
-      it(s"should correctly evaluate $predicate when query window is on the ${queryWindowSide.side} side") {
+      it(
+        s"should correctly evaluate $predicate when query window is on the ${queryWindowSide.side} side") {
         val df = loadTestDataFrame()
         runSpatialQuery(df, predicate, queryWindow, queryWindowSide)
       }
@@ -64,20 +65,30 @@ class PreparedPredicateSuite extends TestBaseScala with TableDrivenPropertyCheck
   }
 
   private def loadTestDataFrame(): DataFrame = {
-    sparkSession.read.format("csv").option("header", "false").option("delimiter", testDataDelimiter)
+    sparkSession.read
+      .format("csv")
+      .option("header", "false")
+      .option("delimiter", testDataDelimiter)
       .load(spatialJoinLeftInputLocation)
       .withColumn("id", col("_c0").cast(IntegerType))
       .withColumn("geom", ST_GeomFromText(new Column("_c2")))
       .select("id", "geom")
   }
 
-  private def runSpatialQuery(df: DataFrame, predicate: String, queryWindow: String, queryWindowSide: QueryWindowSide) = {
+  private def runSpatialQuery(
+      df: DataFrame,
+      predicate: String,
+      queryWindow: String,
+      queryWindowSide: QueryWindowSide) = {
     val (condition, joinCondition) = queryWindowSide match {
-      case LeftSide => (s"$predicate(ST_GeomFromText('$queryWindow'), geom)", s"$predicate(q, geom)")
-      case RightSide => (s"$predicate(geom, ST_GeomFromText('$queryWindow'))", s"$predicate(geom, q)")
+      case LeftSide =>
+        (s"$predicate(ST_GeomFromText('$queryWindow'), geom)", s"$predicate(q, geom)")
+      case RightSide =>
+        (s"$predicate(geom, ST_GeomFromText('$queryWindow'))", s"$predicate(geom, q)")
     }
     val queryDf = df.where(condition).select(col("id"))
-    val oneRowDf = sparkSession.createDataFrame(Seq((1, new WKTReader().read(queryWindow)))).toDF("id2", "q")
+    val oneRowDf =
+      sparkSession.createDataFrame(Seq((1, new WKTReader().read(queryWindow)))).toDF("id2", "q")
     val joinDf = df.join(oneRowDf, expr(joinCondition)).select(col("id"))
     assert(collectPreparedPredicates(queryDf).nonEmpty)
     assert(collectPreparedPredicates(joinDf).isEmpty)

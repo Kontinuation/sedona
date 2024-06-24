@@ -32,50 +32,65 @@ import org.apache.spark.sql.sedona_sql.execution.SedonaBinaryExecNode
 import org.locationtech.jts.geom.Geometry
 
 /**
- * KNN / AKNN joins requires target geometries (objects) to be in the same partition as the query geometries.
- * To create an overlap and guarantee matching geometries end up in the same partition, the target geometry is expanded
- * during partitioning.
+ * KNN / AKNN joins requires target geometries (objects) to be in the same partition as the query
+ * geometries. To create an overlap and guarantee matching geometries end up in the same
+ * partition, the target geometry is expanded during partitioning.
  *
- * E.g.,
- * SELECT * FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, $numNeighbors, true)
- * SELECT * FROM QUERIES JOIN OBJECTS ON ST_AKNN(QUERIES.GEOM, OBJECTS.GEOM, $numNeighbors, true)
+ * E.g., SELECT * FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, $numNeighbors,
+ * true) SELECT * FROM QUERIES JOIN OBJECTS ON ST_AKNN(QUERIES.GEOM, OBJECTS.GEOM, $numNeighbors,
+ * true)
  *
- * @param left left side of the join
- * @param right right side of the join
- * @param leftShape shape expression for the left side
- * @param rightShape shape expression for the right side
- * @param k - number of neighbors to find
- * @param useApproximate whether to use approximate distance for the join
- * @param spatialPredicate spatial predicate as join condition
- * @param condition full join condition
- * @param extraCondition extra join condition other than spatialPredicate
+ * @param left
+ *   left side of the join
+ * @param right
+ *   right side of the join
+ * @param leftShape
+ *   shape expression for the left side
+ * @param rightShape
+ *   shape expression for the right side
+ * @param k
+ *   \- number of neighbors to find
+ * @param useApproximate
+ *   whether to use approximate distance for the join
+ * @param spatialPredicate
+ *   spatial predicate as join condition
+ * @param condition
+ *   full join condition
+ * @param extraCondition
+ *   extra join condition other than spatialPredicate
  */
-case class KNNJoinExec(left: SparkPlan,
-                       right: SparkPlan,
-                       leftShape: Expression,
-                       rightShape: Expression,
-                       k: Expression,
-                       useApproximate: Boolean,
-                       spatialPredicate: SpatialPredicate,
-                       isGeography: Boolean,
-                       condition: Expression,
-                       extraCondition: Option[Expression] = None)
-  extends SedonaBinaryExecNode
+case class KNNJoinExec(
+    left: SparkPlan,
+    right: SparkPlan,
+    leftShape: Expression,
+    rightShape: Expression,
+    k: Expression,
+    useApproximate: Boolean,
+    spatialPredicate: SpatialPredicate,
+    isGeography: Boolean,
+    condition: Expression,
+    extraCondition: Option[Expression] = None)
+    extends SedonaBinaryExecNode
     with TraitKNNJoinQueryExec
     with Logging {
 
   /**
    * Convert the both RDDs to SpatialRDDs
-   * @param leftRdd the left RDD
-   * @param leftShapeExpr the shape expression
-   * @param rightRdd the right RDD
-   * @param rightShapeExpr the shape expression
+   * @param leftRdd
+   *   the left RDD
+   * @param leftShapeExpr
+   *   the shape expression
+   * @param rightRdd
+   *   the right RDD
+   * @param rightShapeExpr
+   *   the shape expression
    * @return
    */
-  override def toSpatialRddPair(leftRdd: RDD[UnsafeRow],
-                                leftShapeExpr: Expression,
-                                rightRdd: RDD[UnsafeRow],
-                                rightShapeExpr: Expression): (SpatialRDD[Geometry], SpatialRDD[Geometry]) = {
+  override def toSpatialRddPair(
+      leftRdd: RDD[UnsafeRow],
+      leftShapeExpr: Expression,
+      rightRdd: RDD[UnsafeRow],
+      rightShapeExpr: Expression): (SpatialRDD[Geometry], SpatialRDD[Geometry]) = {
     if (isRasterJoin(leftShapeExpr, rightShapeExpr)) {
       throw new UnsupportedOperationException("Raster join is not supported by KNNJoinExec.")
     }
@@ -84,25 +99,35 @@ case class KNNJoinExec(left: SparkPlan,
 
   /**
    * Convert the left RDD (queries) to SpatialRDD
-   * @param rdd the left RDD
-   * @param shapeExpression the shape expression
-   * @param projection the projection
+   * @param rdd
+   *   the left RDD
+   * @param shapeExpression
+   *   the shape expression
+   * @param projection
+   *   the projection
    * @return
    */
-  override def leftToSpatialRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression,
-                                projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
+  override def leftToSpatialRDD(
+      rdd: RDD[UnsafeRow],
+      shapeExpression: Expression,
+      projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
     toSpatialRDD(rdd, shapeExpression, projection)
   }
 
   /**
    * Convert the right RDD (queries) to SpatialRDD
-   * @param rdd the right RDD
-   * @param shapeExpression the shape expression
-   * @param projection the projection
+   * @param rdd
+   *   the right RDD
+   * @param shapeExpression
+   *   the shape expression
+   * @param projection
+   *   the projection
    * @return
    */
-  override def rightToSpatialRDD(rdd: RDD[UnsafeRow], shapeExpression: Expression,
-                                 projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
+  override def rightToSpatialRDD(
+      rdd: RDD[UnsafeRow],
+      shapeExpression: Expression,
+      projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
     toSpatialRDD(rdd, shapeExpression, projection)
   }
 
@@ -117,20 +142,26 @@ case class KNNJoinExec(left: SparkPlan,
   }
 
   /**
-   * Execute the spatial partitioning for KNN join
-   * This is required to ensure that the target geometries (objects)
-   * are in the same partition as the query geometries.
+   * Execute the spatial partitioning for KNN join This is required to ensure that the target
+   * geometries (objects) are in the same partition as the query geometries.
    *
-   * Different KNN algorithms require different partitioning strategies.
-   * E.g., approximate KNN join requires a different partitioning strategy than exact KNN join.
+   * Different KNN algorithms require different partitioning strategies. E.g., approximate KNN
+   * join requires a different partitioning strategy than exact KNN join.
    *
-   * @param dominantShapes the dominant shapes (objects)
-   * @param followerShapes the follower shapes (queries)
-   * @param numPartitions the number of partitions
-   * @param sedonaConf the Sedona configuration
+   * @param dominantShapes
+   *   the dominant shapes (objects)
+   * @param followerShapes
+   *   the follower shapes (queries)
+   * @param numPartitions
+   *   the number of partitions
+   * @param sedonaConf
+   *   the Sedona configuration
    */
-  override def doSpatialPartitioning(dominantShapes: SpatialRDD[Geometry], followerShapes: SpatialRDD[Geometry],
-                                     numPartitions: Integer, sedonaConf: SedonaConf): Unit = {
+  override def doSpatialPartitioning(
+      dominantShapes: SpatialRDD[Geometry],
+      followerShapes: SpatialRDD[Geometry],
+      numPartitions: Integer,
+      sedonaConf: SedonaConf): Unit = {
     require(useApproximate, "Exact KNN join is not supported.")
     require(numPartitions > 0, "The number of partitions must be greater than 0.")
 
@@ -139,18 +170,20 @@ case class KNNJoinExec(left: SparkPlan,
 
     dominantShapes.setNeighborSampleNumber(kValue)
     dominantShapes.spatialPartitioning(GridType.ZORDER)
-    followerShapes.spatialPartitioning(dominantShapes.getPartitioner.asInstanceOf[ZOrderPartitioner].nonOverlappedPartitioner())
+    followerShapes.spatialPartitioning(
+      dominantShapes.getPartitioner.asInstanceOf[ZOrderPartitioner].nonOverlappedPartitioner())
 
     dominantShapes.buildIndex(IndexType.RTREE, true)
     followerShapes.buildIndex(IndexType.RTREE, true)
   }
 
   /**
-   * Get the KNN join parameters
-   * This is required to determine the join strategy to support different KNN join strategies.
-   * This function needs to be updated when new join strategies are supported.
+   * Get the KNN join parameters This is required to determine the join strategy to support
+   * different KNN join strategies. This function needs to be updated when new join strategies are
+   * supported.
    *
-   * @return the KNN join parameters
+   * @return
+   *   the KNN join parameters
    */
   override def getKNNJoinParams: JoinParams = {
     // Please update this function when new join strategies are added
@@ -162,12 +195,13 @@ case class KNNJoinExec(left: SparkPlan,
     joinParams
   }
 
- /**
-  * This function determines what join strategy is supported by the KNN join.
-  * This function needs to be updated when new join strategies are supported.
-  *
-  * @return true if the join is supported, false otherwise
-  */
+  /**
+   * This function determines what join strategy is supported by the KNN join. This function needs
+   * to be updated when new join strategies are supported.
+   *
+   * @return
+   *   true if the join is supported, false otherwise
+   */
   override def isSupported(): Boolean = {
     // Please update this function when new join strategies are supported
     // For example, we can set approximate KNN join is not supported for Sedona 1.6.
