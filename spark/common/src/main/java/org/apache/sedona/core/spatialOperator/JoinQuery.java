@@ -32,7 +32,7 @@ import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.enums.JoinBuildSide;
 import org.apache.sedona.core.joinJudgement.*;
-import org.apache.sedona.core.monitoring.Metrics;
+import org.apache.sedona.core.monitoring.JavaMetrics;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner;
 import org.apache.sedona.core.spatialRDD.CircleRDD;
 import org.apache.sedona.core.spatialRDD.SpatialRDD;
@@ -43,7 +43,7 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.PairFunction;
-import org.apache.spark.rdd.RDDExtension;
+import org.apache.spark.rdd.JavaRDDExtension;
 import org.apache.spark.sql.execution.metric.SQLMetric;
 import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
@@ -707,10 +707,10 @@ public class JoinQuery {
     verifyPartitioningMatch(leftRDD, rightRDD);
 
     SparkContext sparkContext = leftRDD.spatialPartitionedRDD.context();
-    LongAccumulator buildCount = Metrics.createMetric(sparkContext, "buildCount");
-    LongAccumulator streamCount = Metrics.createMetric(sparkContext, "streamCount");
-    LongAccumulator resultCount = Metrics.createMetric(sparkContext, "resultCount");
-    LongAccumulator candidateCount = Metrics.createMetric(sparkContext, "candidateCount");
+    LongAccumulator buildCount = JavaMetrics.createMetric(sparkContext, "buildCount");
+    LongAccumulator streamCount = JavaMetrics.createMetric(sparkContext, "streamCount");
+    LongAccumulator resultCount = JavaMetrics.createMetric(sparkContext, "resultCount");
+    LongAccumulator candidateCount = JavaMetrics.createMetric(sparkContext, "candidateCount");
 
     final SpatialPartitioner partitioner =
         (SpatialPartitioner) rightRDD.spatialPartitionedRDD.partitioner().get();
@@ -734,21 +734,22 @@ public class JoinQuery {
           // Left and right are both partitioned using advanced statistics. We can use the
           // statistics to
           // run adaptive spatial join.
-          LongAccumulator buildTime = Metrics.createMetric(sparkContext, "buildTime");
-          LongAccumulator buildLeftTasks = Metrics.createMetric(sparkContext, "buildLeftTasks");
-          LongAccumulator buildRightTasks = Metrics.createMetric(sparkContext, "buildRightTasks");
+          LongAccumulator buildTime = JavaMetrics.createMetric(sparkContext, "buildTime");
+          LongAccumulator buildLeftTasks = JavaMetrics.createMetric(sparkContext, "buildLeftTasks");
+          LongAccumulator buildRightTasks =
+              JavaMetrics.createMetric(sparkContext, "buildRightTasks");
           LongAccumulator prepareBuildTasks =
-              Metrics.createMetric(sparkContext, "prepareBuildTasks");
+              JavaMetrics.createMetric(sparkContext, "prepareBuildTasks");
           LongAccumulator prepareStreamTasks =
-              Metrics.createMetric(sparkContext, "prepareStreamTasks");
+              JavaMetrics.createMetric(sparkContext, "prepareStreamTasks");
           DoubleAccumulator partitionMinX =
-              Metrics.createDoubleMetric(sparkContext, "partitionMinX");
+              JavaMetrics.createDoubleMetric(sparkContext, "partitionMinX");
           DoubleAccumulator partitionMinY =
-              Metrics.createDoubleMetric(sparkContext, "partitionMinY");
+              JavaMetrics.createDoubleMetric(sparkContext, "partitionMinY");
           DoubleAccumulator partitionMaxX =
-              Metrics.createDoubleMetric(sparkContext, "partitionMaxX");
+              JavaMetrics.createDoubleMetric(sparkContext, "partitionMaxX");
           DoubleAccumulator partitionMaxY =
-              Metrics.createDoubleMetric(sparkContext, "partitionMaxY");
+              JavaMetrics.createDoubleMetric(sparkContext, "partitionMaxY");
           AdaptiveIndexLookupJudgement<U, T> judgement =
               new AdaptiveIndexLookupJudgement<>(
                   joinParams.spatialPredicate,
@@ -817,7 +818,7 @@ public class JoinQuery {
     JavaSparkContext sparkContext = new JavaSparkContext(leftRDD.spatialPartitionedRDD.context());
     judgement.prepare(sparkContext);
     final JavaRDD<Pair<U, T>> joinResult =
-        RDDExtension.javaZipPartitionsWithIndex(
+        JavaRDDExtension.javaZipPartitionsWithIndex(
             leftRDD.spatialPartitionedRDD, rightRDD.spatialPartitionedRDD, judgement);
     return joinResult.mapToPair(
         (PairFunction<Pair<U, T>, U, T>) pair -> new Tuple2<>(pair.getKey(), pair.getValue()));
@@ -839,10 +840,10 @@ public class JoinQuery {
     verifyPartitioningNumberMatch(queryRDD, objectRDD);
 
     SparkContext sparkContext = queryRDD.spatialPartitionedRDD.context();
-    LongAccumulator buildCount = Metrics.createMetric(sparkContext, "buildCount");
-    LongAccumulator streamCount = Metrics.createMetric(sparkContext, "streamCount");
-    LongAccumulator resultCount = Metrics.createMetric(sparkContext, "resultCount");
-    LongAccumulator candidateCount = Metrics.createMetric(sparkContext, "candidateCount");
+    LongAccumulator buildCount = JavaMetrics.createMetric(sparkContext, "buildCount");
+    LongAccumulator streamCount = JavaMetrics.createMetric(sparkContext, "streamCount");
+    LongAccumulator resultCount = JavaMetrics.createMetric(sparkContext, "resultCount");
+    LongAccumulator candidateCount = JavaMetrics.createMetric(sparkContext, "candidateCount");
 
     final SpatialPartitioner partitioner =
         (SpatialPartitioner) objectRDD.spatialPartitionedRDD.partitioner().get();

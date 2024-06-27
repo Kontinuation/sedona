@@ -33,7 +33,7 @@ import org.apache.sedona.common.FunctionsGeoTools;
 import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
-import org.apache.sedona.core.monitoring.Metrics;
+import org.apache.sedona.core.monitoring.JavaMetrics;
 import org.apache.sedona.core.spatialPartitioning.*;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitionerBuilder.SpatialPartitionBuildingStrategy;
 import org.apache.sedona.core.spatialPartitioning.quadtree.StandardQuadTree;
@@ -530,9 +530,9 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
     if (conf != null && conf.metricsForSpatialPartitioningEnabled()) {
       // Update metrics when iterating over partitioned geometries
       SparkContext sc = rawSpatialRDD.context();
-      LongAccumulator accInputCount = Metrics.createMetric(sc, "inputCount");
-      LongAccumulator accOutputCount = Metrics.createMetric(sc, "outputCount");
-      LongAccumulator accMaxDuplicates = Metrics.createMetric(sc, "maxDuplicates");
+      LongAccumulator accInputCount = JavaMetrics.createMetric(sc, "inputCount");
+      LongAccumulator accOutputCount = JavaMetrics.createMetric(sc, "outputCount");
+      LongAccumulator accMaxDuplicates = JavaMetrics.createMetric(sc, "maxDuplicates");
       geometryWithPartId =
           this.rawSpatialRDD.mapPartitionsToPair(
               (iterator) ->
