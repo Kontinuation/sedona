@@ -230,6 +230,7 @@ object Catalog {
     function[ST_KNN](),
     function[ST_AKNN](),
     function[ST_IsValidReason](),
+    function[ST_Rotate](),
     // Expression for rasters
     function[RS_NormalizedDifference](),
     function[RS_Mean](),
