@@ -25,6 +25,7 @@ import org.apache.spark.sql.sedona_sql.expressions.st_constructors.ST_GeomFromTe
 import org.apache.spark.sql.sedona_sql.strategy.join.KNNJoinExec
 import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
 import org.apache.spark.sql.{Column, DataFrame, Row}
+import org.apache.spark.sql.functions.expr
 import org.scalatest.matchers.must.Matchers.{be, include}
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.prop.TableDrivenPropertyChecks
@@ -252,6 +253,21 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       resultAll.mkString should be(
         "[2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19]"
       ) // validate for both AKNN and KNN
+    }
+
+    it(
+      "KNN Join with approximate algorithms should work on tiny datasets with lots of partitions") {
+      val df = sparkSession
+        .range(0, 4)
+        .toDF("id")
+        .withColumn("geom", expr("ST_Point(id, id)"))
+        .repartition(10)
+      df.createOrReplaceTempView("df10parts")
+      val dfResult = sparkSession.sql(
+        s"SELECT A.ID, B.ID FROM DF10PARTS A JOIN DF10PARTS B ON ST_AKNN(A.GEOM, B.GEOM, 4, false)")
+      val resultAll = dfResult.collect().sortBy(row => (row.getLong(0), row.getLong(1)))
+      resultAll.mkString should be(
+        "[0,0][0,1][0,2][0,3][1,0][1,1][1,2][1,3][2,0][2,1][2,2][2,3][3,0][3,1][3,2][3,3]")
     }
 
     it("KNN Join with exact algorithms are not supported yet") {

@@ -169,7 +169,7 @@ case class KNNJoinExec(
     require(kValue > 0, "The number of neighbors must be greater than 0.")
 
     dominantShapes.setNeighborSampleNumber(kValue)
-    dominantShapes.spatialPartitioning(GridType.ZORDER)
+    dominantShapes.spatialPartitioning(GridType.ZORDER, numPartitions)
     followerShapes.spatialPartitioning(
       dominantShapes.getPartitioner.asInstanceOf[ZOrderPartitioner].nonOverlappedPartitioner())
 
