@@ -101,6 +101,7 @@ public class Predicates {
 
   public static boolean knn(
       Geometry leftGeometry, Geometry rightGeometry, int k, boolean useSpheroid) {
-    throw new UnsupportedOperationException("KNN predicate is not supported in this version.");
+    // This should only be used as a test predicate used with extra join condition
+    return true;
   }
 }

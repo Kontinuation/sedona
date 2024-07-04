@@ -84,7 +84,12 @@ object TreeTraversal {
         set.foreach(f => extractSedonaClass(f.toString, nodeNames, isPhysicalPlan)) :: Nil
       case array: Array[_] =>
         array.foreach(f => extractSedonaClass(f.toString, nodeNames, isPhysicalPlan)) :: Nil
-      case other => extractSedonaClass(other.toString, nodeNames, isPhysicalPlan) :: Nil
+      case other =>
+        if (other != null) {
+          extractSedonaClass(other.toString, nodeNames, isPhysicalPlan) :: Nil
+        } else {
+          Nil
+        }
     }
 
   /**

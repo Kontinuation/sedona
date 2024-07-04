@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.apache.sedona.core.enums.GridType;
+import org.apache.sedona.core.spatialPartitioning.quadtree.ExtendedQuadTree;
 import org.apache.sedona.core.spatialPartitioning.quadtree.QuadRectangle;
 import org.apache.sedona.core.spatialPartitioning.quadtree.StandardQuadTree;
 import org.locationtech.jts.geom.Envelope;
@@ -85,6 +86,11 @@ public class SpatialPartitionerBuilder {
           tree = new IntervalTree(boundary, numPartitions);
           break;
         }
+      case QUADTREE_RTREE:
+        {
+          tree = new ExtendedQuadTree<>(boundary, numPartitions);
+          break;
+        }
 
       default:
         throw new IllegalArgumentException("Unsupported spatial partitioning method " + gridType);
@@ -135,6 +141,18 @@ public class SpatialPartitionerBuilder {
           }
         }
         break;
+
+      case QUADTREE_RTREE:
+        ExtendedQuadTree<Integer> extendedQuadTree = (ExtendedQuadTree<Integer>) tree;
+        for (final Envelope sample : samples) {
+          if (boundary.covers(sample)) {
+            extendedQuadTree.insert(sample);
+          } else if (boundary.intersects(sample)) {
+            Envelope truncatedSample = boundary.intersection(sample);
+            extendedQuadTree.insert(truncatedSample);
+          }
+        }
+        break;
     }
   }
 
@@ -161,6 +179,11 @@ public class SpatialPartitionerBuilder {
         IntervalTree linearTree = (IntervalTree) tree;
         linearTree.build(neighborSampleNumber, samplingProbability);
         return new ZOrderPartitioner(linearTree);
+
+      case QUADTREE_RTREE:
+        ExtendedQuadTree<Integer> extendedQuadTree = (ExtendedQuadTree<Integer>) tree;
+        extendedQuadTree.build(neighborSampleNumber, samplingProbability);
+        return new QuadTreeRTPartitioner(extendedQuadTree);
 
       default:
         throw new IllegalStateException("Unknown spatial partitioning method " + gridType);

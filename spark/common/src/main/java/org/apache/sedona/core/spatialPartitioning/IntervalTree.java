@@ -30,10 +30,12 @@ import scala.Tuple2;
  * a tree structure such as QuadTree, but rather a simple 1D List for storing the partition zones.
  */
 public class IntervalTree extends PartitioningUtils implements Serializable {
-  private final List<Envelope> samples = new ArrayList<>();
-  private final Envelope boundary;
+  // hold the samples temporarily
+  private final transient List<Envelope> samples = new ArrayList<>();
 
+  private final Envelope boundary;
   private int numPartitions;
+
   // ordered list of ranges of the partition zones in 1D space
   private List<Range<Long>> ranges;
   // ordered list of ranges of the partition zones in 1D space
@@ -87,6 +89,8 @@ public class IntervalTree extends PartitioningUtils implements Serializable {
     List<Range<Long>> partitionRanges = useNonOverlapped ? nonOverlappedRanges : ranges;
     for (int i = 0; i < partitionRanges.size(); i++) {
       if (partitionRanges.get(i).contains(zOrderValue)) {
+        // make sure point is not in the boundary of two partitions
+        if (useNonOverlapped && results.size() == 1) continue;
         results.add(new Tuple2<>(i, geometry));
       }
     }
@@ -109,6 +113,8 @@ public class IntervalTree extends PartitioningUtils implements Serializable {
     List<Range<Long>> partitionRanges = useNonOverlapped ? nonOverlappedRanges : ranges;
     for (int i = 0; i < partitionRanges.size(); i++) {
       if (partitionRanges.get(i).contains(zOrderValue)) {
+        // make sure point is not in the boundary of two partitions
+        if (useNonOverlapped && keys.size() == 1) continue;
         keys.add(i);
       }
     }

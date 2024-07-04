@@ -23,8 +23,8 @@ import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
-import org.apache.spark.sql.catalyst.expressions.{BindReferences, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateUnsafeProjection, GenerateUnsafeRowJoiner}
+import org.apache.spark.sql.catalyst.expressions.{BindReferences, Predicate, UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.locationtech.jts.geom.Geometry
@@ -44,9 +44,6 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
   override lazy val metrics: Map[String, SQLMetric] = Map.empty
 
   override protected def doExecute(): RDD[InternalRow] = {
-    // Check if the join is supported
-    isSupported
-
     // Execute the join
     executeKNNJoin(sedonaConf)
   }
@@ -103,7 +100,7 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
       doSpatialPartitioning(objectShapes, queryShapes, numPartitions, sedonaConf)
     } catch {
       case e: IllegalArgumentException => {
-        print(e.getMessage)
+        log.error(e.getMessage)
         // Partition number are not qualified
         // Use fallback num partitions specified in SedonaConf
         numPartitions = sedonaConf.getFallbackPartitionNum
@@ -158,7 +155,14 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
         val rightRow = r.getUserData.asInstanceOf[UnsafeRow]
         joinRow(leftRow, rightRow)
       }
-      joined
+
+      // Apply the extra join conditions if it exists (e.g., S.ID < Q.ID)
+      extraCondition match {
+        case Some(condition) =>
+          val boundCondition = Predicate.create(condition, output)
+          joined.filter(row => boundCondition.eval(row))
+        case None => joined
+      }
     }
   }
 
@@ -166,11 +170,6 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
   // that extends this trait.
   // Override these methods to provide the necessary functionality for the KNN join.
   def getKNNJoinParams: JoinParams
-
-  // Check if the join is supported
-  // This method should throw an exception if the join is not supported.
-  // Override this method to provide the necessary functionality for the KNN join.
-  def isSupported: Boolean
 }
 
 object TraitKNNJoinQueryExec {

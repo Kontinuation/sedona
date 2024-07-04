@@ -21,7 +21,7 @@ package org.apache.spark.sql.sedona_sql.strategy.join
 import org.apache.sedona.core.enums.{DistanceMetric, GridType, IndexType}
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
 import org.apache.sedona.core.spatialOperator.SpatialPredicate
-import org.apache.sedona.core.spatialPartitioning.ZOrderPartitioner
+import org.apache.sedona.core.spatialPartitioning.{QuadTreeRTPartitioner, ZOrderPartitioner}
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.internal.Logging
@@ -162,19 +162,65 @@ case class KNNJoinExec(
       followerShapes: SpatialRDD[Geometry],
       numPartitions: Integer,
       sedonaConf: SedonaConf): Unit = {
-    require(useApproximate, "Exact KNN join is not supported.")
     require(numPartitions > 0, "The number of partitions must be greater than 0.")
-
     val kValue: Int = this.k.eval().asInstanceOf[Int]
     require(kValue > 0, "The number of neighbors must be greater than 0.")
-
     dominantShapes.setNeighborSampleNumber(kValue)
+
+    if (useApproximate) {
+      approximateSpatialPartitioning(dominantShapes, followerShapes, numPartitions)
+    } else {
+      exactSpatialPartitioning(dominantShapes, followerShapes, numPartitions)
+    }
+  }
+
+  /**
+   * Approximate spatial partitioning for KNN join
+   * @param dominantShapes
+   *   the dominant (objects) shapes
+   * @param followerShapes
+   *   the follower (queries) shapes
+   * @param kValue
+   */
+  private def approximateSpatialPartitioning(
+      dominantShapes: SpatialRDD[Geometry],
+      followerShapes: SpatialRDD[Geometry],
+      numPartitions: Integer): Unit = {
+    // use z-order partitioning, as it is an approximate algorithm
     dominantShapes.spatialPartitioning(GridType.ZORDER, numPartitions)
     followerShapes.spatialPartitioning(
       dominantShapes.getPartitioner.asInstanceOf[ZOrderPartitioner].nonOverlappedPartitioner())
 
     dominantShapes.buildIndex(IndexType.RTREE, true)
-    followerShapes.buildIndex(IndexType.RTREE, true)
+  }
+
+  /**
+   * Exact spatial partitioning for KNN join
+   * @param dominantShapes
+   *   the dominant (objects) shapes
+   * @param followerShapes
+   *   the follower (queries) shapes
+   */
+  private def exactSpatialPartitioning(
+      dominantShapes: SpatialRDD[Geometry],
+      followerShapes: SpatialRDD[Geometry],
+      numPartitions: Integer): Unit = {
+    // analyze the both RDDs to get the statistics (e.g., boundary)
+    dominantShapes.advancedAnalyze()
+    followerShapes.advancedAnalyze()
+
+    // expand the boundary for partition to include both RDDs
+    dominantShapes.getStatistics.getBoundary.expandToInclude(
+      followerShapes.getStatistics.getBoundary)
+
+    // use modified quadtree partitioning, as it is an exact algorithm
+    dominantShapes.spatialPartitioning(GridType.QUADTREE_RTREE, numPartitions)
+    followerShapes.spatialPartitioning(
+      dominantShapes.getPartitioner
+        .asInstanceOf[QuadTreeRTPartitioner]
+        .nonOverlappedPartitioner())
+
+    dominantShapes.buildIndex(IndexType.RTREE, true)
   }
 
   /**
@@ -193,21 +239,5 @@ case class KNNJoinExec(
     val distanceMetric = if (isGeography) DistanceMetric.SPHEROID else DistanceMetric.EUCLIDEAN
     val joinParams = new JoinParams(IndexType.RTREE, kValue, distanceMetric)
     joinParams
-  }
-
-  /**
-   * This function determines what join strategy is supported by the KNN join. This function needs
-   * to be updated when new join strategies are supported.
-   *
-   * @return
-   *   true if the join is supported, false otherwise
-   */
-  override def isSupported(): Boolean = {
-    // Please update this function when new join strategies are supported
-    // For example, we can set approximate KNN join is not supported for Sedona 1.6.
-    if (!useApproximate) {
-      throw new UnsupportedOperationException("Exact KNN join is not supported.")
-    }
-    true
   }
 }

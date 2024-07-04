@@ -34,8 +34,11 @@ public enum GridType implements Serializable {
   /** K-D-B-tree partitioning (k-dimensional B-tree) */
   KDBTREE,
 
-  /** Z-ORDER based partitioning (morton space-filling curve) */
-  ZORDER;
+  /** Z-ORDER based partitioning (morton space-filling curve) for KNN joins */
+  ZORDER,
+
+  /** Modified Quad-tree partitioning for KNN joins */
+  QUADTREE_RTREE;
 
   /**
    * Gets the grid type.

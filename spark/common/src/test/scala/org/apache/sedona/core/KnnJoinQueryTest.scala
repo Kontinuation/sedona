@@ -21,9 +21,10 @@ package org.apache.sedona.core
 import org.apache.sedona.common.enums.FileDataSplitter
 import org.apache.sedona.core.enums.{DistanceMetric, GridType, IndexType}
 import org.apache.sedona.core.spatialOperator.JoinQuery
-import org.apache.sedona.core.spatialPartitioning.ZOrderPartitioner
+import org.apache.sedona.core.spatialPartitioning.{QuadTreeRTPartitioner, ZOrderPartitioner}
 import org.apache.sedona.core.spatialRDD.PointRDD
 import org.apache.sedona.sql.TestBaseScala
+import org.locationtech.jts.geom.Point
 import org.scalatest.prop.TableDrivenPropertyChecks.{Table, forAll}
 import org.scalatest.prop.TableFor7
 
@@ -48,7 +49,11 @@ class KnnJoinQueryTest extends TestBaseScala {
   // Function to read and parse the external file
   def readKnnTestCases(filePath: String): Seq[KnnTestCase] = {
     val lines = Using(Source.fromFile(filePath)) { source =>
-      source.getLines().drop(1).toList
+      source
+        .getLines()
+        .drop(1) // Drop the first line
+        .filterNot(line => line.trim.startsWith("#")) // Skip lines starting with #
+        .toList
     }
     lines match {
       case scala.util.Success(l) =>
@@ -70,13 +75,85 @@ class KnnJoinQueryTest extends TestBaseScala {
     }
   }
 
-  val knnTestCasesFilePath: String = testRootPath + "all-test-cases.csv"
-  val knnTestCasesList: Seq[KnnTestCase] = readKnnTestCases(knnTestCasesFilePath)
+  // All test cases for AKNN
+  val aknnTestCasesFilePath: String = testRootPath + "all-test-cases-aknn.csv"
+  val aknnTestCasesList: Seq[KnnTestCase] = readKnnTestCases(aknnTestCasesFilePath)
+  val aknnTestCases: TableFor7[Int, String, Int, Int, String, String, String] = Table(
+    ("id", "desc", "p", "k", "objectLocation", "queryLocation", "resultLocation"),
+    aknnTestCasesList.map(tc =>
+      (
+        tc.id,
+        "aknn_" + tc.desc,
+        tc.p,
+        tc.k,
+        tc.objectLocation,
+        tc.queryLocation,
+        tc.resultLocation)): _*)
 
+  forAll(aknnTestCases) {
+    (
+        id: Int,
+        desc: String,
+        p: Int,
+        k: Int,
+        objectLocation: String,
+        queryLocation: String,
+        resultLocation: String) =>
+      it(s"$id - $desc: p=$p, k=$k") {
+        val objectRDD =
+          new PointRDD(sc, testRootPath + objectLocation, 0, FileDataSplitter.CSV, true, p)
+        val queryRDD =
+          new PointRDD(sc, testRootPath + queryLocation, 0, FileDataSplitter.CSV, true, p)
+
+        objectRDD.setNeighborSampleNumber(k)
+        // use z-order partitioning, as it is an approximation algorithm
+        objectRDD.spatialPartitioning(GridType.ZORDER)
+        queryRDD.spatialPartitioning(
+          objectRDD.getPartitioner.asInstanceOf[ZOrderPartitioner].nonOverlappedPartitioner())
+
+        objectRDD.buildIndex(IndexType.RTREE, true)
+
+        // Custom ordering for Point based on coordinates
+        implicit val pointOrdering: Ordering[Point] = (p1: Point, p2: Point) => {
+          val cmp = p1.getX.compare(p2.getX)
+          if (cmp != 0) cmp else p1.getY.compare(p2.getY)
+        }
+
+        val knnOutputs = JoinQuery
+          .KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, k, DistanceMetric.EUCLIDEAN)
+          .collect()
+          .asScala
+          .toList
+
+        val sortedKnnOutputs = knnOutputs.sortBy { case (queryPoint, _) => queryPoint }
+
+        val output = sortedKnnOutputs.map { case (queryPoint, neighbors) =>
+          val sortedNeighbors = neighbors.asScala.toList.sorted
+          val neighborsString = sortedNeighbors.mkString(",")
+          s"$queryPoint,$neighborsString\n"
+        }.mkString
+
+        val expectedOutput =
+          new String(Files.readAllBytes(Paths.get(testRootPath + resultLocation)))
+        print(output)
+        assert(expectedOutput == output)
+      }
+  }
+
+  // All test cases for KNN
+  val knnTestCasesFilePath: String = testRootPath + "all-test-cases-knn.csv"
+  val knnTestCasesList: Seq[KnnTestCase] = readKnnTestCases(knnTestCasesFilePath)
   val knnTestCases: TableFor7[Int, String, Int, Int, String, String, String] = Table(
     ("id", "desc", "p", "k", "objectLocation", "queryLocation", "resultLocation"),
     knnTestCasesList.map(tc =>
-      (tc.id, tc.desc, tc.p, tc.k, tc.objectLocation, tc.queryLocation, tc.resultLocation)): _*)
+      (
+        tc.id,
+        "knn_" + tc.desc,
+        tc.p,
+        tc.k,
+        tc.objectLocation,
+        tc.queryLocation,
+        tc.resultLocation)): _*)
 
   forAll(knnTestCases) {
     (
@@ -93,21 +170,40 @@ class KnnJoinQueryTest extends TestBaseScala {
         val queryRDD =
           new PointRDD(sc, testRootPath + queryLocation, 0, FileDataSplitter.CSV, true, p)
 
+        // analyze the both RDDs to get the statistics (e.g., boundary)
+        objectRDD.advancedAnalyze()
+        queryRDD.advancedAnalyze()
+
+        // expand the boundary for partition to include both RDDs
+        objectRDD.getStatistics.getBoundary.expandToInclude(queryRDD.getStatistics.getBoundary)
+
+        // set the number of neighbors to be found
         objectRDD.setNeighborSampleNumber(k)
-        objectRDD.spatialPartitioning(GridType.ZORDER)
+
+        // use modified quadtree partitioning, as it is an exact algorithm
+        objectRDD.spatialPartitioning(GridType.QUADTREE_RTREE)
         queryRDD.spatialPartitioning(
-          objectRDD.getPartitioner.asInstanceOf[ZOrderPartitioner].nonOverlappedPartitioner())
+          objectRDD.getPartitioner.asInstanceOf[QuadTreeRTPartitioner].nonOverlappedPartitioner())
 
         objectRDD.buildIndex(IndexType.RTREE, true)
-        queryRDD.buildIndex(IndexType.RTREE, true)
+
+        // Custom ordering for Point based on coordinates
+        implicit val pointOrdering: Ordering[Point] = (p1: Point, p2: Point) => {
+          val cmp = p1.getX.compare(p2.getX)
+          if (cmp != 0) cmp else p1.getY.compare(p2.getY)
+        }
 
         val knnOutputs = JoinQuery
           .KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, k, DistanceMetric.EUCLIDEAN)
           .collect()
           .asScala
           .toList
-        val output = knnOutputs.map { case (queryPoint, neighbors) =>
-          val neighborsString = neighbors.asScala.mkString(",")
+
+        val sortedKnnOutputs = knnOutputs.sortBy { case (queryPoint, _) => queryPoint }
+
+        val output = sortedKnnOutputs.map { case (queryPoint, neighbors) =>
+          val sortedNeighbors = neighbors.asScala.toList.sorted
+          val neighborsString = sortedNeighbors.mkString(",")
           s"$queryPoint,$neighborsString\n"
         }.mkString
 
