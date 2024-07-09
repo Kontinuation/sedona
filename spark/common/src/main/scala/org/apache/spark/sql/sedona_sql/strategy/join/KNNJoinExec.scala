@@ -27,6 +27,7 @@ import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnsafeRow}
+import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sedona_sql.execution.SedonaBinaryExecNode
 import org.locationtech.jts.geom.Geometry
@@ -64,6 +65,7 @@ case class KNNJoinExec(
     right: SparkPlan,
     leftShape: Expression,
     rightShape: Expression,
+    joinType: JoinType,
     k: Expression,
     useApproximate: Boolean,
     spatialPredicate: SpatialPredicate,

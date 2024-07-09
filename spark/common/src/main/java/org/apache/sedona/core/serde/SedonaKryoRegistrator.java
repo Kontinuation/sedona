@@ -26,6 +26,7 @@ import org.apache.sedona.common.geometrySerde.SpatialIndexSerde;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.joinJudgement.AdaptiveIndexLookupJudgement;
 import org.apache.sedona.core.spatialOperator.Subdivide;
+import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner.OuterJoinUserData;
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector;
 import org.apache.spark.serializer.KryoRegistrator;
 import org.locationtech.jts.geom.Envelope;
@@ -66,5 +67,6 @@ public class SedonaKryoRegistrator implements KryoRegistrator {
     kryo.register(SubdivideOptions.class);
     kryo.register(AdvancedStatCollector.LargeGeometryInfo.class);
     kryo.register(Subdivide.SubdividedPart.class);
+    kryo.register(OuterJoinUserData.class);
   }
 }

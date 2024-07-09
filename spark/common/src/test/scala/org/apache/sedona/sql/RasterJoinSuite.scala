@@ -195,7 +195,7 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       ("df2 JOIN df1", "RS_Within(df2.geom, df1.rast)"))
 
     forAll(joinConditions) { case (joinClause, joinCondition) =>
-      val expected = buildExpectedResult(joinCondition)
+      val expected = buildExpectedResult(joinClause, joinCondition)
       it(s"$joinClause ON $joinCondition, with left side as dominant side") {
         withConf(
           Map(spatialJoinPartitionSideConfKey -> "left", advancedSpatialJoinConfKey -> "false")) {
@@ -231,6 +231,25 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           verifyResult(expected, result)
         }
       }
+      it(s"$joinClause ON $joinCondition (left-join), using advanced spatial join") {
+        val outerJoinClause = joinClause.replace("JOIN", "LEFT JOIN")
+        val expectedOuter = buildExpectedResult(outerJoinClause, joinCondition)
+        withConf(Map(advancedSpatialJoinConfKey -> "true")) {
+          val result =
+            sparkSession.sql(s"SELECT df1.id, df2.id FROM $outerJoinClause ON $joinCondition")
+          verifyResult(expectedOuter, result)
+        }
+      }
+      it(s"$joinClause ON $joinCondition (right-join), using advanced spatial join") {
+        val outerJoinClause = joinClause.replace("JOIN", "RIGHT JOIN")
+        val expectedOuter = buildExpectedResult(outerJoinClause, joinCondition)
+        withConf(Map(advancedSpatialJoinConfKey -> "true")) {
+          val result =
+            sparkSession.sql(s"SELECT df1.id, df2.id FROM $outerJoinClause ON $joinCondition")
+          verifyResult(expectedOuter, result)
+        }
+      }
+
       it(s"$joinClause ON $joinCondition, using subdivided join") {
         withConf(
           Map(
@@ -348,7 +367,7 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     geom
   }
 
-  private def buildExpectedResult(joinCondition: String): Seq[(Int, Int)] = {
+  private def buildExpectedResult(joinClause: String, joinCondition: String): Seq[(Int, Int)] = {
     val evaluate = joinCondition match {
       case "RS_Intersects(df1.rast, df2.geom)" | "RS_Intersects(df2.geom, df1.rast)" =>
         (r: GridCoverage2D, g: Geometry) => RasterPredicates.rsIntersects(r, g)
@@ -357,20 +376,58 @@ class RasterJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       case "RS_Contains(df2.geom, df1.rast)" | "RS_Within(df1.rast, df2.geom)" =>
         (r: GridCoverage2D, g: Geometry) => RasterPredicates.rsWithin(r, g)
     }
-    rasters.flatMap { case (rast, rastId) =>
-      geometries.flatMap { case (geom, geomId) =>
-        if (evaluate(rast, geom)) {
-          Some((rastId, geomId))
-        } else {
-          None
-        }
-      }
+
+    // df1 is rasters, df2 is geometries
+    val outerSide = joinClause match {
+      case "df1 LEFT JOIN df2" | "df1 LEFT OUTER JOIN df2" => Some("df1")
+      case "df1 RIGHT JOIN df2" | "df1 RIGHT OUTER JOIN df2" => Some("df2")
+      case "df2 LEFT JOIN df1" | "df2 LEFT OUTER JOIN df1" => Some("df2")
+      case "df2 RIGHT JOIN df1" | "df2 RIGHT OUTER JOIN df1" => Some("df1")
+      case _ => None
     }
+
+    val joinResults = outerSide match {
+      case None | Some("df1") =>
+        rasters.flatMap { case (rast, rastId) =>
+          val results = geometries.flatMap { case (geom, geomId) =>
+            if (evaluate(rast, geom)) {
+              Some((rastId, geomId))
+            } else {
+              None
+            }
+          }
+          if (results.isEmpty && outerSide.contains("df1")) {
+            Seq((rastId, -1))
+          } else {
+            results
+          }
+        }
+      case Some("df2") =>
+        geometries.flatMap { case (geom, geomId) =>
+          val results = rasters.flatMap { case (rast, rastId) =>
+            if (evaluate(rast, geom)) {
+              Some((rastId, geomId))
+            } else {
+              None
+            }
+          }
+          if (results.isEmpty) {
+            Seq((-1, geomId))
+          } else {
+            results
+          }
+        }
+    }
+    joinResults.sorted
   }
 
   private def verifyResult(expected: Seq[(Int, Int)], result: DataFrame): Unit = {
     isUsingOptimizedSpatialJoin(result)
-    val actual = result.collect().map(row => (row.getInt(0), row.getInt(1))).sorted
+    val actual = result
+      .collect()
+      .map(row =>
+        (if (row.isNullAt(0)) -1 else row.getInt(0), if (row.isNullAt(1)) -1 else row.getInt(1)))
+      .sorted
     assert(actual.nonEmpty)
     assert(actual === expected)
   }

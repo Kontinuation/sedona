@@ -273,16 +273,14 @@ case class BroadcastIndexJoinExec(
       boundStreamShape: Expression) = {
     distance match {
       case Some(distanceExpression) =>
+        val boundDistanceRef = BindReferences.bindReference(distanceExpression, streamed.output)
         streamResultsRaw.map(row => {
           val geom = boundStreamShape.eval(row).asInstanceOf[Array[Byte]]
           if (geom == null) {
             (null, row)
           } else {
             val geometry = GeometrySerializer.deserialize(geom)
-            val radius = BindReferences
-              .bindReference(distanceExpression, streamed.output)
-              .eval(row)
-              .asInstanceOf[Double]
+            val radius = boundDistanceRef.eval(row).asInstanceOf[Double]
             val envelope = geometry.getEnvelopeInternal
             envelope.expandBy(radius)
             (geometry.getFactory.toGeometry(envelope), row)

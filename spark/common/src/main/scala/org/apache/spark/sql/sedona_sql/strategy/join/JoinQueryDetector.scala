@@ -245,11 +245,10 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
 
     /*
      * If either side is small we can automatically broadcast just like Spark does.
-     * This only applies to inner joins as there are no optimized fallback plan for other join types.
      * It's better that users are explicit about broadcasting for other join types than seeing wildly different behavior
      * depending on data size.
      */
-    if (!broadcastLeft && !broadcastRight && joinType == Inner) {
+    if (!broadcastLeft && !broadcastRight) {
       val canAutoBroadCastLeft = canAutoBroadcastBySize(left)
       val canAutoBroadCastRight = canAutoBroadcastBySize(right)
       if (canAutoBroadCastLeft && canAutoBroadCastRight) {
@@ -653,7 +652,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       unneededLeftAttributes: Seq[Attribute],
       unneededRightAttributes: Seq[Attribute]): Seq[SparkPlan] = {
 
-    if (joinType != Inner) {
+    if (!isSupportedJoinType(joinType)) {
       return Nil
     }
 
@@ -670,6 +669,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
           planLater(right),
           a,
           b,
+          joinType,
           spatialPredicate,
           condition,
           extraCondition,
@@ -684,6 +684,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
           planLater(right),
           b,
           a,
+          joinType,
           invSpatialPredicate,
           condition,
           extraCondition,
@@ -708,7 +709,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       condition: Expression,
       extraCondition: Option[Expression] = None): Seq[SparkPlan] = {
 
-    if (joinType != Inner) {
+    if (!isSupportedJoinType(joinType)) {
       return Nil
     }
 
@@ -726,6 +727,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
               planLater(right),
               leftShape,
               rightShape,
+              joinType,
               distance,
               distanceBoundToLeft = true,
               spatialPredicate,
@@ -739,6 +741,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
               planLater(right),
               leftShape,
               rightShape,
+              joinType,
               distance,
               distanceBoundToLeft = false,
               spatialPredicate,
@@ -784,6 +787,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       planLater(right),
       a,
       b,
+      joinType,
       distance,
       useApproximate = useApproximate,
       spatialPredicate = null,
@@ -953,6 +957,24 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       case EqualNullSafe(l, r) if matches(l, left) && matches(r, right) => true
       case EqualNullSafe(l, r) if matches(l, right) && matches(r, left) => true
       case _ => false
+    }
+  }
+
+  /**
+   * Check if the given join type is supported.
+   * @param joinType
+   *   join type
+   * @return
+   *   true if the join type is supported, false otherwise
+   */
+  private def isSupportedJoinType(joinType: JoinType): Boolean = {
+    val advancedJoinEnabled = SedonaConf.fromActiveSession.useAdvancedSpatialJoin()
+    if (advancedJoinEnabled) {
+      // Advanced spatial join supports Inner, LeftOuter, RightOuter
+      joinType == Inner || joinType == LeftOuter || joinType == RightOuter
+    } else {
+      // Legacy spatial join supports only Inner
+      joinType == Inner
     }
   }
 

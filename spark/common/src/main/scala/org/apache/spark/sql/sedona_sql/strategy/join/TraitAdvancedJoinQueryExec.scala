@@ -21,31 +21,42 @@ package org.apache.spark.sql.sedona_sql.strategy.join
 import org.apache.sedona.common.subDivide.SubdivideOptions
 import org.apache.sedona.core.enums.{IndexType, JoinSubdivideMode}
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
-import org.apache.sedona.core.spatialOperator.Subdivide.{SubdivideRDDOptions, SubdividedPart, isSubdivideAccurate}
+import org.apache.sedona.core.spatialOperator.Subdivide.{isSubdivideAccurate, SubdividedPart, SubdivideRDDOptions}
 import org.apache.sedona.core.spatialOperator.{JoinQuery, SpatialPredicate, Subdivide}
 import org.apache.sedona.core.spatialPartitioning.BroadcastedSpatialPartitioner
+import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner
+import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner.OuterJoinUserData
+import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner
+import org.apache.sedona.core.spatialPartitioning.SpatialPartitioningMetrics
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.utils.SedonaConf
-import org.apache.spark.{SparkEnv, TaskContext}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, Literal, Predicate, UnsafeRow}
-import org.apache.spark.sql.execution.UnsafeExternalRowSorter.PrefixComputer
+import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
+import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
+import org.apache.spark.sql.catalyst.plans.FullOuter
+import org.apache.spark.sql.catalyst.plans.Inner
+import org.apache.spark.sql.catalyst.plans.InnerLike
+import org.apache.spark.sql.catalyst.plans.JoinType
+import org.apache.spark.sql.catalyst.plans.LeftOuter
+import org.apache.spark.sql.catalyst.plans.RightOuter
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.{SQLExecution, SparkPlan, UnsafeExternalRowSorter}
+import org.apache.spark.sql.execution.{SparkPlan, SQLExecution}
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.projectUnsafeRow
 import org.locationtech.jts.geom.Geometry
 import org.apache.spark.sql.sedona_sql.expressions.implicits._
 import org.apache.spark.sql.sedona_sql.utils.UnsafeRowRDDSorter.sortUnsafeRowRDD
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.util.collection.unsafe.sort.PrefixComparators.UnsignedPrefixComparator
-import org.apache.spark.util.collection.unsafe.sort.{PrefixComparator, RecordComparator}
+import org.apache.spark.HashPartitioner
+import org.apache.spark.sql.sedona_sql.utils.JoinedUnsafeRowRDDSorter
 import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
+import org.apache.spark.api.java.function.{Function0 => JavaFunction0, Function2 => JavaFunction2}
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.getNullUnsafeRow
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.getUnsafeRowFromUserData
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.joinTypeOf
 
-import java.util.concurrent.TimeUnit.NANOSECONDS
-import java.util.function.Supplier
 import scala.concurrent.duration.{Duration, MILLISECONDS}
 import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
 import scala.util.Try
@@ -57,6 +68,22 @@ import scala.util.Try
  */
 trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
   self: SparkPlan =>
+
+  override def output: Seq[Attribute] = {
+    joinType match {
+      case _: InnerLike =>
+        left.output ++ right.output
+      case LeftOuter =>
+        left.output ++ right.output.map(_.withNullability(true))
+      case RightOuter =>
+        left.output.map(_.withNullability(true)) ++ right.output
+      case FullOuter =>
+        left.output.map(_.withNullability(true)) ++ right.output.map(_.withNullability(true))
+      case x: Any =>
+        throw new IllegalArgumentException(
+          s"BroadcastIndexJoinExec should not take $x as the JoinType")
+    }
+  }
 
   /**
    * These are the attributes that will be discarded by the outer ProjectExec, so that it is
@@ -133,7 +160,7 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     var isRightGeometryAccurate = true
     var (leftShapes, rightShapes) =
       toSpatialRddPair(leftResultsRaw, boundLeftShape, rightResultsRaw, boundRightShape)
-    var (sortedLeftShapes, sortedRightShapes) = toSpatialRddPair(
+    val (sortedLeftShapes, sortedRightShapes) = toSpatialRddPair(
       sortedLeftResultsRaw,
       boundLeftShape,
       sortedRightResultsRaw,
@@ -163,14 +190,21 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     analyzeLeftAndRight(leftShapes, rightShapes)
     sortedLeftShapes.setStatistics(leftShapes.getStatistics)
     sortedRightShapes.setStatistics(rightShapes.getStatistics)
-    var spatialPartitioner = leftShapes.createSpatialPartitioner(
+    val spatialPartitionResult = leftShapes.createSpatialPartitioner(
       sedonaConf.getJoinGridType,
       rightShapes,
       sedonaConf.getFallbackPartitionNum,
       sedonaConf)
-    if (spatialPartitioner == null) {
-      return sparkContext.emptyRDD
+    if (spatialPartitionResult == null) {
+      return computeJoinResultForDisjointInputs(
+        leftResultsRaw,
+        rightResultsRaw,
+        left.output,
+        right.output,
+        joinType)
     }
+    var spatialPartitioner = spatialPartitionResult.getLeft
+    var spatialPartitioningMetrics = spatialPartitionResult.getRight
 
     // Try subdivide the spatial RDD if auto subdivide is enabled
     if (sedonaConf.getSpatialJoinSubdivideLeft == JoinSubdivideMode.AUTO ||
@@ -230,11 +264,13 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     // Recompute the spatial partitioner using re-analyzed data, which is more balanced for subdivided
     // geometries
     if (needReAnalyze) {
-      spatialPartitioner = leftShapes.createSpatialPartitioner(
+      val spatialPartitionResult = leftShapes.createSpatialPartitioner(
         sedonaConf.getJoinGridType,
         rightShapes,
         sedonaConf.getFallbackPartitionNum,
         sedonaConf)
+      spatialPartitioner = spatialPartitionResult.getLeft
+      spatialPartitioningMetrics = spatialPartitionResult.getRight
       sortedLeftShapes.setStatistics(leftShapes.getStatistics)
       sortedRightShapes.setStatistics(rightShapes.getStatistics)
     }
@@ -285,78 +321,138 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       spatialPartitioner = new BroadcastedSpatialPartitioner(
         sparkContext.broadcast(spatialPartitioner))
     }
-    leftShapes.spatialPartitioning(spatialPartitioner, sedonaConf)
-    rightShapes.spatialPartitioning(spatialPartitioner, sedonaConf)
+    // Wrap the spatial partitioner to support out-of-bounds partitions when doing outer join. Please
+    // note that we'll still perform an inner join when global subdivide is enabled, since subdivided
+    // outer joins are handled specially by joining back with original datasets.
+    if (joinType != Inner && subdivideLeftRDDOptions.isEmpty && subdivideRightRDDOptions.isEmpty) {
+      val numOufOfBoundsPartitions = determineNumOutOfBoundsPartitions(
+        joinType,
+        spatialPartitioner,
+        spatialPartitioningMetrics)
+      val outerSpatialPartitioner =
+        new OuterJoinSpatialPartitioner(spatialPartitioner, numOufOfBoundsPartitions, true)
+      val otherSpatialPartitioner =
+        new OuterJoinSpatialPartitioner(spatialPartitioner, numOufOfBoundsPartitions, false)
+      joinType match {
+        case LeftOuter =>
+          leftShapes.spatialPartitioning(outerSpatialPartitioner, sedonaConf)
+          rightShapes.spatialPartitioning(otherSpatialPartitioner, sedonaConf)
+        case RightOuter =>
+          leftShapes.spatialPartitioning(otherSpatialPartitioner, sedonaConf)
+          rightShapes.spatialPartitioning(outerSpatialPartitioner, sedonaConf)
+        case _ =>
+          throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
+      }
+    } else {
+      leftShapes.spatialPartitioning(spatialPartitioner, sedonaConf)
+      rightShapes.spatialPartitioning(spatialPartitioner, sedonaConf)
+    }
 
     // Perform spatial join
-    if (leftShapes.spatialPartitionedRDD == null) {
-      // Skipped spatial partitioning because the join result is empty
-      sparkContext.emptyRDD
-    } else {
-      if (sedonaConf.getSpatialPartitionerSavePath.nonEmpty) {
-        saveSpatialPartitionerToFile(
-          leftShapes.getPartitioner,
-          sedonaConf.getSpatialPartitionerSavePath)
-      }
-      val resultRdd = (subdivideLeftRDDOptions, subdivideRightRDDOptions) match {
-        case (None, None) =>
-          // No subdivision applied, so we can run the join directly
-          val joinedRdd = runSpatialJoin(
-            sedonaConf,
-            leftShapes,
-            rightShapes,
-            spatialPredicate,
-            localSubdivideLeftOptions,
-            localSubdivideRightOptions)
-          joinedRddToRowRdd(joinedRdd)
-        case _ =>
-          // When subdivide kicks in, the spatial predicate for running join must be INTERSECTS. If
-          // the original predicate is anything other than INTERSECTS, we need to change it to INTERSECTS, and
-          // add the original predicate to extraCondition to filter out the false positives.
-          val newExtraCondition = spatialPredicate match {
-            case SpatialPredicate.INTERSECTS => extraCondition
-            case _ => Some(condition)
-          }
-          // If the subdivided geometries are not accurate, we need to refine the INTERSECTS join result using
-          // the original geometries. This refinement could use prepared geometries so it will be faster than
-          // simply leaving everything to evaluating the extra condition.
-          val refineIntersectsUsingOriginalGeometries =
-            !(isLeftGeometryAccurate && isRightGeometryAccurate) && !isDistanceJoin && !isRasterJoin(
-              boundLeftShape,
-              boundRightShape)
-          val joinedRdd = runSpatialJoin(
-            sedonaConf,
-            leftShapes,
-            rightShapes,
-            SpatialPredicate.INTERSECTS,
-            localSubdivideLeftOptions,
-            localSubdivideRightOptions)
-          joinedSubdividedRddToRowRdd(
-            joinedRdd,
-            sortedLeftResultsRaw,
-            sortedRightResultsRaw,
-            subdivideLeftRDDOptions,
-            subdivideRightRDDOptions,
-            refineIntersectsUsingOriginalGeometries,
+    if (sedonaConf.getSpatialPartitionerSavePath.nonEmpty) {
+      saveSpatialPartitionerToFile(
+        leftShapes.getPartitioner,
+        sedonaConf.getSpatialPartitionerSavePath)
+    }
+    val resultRdd = (subdivideLeftRDDOptions, subdivideRightRDDOptions) match {
+      case (None, None) =>
+        // No subdivision applied, so we can run the join directly
+        val joinedRdd = runSpatialJoin(
+          sedonaConf,
+          leftShapes,
+          rightShapes,
+          joinType,
+          spatialPredicate,
+          extraCondition,
+          localSubdivideLeftOptions,
+          localSubdivideRightOptions)
+        joinType match {
+          case Inner => innerJoinedRddToRowRdd(joinedRdd)
+          case LeftOuter | RightOuter => outerJoinedRddToRowRdd(joinedRdd)
+          case _ => throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
+        }
+      case _ =>
+        // When subdivide kicks in, the spatial predicate for running join must be INTERSECTS. If
+        // the original predicate is anything other than INTERSECTS, we need to change it to INTERSECTS, and
+        // add the original predicate to extraCondition to filter out the false positives.
+        val newExtraCondition = spatialPredicate match {
+          case SpatialPredicate.INTERSECTS => extraCondition
+          case _ => Some(condition)
+        }
+        // If the subdivided geometries are not accurate, we need to refine the INTERSECTS join result using
+        // the original geometries. This refinement could use prepared geometries so it will be faster than
+        // simply leaving everything to evaluating the extra condition.
+        val refineIntersectsUsingOriginalGeometries =
+          !(isLeftGeometryAccurate && isRightGeometryAccurate) && !isDistanceJoin && !isRasterJoin(
             boundLeftShape,
-            boundRightShape,
-            newExtraCondition)
-      }
+            boundRightShape)
+        // Join type is INNER when running the spatial run algorithm regardless of the actual join
+        // type. We'll join back with the original datasets using outer join later in
+        // joinedSubdividedRddToRowRdd if the actual join type is outer join.
+        val joinedRdd = runSpatialJoin(
+          sedonaConf,
+          leftShapes,
+          rightShapes,
+          Inner,
+          SpatialPredicate.INTERSECTS,
+          None,
+          localSubdivideLeftOptions,
+          localSubdivideRightOptions)
+        joinedSubdividedRddToRowRdd(
+          joinType,
+          joinedRdd,
+          sortedLeftResultsRaw,
+          sortedRightResultsRaw,
+          subdivideLeftRDDOptions,
+          subdivideRightRDDOptions,
+          refineIntersectsUsingOriginalGeometries,
+          boundLeftShape,
+          boundRightShape,
+          newExtraCondition)
+    }
 
-      // We've already built the joined RDD. Now it is safe to free up memory used by the statistics data,
-      // especially sampled envelopes on both sides
-      leftShapes.forgetStatistics()
-      rightShapes.forgetStatistics()
-      sortedLeftShapes.forgetStatistics()
-      sortedRightShapes.forgetStatistics()
-      resultRdd
+    // We've already built the joined RDD. Now it is safe to free up memory used by the statistics data,
+    // especially sampled envelopes on both sides
+    leftShapes.forgetStatistics()
+    rightShapes.forgetStatistics()
+    sortedLeftShapes.forgetStatistics()
+    sortedRightShapes.forgetStatistics()
+    resultRdd
+  }
+
+  private def computeJoinResultForDisjointInputs(
+      leftResultsRaw: RDD[UnsafeRow],
+      rightResultsRaw: RDD[UnsafeRow],
+      leftOutput: Seq[Attribute],
+      rightOutput: Seq[Attribute],
+      joinType: JoinType): RDD[InternalRow] = {
+    joinType match {
+      case Inner => sparkContext.emptyRDD
+      case LeftOuter =>
+        leftResultsRaw.mapPartitions { iter =>
+          val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
+          val rightNullRow = getNullUnsafeRow(right.output)
+          iter.map { row =>
+            joiner.join(row, rightNullRow)
+          }
+        }
+      case RightOuter =>
+        rightResultsRaw.mapPartitions { iter =>
+          val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
+          val leftNullRow = getNullUnsafeRow(left.output)
+          iter.map { row =>
+            joiner.join(leftNullRow, row)
+          }
+        }
+      case _ => throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
     }
   }
 
   private def joinedSubdividedRddToRowRdd(
+      joinType: JoinType,
       joinedRdd: RDD[(Geometry, Geometry)],
-      leftResultsRaw: RDD[UnsafeRow],
-      rightResultsRaw: RDD[UnsafeRow],
+      sortedLeftResultsRaw: RDD[UnsafeRow],
+      sortedRightResultsRaw: RDD[UnsafeRow],
       subdivideLeftRDDOptions: Option[SubdivideRDDOptions],
       subdivideRightRDDOptions: Option[SubdivideRDDOptions],
       refineIntersectsUsingOriginalGeometries: Boolean,
@@ -388,24 +484,70 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     subdivideLeftRDDOptions.foreach { options =>
       if (!options.keepUserData) {
         joinedRowsWithIds =
-          recoverOriginalRowData(joinedRowsWithIds, leftResultsRaw, joinWithLeftSide = true)
+          recoverOriginalRowData(joinedRowsWithIds, sortedLeftResultsRaw, joinWithLeftSide = true)
         lastJoinedSide = Some(LeftSide)
       }
     }
     subdivideRightRDDOptions.foreach { options =>
       if (!options.keepUserData) {
-        joinedRowsWithIds =
-          recoverOriginalRowData(joinedRowsWithIds, rightResultsRaw, joinWithLeftSide = false)
+        joinedRowsWithIds = recoverOriginalRowData(
+          joinedRowsWithIds,
+          sortedRightResultsRaw,
+          joinWithLeftSide = false)
         lastJoinedSide = Some(RightSide)
       }
     }
 
-    // Convert pair of joined rows to a single joined row
-    joinedRowsWithIds.mapPartitions { iter =>
-      val joinRow = {
-        val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
+    val joinedRowsWithKeys: RDD[(Long, UnsafeRow)] = joinedRowsWithIds.mapPartitions { iter =>
+      val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
+
+      // The UnsafeRow in joinedRowsWithKeys is not always the joined row. The actual row depends
+      // on the join type. For inner join, the row is the joined row. For left/right outer join,
+      // the row is the row on the non-outer side. We'll perform a outer-join with the outer side
+      // later to create joined rows.
+      val createJoinResult = joinType match {
+        case LeftOuter =>
+          (leftId: Long, _: Long, _: UnsafeRow, rightRow: UnsafeRow) => (leftId, rightRow)
+        case RightOuter =>
+          (_: Long, rightId: Long, leftRow: UnsafeRow, _: UnsafeRow) => (rightId, leftRow)
+        case Inner =>
+          (_: Long, _: Long, leftRow: UnsafeRow, rightRow: UnsafeRow) =>
+            (-1L, joiner.join(leftRow, rightRow))
+        case _ =>
+          throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
+      }
+
+      // Similar to createJoinResult, but taking boundCondition into consideration.
+      val createOrIgnoreJoinResult = extraCondition match {
+        case Some(condition) =>
+          val boundCondition = Predicate.create(condition, output)
+          joinType match {
+            case LeftOuter | RightOuter =>
+              (leftId: Long, rightId: Long, leftRow: UnsafeRow, rightRow: UnsafeRow) => {
+                val joinedRow = joiner.join(leftRow, rightRow)
+                if (boundCondition.eval(joinedRow)) {
+                  Some(createJoinResult(leftId, rightId, leftRow, rightRow))
+                } else {
+                  None
+                }
+              }
+            case Inner =>
+              (_: Long, _: Long, leftRow: UnsafeRow, rightRow: UnsafeRow) => {
+                val joinedRow = joiner.join(leftRow, rightRow)
+                if (boundCondition.eval(joinedRow)) Some((-1L, joinedRow)) else None
+              }
+            case _ =>
+              throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
+          }
+        case None =>
+          (leftId: Long, rightId: Long, leftRow: UnsafeRow, rightRow: UnsafeRow) =>
+            Some(createJoinResult(leftId, rightId, leftRow, rightRow))
+      }
+
+      val joinRows = {
         if (!refineIntersectsUsingOriginalGeometries) {
-          (_: Long, _: Long, l: UnsafeRow, r: UnsafeRow) => Some(joiner.join(l, r))
+          (leftId: Long, rightId: Long, l: UnsafeRow, r: UnsafeRow) =>
+            createOrIgnoreJoinResult(leftId, rightId, l, r)
         } else {
           // If either side is in-accurate, we have to re-evaluate INTERSECTS predicate using the original geometries.
           // This is good to have even we have extraCondition to evaluate, because this will be using prepared
@@ -417,16 +559,20 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
               var lastLeftId: Long = -1
               var lastPreparedLeft: PreparedGeometry = null
               val factory = new PreparedGeometryFactory()
-              (leftId: Long, _: Long, l: UnsafeRow, r: UnsafeRow) => {
-                if (leftId != lastLeftId) {
-                  lastPreparedLeft = factory.create(boundLeftShape.toGeometry(l))
-                  lastLeftId = leftId
-                }
-                val rightGeom = boundRightShape.toGeometry(r)
-                if (lastPreparedLeft.intersects(rightGeom)) {
-                  Some(joiner.join(l, r))
+              (leftId: Long, rightId: Long, l: UnsafeRow, r: UnsafeRow) => {
+                if (leftId == -1 || rightId == -1) {
+                  Some(createJoinResult(leftId, rightId, l, r))
                 } else {
-                  None
+                  if (leftId != lastLeftId) {
+                    lastPreparedLeft = factory.create(boundLeftShape.toGeometry(l))
+                    lastLeftId = leftId
+                  }
+                  val rightGeom = boundRightShape.toGeometry(r)
+                  if (lastPreparedLeft.intersects(rightGeom)) {
+                    createOrIgnoreJoinResult(leftId, rightId, l, r)
+                  } else {
+                    None
+                  }
                 }
               }
             case Some(RightSide) =>
@@ -434,48 +580,82 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
               var lastRightId: Long = -1
               var lastPreparedRight: PreparedGeometry = null
               val factory = new PreparedGeometryFactory()
-              (_: Long, rightId: Long, l: UnsafeRow, r: UnsafeRow) => {
-                if (rightId != lastRightId) {
-                  lastPreparedRight = factory.create(boundRightShape.toGeometry(r))
-                  lastRightId = rightId
-                }
-                val leftGeom = boundLeftShape.toGeometry(l)
-                if (lastPreparedRight.intersects(leftGeom)) {
-                  Some(joiner.join(l, r))
+              (leftId: Long, rightId: Long, l: UnsafeRow, r: UnsafeRow) => {
+                if (leftId == -1 || rightId == -1) {
+                  Some(createJoinResult(leftId, rightId, l, r))
                 } else {
-                  None
+                  if (rightId != lastRightId) {
+                    lastPreparedRight = factory.create(boundRightShape.toGeometry(r))
+                    lastRightId = rightId
+                  }
+                  val leftGeom = boundLeftShape.toGeometry(l)
+                  if (lastPreparedRight.intersects(leftGeom)) {
+                    createOrIgnoreJoinResult(leftId, rightId, l, r)
+                  } else {
+                    None
+                  }
                 }
               }
             case None =>
               // This won't be common: if we need the original geometry here, we should not keep it with the user data,
               // otherwise the shuffle write/read will be huge. The subdivided spatial join planner should have avoided
               // this situation.
-              (_: Long, _: Long, l: UnsafeRow, r: UnsafeRow) => {
-                val leftGeom = boundLeftShape.toGeometry(l)
-                val rightGeom = boundRightShape.toGeometry(r)
-                if (leftGeom.intersects(rightGeom)) {
-                  Some(joiner.join(l, r))
+              (leftId: Long, rightId: Long, l: UnsafeRow, r: UnsafeRow) => {
+                if (leftId == -1 || rightId == -1) {
+                  Some(createJoinResult(leftId, rightId, l, r))
                 } else {
-                  None
+                  val leftGeom = boundLeftShape.toGeometry(l)
+                  val rightGeom = boundRightShape.toGeometry(r)
+                  if (leftGeom.intersects(rightGeom)) {
+                    createOrIgnoreJoinResult(leftId, rightId, l, r)
+                  } else {
+                    None
+                  }
                 }
               }
           }
         }
       }
 
-      val joined = iter.flatMap { case ((leftId, rightId), (leftRow, rightRow)) =>
-        joinRow(leftId, rightId, leftRow, rightRow)
+      iter.flatMap { case ((leftId, rightId), (leftRow, rightRow)) =>
+        joinRows(leftId, rightId, leftRow, rightRow)
       }
-      extraCondition match {
-        case Some(condition) =>
-          val boundCondition = Predicate.create(condition, output)
-          joined.filter(row => boundCondition.eval(row))
-        case None => joined
-      }
+    }
+
+    joinType match {
+      case Inner => joinedRowsWithKeys.map(_._2)
+      case LeftOuter =>
+        val rightNullRow = getNullUnsafeRow(right.output)
+        val originalRowWithId =
+          Subdivide.attachId(sortedLeftResultsRaw).rdd.map { case (id, row) => (id.toLong, row) }
+        originalRowWithId.leftOuterJoin(joinedRowsWithKeys).mapPartitions { iter =>
+          val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
+          iter.map { case (_, (leftRow, rightSide)) =>
+            rightSide match {
+              case Some(rightRow) => joiner.join(leftRow, rightRow)
+              case None => joiner.join(leftRow, rightNullRow)
+            }
+          }
+        }
+      case RightOuter =>
+        val leftNullRow = getNullUnsafeRow(left.output)
+        val originalRowWithId =
+          Subdivide.attachId(sortedRightResultsRaw).rdd.map { case (id, row) => (id.toLong, row) }
+        joinedRowsWithKeys.rightOuterJoin(originalRowWithId).mapPartitions { iter =>
+          val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
+          iter.map { case (_, (leftSide, rightRow)) =>
+            leftSide match {
+              case Some(leftRow) => joiner.join(leftRow, rightRow)
+              case None => joiner.join(leftNullRow, rightRow)
+            }
+          }
+        }
+      case _ =>
+        throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
     }
   }
 
-  private def recoverOriginalRowData[T](
+  private def recoverOriginalRowData(
       joinedRowsWithIds: RDD[((Long, Long), (UnsafeRow, UnsafeRow))],
       originalRdd: RDD[UnsafeRow],
       joinWithLeftSide: Boolean): RDD[((Long, Long), (UnsafeRow, UnsafeRow))] = {
@@ -499,9 +679,32 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       sedonaConf: SedonaConf,
       leftShapes: SpatialRDD[Geometry],
       rightShapes: SpatialRDD[Geometry],
+      joinType: JoinType,
       spatialPredicate: SpatialPredicate,
+      extraCondition: Option[Expression],
       localSubdivideLeftOptions: Option[SubdivideOptions],
       localSubdivideRightOptions: Option[SubdivideOptions]) = {
+    // Create an extraFilterCreator to filter geometry pairs using extra condition within the
+    // local spatial join evaluator.
+    val outputAttributes = this.output
+    val leftSchema = left.schema
+    val rightSchema = right.schema
+    val extraFilterCreator: JavaFunction0[JavaFunction2[Geometry, Geometry, java.lang.Boolean]] =
+      extraCondition match {
+        case Some(condition) =>
+          () => {
+            val joiner = GenerateUnsafeRowJoiner.create(leftSchema, rightSchema)
+            val boundCondition = Predicate.create(condition, outputAttributes)
+            (l: Geometry, r: Geometry) => {
+              val leftRow = getUnsafeRowFromUserData(l)
+              val rightRow = getUnsafeRowFromUserData(r)
+              val joinedRow = joiner.join(leftRow, rightRow)
+              boundCondition.eval(joinedRow)
+            }
+          }
+        case None => null
+      }
+
     // Run spatial join
     val metricBuildCount = longMetric("buildCount")
     val metricCandidateCount = longMetric("candidateCount")
@@ -515,6 +718,8 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     val joinParams = new JoinParams(
       true,
       spatialPredicate,
+      extraFilterCreator,
+      joinTypeOf(joinType),
       IndexType.RTREE,
       sedonaConf.getJoinBuildSide,
       -1,
@@ -597,8 +802,6 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
   /**
    * Run the body with the given job description.
    *
-   * @param spark
-   *   Spark session
    * @param description
    *   Job description
    * @param body
@@ -658,7 +861,10 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
           spatialRDD
         }
       case None =>
-        if (unneededAttributes.isEmpty) spatialRDD
+        // We need the original geometries to remove extra rows with null on the non-outer side
+        // when running outer joins (see outerJoinedRddToRowRdd), so this optimization is only
+        // correct when running inner joins.
+        if (joinType != Inner || unneededAttributes.isEmpty) spatialRDD
         else {
           log.info(
             s"Discard unneeded attributes on $side: $unneededAttributes, projection: $projectionExpr")
@@ -689,8 +895,114 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       case None => spatialRDD
     }
   }
+
+  private def innerJoinedRddToRowRdd(joinedRdd: RDD[(Geometry, Geometry)]): RDD[InternalRow] = {
+    joinedRdd.mapPartitions { iter =>
+      val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
+      iter.map { case (l, r) =>
+        val leftRow = l.getUserData.asInstanceOf[UnsafeRow]
+        val rightRow = r.getUserData.asInstanceOf[UnsafeRow]
+        joiner.join(leftRow, rightRow)
+      }
+    }
+  }
+
+  private def outerJoinedRddToRowRdd(joinedRdd: RDD[(Geometry, Geometry)]): RDD[InternalRow] = {
+    val leftNullUnsafeRow = getNullUnsafeRow(left.output)
+    val rightNullUnsafeRow = getNullUnsafeRow(right.output)
+    val joinedRowsWithKeysRdd = joinedRdd.mapPartitions { iter =>
+      val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
+      iter.flatMap { case (l, r) =>
+        val leftRow = if (l != null) getUnsafeRowFromUserData(l) else leftNullUnsafeRow
+        val rightRow = if (r != null) getUnsafeRowFromUserData(r) else rightNullUnsafeRow
+        val joinedRow = joiner.join(leftRow, rightRow)
+        val key = joinType match {
+          case LeftOuter => leftRow.hashCode()
+          case RightOuter => rightRow.hashCode()
+        }
+        Some((key, joinedRow))
+      }
+    }
+
+    // Remove joined rows that are all null on the other side when there are non-null rows present.
+    // We have to colocate rows with the same outer-side together by doing a partitionBy.
+    val repartitionedJoinedRowsRdd =
+      joinedRowsWithKeysRdd.partitionBy(new HashPartitioner(joinedRdd.getNumPartitions)).map(_._2)
+    val perPartitionSortedJoinedRowsRdd = JoinedUnsafeRowRDDSorter.sortJoinedUnsafeRowRDD(
+      repartitionedJoinedRowsRdd,
+      joinType,
+      schema,
+      output,
+      left.output,
+      right.output)
+    perPartitionSortedJoinedRowsRdd.mapPartitions { iter =>
+      val (outerProjection, otherProjection) =
+        JoinedUnsafeRowRDDSorter.createProjections(joinType, output, left.output, right.output)
+      var currentKeyRow: UnsafeRow = null
+      var seenNonNullRows = false
+      iter.flatMap { joinedRow =>
+        val keyRow = outerProjection(joinedRow)
+        val otherRow = otherProjection(joinedRow)
+        if (keyRow != currentKeyRow) {
+          currentKeyRow = keyRow.copy()
+          seenNonNullRows = false
+        }
+        if (JoinedUnsafeRowRDDSorter.isAllNull(otherRow)) {
+          if (seenNonNullRows) None else Some(joinedRow)
+        } else {
+          seenNonNullRows = true
+          Some(joinedRow)
+        }
+      }
+    }
+  }
+
+  private def determineNumOutOfBoundsPartitions(
+      joinType: JoinType,
+      spatialPartitioner: SpatialPartitioner,
+      spatialPartitioningMetrics: SpatialPartitioningMetrics): Int = {
+    val numPartitions = joinType match {
+      case LeftOuter =>
+        spatialPartitioner.numPartitions * (1 - spatialPartitioningMetrics.getLeftPartitionedRatio)
+      case RightOuter =>
+        spatialPartitioner.numPartitions * (1 - spatialPartitioningMetrics.getRightPartitionedRatio)
+      case _ => throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
+    }
+    Math.min(Math.max(1, numPartitions.toInt), sedonaConf.getMaxGuessedPartitionNumber)
+  }
 }
 
 object TraitAdvancedJoinQueryExec {
   val counter = new java.util.concurrent.atomic.AtomicLong(0)
+
+  /**
+   * Get UnsafeRow object from the user data of a geometry object.
+   * @param geom
+   *   Geometry object
+   * @return
+   *   UnsafeRow object
+   */
+  def getUnsafeRowFromUserData(geom: Geometry): UnsafeRow = {
+    geom.getUserData match {
+      case unsafeRow: UnsafeRow => unsafeRow
+      case d: OuterJoinUserData => d.userData.asInstanceOf[UnsafeRow]
+      case _ => throw new RuntimeException("Unexpected user data")
+    }
+  }
+
+  def joinTypeOf(joinType: JoinType): org.apache.sedona.core.enums.JoinType =
+    joinType match {
+      case Inner => org.apache.sedona.core.enums.JoinType.INNER
+      case LeftOuter => org.apache.sedona.core.enums.JoinType.LEFT_OUTER
+      case RightOuter => org.apache.sedona.core.enums.JoinType.RIGHT_OUTER
+      case FullOuter => org.apache.sedona.core.enums.JoinType.FULL_OUTER
+      case _ => throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
+    }
+
+  def getNullUnsafeRow(attributes: Seq[Attribute]): UnsafeRow = {
+    val nullableAttributes = attributes.map(_.withNullability(true))
+    val nullRow = new GenericInternalRow(attributes.length)
+    val projection = UnsafeProjection.create(nullableAttributes, nullableAttributes)
+    projection(nullRow)
+  }
 }

@@ -40,4 +40,21 @@ public final class DedupParams implements Serializable {
   public List<Envelope> getPartitionExtents() {
     return partitionExtents;
   }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (!(o instanceof DedupParams)) {
+      return false;
+    }
+    DedupParams that = (DedupParams) o;
+    return Objects.equals(partitionExtents, that.partitionExtents);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(partitionExtents);
+  }
 }

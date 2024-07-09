@@ -27,7 +27,8 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, Predicate, UnsafeRow}
-import org.apache.spark.sql.execution.{SQLExecution, SparkPlan}
+import org.apache.spark.sql.catalyst.plans.JoinType
+import org.apache.spark.sql.execution.{SparkPlan, SQLExecution}
 import org.locationtech.jts.geom.Geometry
 
 import java.io.PrintWriter
@@ -40,6 +41,7 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
   val right: SparkPlan
   val leftShape: Expression
   val rightShape: Expression
+  val joinType: JoinType
   val spatialPredicate: SpatialPredicate
   val condition: Expression
   val extraCondition: Option[Expression]

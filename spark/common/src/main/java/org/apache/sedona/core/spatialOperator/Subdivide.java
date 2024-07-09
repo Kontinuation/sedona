@@ -41,6 +41,7 @@ import org.apache.sedona.core.utils.GeometrySizeEstimator;
 import org.apache.sedona.core.utils.SedonaConf;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.Function2;
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
@@ -80,7 +81,14 @@ public class Subdivide {
     @Override
     public void write(Kryo kryo, Output output) {
       output.writeLong(id);
-      kryo.writeClassAndObject(output, userData);
+      if (userData instanceof UnsafeRow) {
+        // fast path for joining DataFrames
+        output.writeBoolean(true);
+        ((UnsafeRow) userData).write(kryo, output);
+      } else {
+        output.writeBoolean(false);
+        kryo.writeClassAndObject(output, userData);
+      }
       if (origGeomWithoutUserData != null) {
         byte[] serializedGeom = GeometrySerializer.serialize(origGeomWithoutUserData);
         output.writeInt(serializedGeom.length);
@@ -93,7 +101,13 @@ public class Subdivide {
     @Override
     public void read(Kryo kryo, Input input) {
       id = input.readLong();
-      userData = kryo.readClassAndObject(input);
+      if (input.readBoolean()) {
+        // fast path for joining DataFrames
+        userData = new UnsafeRow();
+        ((UnsafeRow) userData).read(kryo, input);
+      } else {
+        userData = kryo.readClassAndObject(input);
+      }
       int length = input.readInt();
       if (length > 0) {
         byte[] serializedGeom = input.readBytes(length);
@@ -491,8 +505,8 @@ public class Subdivide {
     }
     if (!(isLeftSideAccurate && isRightSideAccurate)) {
       // We cannot keep user data if either side is inaccurate, since we need the original geometry
-      // to recover
-      // the user data. canDiscardLeftGeometry and canDiscardRightGeometry are no longer valid.
+      // to recover the user data. canDiscardLeftGeometry and canDiscardRightGeometry are no longer
+      // valid.
       if (leftOptions.globalOptions != null && leftOptions.globalOptions.keepUserData) {
         leftOptions.globalOptions.keepUserData = false;
         LOGGER.info(

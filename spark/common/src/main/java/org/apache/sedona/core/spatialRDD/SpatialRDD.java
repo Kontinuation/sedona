@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections.iterators.SingletonIterator;
 import org.apache.commons.lang.NullArgumentException;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.FunctionsGeoTools;
 import org.apache.sedona.common.utils.GeomUtils;
@@ -279,10 +280,11 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
    * @param otherRdd Another spatial RDD
    * @param numPartitions Number of partitions
    * @param conf Sedona configuration
-   * @return Spatial partitioner
+   * @return Spatial partitioner and metrics
    */
-  public <U extends Geometry> SpatialPartitioner createSpatialPartitioner(
-      GridType gridType, SpatialRDD<U> otherRdd, int numPartitions, SedonaConf conf) {
+  public <U extends Geometry>
+      Pair<SpatialPartitioner, SpatialPartitioningMetrics> createSpatialPartitioner(
+          GridType gridType, SpatialRDD<U> otherRdd, int numPartitions, SedonaConf conf) {
     if (this.stat == null) {
       throw new IllegalArgumentException(
           "[SpatialRDD][spatialPartitioning] SpatialRDD stat is null. Please call advancedAnalyze() first.");
@@ -302,8 +304,7 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
     }
 
     // Add some padding at the top and right of the boundaryEnvelope to make sure all geometries lie
-    // within
-    // the half-open rectangle.
+    // within the half-open rectangle.
     double deltaX = boundary.getWidth() > 0 ? boundary.getWidth() * 0.01 : 1e-6;
     double deltaY = boundary.getHeight() > 0 ? boundary.getHeight() * 0.01 : 1e-6;
     boundary.expandBy(deltaX, deltaY);
@@ -319,8 +320,15 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
       int otherPartitions = determineNumPartitions(otherRdd, otherSamplesInBoundary, conf);
       numPartitions = Math.max(thisPartitions, otherPartitions);
     }
-    return calc_partitioner(
-        gridType, strategy, numPartitions, thisSamplesInBoundary, otherSamplesInBoundary);
+    SpatialPartitioner spatialPartitioner =
+        calc_partitioner(
+            gridType, strategy, numPartitions, thisSamplesInBoundary, otherSamplesInBoundary);
+    SpatialPartitioningMetrics metrics =
+        new SpatialPartitioningMetrics(
+            (double) thisSamplesInBoundary.estimatedInBoundaryGeometries / this.stat.getCount(),
+            (double) otherSamplesInBoundary.estimatedInBoundaryGeometries
+                / otherRdd.stat.getCount());
+    return Pair.of(spatialPartitioner, metrics);
   }
 
   /**
@@ -335,8 +343,10 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
   public <U extends Geometry> void spatialPartitioning(
       GridType gridType, SpatialRDD<U> otherRdd, int numPartitions) {
     SedonaConf conf = SedonaConf.fromActiveSession();
-    partitioner = createSpatialPartitioner(gridType, otherRdd, numPartitions, conf);
-    if (partitioner != null) {
+    Pair<SpatialPartitioner, SpatialPartitioningMetrics> result =
+        createSpatialPartitioner(gridType, otherRdd, numPartitions, conf);
+    if (result != null) {
+      partitioner = result.getLeft();
       this.spatialPartitionedRDD = partition(this.partitioner, conf);
       otherRdd.spatialPartitioning(this.partitioner, conf);
     }

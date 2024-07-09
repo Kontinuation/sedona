@@ -28,6 +28,18 @@ class SubdividedSpatialJoinSuite extends TestBaseScala with TableDrivenPropertyC
     prepareTempViewsForTestData()
   }
 
+  override def sparkConfig: Map[String, String] =
+    defaultSparkConfig ++ Map(
+      "spark.sedona.join.debug.enableMetricsForSpatialPartitioning" -> "true",
+      "spark.sedona.join.subdivideLeft.maxWidth" -> "0.1",
+      "spark.sedona.join.subdivideLeft.maxHeight" -> "0.1",
+      "spark.sedona.join.subdivideRight.maxWidth" -> "0.1",
+      "spark.sedona.join.subdivideRight.maxHeight" -> "0.1",
+      "spark.sedona.join.subdivideLeftInLocalJoin.maxWidth" -> "0.05",
+      "spark.sedona.join.subdivideLeftInLocalJoin.maxHeight" -> "0.05",
+      "spark.sedona.join.subdivideRightInLocalJoin.maxWidth" -> "0.05",
+      "spark.sedona.join.subdivideRightInLocalJoin.maxHeight" -> "0.05")
+
   describe("Subdivided Sedona-SQL Spatial Join Test") {
     val joinedTables = Table(
       ("left", "right"),
@@ -57,34 +69,38 @@ class SubdividedSpatialJoinSuite extends TestBaseScala with TableDrivenPropertyC
               keepRowDataRight) =>
           it(
             s"$left - $right, left: $subdivideLeft, right: $subdivideRight, keep-left: $keepRowDataLeft, keep-right: $keepRowDataRight") {
-            val expected = withConf(
+            val (expected, expectedLeftOuter, expectedRightOuter) = withConf(
               Map(
                 "spark.sedona.join.subdivideLeft" -> "never",
                 "spark.sedona.join.subdivideRight" -> "never",
                 "spark.sedona.join.subdivideLeftInLocalJoin" -> "never",
                 "spark.sedona.join.subdivideRightInLocalJoin" -> "never")) {
-              sparkSession
+              val expected = sparkSession
                 .sql(s"SELECT $left.id, $right.id, $left.geometry, $right.geometry " +
                   s"FROM $left JOIN $right ON ST_Intersects($left.geometry, $right.geometry)")
                 .collect()
+              val expectedLeftOuter = sparkSession
+                .sql(s"SELECT $left.id, $right.id, $left.geometry, $right.geometry " +
+                  s"FROM $left LEFT JOIN $right ON ST_Intersects($left.geometry, $right.geometry)")
+                .collect()
+              val expectedRightOuter = sparkSession
+                .sql(s"SELECT $left.id, $right.id, $left.geometry, $right.geometry " +
+                  s"FROM $left RIGHT JOIN $right ON ST_Intersects($left.geometry, $right.geometry)")
+                .collect()
+              (expected, expectedLeftOuter, expectedRightOuter)
+            }
+            expected.foreach { r =>
+              assert(r.getAs[Geometry](2) != null)
+              assert(r.getAs[Geometry](3) != null)
             }
 
             withConf(
               Map(
-                "spark.sedona.join.debug.enableMetricsForSpatialPartitioning" -> "true",
                 "sedona.join.numpartition" -> "20",
                 "spark.sedona.join.subdivideLeft" -> subdivideLeft,
-                "spark.sedona.join.subdivideLeft.maxWidth" -> "0.1",
-                "spark.sedona.join.subdivideLeft.maxHeight" -> "0.1",
                 "spark.sedona.join.subdivideRight" -> subdivideRight,
-                "spark.sedona.join.subdivideRight.maxWidth" -> "0.1",
-                "spark.sedona.join.subdivideRight.maxHeight" -> "0.1",
                 "spark.sedona.join.subdivideLeftInLocalJoin" -> localSubdivideLeft,
-                "spark.sedona.join.subdivideLeftInLocalJoin.maxWidth" -> "0.05",
-                "spark.sedona.join.subdivideLeftInLocalJoin.maxHeight" -> "0.05",
                 "spark.sedona.join.subdivideRightInLocalJoin" -> localSubdivideRight,
-                "spark.sedona.join.subdivideRightInLocalJoin.maxWidth" -> "0.05",
-                "spark.sedona.join.subdivideRightInLocalJoin.maxHeight" -> "0.05",
                 "spark.sedona.join.subdivideLeft.keepRowData" -> keepRowDataLeft,
                 "spark.sedona.join.subdivideRight.keepRowData" -> keepRowDataRight)) {
 
@@ -94,6 +110,16 @@ class SubdividedSpatialJoinSuite extends TestBaseScala with TableDrivenPropertyC
                   s"FROM $left JOIN $right ON ST_Intersects($left.geometry, $right.geometry)")
                 .collect()
               validateResult(expected, result, Seq(0, 1, 2, 3))
+              result = sparkSession
+                .sql(s"SELECT $left.id, $right.id, $left.geometry, $right.geometry " +
+                  s"FROM $left LEFT JOIN $right ON ST_Intersects($left.geometry, $right.geometry)")
+                .collect()
+              validateResult(expectedLeftOuter, result, Seq(0, 1, 2, 3))
+              result = sparkSession
+                .sql(s"SELECT $left.id, $right.id, $left.geometry, $right.geometry " +
+                  s"FROM $left RIGHT JOIN $right ON ST_Intersects($left.geometry, $right.geometry)")
+                .collect()
+              validateResult(expectedRightOuter, result, Seq(0, 1, 2, 3))
 
               // Result has geometry column from left side
               result = sparkSession
@@ -143,13 +169,11 @@ class SubdividedSpatialJoinSuite extends TestBaseScala with TableDrivenPropertyC
       result: Array[org.apache.spark.sql.Row],
       indices: Seq[Int]): Unit = {
     assert(expected.length != 0)
-    expected.foreach { r =>
-      assert(r.getAs[Geometry](2) != null)
-      assert(r.getAs[Geometry](3) != null)
-    }
     assert(expected.length == result.length)
-    val expectedSorted = expected.sortBy(r => (r.getLong(0), r.getLong(1)))
-    val resultSorted = result.sortBy(r => (r.getLong(0), r.getLong(1)))
+    val expectedSorted = expected.sortBy(r =>
+      (if (r.isNullAt(0)) -1L else r.getLong(0), if (r.isNullAt(1)) -1L else r.getLong(1)))
+    val resultSorted = result.sortBy(r =>
+      (if (r.isNullAt(0)) -1L else r.getLong(0), if (r.isNullAt(1)) -1L else r.getLong(1)))
     expectedSorted.zip(resultSorted).foreach { case (expectedRow, resultRow) =>
       indices.zipWithIndex.foreach { case (i, ord) =>
         assert(expectedRow.get(i) == resultRow.get(ord))

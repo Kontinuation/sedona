@@ -58,4 +58,8 @@ public abstract class SpatialPartitioner extends Partitioner implements Serializ
   public int getPartition(Object key) {
     return (int) key;
   }
+
+  public boolean compatibleWith(SpatialPartitioner other) {
+    return this.equals(other);
+  }
 }

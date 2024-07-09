@@ -31,11 +31,13 @@ import org.apache.commons.collections.iterators.SingletonIterator;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.enums.IndexType;
+import org.apache.sedona.core.enums.JoinType;
 import org.apache.sedona.core.joinJudgement.AdaptiveIndexLookupJudgement.ExecutionMode;
 import org.apache.sedona.core.joinJudgement.AdaptiveIndexLookupJudgement.IndexBuildSide;
 import org.apache.sedona.core.joinJudgement.AdaptiveIndexLookupJudgement.LocalSpatialJoinExecParams;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators;
+import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner.OuterJoinUserData;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
@@ -56,7 +58,7 @@ public class AdaptiveIndexLookupJudgementTest {
             IndexType.RTREE, IndexBuildSide.LEFT, ExecutionMode.PREPARE_STREAM, null);
     AdaptiveIndexLookupJudgement<Geometry, Geometry> judgement =
         new AdaptiveIndexLookupJudgement<>(
-            SpatialPredicate.INTERSECTS, Collections.singletonList(param));
+            SpatialPredicate.INTERSECTS, JoinType.INNER, Collections.singletonList(param));
 
     // Both sides are empty
     Iterator<Pair<Geometry, Geometry>> resultIterator =
@@ -98,35 +100,43 @@ public class AdaptiveIndexLookupJudgementTest {
   @Test
   public void testSubdividing() {
     SubdivideOptions subdivideOptions = new SubdivideOptions(0.2, 0.2);
+    JoinType[] joinTypes = {JoinType.INNER, JoinType.LEFT_OUTER, JoinType.RIGHT_OUTER};
     ExecutionMode[] executionModes = {
       ExecutionMode.PREPARE_BUILD, ExecutionMode.PREPARE_STREAM, ExecutionMode.PREPARE_NONE
     };
-    for (ExecutionMode executionMode : executionModes) {
-      testExecutionMode(
-          executionMode,
-          SpatialPredicate.INTERSECTS,
-          IndexType.RTREE,
-          IndexBuildSide.LEFT,
-          subdivideOptions,
-          null);
-      testExecutionMode(
-          executionMode,
-          SpatialPredicate.INTERSECTS,
-          IndexType.RTREE,
-          IndexBuildSide.LEFT,
-          null,
-          subdivideOptions);
-      testExecutionMode(
-          executionMode,
-          SpatialPredicate.INTERSECTS,
-          IndexType.RTREE,
-          IndexBuildSide.LEFT,
-          subdivideOptions,
-          subdivideOptions);
+
+    for (JoinType joinType : joinTypes) {
+      for (ExecutionMode executionMode : executionModes) {
+        testExecutionMode(
+            executionMode,
+            SpatialPredicate.INTERSECTS,
+            joinType,
+            IndexType.RTREE,
+            IndexBuildSide.LEFT,
+            subdivideOptions,
+            null);
+        testExecutionMode(
+            executionMode,
+            SpatialPredicate.INTERSECTS,
+            joinType,
+            IndexType.RTREE,
+            IndexBuildSide.LEFT,
+            null,
+            subdivideOptions);
+        testExecutionMode(
+            executionMode,
+            SpatialPredicate.INTERSECTS,
+            joinType,
+            IndexType.RTREE,
+            IndexBuildSide.LEFT,
+            subdivideOptions,
+            subdivideOptions);
+      }
     }
   }
 
   private void testExecutionMode(ExecutionMode executionMode) {
+    JoinType[] joinTypes = {JoinType.INNER, JoinType.LEFT_OUTER, JoinType.RIGHT_OUTER};
     SpatialPredicate[] predicates =
         new SpatialPredicate[] {
           SpatialPredicate.CONTAINS, SpatialPredicate.INTERSECTS, SpatialPredicate.WITHIN
@@ -138,7 +148,22 @@ public class AdaptiveIndexLookupJudgementTest {
     for (SpatialPredicate predicate : predicates) {
       for (IndexType indexType : indexTypes) {
         for (IndexBuildSide indexBuildSide : indexBuildSides) {
-          testExecutionMode(executionMode, predicate, indexType, indexBuildSide, null, null);
+          testExecutionMode(
+              executionMode, predicate, JoinType.INNER, indexType, indexBuildSide, null, null);
+        }
+      }
+    }
+    for (JoinType joinType : joinTypes) {
+      for (IndexType indexType : indexTypes) {
+        for (IndexBuildSide indexBuildSide : indexBuildSides) {
+          testExecutionMode(
+              executionMode,
+              SpatialPredicate.INTERSECTS,
+              joinType,
+              indexType,
+              indexBuildSide,
+              null,
+              null);
         }
       }
     }
@@ -147,6 +172,7 @@ public class AdaptiveIndexLookupJudgementTest {
   private void testExecutionMode(
       ExecutionMode executionMode,
       SpatialPredicate predicate,
+      JoinType joinType,
       IndexType indexType,
       IndexBuildSide indexBuildSide,
       SubdivideOptions subdivideBuildOptions,
@@ -160,12 +186,12 @@ public class AdaptiveIndexLookupJudgementTest {
             subdivideBuildOptions,
             subdivideStreamOptions);
     AdaptiveIndexLookupJudgement<Geometry, Geometry> judgement =
-        new AdaptiveIndexLookupJudgement<>(predicate, Collections.singletonList(param));
+        new AdaptiveIndexLookupJudgement<>(predicate, joinType, Collections.singletonList(param));
     Iterator<Pair<Geometry, Geometry>> resultIterator =
         judgement.call(0, datasetA.iterator(), datasetB.iterator());
-    verifyResult(resultIterator, datasetA, datasetB, predicate);
+    verifyResult(resultIterator, datasetA, datasetB, predicate, joinType);
     resultIterator = judgement.call(0, datasetB.iterator(), datasetA.iterator());
-    verifyResult(resultIterator, datasetB, datasetA, predicate);
+    verifyResult(resultIterator, datasetB, datasetA, predicate, joinType);
   }
 
   private static List<Geometry> generateRandomGeometries(int seed) {
@@ -176,15 +202,18 @@ public class AdaptiveIndexLookupJudgementTest {
       double minY = random.nextDouble() * 10;
       double width = random.nextDouble();
       double height = random.nextDouble();
+      Geometry geom;
       if (random.nextBoolean()) {
         Envelope env = new Envelope(minX, minX + width, minY, minY + height);
-        geoms.add(factory.toGeometry(env));
+        geom = factory.toGeometry(env);
       } else {
         double centerX = minX + width / 2;
         double centerY = minY + height / 2;
         double radius = 0.5 * (width + height);
-        geoms.add(factory.createPoint(new Coordinate(centerX, centerY)).buffer(radius, 2));
+        geom = factory.createPoint(new Coordinate(centerX, centerY)).buffer(radius, 2);
       }
+      geom.setUserData(new OuterJoinUserData(k, true));
+      geoms.add(geom);
     }
     return geoms;
   }
@@ -193,16 +222,39 @@ public class AdaptiveIndexLookupJudgementTest {
       Iterator<Pair<Geometry, Geometry>> resultIterator,
       List<Geometry> datasetA,
       List<Geometry> datasetB,
-      SpatialPredicate predicate) {
+      SpatialPredicate predicate,
+      JoinType joinType) {
     Set<Pair<Geometry, Geometry>> expected = new HashSet<>();
     SpatialPredicateEvaluators.SpatialPredicateEvaluator evaluator =
         SpatialPredicateEvaluators.create(predicate);
-    for (Geometry geomA : datasetA) {
-      for (Geometry geomB : datasetB) {
-        if (evaluator.eval(geomA, geomB)) {
-          expected.add(Pair.of(geomA, geomB));
+    if (joinType == JoinType.INNER || joinType == JoinType.LEFT_OUTER) {
+      for (Geometry geomA : datasetA) {
+        boolean hasResults = false;
+        for (Geometry geomB : datasetB) {
+          if (evaluator.eval(geomA, geomB)) {
+            expected.add(Pair.of(geomA, geomB));
+            hasResults = true;
+          }
+        }
+        if (!hasResults && joinType == JoinType.LEFT_OUTER) {
+          expected.add(Pair.of(geomA, null));
         }
       }
+    } else if (joinType == JoinType.RIGHT_OUTER) {
+      for (Geometry geomB : datasetB) {
+        boolean hasResults = false;
+        for (Geometry geomA : datasetA) {
+          if (evaluator.eval(geomA, geomB)) {
+            expected.add(Pair.of(geomA, geomB));
+            hasResults = true;
+          }
+        }
+        if (!hasResults) {
+          expected.add(Pair.of(null, geomB));
+        }
+      }
+    } else {
+      throw new UnsupportedOperationException("Unsupported join type: " + joinType);
     }
     long count = 0;
     while (resultIterator.hasNext()) {

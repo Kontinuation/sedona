@@ -31,6 +31,7 @@ import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.enums.JoinBuildSide;
+import org.apache.sedona.core.enums.JoinType;
 import org.apache.sedona.core.joinJudgement.*;
 import org.apache.sedona.core.monitoring.JavaMetrics;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner;
@@ -41,6 +42,7 @@ import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.Function0;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.PairFunction;
 import org.apache.spark.rdd.JavaRDDExtension;
@@ -82,7 +84,7 @@ public class JoinQuery {
     final SpatialPartitioner spatialPartitioner = spatialRDD.getPartitioner();
     final SpatialPartitioner queryPartitioner = queryRDD.getPartitioner();
 
-    if (!queryPartitioner.equals(spatialPartitioner)) {
+    if (!queryPartitioner.compatibleWith(spatialPartitioner)) {
       throw new IllegalArgumentException(
           "[JoinQuery] queryRDD is not partitioned by the same grids with spatialRDD. Please make sure they both use the same grids otherwise wrong results will appear.");
     }
@@ -753,6 +755,8 @@ public class JoinQuery {
           AdaptiveIndexLookupJudgement<U, T> judgement =
               new AdaptiveIndexLookupJudgement<>(
                   joinParams.spatialPredicate,
+                  joinParams.extraFilterCreator,
+                  joinParams.joinType,
                   leftRDD.getStatistics(),
                   rightRDD.getStatistics(),
                   leftRDD.getPartitioner(),
@@ -874,6 +878,8 @@ public class JoinQuery {
   public static final class JoinParams {
     public final boolean useIndex;
     public final SpatialPredicate spatialPredicate;
+    public final Function0<Function2<Geometry, Geometry, Boolean>> extraFilterCreator;
+    public final JoinType joinType;
     public final IndexType indexType;
     public final JoinBuildSide joinBuildSide;
 
@@ -906,6 +912,8 @@ public class JoinQuery {
       this(
           useIndex,
           spatialPredicate,
+          null,
+          JoinType.INNER,
           polygonIndexType,
           joinBuildSide,
           -1,
@@ -927,6 +935,8 @@ public class JoinQuery {
     public JoinParams(
         boolean useIndex,
         SpatialPredicate spatialPredicate,
+        Function0<Function2<Geometry, Geometry, Boolean>> extraFilterCreator,
+        JoinType joinType,
         IndexType polygonIndexType,
         JoinBuildSide joinBuildSide,
         int k,
@@ -945,6 +955,8 @@ public class JoinQuery {
         SubdivideOptions localSubdivideRightOptions) {
       this.useIndex = useIndex;
       this.spatialPredicate = spatialPredicate;
+      this.extraFilterCreator = extraFilterCreator;
+      this.joinType = joinType;
       this.indexType = polygonIndexType;
       this.joinBuildSide = joinBuildSide;
       this.k = k;
@@ -972,6 +984,8 @@ public class JoinQuery {
       this(
           true,
           null,
+          null,
+          JoinType.INNER,
           indexType,
           null,
           k,

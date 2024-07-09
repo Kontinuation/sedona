@@ -26,9 +26,9 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -39,12 +39,16 @@ import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.common.utils.HalfOpenRectangle;
 import org.apache.sedona.core.enums.IndexType;
+import org.apache.sedona.core.enums.JoinType;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators;
+import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner.OuterJoinUserData;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner;
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector;
 import org.apache.sedona.core.utils.SedonaConf;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.Function0;
+import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.Function3;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.execution.metric.SQLMetric;
@@ -74,6 +78,8 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
   private static final GeometryFactory factory = new GeometryFactory();
 
   private final SpatialPredicate spatialPredicate;
+  private final Function0<Function2<Geometry, Geometry, Boolean>> extraFilterCreator;
+  private final JoinType joinType;
 
   // Metrics
   private final SpatialJoinMetric buildCount;
@@ -190,6 +196,8 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
 
   public AdaptiveIndexLookupJudgement(
       SpatialPredicate spatialPredicate,
+      Function0<Function2<Geometry, Geometry, Boolean>> extraFilterCreator,
+      JoinType joinType,
       AdvancedStatCollector leftStat,
       AdvancedStatCollector rightStat,
       SpatialPartitioner partitioner,
@@ -219,6 +227,8 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
       SubdivideOptions leftSubdivideOptions,
       SubdivideOptions rightSubdivideOptions) {
     this.spatialPredicate = spatialPredicate;
+    this.extraFilterCreator = extraFilterCreator;
+    this.joinType = joinType;
     this.buildCount = new SpatialJoinMetric(sqlBuildCount, buildCount);
     this.streamCount = new SpatialJoinMetric(sqlStreamCount, streamCount);
     this.resultCount = new SpatialJoinMetric(sqlResultCount, resultCount);
@@ -245,8 +255,11 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
   // Constructor for testing
   public AdaptiveIndexLookupJudgement(
       SpatialPredicate spatialPredicate,
+      JoinType joinType,
       List<LocalSpatialJoinExecParams> localSpatialJoinExecParamsList) {
     this.spatialPredicate = spatialPredicate;
+    this.extraFilterCreator = null;
+    this.joinType = joinType;
     this.buildCount = new SpatialJoinMetric();
     this.streamCount = new SpatialJoinMetric();
     this.resultCount = new SpatialJoinMetric();
@@ -298,14 +311,12 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
     GeometryType rightGeomType = rightStat.getDominantGeometryType();
     long[] leftPerPartitionCount = getPerPartitionGeometryCount(leftStat, partitioner);
     long[] rightPerPartitionCount = getPerPartitionGeometryCount(rightStat, partitioner);
-    int numPartitions = partitioner.numPartitions();
-    DedupParams dedupParams = partitioner.getDedupParams();
-    List<Envelope> grids = (dedupParams != null ? dedupParams.getPartitionExtents() : null);
-    ArrayList<LocalSpatialJoinExecParams> plans = new ArrayList<>(numPartitions);
-    for (int k = 0; k < numPartitions; k++) {
+    List<Envelope> grids = partitioner.getGrids();
+    ArrayList<LocalSpatialJoinExecParams> plans = new ArrayList<>(grids.size());
+    for (int k = 0; k < grids.size(); k++) {
       long leftCount = leftPerPartitionCount[k];
       long rightCount = rightPerPartitionCount[k];
-      Envelope extent = (grids != null ? grids.get(k) : null);
+      Envelope extent = grids.get(k);
       LocalSpatialJoinExecParams plan =
           determineSpatialJoinExecParams(
               leftGeomType,
@@ -458,7 +469,7 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
   @Override
   public Iterator<Pair<U, T>> call(
       Integer index, Iterator<U> leftIterator, Iterator<T> rightIterator) {
-    if (!leftIterator.hasNext() || !rightIterator.hasNext()) {
+    if (joinType == JoinType.INNER && (!leftIterator.hasNext() || !rightIterator.hasNext())) {
       return Collections.emptyIterator();
     }
     List<LocalSpatialJoinExecParams> paramsList;
@@ -472,8 +483,18 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
       throw new IllegalStateException("No per-partition local spatial join params available.");
     }
     if (index >= paramsList.size()) {
-      throw new IllegalStateException(
-          "Invalid partition index: " + index + ", total partitions: " + paramsList.size());
+      if (joinType == JoinType.LEFT_OUTER) {
+        return new OuterJoinIterators.LeftOuterJoinIterator<>(leftIterator);
+      } else if (joinType == JoinType.RIGHT_OUTER) {
+        return new OuterJoinIterators.RightOuterJoinIterator<>(rightIterator);
+      } else if (joinType == JoinType.FULL_OUTER) {
+        return new OuterJoinIterators.FullOuterJoinIterator<>(leftIterator, rightIterator);
+      } else if (joinType == JoinType.INNER) {
+        throw new IllegalStateException(
+            "Spatial partitions for inner join should not have out-of-bounds partitions");
+      } else {
+        throw new UnsupportedOperationException("Unsupported join type: " + joinType);
+      }
     }
     LocalSpatialJoinExecParams params = paramsList.get(index);
     HalfOpenRectangle extent =
@@ -513,11 +534,35 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
 
     if (params.indexBuildSide == IndexBuildSide.LEFT) {
       buildLeftTasks.add(1);
+      Function2<Geometry, Geometry, Boolean> extraFilter = null;
+      if (extraFilterCreator != null) {
+        try {
+          extraFilter = extraFilterCreator.call();
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }
+      LocalJoinType localJoinType;
+      switch (joinType) {
+        case INNER:
+          localJoinType = LocalJoinType.INNER;
+          break;
+        case LEFT_OUTER:
+          localJoinType = LocalJoinType.INDEX_OUTER;
+          break;
+        case RIGHT_OUTER:
+          localJoinType = LocalJoinType.STREAM_OUTER;
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported join type: " + joinType);
+      }
       return new IndexedSpatialJoinIterator<>(
           leftIterator,
           rightIterator,
+          localJoinType,
           params.indexType,
           spatialPredicate,
+          extraFilter,
           params.executionMode,
           extent,
           params.subdivideBuildOptions,
@@ -530,12 +575,36 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
     } else {
       buildRightTasks.add(1);
       SpatialPredicate invSpatialPredicate = SpatialPredicate.inverse(spatialPredicate);
+      Function2<Geometry, Geometry, Boolean> extraFilter = null;
+      if (extraFilterCreator != null) {
+        try {
+          extraFilter = new SwappedExtraFilter(extraFilterCreator.call());
+        } catch (Exception e) {
+          throw new RuntimeException(e);
+        }
+      }
+      LocalJoinType localJoinType;
+      switch (joinType) {
+        case INNER:
+          localJoinType = LocalJoinType.INNER;
+          break;
+        case LEFT_OUTER:
+          localJoinType = LocalJoinType.STREAM_OUTER;
+          break;
+        case RIGHT_OUTER:
+          localJoinType = LocalJoinType.INDEX_OUTER;
+          break;
+        default:
+          throw new UnsupportedOperationException("Unsupported join type: " + joinType);
+      }
       IndexedSpatialJoinIterator<T, U> swappedJoinResultIterator =
           new IndexedSpatialJoinIterator<>(
               rightIterator,
               leftIterator,
+              localJoinType,
               params.indexType,
               invSpatialPredicate,
+              extraFilter,
               params.executionMode,
               extent,
               params.subdivideBuildOptions,
@@ -549,6 +618,12 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
     }
   }
 
+  private enum LocalJoinType {
+    INNER,
+    INDEX_OUTER,
+    STREAM_OUTER
+  }
+
   /**
    * The actual heavy lifting of the local spatial join is done by this iterator.
    *
@@ -560,18 +635,21 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
     private static final PreparedGeometryFactory PREPARED_GEOMETRY_FACTORY =
         new PreparedGeometryFactory();
 
+    private final LocalJoinType localJoinType;
     private final SpatialPredicateEvaluators.SpatialPredicateEvaluator evaluator;
+    private final Function2<Geometry, Geometry, Boolean> extraFilter;
     private final ExecutionMode executionMode;
     private final HalfOpenRectangle extent;
     private final SubdivideOptions subdivideBuildOptions;
     private final SubdivideOptions subdivideStreamOptions;
     private final SpatialIndex spatialIndex;
-    private final ArrayList<Object>
-        indexedGeometries; // only used when indexed geometries are subdivided
+    private final ArrayList<Object> indexedGeometries;
+    private boolean[] indexedGeometryHasJoinResults = null;
     private final Iterator<T> streamIterator;
 
     // Iterator state
     private final List<Pair<U, T>> batch = new ArrayList<>();
+    private boolean populatedIndexOuterBatch = false;
     private int batchIndex;
 
     // metrics
@@ -582,8 +660,10 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
     IndexedSpatialJoinIterator(
         Iterator<U> buildIterator,
         Iterator<T> streamIterator,
+        LocalJoinType localJoinType,
         IndexType indexType,
         SpatialPredicate predicate,
+        Function2<Geometry, Geometry, Boolean> extraFilter,
         ExecutionMode executionMode,
         HalfOpenRectangle extent,
         SubdivideOptions subdivideBuildOptions,
@@ -593,7 +673,9 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
         SpatialJoinMetric resultCount,
         SpatialJoinMetric candidateCount,
         SpatialJoinMetric buildTime) {
+      this.localJoinType = localJoinType;
       this.evaluator = SpatialPredicateEvaluators.create(predicate);
+      this.extraFilter = extraFilter;
       this.executionMode = executionMode;
       this.extent = extent;
       this.subdivideBuildOptions = subdivideBuildOptions;
@@ -616,39 +698,36 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
           subdivideBuildOptions != null
               ? new ExtentBasedGeometrySubDivider(subdivideBuildOptions)
               : null;
-      long count = 0;
+      int count = 0;
       for (; buildIterator.hasNext(); count++) {
         U geometry = buildIterator.next();
+        if (executionMode == ExecutionMode.PREPARE_BUILD) {
+          PreparedGeometry preparedGeometry = PREPARED_GEOMETRY_FACTORY.create(geometry);
+          indexedGeometries.add(preparedGeometry);
+        } else {
+          indexedGeometries.add(geometry);
+        }
         if (subDivider == null) {
-          // No subdivision, put the original geometry or prepared geometry into the spatial index
+          // No subdivision, put the index of the original geometry or prepared geometry in
+          // the array into the spatial index
           Envelope envelope = geometry.getEnvelopeInternal();
-          if (executionMode == ExecutionMode.PREPARE_BUILD) {
-            PreparedGeometry preparedGeometry = PREPARED_GEOMETRY_FACTORY.create(geometry);
-            spatialIndex.insert(envelope, preparedGeometry);
-          } else {
-            spatialIndex.insert(envelope, geometry);
-          }
+          spatialIndex.insert(envelope, count);
         } else {
           // With subdivision, put subdivided parts into the spatial index, with an index into the
-          // array
-          // containing the original geometries
-          if (executionMode == ExecutionMode.PREPARE_BUILD) {
-            PreparedGeometry preparedGeometry = PREPARED_GEOMETRY_FACTORY.create(geometry);
-            indexedGeometries.add(preparedGeometry);
-          } else {
-            indexedGeometries.add(geometry);
-          }
+          // array containing the original geometries
           Iterator<Geometry> subGeomIter = subDivider.subdivide(geometry);
           while (subGeomIter.hasNext()) {
             Geometry geom = subGeomIter.next();
             Envelope envelope = geom.getEnvelopeInternal();
-            spatialIndex.insert(envelope, (int) count);
+            spatialIndex.insert(envelope, count);
           }
         }
       }
       if (indexType == IndexType.RTREE) {
         ((STRtree) spatialIndex).build();
       }
+      indexedGeometryHasJoinResults = new boolean[count];
+      Arrays.fill(indexedGeometryHasJoinResults, false);
       buildCount.add(count);
       return spatialIndex;
     }
@@ -721,20 +800,38 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
         streamCount++;
         T geometry = streamIterator.next();
         Envelope envelope = geometry.getEnvelopeInternal();
-        List<PreparedGeometry> candidates = (List<PreparedGeometry>) spatialIndex.query(envelope);
-        candidateCount += candidates.size();
-        for (PreparedGeometry candidate : candidates) {
+        List<Integer> candidateIndexes = (List<Integer>) spatialIndex.query(envelope);
+        candidateCount += candidateIndexes.size();
+        for (int candidateIndex : candidateIndexes) {
+          PreparedGeometry candidate = (PreparedGeometry) indexedGeometries.get(candidateIndex);
           if (evaluator.eval(candidate, geometry)) {
             if (extent == null
                 || !GeomUtils.isDuplicate(candidate.getGeometry(), geometry, extent)) {
-              batch.add(Pair.of((U) candidate.getGeometry(), geometry));
+              try {
+                if (extraFilter == null || extraFilter.call(candidate.getGeometry(), geometry)) {
+                  indexedGeometryHasJoinResults[candidateIndex] = true;
+                  batch.add(Pair.of((U) candidate.getGeometry(), geometry));
+                }
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
             }
             resultCount++;
           }
         }
         if (!batch.isEmpty()) {
           break;
+        } else {
+          if (tryPopulateStreamOuterBatch(geometry)) {
+            break;
+          }
         }
+      }
+
+      // When we get here and the batch is still empty, we must have consumed all geometries from
+      // the stream side. We may need to populate elements for index outer join.
+      if (batch.isEmpty()) {
+        populateIndexOuterBatch();
       }
 
       // Update statistics
@@ -753,16 +850,22 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
         streamCount++;
         T geometry = streamIterator.next();
         Envelope envelope = geometry.getEnvelopeInternal();
-        List<U> candidates = (List<U>) spatialIndex.query(envelope);
-        if (candidates.isEmpty()) {
-          continue;
-        } else {
-          candidateCount += candidates.size();
+        List<Integer> candidateIndexes = (List<Integer>) spatialIndex.query(envelope);
+        if (!candidateIndexes.isEmpty()) {
+          candidateCount += candidateIndexes.size();
           PreparedGeometry preparedGeometry = PREPARED_GEOMETRY_FACTORY.create(geometry);
-          for (U candidate : candidates) {
+          for (int candidateIndex : candidateIndexes) {
+            U candidate = (U) indexedGeometries.get(candidateIndex);
             if (evaluator.eval(candidate, preparedGeometry)) {
               if (extent == null || !GeomUtils.isDuplicate(candidate, geometry, extent)) {
-                batch.add(Pair.of(candidate, geometry));
+                try {
+                  if (extraFilter == null || extraFilter.call(candidate, geometry)) {
+                    indexedGeometryHasJoinResults[candidateIndex] = true;
+                    batch.add(Pair.of(candidate, geometry));
+                  }
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
               }
               resultCount++;
             }
@@ -770,7 +873,17 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
         }
         if (!batch.isEmpty()) {
           break;
+        } else {
+          if (tryPopulateStreamOuterBatch(geometry)) {
+            break;
+          }
         }
+      }
+
+      // When we get here and the batch is still empty, we must have consumed all geometries from
+      // the stream side. We may need to populate elements for index outer join.
+      if (batch.isEmpty()) {
+        populateIndexOuterBatch();
       }
 
       // Update statistics
@@ -789,19 +902,37 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
         streamCount++;
         T geometry = streamIterator.next();
         Envelope envelope = geometry.getEnvelopeInternal();
-        List<U> candidates = (List<U>) spatialIndex.query(envelope);
-        candidateCount += candidates.size();
-        for (U candidate : candidates) {
+        List<Integer> candidateIndexes = (List<Integer>) spatialIndex.query(envelope);
+        candidateCount += candidateIndexes.size();
+        for (int candidateIndex : candidateIndexes) {
+          U candidate = (U) indexedGeometries.get(candidateIndex);
           if (evaluator.eval(candidate, geometry)) {
             if (extent == null || !GeomUtils.isDuplicate(candidate, geometry, extent)) {
-              batch.add(Pair.of(candidate, geometry));
+              try {
+                if (extraFilter == null || extraFilter.call(candidate, geometry)) {
+                  indexedGeometryHasJoinResults[candidateIndex] = true;
+                  batch.add(Pair.of(candidate, geometry));
+                }
+              } catch (Exception e) {
+                throw new RuntimeException(e);
+              }
             }
             resultCount++;
           }
         }
         if (!batch.isEmpty()) {
           break;
+        } else {
+          if (tryPopulateStreamOuterBatch(geometry)) {
+            break;
+          }
         }
+      }
+
+      // When we get here and the batch is still empty, we must have consumed all geometries from
+      // the stream side. We may need to populate elements for index outer join.
+      if (batch.isEmpty()) {
+        populateIndexOuterBatch();
       }
 
       // Update statistics
@@ -840,72 +971,113 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
           candidates.addAll(spatialIndex.query(envelope));
         }
 
-        // Now there are 3 cases:
-        // 1. The retrieved candidates are prepared geometries
-        // 2. The retrieved candidates are ordinary geometries
-        // 3. The retrieved candidates are subdivided parts of the original indexed geometries
-        // In all cases, we need to deduplicate the candidates before evaluating the spatial
-        // predicate.
-        List<Object> deduplicatedCandidates = new ArrayList<>();
-        if (subdivideBuildOptions != null) {
-          // Case 3: deduplicate the candidate indexes and retrieve the candidates
+        if (!candidates.isEmpty()) {
+          // Now there are 3 cases:
+          // 1. The retrieved candidates are prepared geometries
+          // 2. The retrieved candidates are ordinary geometries
+          // 3. The retrieved candidates are subdivided parts of the original indexed geometries
+          // In all cases, we need to deduplicate the candidates before evaluating the spatial
+          // predicate.
           HashSet<Integer> candidateIndexes = new HashSet<>();
           for (Object candidate : candidates) {
             candidateIndexes.add((Integer) candidate);
           }
-          for (int candidateIndex : candidateIndexes) {
-            deduplicatedCandidates.add(indexedGeometries.get(candidateIndex));
-          }
-        } else {
-          // Case 1 or 2: deduplicate the candidates by referential equality
-          IdentityHashMap<Object, Boolean> candidateMap = new IdentityHashMap<>();
-          for (Object candidate : candidates) {
-            candidateMap.put(candidate, true);
-          }
-          deduplicatedCandidates.addAll(candidateMap.keySet());
-        }
-        if (deduplicatedCandidates.isEmpty()) {
-          continue;
-        }
-        candidateCount += deduplicatedCandidates.size();
+          candidateCount += candidateIndexes.size();
 
-        // Evaluate spatial predicate on candidates
-        PreparedGeometry preparedGeometry =
-            (executionMode == ExecutionMode.PREPARE_STREAM)
-                ? PREPARED_GEOMETRY_FACTORY.create(geometry)
-                : null;
-        for (Object candidateObj : deduplicatedCandidates) {
-          Geometry candidateGeom;
-          boolean evalResult;
-          if (executionMode == ExecutionMode.PREPARE_BUILD) {
-            PreparedGeometry candidate = (PreparedGeometry) candidateObj;
-            candidateGeom = candidate.getGeometry();
-            evalResult = evaluator.eval(candidate, geometry);
-          } else {
-            Geometry candidate = (Geometry) candidateObj;
-            candidateGeom = candidate;
-            evalResult =
-                preparedGeometry != null
-                    ? evaluator.eval(candidate, preparedGeometry)
-                    : evaluator.eval(candidate, geometry);
-          }
-          if (evalResult) {
-            if (extent == null || !GeomUtils.isDuplicate(candidateGeom, geometry, extent)) {
-              batch.add(Pair.of((U) candidateGeom, geometry));
+          // Evaluate spatial predicate on candidates
+          PreparedGeometry preparedGeometry =
+              (executionMode == ExecutionMode.PREPARE_STREAM)
+                  ? PREPARED_GEOMETRY_FACTORY.create(geometry)
+                  : null;
+          for (int candidateIndex : candidateIndexes) {
+            Object candidateObj = indexedGeometries.get(candidateIndex);
+            Geometry candidateGeom;
+            boolean evalResult;
+            if (executionMode == ExecutionMode.PREPARE_BUILD) {
+              PreparedGeometry candidate = (PreparedGeometry) candidateObj;
+              candidateGeom = candidate.getGeometry();
+              evalResult = evaluator.eval(candidate, geometry);
+            } else {
+              Geometry candidate = (Geometry) candidateObj;
+              candidateGeom = candidate;
+              evalResult =
+                  preparedGeometry != null
+                      ? evaluator.eval(candidate, preparedGeometry)
+                      : evaluator.eval(candidate, geometry);
             }
-            resultCount++;
+            if (evalResult) {
+              if (extent == null || !GeomUtils.isDuplicate(candidateGeom, geometry, extent)) {
+                try {
+                  if (extraFilter == null || extraFilter.call(candidateGeom, geometry)) {
+                    indexedGeometryHasJoinResults[candidateIndex] = true;
+                    batch.add(Pair.of((U) candidateGeom, geometry));
+                  }
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              }
+              resultCount++;
+            }
           }
         }
 
         if (!batch.isEmpty()) {
           break;
+        } else {
+          if (tryPopulateStreamOuterBatch(geometry)) {
+            break;
+          }
         }
+      }
+
+      // When we get here and the batch is still empty, we must have consumed all geometries from
+      // the stream side. We may need to populate elements for index outer join.
+      if (batch.isEmpty()) {
+        populateIndexOuterBatch();
       }
 
       // Update statistics
       metricStreamCount.add(streamCount);
       metricCandidateCount.add(candidateCount);
       metricResultCount.add(resultCount);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void populateIndexOuterBatch() {
+      if (localJoinType == LocalJoinType.INDEX_OUTER && !populatedIndexOuterBatch) {
+        populatedIndexOuterBatch = true;
+        // Walk through all primary geometries in the index side that has no emitted join results,
+        // and emit a record with stream side = null for them.
+        for (int k = 0; k < indexedGeometryHasJoinResults.length; k++) {
+          if (!indexedGeometryHasJoinResults[k]) {
+            Object indexedObj = indexedGeometries.get(k);
+            U geometry;
+            if (executionMode == ExecutionMode.PREPARE_BUILD) {
+              geometry = (U) ((PreparedGeometry) indexedObj).getGeometry();
+            } else {
+              geometry = (U) indexedObj;
+            }
+            OuterJoinUserData userData = (OuterJoinUserData) geometry.getUserData();
+            if (userData.isPrimary) {
+              batch.add(Pair.of(geometry, null));
+            }
+          }
+        }
+      }
+    }
+
+    private boolean tryPopulateStreamOuterBatch(T geometry) {
+      // Check if the stream side is the primary geometry. if it is, we should emit a
+      // record with index side = null
+      if (localJoinType != LocalJoinType.STREAM_OUTER) {
+        return false;
+      }
+      OuterJoinUserData userData = (OuterJoinUserData) geometry.getUserData();
+      if (!userData.isPrimary) {
+        return false;
+      }
+      batch.add(Pair.of(null, geometry));
+      return true;
     }
   }
 
@@ -926,6 +1098,19 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
     public Pair<T, U> next() {
       Pair<U, T> pair = iterator.next();
       return Pair.of(pair.getRight(), pair.getLeft());
+    }
+  }
+
+  private static class SwappedExtraFilter implements Function2<Geometry, Geometry, Boolean> {
+    final Function2<Geometry, Geometry, Boolean> wrapped;
+
+    SwappedExtraFilter(Function2<Geometry, Geometry, Boolean> wrapped) {
+      this.wrapped = wrapped;
+    }
+
+    @Override
+    public Boolean call(Geometry v1, Geometry v2) throws Exception {
+      return wrapped.call(v2, v1);
     }
   }
 

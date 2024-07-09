@@ -18,6 +18,7 @@
  */
 package org.apache.spark.sql.sedona_sql.strategy.join
 
+import org.apache.sedona.common.geometryObjects.NullGeometry
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.sedona.sql.utils.{GeometrySerializer, RasterSerializer}
@@ -58,8 +59,12 @@ trait TraitJoinQueryBase {
         .mapPartitions { iter =>
           val toUserData = projectUnsafeRow(projection)
           iter.map { row =>
-            val shape =
-              GeometrySerializer.deserialize(shapeExpression.eval(row).asInstanceOf[Array[Byte]])
+            val serializedShape = shapeExpression.eval(row).asInstanceOf[Array[Byte]]
+            val shape = if (serializedShape != null) {
+              GeometrySerializer.deserialize(serializedShape)
+            } else {
+              new NullGeometry()
+            }
             val userData = toUserData(row)
             shape.setUserData(userData)
             shape
@@ -95,11 +100,14 @@ trait TraitJoinQueryBase {
         .mapPartitions { iter =>
           val toUserData = projectUnsafeRow(projection)
           iter.map { row =>
-            val shape =
-              GeometrySerializer.deserialize(shapeExpression.eval(row).asInstanceOf[Array[Byte]])
-            val distance = boundRadius.eval(row).asInstanceOf[Double]
-            val expandedEnvelope =
+            val serializedShape = shapeExpression.eval(row).asInstanceOf[Array[Byte]]
+            val expandedEnvelope = if (serializedShape != null) {
+              val shape = GeometrySerializer.deserialize(serializedShape)
+              val distance = boundRadius.eval(row).asInstanceOf[Double]
               JoinedGeometry.geometryToExpandedEnvelope(shape, distance, isGeography)
+            } else {
+              new NullGeometry()
+            }
             val userData = toUserData(row)
             expandedEnvelope.setUserData(userData)
             expandedEnvelope
@@ -118,21 +126,29 @@ trait TraitJoinQueryBase {
     val spatialRdd = new SpatialRDD[Geometry]
     val wgs84EnvelopeRdd = if (shapeExpression.dataType.isInstanceOf[RasterUDT]) {
       rdd.map { row =>
-        val raster =
-          RasterSerializer.deserialize(shapeExpression.eval(row).asInstanceOf[Array[Byte]])
-        try {
-          val shape = JoinedGeometryRaster.rasterToWGS84Envelope(raster)
-          shape.setUserData(row.copy)
-          shape
-        } finally {
-          raster.dispose(true)
+        val serializedRaster = shapeExpression.eval(row).asInstanceOf[Array[Byte]]
+        val shape = if (serializedRaster != null) {
+          val raster = RasterSerializer.deserialize(serializedRaster)
+          try {
+            JoinedGeometryRaster.rasterToWGS84Envelope(raster)
+          } finally {
+            raster.dispose(true)
+          }
+        } else {
+          new NullGeometry()
         }
+        shape.setUserData(row.copy)
+        shape
       }
     } else {
       rdd.map { row =>
-        val geom =
-          GeometrySerializer.deserialize(shapeExpression.eval(row).asInstanceOf[Array[Byte]])
-        val shape = JoinedGeometryRaster.geometryToWGS84Envelope(geom)
+        val serializedShape = shapeExpression.eval(row).asInstanceOf[Array[Byte]]
+        val shape = if (serializedShape != null) {
+          val geom = GeometrySerializer.deserialize(serializedShape)
+          JoinedGeometryRaster.geometryToWGS84Envelope(geom)
+        } else {
+          new NullGeometry()
+        }
         shape.setUserData(row.copy)
         shape
       }

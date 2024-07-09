@@ -28,6 +28,7 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.util.collection.unsafe.sort.PrefixComparators.UnsignedPrefixComparator
 import org.apache.spark.util.collection.unsafe.sort.{PrefixComparator, RecordComparator}
 
+import java.util
 import java.util.function.Supplier
 
 object UnsafeRowRDDSorter {
@@ -36,7 +37,7 @@ object UnsafeRowRDDSorter {
     unsafeRowRdd.mapPartitions { iter =>
       val numFields = schema.size
       val recordComparatorSupplier: Supplier[RecordComparator] =
-        () => UnsafeRowComparator(numFields)
+        () => new UnsafeRowComparator(numFields)
       val pageSize = SparkEnv.get.memoryManager.pageSizeBytes
       val canUseRadixSort = false
       val prefixComputer: UnsafeExternalRowSorter.PrefixComputer = new UnsafeRowPrefixComputer
@@ -59,7 +60,7 @@ object UnsafeRowRDDSorter {
     }
   }
 
-  case class UnsafeRowComparator(numFields: Int) extends RecordComparator {
+  class UnsafeRowComparator(numFields: Int) extends RecordComparator {
     override def compare(
         leftBaseObject: Any,
         leftBaseOffset: Long,
@@ -73,36 +74,9 @@ object UnsafeRowRDDSorter {
       rightRow.pointTo(rightBaseObject, rightBaseOffset, rightBaseLength)
       val leftBytes = leftRow.getBytes
       val rightBytes = rightRow.getBytes
-      compareByteArray(leftBytes, rightBytes)
+      val cmp = util.Arrays.hashCode(leftBytes) - util.Arrays.hashCode(rightBytes)
+      if (cmp != 0) cmp else compareByteArray(leftBytes, rightBytes)
     }
-
-    private def compareByteArray(a: Array[Byte], b: Array[Byte]): Int = {
-      // FIXME: This is a implementation of `java.util.Arrays.compare`, which is only available in Java 9.
-      //  This is only for compatibility with Java 8, and it could be slower than `java.util.Arrays.compare`.
-      //  We should remove this after we drop Java 8 support.
-      if (a eq b) {
-        0
-      } else {
-        val len = math.min(a.length, b.length)
-        var i = 0
-        var result = 0
-
-        while (i < len && result == 0) {
-          val diff = java.lang.Byte.toUnsignedInt(a(i)) - java.lang.Byte.toUnsignedInt(b(i))
-          if (diff != 0) {
-            result = diff
-          }
-          i += 1
-        }
-
-        if (result == 0) {
-          a.length - b.length
-        } else {
-          result
-        }
-      }
-    }
-
   }
 
   class UnsafeRowPrefixComputer extends UnsafeExternalRowSorter.PrefixComputer {
@@ -111,19 +85,41 @@ object UnsafeRowRDDSorter {
       row match {
         case unsafeRow: UnsafeRow =>
           val bytes = unsafeRow.getBytes
-          if (bytes.length < 8) {
-            prefix.value = 0
-            prefix.isNull = true
-          } else {
-            prefix.value = java.nio.ByteBuffer.wrap(bytes).getLong
-            prefix.isNull = false
-          }
+          prefix.value = util.Arrays.hashCode(bytes)
+          prefix.isNull = false
         case _ =>
           val prefix = new PrefixComputer.Prefix()
           prefix.value = 0
           prefix.isNull = true
       }
       prefix
+    }
+  }
+
+  def compareByteArray(a: Array[Byte], b: Array[Byte]): Int = {
+    // FIXME: This is a implementation of `java.util.Arrays.compare`, which is only available in Java 9.
+    //  This is only for compatibility with Java 8, and it could be slower than `java.util.Arrays.compare`.
+    //  We should remove this after we drop Java 8 support.
+    if (a eq b) {
+      0
+    } else {
+      val len = math.min(a.length, b.length)
+      var i = 0
+      var result = 0
+
+      while (i < len && result == 0) {
+        val diff = java.lang.Byte.toUnsignedInt(a(i)) - java.lang.Byte.toUnsignedInt(b(i))
+        if (diff != 0) {
+          result = diff
+        }
+        i += 1
+      }
+
+      if (result == 0) {
+        a.length - b.length
+      } else {
+        result
+      }
     }
   }
 }
