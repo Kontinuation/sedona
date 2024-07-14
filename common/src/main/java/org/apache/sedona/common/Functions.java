@@ -41,7 +41,6 @@ import org.locationtech.jts.algorithm.construct.LargestEmptyCircle;
 import org.locationtech.jts.algorithm.construct.MaximumInscribedCircle;
 import org.locationtech.jts.algorithm.hull.ConcaveHull;
 import org.locationtech.jts.geom.*;
-import org.locationtech.jts.geom.impl.CoordinateArraySequence;
 import org.locationtech.jts.geom.util.AffineTransformation;
 import org.locationtech.jts.geom.util.GeometryFixer;
 import org.locationtech.jts.io.ByteOrderValues;
@@ -69,10 +68,6 @@ import org.locationtech.jts.triangulate.polygon.ConstrainedDelaunayTriangulator;
 import org.wololo.jts2geojson.GeoJSONWriter;
 
 public class Functions {
-  private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
-  private static Geometry EMPTY_POLYGON = GEOMETRY_FACTORY.createPolygon(null, null);
-  private static GeometryCollection EMPTY_GEOMETRY_COLLECTION =
-      GEOMETRY_FACTORY.createGeometryCollection(null);
   private static final double DEFAULT_TOLERANCE = 1e-6;
   private static final int DEFAULT_MAX_ITER = 1000;
   private static final int OGC_SFS_VALIDITY = 0; // Use usual OGC SFS validity semantics
@@ -94,7 +89,7 @@ public class Functions {
   public static Geometry boundary(Geometry geometry) {
     Geometry boundary = geometry.getBoundary();
     if (boundary instanceof LinearRing) {
-      boundary = GEOMETRY_FACTORY.createLineString(boundary.getCoordinates());
+      boundary = geometry.getFactory().createLineString(boundary.getCoordinates());
     }
     return boundary;
   }
@@ -550,7 +545,11 @@ public class Functions {
 
   public static Geometry geometryN(Geometry geometry, int n) {
     if (n < geometry.getNumGeometries()) {
-      return geometry.getGeometryN(n);
+      Geometry subGeom = geometry.getGeometryN(n);
+      if (subGeom.getSRID() == geometry.getSRID()) {
+        return subGeom;
+      }
+      return setSRID(subGeom, geometry.getSRID());
     }
     return null;
   }
@@ -561,7 +560,7 @@ public class Functions {
       if (n < polygon.getNumInteriorRing()) {
         Geometry interiorRing = polygon.getInteriorRingN(n);
         if (interiorRing instanceof LinearRing) {
-          interiorRing = GEOMETRY_FACTORY.createLineString(interiorRing.getCoordinates());
+          interiorRing = polygon.getFactory().createLineString(interiorRing.getCoordinates());
         }
         return interiorRing;
       }
@@ -579,7 +578,7 @@ public class Functions {
   public static Geometry exteriorRing(Geometry geometry) {
     Geometry ring = GeomUtils.getExteriorRing(geometry);
     if (ring instanceof LinearRing) {
-      ring = GEOMETRY_FACTORY.createLineString(ring.getCoordinates());
+      ring = geometry.getFactory().createLineString(ring.getCoordinates());
     }
     return ring;
   }
@@ -767,7 +766,7 @@ public class Functions {
         } else {
           coordinates.add(position, point.getCoordinate());
         }
-        return GEOMETRY_FACTORY.createLineString(coordinates.toArray(new Coordinate[0]));
+        return linestring.getFactory().createLineString(coordinates.toArray(new Coordinate[0]));
       }
     }
     return null;
@@ -788,7 +787,7 @@ public class Functions {
           position = coordinates.size() - 1;
         }
         coordinates.remove(position);
-        return GEOMETRY_FACTORY.createLineString(coordinates.toArray(new Coordinate[0]));
+        return linestring.getFactory().createLineString(coordinates.toArray(new Coordinate[0]));
       }
     }
     return null;
@@ -803,7 +802,7 @@ public class Functions {
         } else {
           coordinates.set(position, point.getCoordinate());
         }
-        return GEOMETRY_FACTORY.createLineString(coordinates.toArray(new Coordinate[0]));
+        return linestring.getFactory().createLineString(coordinates.toArray(new Coordinate[0]));
       }
     }
     return null;
@@ -817,14 +816,14 @@ public class Functions {
     for (Coordinate c : geometry.getCoordinates()) {
       coordinates.add(c);
     }
-    return GEOMETRY_FACTORY.createLineString(coordinates.toArray(new Coordinate[0]));
+    return geometry.getFactory().createLineString(coordinates.toArray(new Coordinate[0]));
   }
 
   public static Geometry closestPoint(Geometry left, Geometry right) {
     DistanceOp distanceOp = new DistanceOp(left, right);
     try {
       Coordinate[] closestPoints = distanceOp.nearestPoints();
-      return GEOMETRY_FACTORY.createPoint(closestPoints[0]);
+      return left.getFactory().createPoint(closestPoints[0]);
     } catch (Exception e) {
       throw new IllegalArgumentException("ST_ClosestPoint doesn't support empty geometry object.");
     }
@@ -888,7 +887,7 @@ public class Functions {
   public static Geometry intersection(Geometry leftGeometry, Geometry rightGeometry) {
     boolean isIntersects = leftGeometry.intersects(rightGeometry);
     if (!isIntersects) {
-      return EMPTY_POLYGON;
+      return leftGeometry.getFactory().createPolygon();
     }
     if (leftGeometry.contains(rightGeometry)) {
       return rightGeometry;
@@ -929,7 +928,7 @@ public class Functions {
         return geometry;
       }
     }
-    return EMPTY_GEOMETRY_COLLECTION;
+    return geometry.getFactory().createGeometryCollection();
   }
 
   public static Geometry minimumBoundingCircle(Geometry geometry, int quadrantSegments) {
@@ -979,7 +978,7 @@ public class Functions {
     MinimumBoundingCircle minimumBoundingCircle = new MinimumBoundingCircle(geometry);
     Coordinate coods = minimumBoundingCircle.getCentre();
     double radius = minimumBoundingCircle.getRadius();
-    Point centre = GEOMETRY_FACTORY.createPoint(coods);
+    Point centre = geometry.getFactory().createPoint(coods);
     return Pair.of(centre, radius);
   }
 
@@ -1002,7 +1001,7 @@ public class Functions {
     double length = geom.getLength();
     LengthIndexedLine indexedLine = new LengthIndexedLine(geom);
     Coordinate interPoint = indexedLine.extractPoint(length * fraction);
-    return GEOMETRY_FACTORY.createPoint(interPoint);
+    return geom.getFactory().createPoint(interPoint);
   }
 
   /**
@@ -1027,7 +1026,7 @@ public class Functions {
         polygons.add((Polygon) transformCW(polygon));
       }
 
-      return new GeometryFactory().createMultiPolygon(polygons.toArray(new Polygon[0]));
+      return geom.getFactory().createMultiPolygon(polygons.toArray(new Polygon[0]));
     }
     // Non-polygonal geometries are returned unchanged
     return geom;
@@ -1042,7 +1041,8 @@ public class Functions {
       interiorRings.add(transformCW(polygon.getInteriorRingN(i), false));
     }
 
-    return new GeometryFactory(polygon.getPrecisionModel(), polygon.getSRID())
+    return polygon
+        .getFactory()
         .createPolygon(exteriorRingEnforced, interiorRings.toArray(new LinearRing[0]));
   }
 
@@ -1139,7 +1139,7 @@ public class Functions {
         polygons.add((Polygon) transformCCW(polygon));
       }
 
-      return new GeometryFactory().createMultiPolygon(polygons.toArray(new Polygon[0]));
+      return geom.getFactory().createMultiPolygon(polygons.toArray(new Polygon[0]));
     }
     // Non-polygonal geometries are returned unchanged
     return geom;
@@ -1154,7 +1154,8 @@ public class Functions {
       interiorRings.add(transformCCW(polygon.getInteriorRingN(i), false));
     }
 
-    return new GeometryFactory(polygon.getPrecisionModel(), polygon.getSRID())
+    return polygon
+        .getFactory()
         .createPolygon(exteriorRingEnforced, interiorRings.toArray(new LinearRing[0]));
   }
 
@@ -1244,7 +1245,7 @@ public class Functions {
     if (!isIntersects) {
       return leftGeometry;
     } else if (rightGeometry.contains(leftGeometry)) {
-      return EMPTY_POLYGON;
+      return leftGeometry.getFactory().createPolygon();
     } else {
       return leftGeometry.difference(rightGeometry);
     }
@@ -1252,7 +1253,7 @@ public class Functions {
 
   public static Geometry split(Geometry input, Geometry blade) {
     // check input geometry
-    return new GeometrySplitter(GEOMETRY_FACTORY).split(input, blade);
+    return new GeometrySplitter(input.getFactory()).split(input, blade);
   }
 
   public static Integer dimension(Geometry geometry) {
@@ -1479,9 +1480,8 @@ public class Functions {
   }
 
   public static Geometry[] dumpPoints(Geometry geometry) {
-    return Arrays.stream(geometry.getCoordinates())
-        .map(GEOMETRY_FACTORY::createPoint)
-        .toArray(Point[]::new);
+    GeometryFactory factory = geometry.getFactory();
+    return Arrays.stream(geometry.getCoordinates()).map(factory::createPoint).toArray(Point[]::new);
   }
 
   public static Geometry symDifference(Geometry leftGeom, Geometry rightGeom) {
@@ -1493,7 +1493,8 @@ public class Functions {
   }
 
   public static Geometry union(Geometry[] geoms) {
-    return GEOMETRY_FACTORY.createGeometryCollection(geoms).union();
+    GeometryFactory factory = (geoms.length > 0) ? geoms[0].getFactory() : new GeometryFactory();
+    return factory.createGeometryCollection(geoms).union();
   }
 
   public static Geometry unaryUnion(Geometry geom) {
@@ -1501,18 +1502,19 @@ public class Functions {
   }
 
   public static Geometry createMultiGeometryFromOneElement(Geometry geometry) {
+    GeometryFactory factory = geometry.getFactory();
     if (geometry instanceof Circle) {
-      return GEOMETRY_FACTORY.createGeometryCollection(new Circle[] {(Circle) geometry});
+      return factory.createGeometryCollection(new Circle[] {(Circle) geometry});
     } else if (geometry instanceof GeometryCollection) {
       return geometry;
     } else if (geometry instanceof LineString) {
-      return GEOMETRY_FACTORY.createMultiLineString(new LineString[] {(LineString) geometry});
+      return factory.createMultiLineString(new LineString[] {(LineString) geometry});
     } else if (geometry instanceof Point) {
-      return GEOMETRY_FACTORY.createMultiPoint(new Point[] {(Point) geometry});
+      return factory.createMultiPoint(new Point[] {(Point) geometry});
     } else if (geometry instanceof Polygon) {
-      return GEOMETRY_FACTORY.createMultiPolygon(new Polygon[] {(Polygon) geometry});
+      return factory.createMultiPolygon(new Polygon[] {(Polygon) geometry});
     } else {
-      return GEOMETRY_FACTORY.createGeometryCollection();
+      return factory.createGeometryCollection();
     }
   }
 
@@ -1603,10 +1605,16 @@ public class Functions {
     }
 
     Coordinate[] coords = coordinates.toArray(new Coordinate[0]);
-    return GEOMETRY_FACTORY.createLineString(coords);
+    GeometryFactory factory = (geoms.length > 0) ? geoms[0].getFactory() : new GeometryFactory();
+    return factory.createLineString(coords);
   }
 
   public static Geometry makePolygon(Geometry shell, Geometry[] holes) {
+    GeometryFactory factory = shell.getFactory();
+    return makePolygon(shell, holes, factory);
+  }
+
+  public static Geometry makePolygon(Geometry shell, Geometry[] holes, GeometryFactory factory) {
     try {
       if (holes != null) {
         LinearRing[] interiorRings =
@@ -1617,11 +1625,11 @@ public class Functions {
                             && !h.isEmpty()
                             && h instanceof LineString
                             && ((LineString) h).isClosed())
-                .map(h -> GEOMETRY_FACTORY.createLinearRing(h.getCoordinates()))
+                .map(h -> factory.createLinearRing(h.getCoordinates()))
                 .toArray(LinearRing[]::new);
         if (interiorRings.length != 0) {
-          return GEOMETRY_FACTORY.createPolygon(
-              GEOMETRY_FACTORY.createLinearRing(shell.getCoordinates()),
+          return factory.createPolygon(
+              factory.createLinearRing(shell.getCoordinates()),
               Arrays.stream(holes)
                   .filter(
                       h ->
@@ -1629,32 +1637,30 @@ public class Functions {
                               && !h.isEmpty()
                               && h instanceof LineString
                               && ((LineString) h).isClosed())
-                  .map(h -> GEOMETRY_FACTORY.createLinearRing(h.getCoordinates()))
+                  .map(h -> factory.createLinearRing(h.getCoordinates()))
                   .toArray(LinearRing[]::new));
         }
       }
-      return GEOMETRY_FACTORY.createPolygon(
-          GEOMETRY_FACTORY.createLinearRing(shell.getCoordinates()));
+      return factory.createPolygon(factory.createLinearRing(shell.getCoordinates()));
     } catch (IllegalArgumentException e) {
       return null;
     }
   }
 
   public static Geometry makepolygonWithSRID(Geometry lineString, Integer srid) {
-    Geometry geom = makePolygon(lineString, null);
-    if (geom != null) {
-      geom.setSRID(srid);
-    }
-    return geom;
+    GeometryFactory factory =
+        (srid != null) ? new GeometryFactory(new PrecisionModel(), srid) : lineString.getFactory();
+    return makePolygon(lineString, null, factory);
   }
 
   public static Geometry createMultiGeometry(Geometry[] geometries) {
     if (geometries.length > 1) {
-      return GEOMETRY_FACTORY.buildGeometry(Arrays.asList(geometries));
+      return geometries[0].getFactory().buildGeometry(Arrays.asList(geometries));
     } else if (geometries.length == 1) {
       return createMultiGeometryFromOneElement(geometries[0]);
     } else {
-      return GEOMETRY_FACTORY.createGeometryCollection();
+      GeometryFactory factory = new GeometryFactory();
+      return factory.createGeometryCollection();
     }
   }
 
@@ -1662,20 +1668,21 @@ public class Functions {
     if (geomType == null) {
       return collectionExtract(geometry);
     }
+    GeometryFactory factory = geometry.getFactory();
     Class<? extends Geometry> geomClass;
     GeometryCollection emptyResult;
     switch (geomType) {
       case 1:
         geomClass = Point.class;
-        emptyResult = GEOMETRY_FACTORY.createMultiPoint();
+        emptyResult = factory.createMultiPoint();
         break;
       case 2:
         geomClass = LineString.class;
-        emptyResult = GEOMETRY_FACTORY.createMultiLineString();
+        emptyResult = factory.createMultiLineString();
         break;
       case 3:
         geomClass = Polygon.class;
-        emptyResult = GEOMETRY_FACTORY.createMultiPolygon();
+        emptyResult = factory.createMultiPolygon();
         break;
       default:
         throw new IllegalArgumentException("Invalid geometry type");
@@ -1689,21 +1696,22 @@ public class Functions {
 
   public static Geometry collectionExtract(Geometry geometry) {
     List<Geometry> geometries = GeomUtils.extractGeometryCollection(geometry);
+    GeometryFactory factory = geometry.getFactory();
     Polygon[] polygons =
         geometries.stream().filter(g -> g instanceof Polygon).toArray(Polygon[]::new);
     if (polygons.length > 0) {
-      return GEOMETRY_FACTORY.createMultiPolygon(polygons);
+      return factory.createMultiPolygon(polygons);
     }
     LineString[] lines =
         geometries.stream().filter(g -> g instanceof LineString).toArray(LineString[]::new);
     if (lines.length > 0) {
-      return GEOMETRY_FACTORY.createMultiLineString(lines);
+      return factory.createMultiLineString(lines);
     }
     Point[] points = geometries.stream().filter(g -> g instanceof Point).toArray(Point[]::new);
     if (points.length > 0) {
-      return GEOMETRY_FACTORY.createMultiPoint(points);
+      return factory.createMultiPoint(points);
     }
-    return GEOMETRY_FACTORY.createGeometryCollection();
+    return factory.createGeometryCollection();
   }
 
   // ported from
@@ -1848,15 +1856,15 @@ public class Functions {
   }
 
   public static Geometry force3D(Geometry geometry, double zValue) {
-    return GeomUtils.get3DGeom(geometry, zValue);
+    return GeometryForce3DTransformer.transform(geometry, zValue);
   }
 
   public static Geometry force3D(Geometry geometry) {
-    return GeomUtils.get3DGeom(geometry, 0.0);
+    return GeometryForce3DTransformer.transform(geometry, 0.0);
   }
 
   public static Geometry forceCollection(Geometry geom) {
-    return new GeometryFactory().createGeometryCollection(convertGeometryToArray(geom));
+    return geom.getFactory().createGeometryCollection(convertGeometryToArray(geom));
   }
 
   private static Geometry[] convertGeometryToArray(Geometry geom) {
@@ -1935,13 +1943,14 @@ public class Functions {
   public static Geometry geometricMedian(
       Geometry geometry, double tolerance, int maxIter, boolean failIfNotConverged)
       throws Exception {
+    GeometryFactory factory = geometry.getFactory();
     String geometryType = geometry.getGeometryType();
     if (!(Geometry.TYPENAME_POINT.equals(geometryType)
         || Geometry.TYPENAME_MULTIPOINT.equals(geometryType))) {
       throw new Exception("Unsupported geometry type: " + geometryType);
     }
     Coordinate[] coordinates = extractCoordinates(geometry);
-    if (coordinates.length == 0) return new Point(null, GEOMETRY_FACTORY);
+    if (coordinates.length == 0) return new Point(null, factory);
     Coordinate median = initGuess(coordinates);
     double delta = Double.MAX_VALUE;
     double[] distances =
@@ -1954,10 +1963,7 @@ public class Functions {
               "Median failed to converge within %.1E after %d iterations.", tolerance, maxIter));
     boolean is3d = !Double.isNaN(geometry.getCoordinate().z);
     if (!is3d) median.z = Double.NaN;
-    Point point =
-        new Point(new CoordinateArraySequence(new Coordinate[] {median}), GEOMETRY_FACTORY);
-    point.setSRID(geometry.getSRID());
-    return point;
+    return factory.createPoint(median);
   }
 
   public static Geometry geometricMedian(Geometry geometry, double tolerance, int maxIter)
@@ -1986,8 +1992,9 @@ public class Functions {
   }
 
   public static Geometry boundingDiagonal(Geometry geometry) {
+    GeometryFactory factory = geometry.getFactory();
     if (geometry.isEmpty()) {
-      return GEOMETRY_FACTORY.createLineString();
+      return factory.createLineString();
     } else {
       Double startX = null, startY = null, startZ = null, endX = null, endY = null, endZ = null;
       boolean is3d = !Double.isNaN(geometry.getCoordinate().z);
@@ -2012,7 +2019,7 @@ public class Functions {
         startCoordinate = new Coordinate(startX, startY);
         endCoordinate = new Coordinate(endX, endY);
       }
-      return GEOMETRY_FACTORY.createLineString(new Coordinate[] {startCoordinate, endCoordinate});
+      return factory.createLineString(new Coordinate[] {startCoordinate, endCoordinate});
     }
   }
 
@@ -2127,8 +2134,9 @@ public class Functions {
    * @return A GeometryCollection containing the resultant polygons.
    */
   public static Geometry polygonize(Geometry geometry) {
+    GeometryFactory factory = (geometry != null) ? geometry.getFactory() : new GeometryFactory();
     if (geometry == null || geometry.isEmpty()) {
-      return GEOMETRY_FACTORY.createGeometryCollection(null);
+      return factory.createGeometryCollection(null);
     }
 
     if (geometry instanceof GeometryCollection) {
@@ -2141,9 +2149,9 @@ public class Functions {
       Collection polygons = polygonizer.getPolygons();
       Geometry[] polyArray = (Geometry[]) polygons.toArray(new Geometry[0]);
 
-      return GEOMETRY_FACTORY.createGeometryCollection(polyArray);
+      return factory.createGeometryCollection(polyArray);
     } else {
-      return GEOMETRY_FACTORY.createGeometryCollection(null);
+      return factory.createGeometryCollection(null);
     }
   }
 
@@ -2163,7 +2171,7 @@ public class Functions {
     Coordinate[] coordinates = geometry.getCoordinates();
 
     // Creating a MultiPoint from the extracted coordinates
-    return GEOMETRY_FACTORY.createMultiPointFromCoords(coordinates);
+    return geometry.getFactory().createMultiPointFromCoords(coordinates);
   }
 
   /**

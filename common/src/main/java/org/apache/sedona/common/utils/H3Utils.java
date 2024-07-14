@@ -255,7 +255,7 @@ public class H3Utils {
             cells.addAll(
                 polygonToCells(
                     (Polygon)
-                        (new GeometryFactory()
+                        (line.getFactory()
                             .createLineString(new Coordinate[] {cs, ce})
                             .getEnvelope()),
                     level,

@@ -20,6 +20,7 @@ package org.apache.sedona.common.raster;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.apache.sedona.common.Functions;
 import org.apache.sedona.common.utils.RasterPolygonEnumerator;
 import org.apache.sedona.common.utils.RasterPolygonizer;
 import org.apache.sedona.common.utils.RasterUtils;
@@ -133,7 +134,7 @@ public class RasterAIFunctions {
         geom = polygons.get(0);
       }
       Geometry transformed = JTS.transform(geom, transform);
-      transformed.setSRID(4326);
+      transformed = Functions.setSRID(transformed, 4326);
       results.add(
           new ExtractedRegionInfo(transformed, averageScores[labelIndex], labelArray[labelIndex]));
     }
