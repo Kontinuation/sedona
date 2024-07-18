@@ -193,25 +193,27 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       // 2. If the extra condition references the geometry columns, we need them to refine the results
       // 3. If the spatial predicate is not INTERSECTS, we need them if subdividing is applied
       //
-      // In conclusion, we can only discard geometry columns when spatial predicate is INTERSECTS, and neither
-      // projectList nor extra condition references geometry columns.
-      //
       // The point of discarding unneeded geometry columns beforehand is making the size of duplicated rows smaller
       // when geometry subdividing is enabled: if we don't need the geometries after joining, we don't need to carry
       // the original geometries in subdivided rdd, or joining back with the original datasets to retrieve the original
       // geometries.
       val joinConditionMatcher = OptimizableJoinCondition(left, right)
       val unneededAttributes = condition.flatMap {
-        case joinConditionMatcher(ST_Intersects(_), extraCondition) =>
-          def filterUnneededAttributes(refs: Seq[Attribute]): Seq[Attribute] = {
-            refs.filter { ref =>
-              !(extraCondition.exists(_.references.contains(ref)) || projectList.exists(
-                _.references.contains(ref)))
-            }
+        case joinConditionMatcher(pred, extraCondition) =>
+          pred match {
+            case ST_Intersects(_) | ST_Contains(_) | ST_Within(_) | ST_Covers(_) |
+                ST_CoveredBy(_) | ST_Overlaps(_) | ST_Touches(_) | ST_Equals(_) | ST_Crosses(_) =>
+              def filterUnneededAttributes(refs: Seq[Attribute]): Seq[Attribute] = {
+                refs.filter { ref =>
+                  !(extraCondition.exists(_.references.contains(ref)) || projectList.exists(
+                    _.references.contains(ref)))
+                }
+              }
+              val unneededLeftAttributes = filterUnneededAttributes(left.output)
+              val unneededRightAttributes = filterUnneededAttributes(right.output)
+              Some((unneededLeftAttributes, unneededRightAttributes))
+            case _ => None
           }
-          val unneededLeftAttributes = filterUnneededAttributes(left.output)
-          val unneededRightAttributes = filterUnneededAttributes(right.output)
-          Some((unneededLeftAttributes, unneededRightAttributes))
         case _ => None
       }
       unneededAttributes match {
@@ -543,7 +545,9 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
             broadcastRight,
             isGeography,
             extraCondition,
-            distance)
+            distance,
+            unneededLeftAttributes,
+            unneededRightAttributes)
         case _ =>
           Nil
       }
@@ -807,7 +811,9 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       broadcastRight: Boolean,
       isGeography: Boolean,
       extraCondition: Option[Expression],
-      distance: Option[Expression]): Seq[SparkPlan] = {
+      distance: Option[Expression],
+      unneededLeftAttributes: Seq[Attribute],
+      unneededRightAttributes: Seq[Attribute]): Seq[SparkPlan] = {
 
     val broadcastSide = joinType match {
       case Inner if broadcastLeft => Some(LeftSide)
@@ -862,56 +868,65 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
     matchExpressionsToPlans(a, b, left, right) match {
       case Some((_, _, swapped)) =>
         logInfo(s"Planning spatial join for $relationship relationship")
-        val (leftPlan, rightPlan, streamShape, windowSide) = (broadcastSide.get, swapped) match {
-          case (LeftSide, false) => // Broadcast the left side, windows on the left
-            (
-              SpatialIndexExec(
-                planLater(left),
-                a,
-                indexType,
-                isRasterPredicate,
-                isGeography,
-                distanceOnIndexSide),
-              planLater(right),
-              b,
-              LeftSide)
-          case (LeftSide, true) => // Broadcast the left side, objects on the left
-            (
-              SpatialIndexExec(
-                planLater(left),
-                b,
-                indexType,
-                isRasterPredicate,
-                isGeography,
-                distanceOnIndexSide),
-              planLater(right),
-              a,
-              RightSide)
-          case (RightSide, false) => // Broadcast the right side, windows on the left
-            (
-              planLater(left),
-              SpatialIndexExec(
+        val (leftPlan, rightPlan, streamShape, windowSide, unneededStreamAttributes) =
+          (broadcastSide.get, swapped) match {
+            case (LeftSide, false) => // Broadcast the left side, windows on the left
+              (
+                SpatialIndexExec(
+                  planLater(left),
+                  a,
+                  indexType,
+                  isRasterPredicate,
+                  isGeography,
+                  distanceOnIndexSide,
+                  unneededLeftAttributes),
                 planLater(right),
                 b,
-                indexType,
-                isRasterPredicate,
-                isGeography,
-                distanceOnIndexSide),
-              a,
-              LeftSide)
-          case (RightSide, true) => // Broadcast the right side, objects on the left
-            (
-              planLater(left),
-              SpatialIndexExec(
+                LeftSide,
+                unneededRightAttributes)
+            case (LeftSide, true) => // Broadcast the left side, objects on the left
+              (
+                SpatialIndexExec(
+                  planLater(left),
+                  b,
+                  indexType,
+                  isRasterPredicate,
+                  isGeography,
+                  distanceOnIndexSide,
+                  unneededLeftAttributes),
                 planLater(right),
                 a,
-                indexType,
-                isRasterPredicate,
-                isGeography,
-                distanceOnIndexSide),
-              b,
-              RightSide)
-        }
+                RightSide,
+                unneededRightAttributes)
+            case (RightSide, false) => // Broadcast the right side, windows on the left
+              (
+                planLater(left),
+                SpatialIndexExec(
+                  planLater(right),
+                  b,
+                  indexType,
+                  isRasterPredicate,
+                  isGeography,
+                  distanceOnIndexSide,
+                  unneededRightAttributes),
+                a,
+                LeftSide,
+                unneededLeftAttributes)
+            case (RightSide, true) => // Broadcast the right side, objects on the left
+              (
+                planLater(left),
+                SpatialIndexExec(
+                  planLater(right),
+                  a,
+                  indexType,
+                  isRasterPredicate,
+                  isGeography,
+                  distanceOnIndexSide,
+                  unneededRightAttributes),
+                b,
+                RightSide,
+                unneededLeftAttributes)
+          }
         BroadcastIndexJoinExec(
           leftPlan,
           rightPlan,
@@ -921,7 +936,8 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
           joinType,
           spatialPredicate,
           extraCondition,
-          distanceOnStreamSide) :: Nil
+          distanceOnStreamSide,
+          unneededStreamAttributes) :: Nil
       case None =>
         logInfo(
           s"Spatial join for $relationship with arguments not aligned " +

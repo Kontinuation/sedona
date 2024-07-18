@@ -27,6 +27,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, GenericInternalRow, JoinedRow, Predicate, UnsafeProjection, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -48,7 +49,8 @@ case class BroadcastIndexJoinExec(
     joinType: JoinType,
     spatialPredicate: SpatialPredicate,
     extraCondition: Option[Expression] = None,
-    distance: Option[Expression] = None)
+    distance: Option[Expression] = None,
+    unneededStreamAttributes: Seq[Attribute] = Seq.empty)
     extends SedonaBinaryExecNode
     with TraitJoinQueryBase
     with Logging {
@@ -82,15 +84,15 @@ case class BroadcastIndexJoinExec(
   // Using lazy val to avoid serialization
   @transient private lazy val boundCondition: (InternalRow => Boolean) = extraCondition match {
     case Some(condition) =>
-      Predicate.create(condition, streamed.output ++ broadcast.output).eval _ // SPARK3 anchor
-    //      newPredicate(condition, broadcast.output ++ streamed.output).eval _ // SPARK2 anchor
+      Predicate.create(condition, streamed.output ++ broadcast.output).eval _
     case None =>
       (r: InternalRow) => true
   }
 
   protected def createResultProjection(): InternalRow => InternalRow = joinType match {
     case LeftExistence(_) =>
-      UnsafeProjection.create(output, output)
+      // Some attributes may be projected away, which breaks the original nullability assumption
+      UnsafeProjection.create(output, output.map(_.withNullability(true)))
     case _ =>
       // Always put the stream side on left to simplify implementation
       // both of left and right side could be null
@@ -119,8 +121,7 @@ case class BroadcastIndexJoinExec(
   }
 
   override def simpleString(maxFields: Int): String =
-    super.simpleString(maxFields) + s" $spatialExpression" // SPARK3 anchor
-//  override def simpleString: String = super.simpleString + s" $spatialExpression" // SPARK2 anchor
+    super.simpleString(maxFields) + s" $spatialExpression"
 
   // Make sure that geometries from broadcast (indexed) side are always on the left of the predicate
   private val actualPredicate =
@@ -274,42 +275,59 @@ case class BroadcastIndexJoinExec(
     distance match {
       case Some(distanceExpression) =>
         val boundDistanceRef = BindReferences.bindReference(distanceExpression, streamed.output)
-        streamResultsRaw.map(row => {
-          val geom = boundStreamShape.eval(row).asInstanceOf[Array[Byte]]
-          if (geom == null) {
-            (null, row)
-          } else {
-            val geometry = GeometrySerializer.deserialize(geom)
-            val radius = boundDistanceRef.eval(row).asInstanceOf[Double]
-            val envelope = geometry.getEnvelopeInternal
-            envelope.expandBy(radius)
-            (geometry.getFactory.toGeometry(envelope), row)
+        streamResultsRaw.mapPartitions { iter =>
+          val projector = createUnsafeRowProjector(streamed, unneededStreamAttributes)
+          iter.map { row =>
+            val geom = boundStreamShape.eval(row).asInstanceOf[Array[Byte]]
+            if (geom == null) {
+              (null, projector(row))
+            } else {
+              val geometry = GeometrySerializer.deserialize(geom)
+              val radius = boundDistanceRef.eval(row).asInstanceOf[Double]
+              val envelope = geometry.getEnvelopeInternal
+              envelope.expandBy(radius)
+              (geometry.getFactory.toGeometry(envelope), projector(row))
+            }
           }
-        })
+        }
       case _ =>
-        streamResultsRaw.map(row => {
-          val serializedObject = boundStreamShape.eval(row).asInstanceOf[Array[Byte]]
-          if (serializedObject == null) {
-            (null, row)
-          } else {
-            val shape = if (isRasterPredicate) {
-              if (boundStreamShape.dataType.isInstanceOf[RasterUDT]) {
-                val raster = RasterSerializer.deserialize(serializedObject)
-                try {
-                  JoinedGeometryRaster.rasterToWGS84Envelope(raster)
-                } finally {
-                  raster.dispose(true)
+        streamResultsRaw.mapPartitions { iter =>
+          val projector = createUnsafeRowProjector(streamed, unneededStreamAttributes)
+          iter.map { row =>
+            val serializedObject = boundStreamShape.eval(row).asInstanceOf[Array[Byte]]
+            if (serializedObject == null) {
+              (null, projector(row))
+            } else {
+              val shape = if (isRasterPredicate) {
+                if (boundStreamShape.dataType.isInstanceOf[RasterUDT]) {
+                  val raster = RasterSerializer.deserialize(serializedObject)
+                  try {
+                    JoinedGeometryRaster.rasterToWGS84Envelope(raster)
+                  } finally {
+                    raster.dispose(true)
+                  }
+                } else {
+                  val geom = GeometrySerializer.deserialize(serializedObject)
+                  JoinedGeometryRaster.geometryToWGS84Envelope(geom)
                 }
               } else {
-                val geom = GeometrySerializer.deserialize(serializedObject)
-                JoinedGeometryRaster.geometryToWGS84Envelope(geom)
+                GeometrySerializer.deserialize(serializedObject)
               }
-            } else {
-              GeometrySerializer.deserialize(serializedObject)
+              (shape, projector(row))
             }
-            (shape, row)
           }
-        })
+        }
+    }
+  }
+
+  private def createUnsafeRowProjector(
+      plan: SparkPlan,
+      unneeded: Seq[Attribute]): UnsafeRow => UnsafeRow = {
+    projection(plan, unneeded) match {
+      case Some(attrs) =>
+        val projection = GenerateUnsafeProjection.generate(attrs)
+        (row: UnsafeRow) => projection(row)
+      case None => (row: UnsafeRow) => row
     }
   }
 

@@ -817,28 +817,6 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     }
   }
 
-  /**
-   * Assemble the projection for the left and right side to eliminate unneeded geometry attributes
-   * @param plan
-   *   Spark plan
-   * @param unneeded
-   *   Unneeded attributes
-   * @return
-   *   Projection expressions
-   */
-  private def projection(plan: SparkPlan, unneeded: Seq[Attribute]): Option[Seq[Expression]] = {
-    if (unneeded.isEmpty) None
-    else {
-      Some(plan.output.map { ref =>
-        if (unneeded.exists(_.semanticEquals(ref))) {
-          Literal(null, ref.dataType)
-        } else {
-          BindReferences.bindReference(ref.asInstanceOf[Expression], plan.output)
-        }
-      })
-    }
-  }
-
   private def discardUnneededAttributes(
       spatialRDD: SpatialRDD[Geometry],
       subdivideRDDOptions: Option[SubdivideRDDOptions],
@@ -861,7 +839,7 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
           spatialRDD
         }
       case None =>
-        // We need the original geometries to remove extra rows with null on the non-outer side
+        // We need the original row to remove extra rows with null on the non-outer side
         // when running outer joins (see outerJoinedRddToRowRdd), so this optimization is only
         // correct when running inner joins.
         if (joinType != Inner || unneededAttributes.isEmpty) spatialRDD

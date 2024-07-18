@@ -25,6 +25,9 @@ import org.apache.sedona.sql.utils.{GeometrySerializer, RasterSerializer}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.Attribute
+import org.apache.spark.sql.catalyst.expressions.BindReferences
+import org.apache.spark.sql.catalyst.expressions.Literal
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.projectUnsafeRow
@@ -176,6 +179,28 @@ trait TraitJoinQueryBase {
         newSpatialRDD.setStatistics(spatialRDD.getStatistics)
         newSpatialRDD
       case None => spatialRDD
+    }
+  }
+
+  /**
+   * Assemble the projection for the left and right side to eliminate unneeded geometry attributes
+   * @param plan
+   *   Spark plan
+   * @param unneeded
+   *   Unneeded attributes
+   * @return
+   *   Projection expressions
+   */
+  def projection(plan: SparkPlan, unneeded: Seq[Attribute]): Option[Seq[Expression]] = {
+    if (unneeded.isEmpty) None
+    else {
+      Some(plan.output.map { ref =>
+        if (unneeded.exists(_.semanticEquals(ref))) {
+          Literal(null, ref.dataType)
+        } else {
+          BindReferences.bindReference(ref.asInstanceOf[Expression], plan.output)
+        }
+      })
     }
   }
 

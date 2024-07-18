@@ -504,6 +504,22 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
   }
 
   describe("Spatial join should produce results with correct geometry values") {
+    def verifyGeometries(result: DataFrame): Unit = {
+      val resultRows = result.collect()
+      val leftRows = sparkSession.sql("SELECT id, geom FROM df1").collect()
+      val rightRows = sparkSession.sql("SELECT id, geom FROM df2").collect()
+      val leftGeomMap = leftRows.map(row => (row.getInt(0), row.getAs[Geometry](1))).toMap
+      val rightGeomMap = rightRows.map(row => (row.getInt(0), row.getAs[Geometry](1))).toMap
+      resultRows.foreach { row =>
+        val id1 = row.getInt(0)
+        val id2 = row.getInt(1)
+        val geom1 = row.getAs[Geometry](2)
+        val geom2 = row.getAs[Geometry](3)
+        assert(geom1.equals(leftGeomMap(id1)))
+        assert(geom2.equals(rightGeomMap(id2)))
+      }
+    }
+
     it("Should produce correct geometry values") {
       val configs = Seq(
         Map(
@@ -529,21 +545,27 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
               "FROM df1 JOIN df2 ON ST_Intersects(df1.geom, df2.geom)")
           val expected = buildExpectedResult("ST_Intersects(df1.geom, df2.geom)")
           verifyResult(expected, result)
-          val resultRows = result.collect()
-          val leftRows = sparkSession.sql("SELECT id, geom FROM df1").collect()
-          val rightRows = sparkSession.sql("SELECT id, geom FROM df2").collect()
-          val leftGeomMap = leftRows.map(row => (row.getInt(0), row.getAs[Geometry](1))).toMap
-          val rightGeomMap = rightRows.map(row => (row.getInt(0), row.getAs[Geometry](1))).toMap
-          resultRows.foreach { row =>
-            val id1 = row.getInt(0)
-            val id2 = row.getInt(1)
-            val geom1 = row.getAs[Geometry](2)
-            val geom2 = row.getAs[Geometry](3)
-            assert(geom1.equals(leftGeomMap(id1)))
-            assert(geom2.equals(rightGeomMap(id2)))
-          }
+          verifyGeometries(result)
         }
       }
+    }
+
+    it("Should produce correct geometry values when left side is broadcasted") {
+      val result = sparkSession.sql(
+        "SELECT /*+ BROADCAST(df1) */ df1.id, df2.id, df1.geom AS geom1, df2.geom AS geom2 " +
+          "FROM df1 JOIN df2 ON ST_Intersects(df1.geom, df2.geom)")
+      val expected = buildExpectedResult("ST_Intersects(df1.geom, df2.geom)")
+      verifyResult(expected, result)
+      verifyGeometries(result)
+    }
+
+    it("Should produce correct geometry values when right side is broadcasted") {
+      val result = sparkSession.sql(
+        "SELECT /*+ BROADCAST(df2) */ df1.id, df2.id, df1.geom AS geom1, df2.geom AS geom2 " +
+          "FROM df1 JOIN df2 ON ST_Intersects(df1.geom, df2.geom)")
+      val expected = buildExpectedResult("ST_Intersects(df1.geom, df2.geom)")
+      verifyResult(expected, result)
+      verifyGeometries(result)
     }
   }
 
