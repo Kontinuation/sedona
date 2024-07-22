@@ -73,6 +73,7 @@ public class SedonaConf implements Serializable {
   private long expectedPerPartitionCount;
   private int maxGuessedPartitionNumber;
   private SpatialPartitionBuildingStrategy spatialPartitionBuildingStrategy;
+  private int maxSamplesForAdaptiveBroadcastJoinExecutionMode;
 
   // Parameters for enabling auto-subdividing when running spatial joins
   private JoinSubdivideMode spatialJoinSubdivideLeft;
@@ -95,6 +96,9 @@ public class SedonaConf implements Serializable {
   // Parameters for debugging spatial partitioning
   private boolean enableMetricsForSpatialPartitioning;
   private String spatialPartitionerSavePath;
+
+  // Parameters for testing
+  private boolean allowPlanBroadcastJoin;
 
   public static SedonaConf fromActiveSession() {
     return new SedonaConf(SparkSession.active().conf());
@@ -141,8 +145,7 @@ public class SedonaConf implements Serializable {
     }
 
     // Internal parameters for advanced, self-driving optimized spatial join. Users usually do not
-    // need to
-    // tune these parameters.
+    // need to tune these parameters.
     this.maxSamplesForSpatialPartitioning =
         Long.parseLong(
             runtimeConfig.get(
@@ -184,6 +187,10 @@ public class SedonaConf implements Serializable {
             runtimeConfig
                 .get("spark.sedona.join.spatialPartitionBuildingStrategy", "subsampling")
                 .toUpperCase(Locale.ROOT));
+    this.maxSamplesForAdaptiveBroadcastJoinExecutionMode =
+        Integer.parseInt(
+            runtimeConfig.get(
+                "spark.sedona.join.maxSamplesForAdaptiveBroadcastJoinExecutionMode", "10"));
 
     // Parameters for enabling auto-subdividing when running spatial joins
     this.spatialJoinSubdivideLeft =
@@ -248,6 +255,11 @@ public class SedonaConf implements Serializable {
                 "spark.sedona.join.debug.enableMetricsForSpatialPartitioning", "false"));
     this.spatialPartitionerSavePath =
         runtimeConfig.get("spark.sedona.join.debug.spatialPartitionerSavePath", "");
+
+    // Parameters for testing
+    this.allowPlanBroadcastJoin =
+        Boolean.parseBoolean(
+            runtimeConfig.get("spark.sedona.testonly.allowPlanBroadcastJoin", "true"));
   }
 
   private SubdivideOptions readSubdivideOptions(RuntimeConfig runtimeConfig, String prefix) {
@@ -378,6 +390,10 @@ public class SedonaConf implements Serializable {
     return spatialPartitionBuildingStrategy;
   }
 
+  public int getMaxSamplesForAdaptiveBroadcastJoinExecutionMode() {
+    return maxSamplesForAdaptiveBroadcastJoinExecutionMode;
+  }
+
   public JoinSubdivideMode getSpatialJoinSubdivideLeft() {
     return spatialJoinSubdivideLeft;
   }
@@ -444,5 +460,9 @@ public class SedonaConf implements Serializable {
 
   public String getSpatialPartitionerSavePath() {
     return spatialPartitionerSavePath;
+  }
+
+  public boolean allowPlanBroadcastJoin() {
+    return allowPlanBroadcastJoin;
   }
 }

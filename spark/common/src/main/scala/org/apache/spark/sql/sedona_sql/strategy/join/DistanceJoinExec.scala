@@ -120,6 +120,10 @@ case class DistanceJoinExec(
 
   override def isDistanceJoin: Boolean = true
 
+  override def isGeographyDistanceJoin: Boolean = isGeography
+
+  override def distanceExpression: Option[Expression] = Some(distance)
+
   protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): SparkPlan = {
     copy(left = newLeft, right = newRight)
   }

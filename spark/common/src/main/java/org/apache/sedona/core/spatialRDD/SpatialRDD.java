@@ -42,6 +42,7 @@ import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector;
 import org.apache.sedona.core.spatialRddTool.IndexBuilder;
 import org.apache.sedona.core.spatialRddTool.PlaceGeometryWithMetricsIterator;
 import org.apache.sedona.core.spatialRddTool.StatCalculator;
+import org.apache.sedona.core.utils.ExecutorResourceUtils;
 import org.apache.sedona.core.utils.RDDSampleUtils;
 import org.apache.sedona.core.utils.SedonaConf;
 import org.apache.spark.SparkContext;
@@ -371,36 +372,26 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
 
     // Infer the amount of available executor memory for running local spatial join.
     SparkContext context = spatialRDD.rawSpatialRDD.context();
-    long executorMemory = (long) context.executorMemory() * 1024 * 1024;
-    double memoryFraction =
-        Double.parseDouble(context.getConf().get("spark.memory.fraction", "0.6"));
-    double storageFraction =
-        Double.parseDouble(context.getConf().get("spark.memory.storageFraction", "0.5"));
-    int executorCores = Integer.parseInt(context.getConf().get("spark.executor.cores", "1"));
-    long availableMemory =
-        (long) (executorMemory * memoryFraction * (1 - storageFraction) / executorCores);
+    long availableMemory = ExecutorResourceUtils.inferExecutionMemory(context);
 
     // Determine the number of spatial partitions to make partitions fit in executor memory.
     long thisTotalSizeInBytes = stat.getEstimatedSizeInBytes() * inBoundsCount;
     int partitionsBySize = (int) Math.ceil(thisTotalSizeInBytes * 2.0 / availableMemory);
 
     // Determine the number of spatial partitions to ensure that each partition has a reasonable
-    // amount of
-    // geometries.
+    // amount of geometries.
     long perPartitionCount = conf.getExpectedPerPartitionCount();
     int maxNumPartitions = conf.getMaxGuessedPartitionNumber();
     int partitionsByCount =
         (int) Math.min(Math.ceil((double) inBoundsCount / perPartitionCount), maxNumPartitions);
 
     // Take the maximum of the two. If the spatial RDD is already partitioned to a larger number of
-    // partitions,
-    // we keep the larger number.
+    // partitions, we keep the larger number.
     int numPartitions = Math.max(partitionsBySize, partitionsByCount);
     numPartitions = Math.max(numPartitions, spatialRDD.rawSpatialRDD.getNumPartitions());
 
     // If numPartitions exceeds half of the number of estimated in-bound geometries, we may need to
-    // reduce the
-    // number of partitions.
+    // reduce the number of partitions.
     if (numPartitions * 2L > inBoundsCount) {
       numPartitions = Math.max((int) Math.ceil(inBoundsCount / 2.0), 1);
     }

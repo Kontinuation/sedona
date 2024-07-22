@@ -40,6 +40,10 @@ trait TraitJoinQueryBase {
     leftShapeExpr.dataType.isInstanceOf[RasterUDT] || rightShapeExpr.dataType
       .isInstanceOf[RasterUDT]
 
+  def isGeographyDistanceJoin: Boolean = false
+
+  def distanceExpression: Option[Expression] = None
+
   def toSpatialRddPair(
       leftRdd: RDD[UnsafeRow],
       leftShapeExpr: Expression,

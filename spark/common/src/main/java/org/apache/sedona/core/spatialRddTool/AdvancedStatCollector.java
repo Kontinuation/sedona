@@ -45,7 +45,7 @@ import org.locationtech.jts.geom.Puntal;
  */
 public class AdvancedStatCollector implements Serializable {
   public static final long DEFAULT_MIN_SAMPLES = 10000;
-  public static final long DEFAULT_MAX_SAMPLES = 1000000; // roughly 50 MB
+  public static final long DEFAULT_MAX_SAMPLES = 100000; // roughly 5 MB
   public static final double DEFAULT_MIN_SAMPLING_RATE = 0.01;
   public static final double DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE = 1.2;
   public static final int DEFAULT_TOP_K_LARGEST_GEOMETRIES = 10;
@@ -485,6 +485,10 @@ public class AdvancedStatCollector implements Serializable {
     return numEstimatedGeometries;
   }
 
+  public long getEstimatedRDDSizeInBytes() {
+    return getEstimatedSizeInBytes() * getCount();
+  }
+
   public long getEstimatedSizeInBytes() {
     if (numEstimatedGeometries == 0) {
       return 0;
@@ -533,6 +537,10 @@ public class AdvancedStatCollector implements Serializable {
 
   public List<Envelope> getSampledEnvelopes() {
     return samples;
+  }
+
+  public void forgetSampledEnvelopes() {
+    samples.clear();
   }
 
   public PriorityQueue<LargeGeometryInfo> getTopAreaInfos() {

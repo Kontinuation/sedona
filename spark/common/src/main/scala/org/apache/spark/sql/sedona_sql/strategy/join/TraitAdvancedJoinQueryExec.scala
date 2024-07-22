@@ -20,6 +20,7 @@ package org.apache.spark.sql.sedona_sql.strategy.join
 
 import org.apache.sedona.common.subDivide.SubdivideOptions
 import org.apache.sedona.core.enums.{IndexType, JoinSubdivideMode}
+import org.apache.sedona.core.enums.ExecutionMode
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
 import org.apache.sedona.core.spatialOperator.Subdivide.{isSubdivideAccurate, SubdividedPart, SubdivideRDDOptions}
 import org.apache.sedona.core.spatialOperator.{JoinQuery, SpatialPredicate, Subdivide}
@@ -29,6 +30,7 @@ import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner.Ou
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitioningMetrics
 import org.apache.sedona.core.spatialRDD.SpatialRDD
+import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
@@ -53,6 +55,7 @@ import org.apache.spark.HashPartitioner
 import org.apache.spark.sql.sedona_sql.utils.JoinedUnsafeRowRDDSorter
 import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
 import org.apache.spark.api.java.function.{Function0 => JavaFunction0, Function2 => JavaFunction2}
+import org.apache.spark.sql.sedona_sql.optimization.ExpressionUtils.matchDistanceExpressionToJoinSide
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.getNullUnsafeRow
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.getUnsafeRowFromUserData
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.joinTypeOf
@@ -100,11 +103,12 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
 
   private lazy val sedonaConf = SedonaConf.fromActiveSession
 
+  private lazy val numOutputRows: SQLMetric =
+    SQLMetrics.createMetric(sparkContext, "number of output rows (without dedup)")
+
   override lazy val metrics: Map[String, SQLMetric] = if (sedonaConf.useAdvancedSpatialJoin) {
     Map(
-      "numOutputRows" -> SQLMetrics.createMetric(
-        sparkContext,
-        "number of output rows (without dedup)"),
+      "numOutputRows" -> numOutputRows,
       "buildCount" -> SQLMetrics.createMetric(sparkContext, "number of build side"),
       "streamCount" -> SQLMetrics.createMetric(sparkContext, "number of stream side"),
       "candidateCount" -> SQLMetrics.createMetric(sparkContext, "number of candidates"),
@@ -196,15 +200,42 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       sedonaConf.getFallbackPartitionNum,
       sedonaConf)
     if (spatialPartitionResult == null) {
-      return computeJoinResultForDisjointInputs(
-        leftResultsRaw,
-        rightResultsRaw,
-        left.output,
-        right.output,
-        joinType)
+      return computeJoinResultForDisjointInputs(leftResultsRaw, rightResultsRaw, joinType)
     }
     var spatialPartitioner = spatialPartitionResult.getLeft
     var spatialPartitioningMetrics = spatialPartitionResult.getRight
+
+    // Switch to broadcast indexed join when one side is small enough. We'll only do this when
+    // subdividing is not forced on both sides. Although this is not as fast as planning the
+    // spatial join as broadcast indexed join in the first place, but it is still faster than
+    // shuffling the dataset.
+    if (sedonaConf.getSpatialJoinSubdivideLeft != JoinSubdivideMode.ALWAYS &&
+      sedonaConf.getSpatialJoinSubdivideRight != JoinSubdivideMode.ALWAYS) {
+      val leftSize = leftShapes.getStatistics.getEstimatedRDDSizeInBytes
+      val rightSize = rightShapes.getStatistics.getEstimatedRDDSizeInBytes
+      val broadcastThreshold = sedonaConf.getAutoBroadcastJoinThreshold
+      joinType match {
+        case Inner =>
+          if (leftSize <= broadcastThreshold || rightSize <= broadcastThreshold) {
+            return computeJoinResultUsingBroadcastJoin(
+              leftShapes.getStatistics,
+              rightShapes.getStatistics)
+          }
+        case LeftOuter =>
+          if (rightSize <= broadcastThreshold) {
+            return computeJoinResultUsingBroadcastJoin(
+              leftShapes.getStatistics,
+              rightShapes.getStatistics)
+          }
+        case RightOuter =>
+          if (leftSize <= broadcastThreshold) {
+            return computeJoinResultUsingBroadcastJoin(
+              leftShapes.getStatistics,
+              rightShapes.getStatistics)
+          }
+        case _ => ()
+      }
+    }
 
     // Try subdivide the spatial RDD if auto subdivide is enabled
     if (sedonaConf.getSpatialJoinSubdivideLeft == JoinSubdivideMode.AUTO ||
@@ -420,11 +451,97 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     resultRdd
   }
 
+  private def computeJoinResultUsingBroadcastJoin(
+      leftStat: AdvancedStatCollector,
+      rightStat: AdvancedStatCollector): RDD[InternalRow] = {
+    val leftSize = leftStat.getEstimatedRDDSizeInBytes
+    val rightSize = rightStat.getEstimatedRDDSizeInBytes
+    val indexBuildSide = joinType match {
+      case Inner => if (leftSize <= rightSize) LeftSide else RightSide
+      case LeftOuter => RightSide
+      case RightOuter => LeftSide
+      case _ => throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
+    }
+
+    var broadcastPlan: SparkPlan = null
+    var broadcastShape: Expression = null
+    var broadcastUnneededAttributes: Seq[Attribute] = Seq.empty
+    var broadcastStat: AdvancedStatCollector = null
+    var streamPlan: SparkPlan = null
+    var streamShape: Expression = null
+    var streamUnneededAttributes: Seq[Attribute] = Seq.empty
+    var streamStat: AdvancedStatCollector = null
+    indexBuildSide match {
+      case LeftSide =>
+        broadcastPlan = left
+        broadcastShape = leftShape
+        broadcastUnneededAttributes = unneededLeftAttributes
+        broadcastStat = leftStat
+        streamPlan = right
+        streamShape = rightShape
+        streamUnneededAttributes = unneededRightAttributes
+        streamStat = rightStat
+      case RightSide =>
+        broadcastPlan = right
+        broadcastShape = rightShape
+        broadcastUnneededAttributes = unneededRightAttributes
+        broadcastStat = rightStat
+        streamPlan = left
+        streamShape = leftShape
+        streamUnneededAttributes = unneededLeftAttributes
+        streamStat = leftStat
+    }
+
+    val (distanceOnIndexSide, distanceOnStreamSide) = distanceExpression
+      .map { distanceExpr =>
+        matchDistanceExpressionToJoinSide(distanceExpr, broadcastPlan, streamPlan) match {
+          case Some(LeftSide) => (Some(distanceExpr), None)
+          case Some(RightSide) => (None, Some(distanceExpr))
+          case _ =>
+            throw new IllegalArgumentException(
+              "Distance expression must be bound to one side of the join")
+        }
+      }
+      .getOrElse((None, None))
+
+    val isRasterPredicate = this.isRasterJoin(leftShape, rightShape)
+    val indexExec = SpatialIndexExec(
+      broadcastPlan,
+      broadcastShape,
+      IndexType.RTREE,
+      isRasterPredicate,
+      isGeographyDistanceJoin,
+      distanceOnIndexSide,
+      broadcastUnneededAttributes)
+    val (leftPlan, rightPlan) = indexBuildSide match {
+      case LeftSide => (indexExec, right)
+      case RightSide => (left, indexExec)
+    }
+    val executionMode =
+      ExecutionMode.getOptimalExecutionMode(spatialPredicate, broadcastStat, streamStat)
+    val broadcastIndexJoinExec = BroadcastIndexJoinExec(
+      leftPlan,
+      rightPlan,
+      streamShape,
+      indexBuildSide,
+      LeftSide,
+      joinType,
+      spatialPredicate,
+      extraCondition,
+      isGeographyDistanceJoin,
+      distanceOnStreamSide,
+      streamUnneededAttributes,
+      Some(numOutputRows),
+      Some(executionMode))
+
+    leftStat.forgetSampledEnvelopes()
+    rightStat.forgetSampledEnvelopes()
+    broadcastIndexJoinExec.execute()
+  }
+
   private def computeJoinResultForDisjointInputs(
       leftResultsRaw: RDD[UnsafeRow],
       rightResultsRaw: RDD[UnsafeRow],
-      leftOutput: Seq[Attribute],
-      rightOutput: Seq[Attribute],
       joinType: JoinType): RDD[InternalRow] = {
     joinType match {
       case Inner => sparkContext.emptyRDD

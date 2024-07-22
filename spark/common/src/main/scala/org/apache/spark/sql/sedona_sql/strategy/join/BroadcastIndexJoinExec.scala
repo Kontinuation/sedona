@@ -18,7 +18,9 @@
  */
 package org.apache.spark.sql.sedona_sql.strategy.join
 
+import org.apache.sedona.core.enums.ExecutionMode
 import org.apache.sedona.core.spatialOperator.{SpatialPredicate, SpatialPredicateEvaluators}
+import org.apache.sedona.core.utils.SedonaConf
 import org.apache.sedona.sql.utils.{GeometrySerializer, RasterSerializer}
 
 import scala.collection.JavaConverters._
@@ -32,10 +34,13 @@ import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.execution.metric.SQLMetrics
 import org.apache.spark.sql.execution.{RowIterator, SparkPlan}
+import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
 import org.apache.spark.sql.sedona_sql.execution.SedonaBinaryExecNode
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
+import org.locationtech.jts.geom.MultiPoint
+import org.locationtech.jts.geom.Point
 import org.locationtech.jts.index.SpatialIndex
 
 import java.util
@@ -49,8 +54,11 @@ case class BroadcastIndexJoinExec(
     joinType: JoinType,
     spatialPredicate: SpatialPredicate,
     extraCondition: Option[Expression] = None,
+    isGeography: Boolean,
     distance: Option[Expression] = None,
-    unneededStreamAttributes: Seq[Attribute] = Seq.empty)
+    unneededStreamAttributes: Seq[Attribute] = Seq.empty,
+    numOutputRowsMetrics: Option[SQLMetric] = None,
+    executionMode: Option[ExecutionMode] = None)
     extends SedonaBinaryExecNode
     with TraitJoinQueryBase
     with Logging {
@@ -74,7 +82,8 @@ case class BroadcastIndexJoinExec(
   }
 
   override lazy val metrics = Map(
-    "numOutputRows" -> SQLMetrics.createMetric(sparkContext, "number of output rows"))
+    "numOutputRows" -> numOutputRowsMetrics.getOrElse(
+      SQLMetrics.createMetric(sparkContext, "number of output rows")))
 
   private val (streamed, broadcast) = indexBuildSide match {
     case LeftSide => (right, left.asInstanceOf[SpatialIndexExec])
@@ -130,10 +139,14 @@ case class BroadcastIndexJoinExec(
 
   private def innerJoin(
       streamIter: Iterator[(Geometry, UnsafeRow)],
-      broadcastIndex: Broadcast[SpatialIndex]): Iterator[InternalRow] = {
+      broadcastIndex: Broadcast[SpatialIndex],
+      sedonaConf: SedonaConf): Iterator[InternalRow] = {
     val joinedRow = new JoinedRow
     val index = broadcastIndex.value
-    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(actualPredicate)
+    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(
+      executionMode,
+      actualPredicate,
+      sedonaConf)
     streamIter.flatMap { case (geom, row) =>
       joinedRow.withLeft(row)
       val candidates =
@@ -147,10 +160,14 @@ case class BroadcastIndexJoinExec(
 
   private def semiJoin(
       streamIter: Iterator[(Geometry, UnsafeRow)],
-      broadcastIndex: Broadcast[SpatialIndex]): Iterator[InternalRow] = {
+      broadcastIndex: Broadcast[SpatialIndex],
+      sedonaConf: SedonaConf): Iterator[InternalRow] = {
     val joinedRow = new JoinedRow
     val index = broadcastIndex.value
-    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(actualPredicate)
+    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(
+      executionMode,
+      actualPredicate,
+      sedonaConf)
     streamIter.flatMap { case (geom, row) =>
       val left = row
       joinedRow.withLeft(left)
@@ -171,10 +188,14 @@ case class BroadcastIndexJoinExec(
 
   private def antiJoin(
       streamIter: Iterator[(Geometry, UnsafeRow)],
-      broadcastIndex: Broadcast[SpatialIndex]): Iterator[InternalRow] = {
+      broadcastIndex: Broadcast[SpatialIndex],
+      sedonaConf: SedonaConf): Iterator[InternalRow] = {
     val joinedRow = new JoinedRow
     val index = broadcastIndex.value
-    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(actualPredicate)
+    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(
+      executionMode,
+      actualPredicate,
+      sedonaConf)
     streamIter.flatMap { case (geom, row) =>
       val left = row
       joinedRow.withLeft(row)
@@ -199,11 +220,15 @@ case class BroadcastIndexJoinExec(
 
   private def outerJoin(
       streamIter: Iterator[(Geometry, UnsafeRow)],
-      broadcastIndex: Broadcast[SpatialIndex]): Iterator[InternalRow] = {
+      broadcastIndex: Broadcast[SpatialIndex],
+      sedonaConf: SedonaConf): Iterator[InternalRow] = {
     val joinedRow = new JoinedRow
     val nullRow = new GenericInternalRow(broadcast.output.length)
     val index = broadcastIndex.value
-    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(actualPredicate)
+    val refiner = BroadcastIndexJoinExec.createJoinCandidateRefiner(
+      executionMode,
+      actualPredicate,
+      sedonaConf)
 
     streamIter.flatMap { case (geom, row) =>
       joinedRow.withLeft(row)
@@ -238,24 +263,23 @@ case class BroadcastIndexJoinExec(
   }
 
   override protected def doExecute(): RDD[InternalRow] = {
+    val sedonaConf = SedonaConf.fromActiveSession()
     val numOutputRows = longMetric("numOutputRows")
     val boundStreamShape = BindReferences.bindReference(streamShape, streamed.output)
     val streamResultsRaw = streamed.execute().asInstanceOf[RDD[UnsafeRow]]
-
     val broadcastIndex = broadcast.executeBroadcast[SpatialIndex]()
-
     val streamShapes = createStreamShapes(streamResultsRaw, boundStreamShape)
 
     streamShapes.mapPartitions { streamedIter =>
       val joinedIter = joinType match {
         case _: InnerLike =>
-          innerJoin(streamedIter, broadcastIndex)
+          innerJoin(streamedIter, broadcastIndex, sedonaConf)
         case LeftSemi =>
-          semiJoin(streamedIter, broadcastIndex)
+          semiJoin(streamedIter, broadcastIndex, sedonaConf)
         case LeftAnti =>
-          antiJoin(streamedIter, broadcastIndex)
+          antiJoin(streamedIter, broadcastIndex, sedonaConf)
         case LeftOuter | RightOuter =>
-          outerJoin(streamedIter, broadcastIndex)
+          outerJoin(streamedIter, broadcastIndex, sedonaConf)
         case x: Any =>
           throw new IllegalArgumentException(
             s"BroadcastIndexJoinExec should not take $x as the JoinType")
@@ -284,9 +308,9 @@ case class BroadcastIndexJoinExec(
             } else {
               val geometry = GeometrySerializer.deserialize(geom)
               val radius = boundDistanceRef.eval(row).asInstanceOf[Double]
-              val envelope = geometry.getEnvelopeInternal
-              envelope.expandBy(radius)
-              (geometry.getFactory.toGeometry(envelope), projector(row))
+              val envelope =
+                JoinedGeometry.geometryToExpandedEnvelope(geometry, radius, isGeography)
+              (envelope, projector(row))
             }
           }
         }
@@ -331,21 +355,38 @@ case class BroadcastIndexJoinExec(
     }
   }
 
+  override def isGeographyDistanceJoin: Boolean = distance.isDefined && isGeography
+
+  override def distanceExpression: Option[Expression] = distance
+
   protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): SparkPlan = {
     copy(left = newLeft, right = newRight)
   }
 }
 
 object BroadcastIndexJoinExec {
-  private def createJoinCandidateRefiner(predicate: SpatialPredicate): Refiner = {
-    predicate match {
-      case SpatialPredicate.INTERSECTS | SpatialPredicate.COVERED_BY | SpatialPredicate.WITHIN =>
-        new PrepareStreamSideRefiner(predicate)
+  private def createJoinCandidateRefiner(
+      executionMode: Option[ExecutionMode],
+      predicate: SpatialPredicate,
+      sedonaConf: SedonaConf): Refiner = {
+    executionMode match {
+      case Some(ExecutionMode.PREPARE_BUILD) => new PrepareBuildSideRefiner(predicate)
+      case Some(ExecutionMode.PREPARE_STREAM) => new PrepareBuildSideRefiner(predicate)
+      case Some(ExecutionMode.PREPARE_NONE) => new PlainRefiner(predicate)
+      case None =>
+        predicate match {
+          case SpatialPredicate.INTERSECTS =>
+            val maxSamples = sedonaConf.getMaxSamplesForAdaptiveBroadcastJoinExecutionMode
+            new AdaptiveIntersectRefiner(maxSamples)
 
-      case SpatialPredicate.CONTAINS | SpatialPredicate.COVERS =>
-        new PrepareBuildSideRefiner(predicate)
+          case SpatialPredicate.COVERED_BY | SpatialPredicate.WITHIN =>
+            new PrepareStreamSideRefiner(predicate)
 
-      case _ => new PlainRefiner(predicate)
+          case SpatialPredicate.CONTAINS | SpatialPredicate.COVERS =>
+            new PrepareBuildSideRefiner(predicate)
+
+          case _ => new PlainRefiner(predicate)
+        }
     }
   }
 
@@ -391,6 +432,62 @@ object BroadcastIndexJoinExec {
       else {
         val preparedGeom = factory.create(streamSide)
         buildSide.iterator.asScala.filter(evaluator.eval(_, preparedGeom))
+      }
+    }
+  }
+
+  private class AdaptiveIntersectRefiner(maxSamples: Long) extends Refiner {
+    private var currentRefiner: Refiner = new PrepareStreamSideRefiner(
+      SpatialPredicate.INTERSECTS)
+    private val factory = new PreparedGeometryFactory()
+    private var seenStreamSide = 0L
+    private var seenBuildSide = 0L
+    private var buildSideTotalPoints = 0L
+    private var streamSideTotalPoints = 0L
+    private var buildSideOnlyHasPoints = true
+    private var streamSideOnlyHasPoints = true
+    override def refine(
+        buildSide: java.util.List[Geometry],
+        streamGeom: Geometry): Iterator[Geometry] = {
+      seenStreamSide += 1
+      if (seenStreamSide > maxSamples) {
+        currentRefiner.refine(buildSide, streamGeom)
+      } else {
+        // Collect statistics to decide which refiner to use
+        streamSideTotalPoints += streamGeom.getNumPoints
+        if (!streamGeom.isInstanceOf[Point] && !streamGeom.isInstanceOf[MultiPoint]) {
+          streamSideOnlyHasPoints = false
+        }
+        val result =
+          if (buildSide.isEmpty) Seq.empty
+          else {
+            seenBuildSide += buildSide.size()
+            val preparedGeom = factory.create(streamGeom)
+            buildSide.asScala.filter { buildGeom =>
+              buildSideTotalPoints += buildGeom.getNumPoints
+              if (!buildGeom.isInstanceOf[Point] && !buildGeom.isInstanceOf[MultiPoint]) {
+                buildSideOnlyHasPoints = false
+              }
+              preparedGeom.intersects(buildGeom)
+            }
+          }
+        if (seenStreamSide == maxSamples) {
+          // Collected enough samples, determine which refiner to use
+          val buildSideMeanPoints =
+            if (seenBuildSide > 0) buildSideTotalPoints.toDouble / seenBuildSide else 1
+          val streamSideMeanPoints =
+            if (seenStreamSide > 0) streamSideTotalPoints.toDouble / seenStreamSide else 1
+          if (buildSideOnlyHasPoints) {
+            currentRefiner = new PrepareStreamSideRefiner(SpatialPredicate.INTERSECTS)
+          } else if (streamSideOnlyHasPoints) {
+            currentRefiner = new PrepareBuildSideRefiner(SpatialPredicate.INTERSECTS)
+          } else if (buildSideMeanPoints > streamSideMeanPoints) {
+            currentRefiner = new PrepareBuildSideRefiner(SpatialPredicate.INTERSECTS)
+          } else {
+            currentRefiner = new PrepareStreamSideRefiner(SpatialPredicate.INTERSECTS)
+          }
+        }
+        result.iterator
       }
     }
   }

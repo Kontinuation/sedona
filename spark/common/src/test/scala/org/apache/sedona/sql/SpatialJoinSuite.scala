@@ -242,6 +242,42 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           verifyResult(expected, result)
         }
       }
+
+      it(
+        s"should join two dataframe with $joinCondition, using advanced spatial join with auto broadcast enabled") {
+        withConf(
+          Map(
+            advancedSpatialJoinConfKey -> "true",
+            "sedona.join.autoBroadcastJoinThreshold" -> "100m",
+            "spark.sedona.testonly.allowPlanBroadcastJoin" -> "false")) {
+          var result =
+            sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+          var expected = buildExpectedResult(joinCondition)
+          verifyResult(expected, result)
+          result = sparkSession.sql(s"SELECT df1.id, df2.id FROM df2 JOIN df1 ON $joinCondition")
+          verifyResult(expected, result)
+
+          result =
+            sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 LEFT JOIN df2 ON $joinCondition")
+          expected = buildExpectedResult(joinCondition, LeftOuter)
+          verifyResult(expected, result)
+
+          result =
+            sparkSession.sql(s"SELECT df1.id, df2.id FROM df2 LEFT JOIN df1 ON $joinCondition")
+          expected = buildExpectedResult(joinCondition, RightOuter)
+          verifyResult(expected, result)
+
+          result =
+            sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 RIGHT JOIN df2 ON $joinCondition")
+          expected = buildExpectedResult(joinCondition, RightOuter)
+          verifyResult(expected, result)
+
+          result =
+            sparkSession.sql(s"SELECT df1.id, df2.id FROM df2 RIGHT JOIN df1 ON $joinCondition")
+          expected = buildExpectedResult(joinCondition, LeftOuter)
+          verifyResult(expected, result)
+        }
+      }
     }
   }
 

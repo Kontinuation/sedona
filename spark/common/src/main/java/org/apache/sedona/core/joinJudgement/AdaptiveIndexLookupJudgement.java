@@ -33,11 +33,11 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import org.apache.commons.lang3.tuple.Pair;
-import org.apache.sedona.common.enums.GeometryType;
 import org.apache.sedona.common.subDivide.ExtentBasedGeometrySubDivider;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.common.utils.HalfOpenRectangle;
+import org.apache.sedona.core.enums.ExecutionMode;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.enums.JoinType;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
@@ -183,17 +183,6 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
     RIGHT
   }
 
-  public enum ExecutionMode {
-    /** Create prepared geometries for the build side */
-    PREPARE_BUILD,
-
-    /** Create prepared geometries for the stream side */
-    PREPARE_STREAM,
-
-    /** Don't use prepared geometry for evaluating spatial predicates */
-    PREPARE_NONE
-  }
-
   public AdaptiveIndexLookupJudgement(
       SpatialPredicate spatialPredicate,
       Function0<Function2<Geometry, Geometry, Boolean>> extraFilterCreator,
@@ -307,8 +296,6 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
       SpatialPredicate spatialPredicate,
       SubdivideOptions leftSubdivideOptions,
       SubdivideOptions rightSubdivideOptions) {
-    GeometryType leftGeomType = leftStat.getDominantGeometryType();
-    GeometryType rightGeomType = rightStat.getDominantGeometryType();
     long[] leftPerPartitionCount = getPerPartitionGeometryCount(leftStat, partitioner);
     long[] rightPerPartitionCount = getPerPartitionGeometryCount(rightStat, partitioner);
     List<Envelope> grids = partitioner.getGrids();
@@ -319,12 +306,10 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
       Envelope extent = grids.get(k);
       LocalSpatialJoinExecParams plan =
           determineSpatialJoinExecParams(
-              leftGeomType,
+              leftStat,
               leftCount,
-              leftStat.getMeanNumPoints(),
-              rightGeomType,
+              rightStat,
               rightCount,
-              rightStat.getMeanNumPoints(),
               spatialPredicate,
               extent,
               leftSubdivideOptions,
@@ -337,12 +322,10 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
   /**
    * Determine the spatial join execution parameters for a partition.
    *
-   * @param leftGeomType The dominant geometry type of the left RDD.
+   * @param leftStat Statistics of the left RDD.
    * @param leftCount The estimated number of geometries in the left RDD.
-   * @param leftMeanNumPoints The mean number of points of geometries in the left RDD.
-   * @param rightGeomType The dominant geometry type of the right RDD.
+   * @param rightStat Statistics of the right RDD.
    * @param rightCount The estimated number of geometries in the right RDD.
-   * @param rightMeanNumPoints The mean number of points of geometries in the right RDD.
    * @param predicate The spatial predicate.
    * @param extent The extent of the partition.
    * @param leftSubdivideOptions The subdivide options for the left geometries.
@@ -350,12 +333,10 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
    * @return The spatial join execution parameters.
    */
   private static LocalSpatialJoinExecParams determineSpatialJoinExecParams(
-      GeometryType leftGeomType,
+      AdvancedStatCollector leftStat,
       long leftCount,
-      double leftMeanNumPoints,
-      GeometryType rightGeomType,
+      AdvancedStatCollector rightStat,
       long rightCount,
-      double rightMeanNumPoints,
       SpatialPredicate predicate,
       Envelope extent,
       SubdivideOptions leftSubdivideOptions,
@@ -365,24 +346,18 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
 
     // Use the smaller side as the index build side
     IndexBuildSide buildSide = leftCount <= rightCount ? IndexBuildSide.LEFT : IndexBuildSide.RIGHT;
-    GeometryType indexGeomType;
-    GeometryType streamGeomType;
-    double indexMeanNumPoints;
-    double streamMeanNumPoints;
+    AdvancedStatCollector indexedStat;
+    AdvancedStatCollector streamStat;
     SubdivideOptions subdivideBuildOptions;
     SubdivideOptions subdivideStreamOptions;
     if (buildSide == IndexBuildSide.LEFT) {
-      indexGeomType = leftGeomType;
-      streamGeomType = rightGeomType;
-      indexMeanNumPoints = leftMeanNumPoints;
-      streamMeanNumPoints = rightMeanNumPoints;
+      indexedStat = leftStat;
+      streamStat = rightStat;
       subdivideBuildOptions = leftSubdivideOptions;
       subdivideStreamOptions = rightSubdivideOptions;
     } else {
-      indexGeomType = rightGeomType;
-      streamGeomType = leftGeomType;
-      indexMeanNumPoints = rightMeanNumPoints;
-      streamMeanNumPoints = leftMeanNumPoints;
+      indexedStat = rightStat;
+      streamStat = leftStat;
       subdivideBuildOptions = rightSubdivideOptions;
       subdivideStreamOptions = leftSubdivideOptions;
 
@@ -391,46 +366,8 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
     }
 
     // Determine the execution mode
-    ExecutionMode executionMode;
-    switch (predicate) {
-      case CONTAINS:
-      case COVERS:
-        executionMode = ExecutionMode.PREPARE_BUILD;
-        break;
-
-      case WITHIN:
-      case COVERED_BY:
-        executionMode = ExecutionMode.PREPARE_STREAM;
-        break;
-
-      case INTERSECTS:
-        if (indexGeomType == GeometryType.POINT && streamGeomType != GeometryType.POINT) {
-          executionMode = ExecutionMode.PREPARE_STREAM;
-        } else if (indexGeomType != GeometryType.POINT && streamGeomType == GeometryType.POINT) {
-          executionMode = ExecutionMode.PREPARE_BUILD;
-        } else if (indexGeomType != GeometryType.POINT) {
-          // Both sides are not points. We need to determine the execution mode based on the
-          // complexity
-          // of the geometries.
-          if (streamMeanNumPoints > 0 && indexMeanNumPoints / streamMeanNumPoints > 10) {
-            // The index side is much more complex than the stream side. We create prepared
-            // geometries for
-            // the build side.
-            executionMode = ExecutionMode.PREPARE_BUILD;
-          } else {
-            // In all other cases, we create prepared geometries for the stream side. Preparing the
-            // stream
-            // side has better performance in general since it has a higher cache hit rate.
-            executionMode = ExecutionMode.PREPARE_STREAM;
-          }
-        } else {
-          executionMode = ExecutionMode.PREPARE_STREAM;
-        }
-        break;
-
-      default:
-        executionMode = ExecutionMode.PREPARE_NONE;
-    }
+    ExecutionMode executionMode =
+        ExecutionMode.getOptimalExecutionMode(predicate, indexedStat, streamStat);
 
     return new LocalSpatialJoinExecParams(
         indexType, buildSide, executionMode, extent, subdivideBuildOptions, subdivideStreamOptions);

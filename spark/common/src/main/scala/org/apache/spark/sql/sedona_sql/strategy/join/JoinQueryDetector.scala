@@ -521,7 +521,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
 
     val sedonaConf = new SedonaConf(sparkSession.conf)
 
-    if ((broadcastLeft || broadcastRight) && sedonaConf.getUseIndex) {
+    if ((broadcastLeft || broadcastRight) && sedonaConf.getUseIndex && sedonaConf.allowPlanBroadcastJoin) {
       queryDetection match {
         case Some(
               JoinQueryDetection(
@@ -936,6 +936,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
           joinType,
           spatialPredicate,
           extraCondition,
+          isGeography,
           distanceOnStreamSide,
           unneededStreamAttributes) :: Nil
       case None =>

@@ -78,3 +78,7 @@ The advanced spatial join algorithm is enabled by default, users can disable adv
 		* all: Always optimize spatial join queries, even for equi-joins.
 		* none: Disable optimization for spatial joins.
 		* nonequi: Optimize spatial join queries that are not equi-joins.
+* spark.sedona.join.maxSamplesForAdaptiveBroadcastJoinExecutionMode **(Advanced users only!)**
+	* Decide the execution mode of local join after observing specified number of geometries on the stream side when running broadcast index join. The more samples observed, the more likely that the optimal execution mode will be selected and it run the rest of the join more efficiently. The downside is that observed samples may be processed by a sub-optimal execution mode, observing too many samples will degrade the spatial join performance.
+	* Default: 10
+	* Possible values: any non-negative integer

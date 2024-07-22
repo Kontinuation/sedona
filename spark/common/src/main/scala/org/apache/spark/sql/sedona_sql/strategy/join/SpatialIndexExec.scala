@@ -21,7 +21,6 @@ package org.apache.spark.sql.sedona_sql.strategy.join
 import org.apache.sedona.core.enums.IndexType
 import org.apache.sedona.core.spatialRddTool.IndexBuilder
 
-import scala.jdk.CollectionConverters._
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -30,8 +29,6 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Exp
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sedona_sql.execution.SedonaUnaryExecNode
 import org.locationtech.jts.geom.Geometry
-
-import java.util.Collections
 
 case class SpatialIndexExec(
     child: SparkPlan,
@@ -54,7 +51,7 @@ case class SpatialIndexExec(
 
   override protected[sql] def doExecuteBroadcast[T](): Broadcast[T] = {
     val boundShape = BindReferences.bindReference(shape, child.output)
-    val resultRaw = child.execute().asInstanceOf[RDD[UnsafeRow]].coalesce(1)
+    val resultRaw = child.execute().asInstanceOf[RDD[UnsafeRow]]
     val spatialRDD = distance match {
       case Some(distanceExpression) =>
         toExpandedEnvelopeRDD(
@@ -71,15 +68,9 @@ case class SpatialIndexExec(
         }
     }
 
-    spatialRDD.buildIndex(indexType, false)
-    val spatialIndexes = spatialRDD.indexedRawRDD.take(1).asScala
-    val spatialIndex = if (spatialIndexes.nonEmpty) {
-      spatialIndexes.head
-    } else {
-      // The broadcasted dataframe contains 0 partition. In this case, we should provide an empty spatial index.
-      val indexBuilder = new IndexBuilder[Geometry](indexType)
-      indexBuilder.call(Collections.emptyIterator()).next()
-    }
+    val indexedGeometries = spatialRDD.rawSpatialRDD.collect()
+    val indexBuilder = new IndexBuilder[Geometry](indexType)
+    val spatialIndex = indexBuilder.call(indexedGeometries.iterator).next()
     sparkContext.broadcast(spatialIndex).asInstanceOf[Broadcast[T]]
   }
 
