@@ -125,10 +125,7 @@ public class SedonaConf implements Serializable {
     this.fallbackPartitionNum =
         Integer.parseInt(runtimeConfig.get("sedona.join.numpartition", "-1"));
     this.autoBroadcastJoinThreshold =
-        bytesFromString(
-            runtimeConfig.get(
-                "sedona.join.autoBroadcastJoinThreshold",
-                runtimeConfig.get("spark.sql.autoBroadcastJoinThreshold")));
+        bytesFromString(runtimeConfig.get("sedona.join.autoBroadcastJoinThreshold", "500mb"));
     this.spatialJoinOptimizationMode =
         SpatialJoinOptimizationMode.getSpatialJoinOptimizationMode(
             runtimeConfig.get("sedona.join.optimizationmode", "nonequi"));
