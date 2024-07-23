@@ -20,6 +20,8 @@ package org.apache.sedona.sql
 
 import org.apache.spark.sql.Row
 import org.locationtech.jts.geom.{Coordinate, Geometry, GeometryFactory}
+import org.apache.spark.sql.DataFrame
+import scala.util.Random
 
 class aggregateFunctionTestScala extends TestBaseScala {
 
@@ -61,6 +63,35 @@ class aggregateFunctionTestScala extends TestBaseScala {
       polygonDf.createOrReplaceTempView("polygondf")
       var union = sparkSession.sql("select ST_Union_Aggr(polygondf.polygonshape) from polygondf")
       assert(union.take(1)(0).get(0).asInstanceOf[Geometry].getArea == 10100)
+    }
+
+    it("Measured ST_Union_aggr wall time") {
+      // number of random polygons to generate
+      val numPolygons = 1000
+      val df = createPolygonDataFrame(numPolygons)
+
+      df.createOrReplaceTempView("geometry_table_for_measuring_union_aggr")
+
+      // cache the table to eliminate the time of table scan
+      df.cache()
+      sparkSession
+        .sql("select count(*) from geometry_table_for_measuring_union_aggr")
+        .take(1)(0)
+        .get(0)
+
+      // measure time for optimized ST_Union_Aggr
+      val startTimeOptimized = System.currentTimeMillis()
+      val unionOptimized =
+        sparkSession.sql(
+          "SELECT ST_Union_Aggr(geom) AS union_geom FROM geometry_table_for_measuring_union_aggr")
+      assert(unionOptimized.take(1)(0).get(0).asInstanceOf[Geometry].getArea > 0)
+      val endTimeOptimized = System.currentTimeMillis()
+      val durationOptimized = endTimeOptimized - startTimeOptimized
+
+      assert(durationOptimized > 0, "Duration of optimized ST_Union_Aggr should be positive")
+
+      // clear cache
+      df.unpersist()
     }
 
     it("Passed ST_Intersection_aggr") {
@@ -130,5 +161,25 @@ class aggregateFunctionTestScala extends TestBaseScala {
       assert(Math.round(stats.getAs[Double]("mean_points_per_geometry")) > 4)
       assert(stats.getAs[Long]("polygonal_count") == 2)
     }
+  }
+
+  def generateRandomPolygon(index: Int): String = {
+    val random = new Random()
+    val x = random.nextDouble() * index
+    val y = random.nextDouble() * index
+    s"POLYGON (($x $y, ${x + 1} $y, ${x + 1} ${y + 1}, $x ${y + 1}, $x $y))"
+  }
+
+  def createPolygonDataFrame(numPolygons: Int): DataFrame = {
+    val polygons = (1 to numPolygons).map(generateRandomPolygon).toArray
+    val polygonArray = polygons.map(polygon => s"ST_GeomFromWKT('$polygon')")
+    val polygonArrayStr = polygonArray.mkString(", ")
+
+    val sqlQuery =
+      s"""
+         |SELECT explode(array($polygonArrayStr)) AS geom
+     """.stripMargin
+
+    sparkSession.sql(sqlQuery)
   }
 }

@@ -36,7 +36,6 @@ object UdfRegistrator {
     }
     Catalog.aggregateExpressions.foreach(f =>
       sparkSession.udf.register(f.getClass.getSimpleName, functions.udaf(f))) // SPARK3 anchor
-//Catalog.aggregateExpressions_UDAF.foreach(f => sparkSession.udf.register(f.getClass.getSimpleName, f)) // SPARK2 anchor
   }
 
   def dropAll(sparkSession: SparkSession): Unit = {

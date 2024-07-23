@@ -28,6 +28,7 @@ import org.apache.spark.sql.sedona_sql.expressions.raster._
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.operation.buffer.BufferParameters
 
+import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 object Catalog {
