@@ -29,7 +29,6 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, GenericInternalRow, JoinedRow, Predicate, UnsafeProjection, UnsafeRow}
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.catalyst.plans.physical.Partitioning
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.execution.metric.SQLMetrics
@@ -37,6 +36,7 @@ import org.apache.spark.sql.execution.{RowIterator, SparkPlan}
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
 import org.apache.spark.sql.sedona_sql.execution.SedonaBinaryExecNode
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.createUnsafeRowProjector
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
 import org.locationtech.jts.geom.MultiPoint
@@ -300,7 +300,8 @@ case class BroadcastIndexJoinExec(
       case Some(distanceExpression) =>
         val boundDistanceRef = BindReferences.bindReference(distanceExpression, streamed.output)
         streamResultsRaw.mapPartitions { iter =>
-          val projector = createUnsafeRowProjector(streamed, unneededStreamAttributes)
+          val projector =
+            createUnsafeRowProjector(projection(streamed, unneededStreamAttributes), copy = false)
           iter.map { row =>
             val geom = boundStreamShape.eval(row).asInstanceOf[Array[Byte]]
             if (geom == null) {
@@ -316,7 +317,8 @@ case class BroadcastIndexJoinExec(
         }
       case _ =>
         streamResultsRaw.mapPartitions { iter =>
-          val projector = createUnsafeRowProjector(streamed, unneededStreamAttributes)
+          val projector =
+            createUnsafeRowProjector(projection(streamed, unneededStreamAttributes), copy = false)
           iter.map { row =>
             val serializedObject = boundStreamShape.eval(row).asInstanceOf[Array[Byte]]
             if (serializedObject == null) {
@@ -341,17 +343,6 @@ case class BroadcastIndexJoinExec(
             }
           }
         }
-    }
-  }
-
-  private def createUnsafeRowProjector(
-      plan: SparkPlan,
-      unneeded: Seq[Attribute]): UnsafeRow => UnsafeRow = {
-    projection(plan, unneeded) match {
-      case Some(attrs) =>
-        val projection = GenerateUnsafeProjection.generate(attrs)
-        (row: UnsafeRow) => projection(row)
-      case None => (row: UnsafeRow) => row
     }
   }
 

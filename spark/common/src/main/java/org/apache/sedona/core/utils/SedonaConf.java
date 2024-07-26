@@ -87,7 +87,7 @@ public class SedonaConf implements Serializable {
 
   // Internal Parameters for automatic subdivide parameter tuning
   private int subdivideDuplicationFactorThreshold;
-  private long subdivideDupGeomSizeThreshold;
+  private long perPartitionShuffleWriteSizeThreshold;
   private int subdivideNumPointsThreshold;
   private double subdivideCollisionFactorThreshold;
   private double subdivideNonPolygonalCollisionFactorThreshold;
@@ -227,11 +227,10 @@ public class SedonaConf implements Serializable {
     this.subdivideDuplicationFactorThreshold =
         Integer.parseInt(
             runtimeConfig.get("spark.sedona.join.subdivideDuplicationFactorThreshold", "5"));
-    this.subdivideDupGeomSizeThreshold =
-        Long.parseLong(
+    this.perPartitionShuffleWriteSizeThreshold =
+        bytesFromString(
             runtimeConfig.get(
-                "spark.sedona.join.subdivideDupGeomSizeThreshold",
-                Long.toString(1024 * 1024 * 500)));
+                "spark.sedona.join.subdividePerPartitionShuffleWriteSizeThreshold", "20gb"));
     this.subdivideNumPointsThreshold =
         Integer.parseInt(runtimeConfig.get("spark.sedona.join.subdivideNumPointsThreshold", "100"));
     this.subdivideCollisionFactorThreshold =
@@ -431,8 +430,8 @@ public class SedonaConf implements Serializable {
     return subdivideDuplicationFactorThreshold;
   }
 
-  public long getSubdivideDupGeomSizeThreshold() {
-    return subdivideDupGeomSizeThreshold;
+  public long perPartitionShuffleWriteSizeThreshold() {
+    return perPartitionShuffleWriteSizeThreshold;
   }
 
   public int getSubdivideNumPointsThreshold() {

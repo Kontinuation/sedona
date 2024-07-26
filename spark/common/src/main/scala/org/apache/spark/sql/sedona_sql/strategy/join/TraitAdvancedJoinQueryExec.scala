@@ -36,7 +36,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, Literal, Predicate, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, Predicate, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
 import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
 import org.apache.spark.sql.catalyst.plans.FullOuter
@@ -47,7 +47,7 @@ import org.apache.spark.sql.catalyst.plans.LeftOuter
 import org.apache.spark.sql.catalyst.plans.RightOuter
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.execution.{SparkPlan, SQLExecution}
-import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.projectUnsafeRow
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.createUnsafeRowProjector
 import org.locationtech.jts.geom.Geometry
 import org.apache.spark.sql.sedona_sql.expressions.implicits._
 import org.apache.spark.sql.sedona_sql.utils.UnsafeRowRDDSorter.sortUnsafeRowRDD
@@ -59,6 +59,8 @@ import org.apache.spark.sql.sedona_sql.optimization.ExpressionUtils.matchDistanc
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.getNullUnsafeRow
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.getUnsafeRowFromUserData
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.joinTypeOf
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.UnsafeRowWithId
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.UnsafeRowWithKeyIdAndOtherId
 
 import scala.concurrent.duration.{Duration, MILLISECONDS}
 import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
@@ -628,8 +630,12 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
         case RightOuter =>
           (_: Long, rightId: Long, leftRow: UnsafeRow, _: UnsafeRow) => (rightId, leftRow)
         case Inner =>
+          val leftRowProjector =
+            createUnsafeRowProjector(projection(left, unneededLeftAttributes), copy = false)
+          val rightRowProjector =
+            createUnsafeRowProjector(projection(right, unneededRightAttributes), copy = false)
           (_: Long, _: Long, leftRow: UnsafeRow, rightRow: UnsafeRow) =>
-            (-1L, joiner.join(leftRow, rightRow))
+            (-1L, joiner.join(leftRowProjector(leftRow), rightRowProjector(rightRow)))
         case _ =>
           throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
       }
@@ -747,10 +753,15 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
           Subdivide.attachId(sortedLeftResultsRaw).rdd.map { case (id, row) => (id.toLong, row) }
         originalRowWithId.leftOuterJoin(joinedRowsWithKeys).mapPartitions { iter =>
           val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
+          val leftRowProjector =
+            createUnsafeRowProjector(projection(left, unneededLeftAttributes), copy = false)
+          val rightRowProjector =
+            createUnsafeRowProjector(projection(right, unneededRightAttributes), copy = false)
           iter.map { case (_, (leftRow, rightSide)) =>
             rightSide match {
-              case Some(rightRow) => joiner.join(leftRow, rightRow)
-              case None => joiner.join(leftRow, rightNullRow)
+              case Some(rightRow) =>
+                joiner.join(leftRowProjector(leftRow), rightRowProjector(rightRow))
+              case None => joiner.join(leftRowProjector(leftRow), rightNullRow)
             }
           }
         }
@@ -760,10 +771,15 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
           Subdivide.attachId(sortedRightResultsRaw).rdd.map { case (id, row) => (id.toLong, row) }
         joinedRowsWithKeys.rightOuterJoin(originalRowWithId).mapPartitions { iter =>
           val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
+          val leftRowProjector =
+            createUnsafeRowProjector(projection(left, unneededLeftAttributes), copy = false)
+          val rightRowProjector =
+            createUnsafeRowProjector(projection(right, unneededRightAttributes), copy = false)
           iter.map { case (_, (leftSide, rightRow)) =>
             leftSide match {
-              case Some(leftRow) => joiner.join(leftRow, rightRow)
-              case None => joiner.join(leftNullRow, rightRow)
+              case Some(leftRow) =>
+                joiner.join(leftRowProjector(leftRow), rightRowProjector(rightRow))
+              case None => joiner.join(leftNullRow, rightRowProjector(rightRow))
             }
           }
         }
@@ -776,19 +792,61 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       joinedRowsWithIds: RDD[((Long, Long), (UnsafeRow, UnsafeRow))],
       originalRdd: RDD[UnsafeRow],
       joinWithLeftSide: Boolean): RDD[((Long, Long), (UnsafeRow, UnsafeRow))] = {
-    val originalRowWithId =
-      Subdivide.attachId(originalRdd).rdd.map { case (id, row) => (id.toLong, row) }
-    val keyedByJoinedId = joinedRowsWithIds.map { case ((leftId, rightId), (leftRow, rightRow)) =>
-      if (joinWithLeftSide) (leftId, (rightId, rightRow)) else (rightId, (leftId, leftRow))
+    val session = SparkSession.getActiveSession.getOrElse(
+      throw new IllegalStateException("No active SparkSession"))
+    import session.implicits._
+
+    val rddUnsafeRowWithId = Subdivide.attachId(originalRdd).rdd.map { case (id, row) =>
+      UnsafeRowWithId(id, row.getBytes)
     }
-    if (joinWithLeftSide) {
-      originalRowWithId.join(keyedByJoinedId).map {
-        case (leftId, (leftRow, (rightId, rightRow))) => ((leftId, rightId), (leftRow, rightRow))
-      }
+    val dsUnsafeRowWithId = session.createDataset(rddUnsafeRowWithId)
+
+    val rddKeyedByJoinedId = joinedRowsWithIds.map {
+      case ((leftId, rightId), (leftRow, rightRow)) =>
+        if (joinWithLeftSide) {
+          UnsafeRowWithKeyIdAndOtherId(
+            leftId,
+            rightId,
+            if (rightRow != null) rightRow.getBytes else null)
+        } else {
+          UnsafeRowWithKeyIdAndOtherId(
+            rightId,
+            leftId,
+            if (leftRow != null) leftRow.getBytes else null)
+        }
+    }
+    val dsKeyedByJoinedId = session.createDataset(rddKeyedByJoinedId)
+
+    val rddResult = if (joinWithLeftSide) {
+      dsUnsafeRowWithId
+        .joinWith(dsKeyedByJoinedId, dsUnsafeRowWithId("id") === dsKeyedByJoinedId("keyId"))
+        .rdd
+        .map { case (l, r) => ((l.id, r.otherId), (l.row, r.row)) }
     } else {
-      keyedByJoinedId.join(originalRowWithId).map {
-        case (rightId, ((leftId, leftRow), rightRow)) => ((leftId, rightId), (leftRow, rightRow))
-      }
+      dsKeyedByJoinedId
+        .joinWith(dsUnsafeRowWithId, dsKeyedByJoinedId("keyId") === dsUnsafeRowWithId("id"))
+        .rdd
+        .map { case (l, r) => ((l.otherId, r.id), (l.row, r.row)) }
+    }
+
+    val numFieldLeft = left.schema.length
+    val numFieldRight = right.schema.length
+    rddResult.map { case ((leftId, rightId), (leftBytes, rightBytes)) =>
+      val leftRow =
+        if (leftBytes == null) null
+        else {
+          val row = new UnsafeRow(numFieldLeft)
+          row.pointTo(leftBytes, leftBytes.length)
+          row
+        }
+      val rightRow =
+        if (rightBytes == null) null
+        else {
+          val row = new UnsafeRow(numFieldRight)
+          row.pointTo(rightBytes, rightBytes.length)
+          row
+        }
+      ((leftId, rightId), (leftRow, rightRow))
     }
   }
 
@@ -974,7 +1032,7 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     projection match {
       case Some(_) =>
         val rawSpatialRDD = spatialRDD.rawSpatialRDD.rdd.mapPartitions { shapes =>
-          val toUserData = projectUnsafeRow(projection)
+          val toUserData = createUnsafeRowProjector(projection)
           shapes.map { shape =>
             val part = shape.getUserData.asInstanceOf[SubdividedPart]
             val rowData = part.userData.asInstanceOf[UnsafeRow]
@@ -1100,4 +1158,7 @@ object TraitAdvancedJoinQueryExec {
     val projection = UnsafeProjection.create(nullableAttributes, nullableAttributes)
     projection(nullRow)
   }
+
+  case class UnsafeRowWithId(id: Long, row: Array[Byte])
+  case class UnsafeRowWithKeyIdAndOtherId(keyId: Long, otherId: Long, row: Array[Byte])
 }

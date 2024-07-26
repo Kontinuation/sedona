@@ -30,7 +30,7 @@ import org.apache.spark.sql.catalyst.expressions.BindReferences
 import org.apache.spark.sql.catalyst.expressions.Literal
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
-import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.projectUnsafeRow
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.createUnsafeRowProjector
 import org.locationtech.jts.geom.Geometry
 
 trait TraitJoinQueryBase {
@@ -64,7 +64,7 @@ trait TraitJoinQueryBase {
     spatialRdd.setRawSpatialRDD(
       rdd
         .mapPartitions { iter =>
-          val toUserData = projectUnsafeRow(projection)
+          val toUserData = createUnsafeRowProjector(projection)
           iter.map { row =>
             val serializedShape = shapeExpression.eval(row).asInstanceOf[Array[Byte]]
             val shape = if (serializedShape != null) {
@@ -105,7 +105,7 @@ trait TraitJoinQueryBase {
     spatialRdd.setRawSpatialRDD(
       rdd
         .mapPartitions { iter =>
-          val toUserData = projectUnsafeRow(projection)
+          val toUserData = createUnsafeRowProjector(projection)
           iter.map { row =>
             val serializedShape = shapeExpression.eval(row).asInstanceOf[Array[Byte]]
             val expandedEnvelope = if (serializedShape != null) {
@@ -170,7 +170,7 @@ trait TraitJoinQueryBase {
     projection match {
       case Some(_) =>
         val rawSpatialRDD = spatialRDD.rawSpatialRDD.rdd.mapPartitions { shapes =>
-          val toUserData = projectUnsafeRow(projection)
+          val toUserData = createUnsafeRowProjector(projection)
           shapes.map { shape =>
             val rowData = shape.getUserData.asInstanceOf[UnsafeRow]
             val newUserData = toUserData(rowData)
@@ -221,12 +221,23 @@ trait TraitJoinQueryBase {
 }
 
 object TraitJoinQueryBase {
-  def projectUnsafeRow(projection: Option[Seq[Expression]]): UnsafeRow => UnsafeRow = {
+  def createUnsafeRowProjector(
+      projection: Option[Seq[Expression]],
+      copy: Boolean = true): UnsafeRow => UnsafeRow = {
     projection match {
       case Some(attrs) =>
         val projection = GenerateUnsafeProjection.generate(attrs)
-        (row: UnsafeRow) => projection(row).copy
-      case None => (row: UnsafeRow) => row.copy
+        if (copy) { (row: UnsafeRow) =>
+          projection(row).copy
+        } else { (row: UnsafeRow) =>
+          projection(row)
+        }
+      case None =>
+        if (copy) { (row: UnsafeRow) =>
+          row.copy
+        } else { (row: UnsafeRow) =>
+          row
+        }
     }
   }
 }

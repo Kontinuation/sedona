@@ -563,11 +563,12 @@ public class Subdivide {
     long inBoundCount = (long) (stat.getCount() * spatialPartitionQuality.partitionedPercentage);
     long totalGeomSize =
         (long) (stat.getEstimatedSizeWithoutUserDataInBytes() * inBoundCount * duplicationFactor);
+    long perPartitionShuffleWriteSize = totalGeomSize / spatialRDD.rawSpatialRDD.getNumPartitions();
     int duplicationFactorThreshold = sedonaConf.getSubdivideDuplicationFactorThreshold();
-    long duplicatedGeometrySizeThreshold = sedonaConf.getSubdivideDupGeomSizeThreshold();
+    long perPartitionShuffleWriteSizeThreshold = sedonaConf.perPartitionShuffleWriteSizeThreshold();
     int numPointsThreshold = sedonaConf.getSubdivideNumPointsThreshold();
     if (duplicationFactor >= duplicationFactorThreshold
-        && totalGeomSize >= duplicatedGeometrySizeThreshold
+        && perPartitionShuffleWriteSize >= perPartitionShuffleWriteSizeThreshold
         && stat.getMeanNumPoints() >= numPointsThreshold) {
       // If the duplication factor is too large, we should subdivide before spatial partitioning
       globalSubdivide = true;
@@ -592,7 +593,7 @@ public class Subdivide {
       largestDup = largestDupByHeight;
     }
     if (largestDup.numDuplicates >= duplicationFactorThreshold
-        && largestDup.estimatedSize >= duplicatedGeometrySizeThreshold
+        && largestDup.estimatedSize >= perPartitionShuffleWriteSizeThreshold
         && largestDup.numCoordinates >= numPointsThreshold) {
       // Duplication of large geometries caused large amount of data to be shuffled. We should
       // subdivide before
