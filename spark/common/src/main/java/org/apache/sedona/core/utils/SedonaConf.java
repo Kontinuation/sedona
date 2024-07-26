@@ -97,6 +97,9 @@ public class SedonaConf implements Serializable {
   private boolean enableMetricsForSpatialPartitioning;
   private String spatialPartitionerSavePath;
 
+  // Parameters for knn joins
+  private boolean includeTieBreakersInKNNJoins = false;
+
   // Parameters for testing
   private boolean allowPlanBroadcastJoin;
 
@@ -252,6 +255,9 @@ public class SedonaConf implements Serializable {
     this.spatialPartitionerSavePath =
         runtimeConfig.get("spark.sedona.join.debug.spatialPartitionerSavePath", "");
 
+    this.includeTieBreakersInKNNJoins =
+        Boolean.parseBoolean(
+            runtimeConfig.get("spark.sedona.join.knn.includeTieBreakers", "false"));
     // Parameters for testing
     this.allowPlanBroadcastJoin =
         Boolean.parseBoolean(
@@ -456,6 +462,10 @@ public class SedonaConf implements Serializable {
 
   public String getSpatialPartitionerSavePath() {
     return spatialPartitionerSavePath;
+  }
+
+  public boolean isIncludeTieBreakersInKNNJoins() {
+    return includeTieBreakersInKNNJoins;
   }
 
   public boolean allowPlanBroadcastJoin() {

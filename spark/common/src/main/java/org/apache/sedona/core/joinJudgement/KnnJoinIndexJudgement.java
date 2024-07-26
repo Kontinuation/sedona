@@ -24,11 +24,15 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.knnJudgement.EuclideanItemDistance;
 import org.apache.sedona.core.knnJudgement.HaversineItemDistance;
+import org.apache.sedona.core.knnJudgement.SpheroidDistance;
 import org.apache.spark.api.java.function.FlatMapFunction2;
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.util.LongAccumulator;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.index.SpatialIndex;
 import org.locationtech.jts.index.strtree.GeometryItemDistance;
+import org.locationtech.jts.index.strtree.ItemDistance;
 import org.locationtech.jts.index.strtree.STRtree;
 
 /**
@@ -43,6 +47,8 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
     implements FlatMapFunction2<Iterator<T>, Iterator<SpatialIndex>, Pair<U, T>>, Serializable {
   private final int k;
   private final DistanceMetric distanceMetric;
+  private final boolean includeTies;
+  private final Broadcast<STRtree> broadcastedTreeIndex;
 
   /**
    * Constructor for the KnnJoinIndexJudgement class.
@@ -53,10 +59,13 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
    * @param streamCount accumulator for the number of geometries processed from the stream side
    * @param resultCount accumulator for the number of join results
    * @param candidateCount accumulator for the number of candidate matches
+   * @param broadcastedTreeIndex the broadcasted spatial index
    */
   public KnnJoinIndexJudgement(
       int k,
       DistanceMetric distanceMetric,
+      boolean includeTies,
+      Broadcast<STRtree> broadcastedTreeIndex,
       LongAccumulator buildCount,
       LongAccumulator streamCount,
       LongAccumulator resultCount,
@@ -64,6 +73,8 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
     super(null, buildCount, streamCount, resultCount, candidateCount, false);
     this.k = k;
     this.distanceMetric = distanceMetric;
+    this.includeTies = includeTies;
+    this.broadcastedTreeIndex = broadcastedTreeIndex;
   }
 
   /**
@@ -87,13 +98,23 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
       return Collections.emptyIterator();
     }
 
-    SpatialIndex treeIndex = treeIndexes.next();
-    if (!(treeIndex instanceof STRtree)) {
-      throw new Exception("[KnnJoinIndexJudgement][Call] Only STRtree index supports KNN search.");
+    STRtree strTree;
+    if (broadcastedTreeIndex != null) {
+      // get the broadcasted spatial index if available
+      // this is to support the broadcast join
+      strTree = broadcastedTreeIndex.getValue();
+    } else {
+      // get the spatial index from the iterator
+      SpatialIndex treeIndex = treeIndexes.next();
+      if (!(treeIndex instanceof STRtree)) {
+        throw new Exception(
+            "[KnnJoinIndexJudgement][Call] Only STRtree index supports KNN search.");
+      }
+      strTree = (STRtree) treeIndex;
     }
 
-    STRtree strTree = (STRtree) treeIndex;
     List<Pair<U, T>> result = new ArrayList<>();
+    ItemDistance itemDistance;
 
     while (streamShapes.hasNext()) {
       T streamShape = streamShapes.next();
@@ -102,25 +123,23 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
       Object[] localK;
       switch (distanceMetric) {
         case EUCLIDEAN:
-          localK =
-              strTree.nearestNeighbour(
-                  streamShape.getEnvelopeInternal(), streamShape, new EuclideanItemDistance(), k);
+          itemDistance = new EuclideanItemDistance();
           break;
         case HAVERSINE:
-          localK =
-              strTree.nearestNeighbour(
-                  streamShape.getEnvelopeInternal(), streamShape, new HaversineItemDistance(), k);
+          itemDistance = new HaversineItemDistance();
           break;
         case SPHEROID:
-          localK =
-              strTree.nearestNeighbour(
-                  streamShape.getEnvelopeInternal(), streamShape, new HaversineItemDistance(), k);
+          itemDistance = new SpheroidDistance();
           break;
         default:
-          localK =
-              strTree.nearestNeighbour(
-                  streamShape.getEnvelopeInternal(), streamShape, new GeometryItemDistance(), k);
+          itemDistance = new GeometryItemDistance();
           break;
+      }
+
+      localK =
+          strTree.nearestNeighbour(streamShape.getEnvelopeInternal(), streamShape, itemDistance, k);
+      if (includeTies) {
+        localK = getUpdatedLocalKWithTies(streamShape, localK, strTree);
       }
 
       for (Object obj : localK) {
@@ -132,5 +151,37 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
     }
 
     return result.iterator();
+  }
+
+  private Object[] getUpdatedLocalKWithTies(T streamShape, Object[] localK, STRtree strTree) {
+    Envelope searchEnvelope = streamShape.getEnvelopeInternal();
+    // get the maximum distance from the k nearest neighbors
+    double maxDistance = 0.0;
+    LinkedHashSet<T> uniqueCandidates = new LinkedHashSet<>();
+    for (Object obj : localK) {
+      T candidate = (T) obj;
+      uniqueCandidates.add(candidate);
+      double distance = streamShape.distance(candidate);
+      if (distance > maxDistance) {
+        maxDistance = distance;
+      }
+    }
+    searchEnvelope.expandBy(maxDistance);
+    List<T> candidates = strTree.query(searchEnvelope);
+    if (!candidates.isEmpty()) {
+      // update localK with all candidates that are within the maxDistance
+      List<Object> tiedResults = new ArrayList<>();
+      // add all localK
+      Collections.addAll(tiedResults, localK);
+
+      for (T candidate : candidates) {
+        double distance = streamShape.distance(candidate);
+        if (distance == maxDistance && !uniqueCandidates.contains(candidate)) {
+          tiedResults.add(candidate);
+        }
+      }
+      localK = tiedResults.toArray();
+    }
+    return localK;
   }
 }

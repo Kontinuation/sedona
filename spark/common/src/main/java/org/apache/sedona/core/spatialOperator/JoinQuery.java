@@ -45,11 +45,13 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.api.java.function.Function0;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.api.java.function.PairFunction;
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.rdd.JavaRDDExtension;
 import org.apache.spark.sql.execution.metric.SQLMetric;
 import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.index.strtree.STRtree;
 import scala.Tuple2;
 
 public class JoinQuery {
@@ -430,7 +432,7 @@ public class JoinQuery {
       DistanceMetric distanceMetric)
       throws Exception {
     final JoinParams joinParams = new JoinParams(indexType, k, distanceMetric);
-    final JavaPairRDD<U, T> joinResults = knnJoin(queryRDD, objectRDD, joinParams);
+    final JavaPairRDD<U, T> joinResults = knnJoin(queryRDD, objectRDD, joinParams, false, false);
     return collectGeometriesByKey(joinResults);
   }
 
@@ -833,26 +835,35 @@ public class JoinQuery {
    *     (center points)
    * @param objectRDD {@code objectRDD} is the set of geometries (neighbors) to be queried
    * @param joinParams {@code joinParams} is the parameters for the join
+   * @param includeTies {@code includeTies} is a boolean indicating whether to include ties
    * @return RDD of pairs where each pair contains a geometry and a set of matching geometries
    * @param <U> Type of the geometries in queryRDD set
    * @param <T> Type of the geometries in objectRDD set
    * @throws Exception
    */
   public static <U extends Geometry, T extends Geometry> JavaPairRDD<U, T> knnJoin(
-      SpatialRDD<U> queryRDD, SpatialRDD<T> objectRDD, JoinParams joinParams) throws Exception {
+      SpatialRDD<U> queryRDD,
+      SpatialRDD<T> objectRDD,
+      JoinParams joinParams,
+      boolean includeTies,
+      boolean broadcastJoin)
+      throws Exception {
     verifyCRSMatch(queryRDD, objectRDD);
-    verifyPartitioningNumberMatch(queryRDD, objectRDD);
+    if (!broadcastJoin) verifyPartitioningNumberMatch(queryRDD, objectRDD);
 
-    SparkContext sparkContext = queryRDD.spatialPartitionedRDD.context();
+    SparkContext sparkContext = queryRDD.rawSpatialRDD.context();
     LongAccumulator buildCount = JavaMetrics.createMetric(sparkContext, "buildCount");
     LongAccumulator streamCount = JavaMetrics.createMetric(sparkContext, "streamCount");
     LongAccumulator resultCount = JavaMetrics.createMetric(sparkContext, "resultCount");
     LongAccumulator candidateCount = JavaMetrics.createMetric(sparkContext, "candidateCount");
 
-    final SpatialPartitioner partitioner =
-        (SpatialPartitioner) objectRDD.spatialPartitionedRDD.partitioner().get();
-    final DedupParams dedupParams = partitioner.getDedupParams();
-    final SparkContext cxt = queryRDD.rawSpatialRDD.context();
+    final Broadcast<STRtree> broadcastedTreeIndex;
+    if (broadcastJoin) {
+      STRtree strTree = objectRDD.coalesceAndBuildRawIndex(IndexType.RTREE);
+      broadcastedTreeIndex = JavaSparkContext.fromSparkContext(sparkContext).broadcast(strTree);
+    } else {
+      broadcastedTreeIndex = null;
+    }
 
     // The reason for using objectRDD as the right side is that the partitions are built on the
     // right side.
@@ -862,11 +873,25 @@ public class JoinQuery {
           new KnnJoinIndexJudgement(
               joinParams.k,
               joinParams.distanceMetric,
+              includeTies,
+              broadcastedTreeIndex,
               buildCount,
               streamCount,
               resultCount,
               candidateCount);
       joinResult = queryRDD.spatialPartitionedRDD.zipPartitions(objectRDD.indexedRDD, judgement);
+    } else if (broadcastedTreeIndex != null) {
+      final KnnJoinIndexJudgement judgement =
+          new KnnJoinIndexJudgement(
+              joinParams.k,
+              joinParams.distanceMetric,
+              includeTies,
+              broadcastedTreeIndex,
+              buildCount,
+              streamCount,
+              resultCount,
+              candidateCount);
+      joinResult = queryRDD.rawSpatialRDD.zipPartitions(objectRDD.rawSpatialRDD, judgement);
     } else {
       throw new IllegalArgumentException("No index found on the input RDDs.");
     }

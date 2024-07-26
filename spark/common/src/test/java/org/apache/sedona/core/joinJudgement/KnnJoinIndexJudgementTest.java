@@ -51,7 +51,14 @@ public class KnnJoinIndexJudgementTest {
     factory = new GeometryFactory();
     judgement =
         new KnnJoinIndexJudgement<>(
-            5, DistanceMetric.EUCLIDEAN, buildCount, streamCount, resultCount, candidateCount);
+            5,
+            DistanceMetric.EUCLIDEAN,
+            false,
+            null,
+            buildCount,
+            streamCount,
+            resultCount,
+            candidateCount);
   }
 
   @Test
@@ -155,7 +162,14 @@ public class KnnJoinIndexJudgementTest {
 
     KnnJoinIndexJudgement thisJudgement =
         new KnnJoinIndexJudgement<>(
-            4, DistanceMetric.EUCLIDEAN, buildCount, streamCount, resultCount, candidateCount);
+            4,
+            DistanceMetric.EUCLIDEAN,
+            false,
+            null,
+            buildCount,
+            streamCount,
+            resultCount,
+            candidateCount);
     // Points forming a grid
     for (int i = 0; i <= 7; i++) {
       for (int j = 0; j <= 4; j++) {

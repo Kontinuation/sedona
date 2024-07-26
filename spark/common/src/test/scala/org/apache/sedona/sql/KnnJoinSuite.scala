@@ -23,12 +23,15 @@ import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.sedona_sql.expressions.st_constructors.ST_GeomFromText
 import org.apache.spark.sql.sedona_sql.strategy.join.KNNJoinExec
-import org.apache.spark.sql.types.{IntegerType, StructField, StructType}
-import org.apache.spark.sql.{Column, DataFrame, Row}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType}
+import org.apache.spark.sql.{Column, DataFrame, Row, SparkSession}
 import org.apache.spark.sql.functions.expr
 import org.scalatest.matchers.must.Matchers.{be, include}
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.prop.TableDrivenPropertyChecks
+import org.apache.spark.sql.functions._
+
+import java.util.Random
 
 /**
  * Test suite for KNN spatial join SQLs
@@ -55,6 +58,19 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     it("KNN Join with approximate algorithms based on euclidean distance") {
       val df = sparkSession.sql(
         s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_AKNN(QUERIES.GEOM, OBJECTS.GEOM, 3, false)")
+      validateQueryPlan(
+        df,
+        numNeighbors = 3,
+        useApproximate = true,
+        expressionSize = 5,
+        isGeography = false,
+        mustInclude = "")
+    }
+
+    it(
+      "KNN Join with approximate algorithms based on euclidean distance using different join clause ordering") {
+      val df = sparkSession.sql(
+        s"SELECT QUERIES.ID, OBJECTS.ID FROM OBJECTS JOIN QUERIES ON ST_AKNN(QUERIES.GEOM, OBJECTS.GEOM, 3, false)")
       validateQueryPlan(
         df,
         numNeighbors = 3,
@@ -192,36 +208,6 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         isGeography = false,
         mustInclude = "")
     }
-
-    it("KNN Join should not support broadcast join hint on left side") {
-      val exception = intercept[UnsupportedOperationException] {
-        val df = sparkSession.sql(
-          s"SELECT /*+ BROADCAST(QUERIES) */ QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_AKNN(QUERIES.GEOM, OBJECTS.GEOM, 3, false)")
-        validateQueryPlan(
-          df,
-          numNeighbors = 3,
-          useApproximate = true,
-          expressionSize = 5,
-          isGeography = false,
-          mustInclude = "")
-      }
-      exception.getMessage should include("KNN joins are not supported with broadcast hint")
-    }
-
-    it("KNN Join should not support broadcast join hint on right side") {
-      val exception = intercept[UnsupportedOperationException] {
-        val df = sparkSession.sql(
-          s"SELECT /*+ BROADCAST(OBJECTS) */ QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_AKNN(QUERIES.GEOM, OBJECTS.GEOM, 3, false)")
-        validateQueryPlan(
-          df,
-          numNeighbors = 3,
-          useApproximate = true,
-          expressionSize = 5,
-          isGeography = false,
-          mustInclude = "")
-      }
-      exception.getMessage should include("KNN joins are not supported with broadcast hint")
-    }
   }
 
   describe("AKNN spatial join SQLs should be executed correctly") {
@@ -232,6 +218,16 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       resultAll.length should be(3 * 4) // 3 queries and 4 neighbors each
       resultAll.mkString should be(
         "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19]")
+    }
+
+    it(
+      "AKNN Join with approximate algorithms based on EUCLIDEAN distance with different join ordering") {
+      val df = sparkSession.sql(
+        s"SELECT OBJECTS.ID, QUERIES.ID FROM OBJECTS JOIN QUERIES ON ST_AKNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false)")
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.length should be(3 * 4) // 3 queries and 4 neighbors each
+      resultAll.mkString should be(
+        "[1,2][3,1][3,3][5,2][6,1][9,3][11,2][13,1][13,3][15,2][16,1][19,3]")
     }
 
     it("AKNN Join with approximate algorithms based on SPHEROID distance") {
@@ -253,7 +249,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
   }
 
   describe("KNN spatial join SQLs should be executed correctly") {
-    it("KNN Join with approximate algorithms based on EUCLIDEAN distance") {
+    it("KNN Join with exact algorithms based on EUCLIDEAN distance") {
       val df = sparkSession.sql(
         s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false)")
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
@@ -262,7 +258,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19]")
     }
 
-    it("KNN Join with approximate algorithms based on SPHEROID distance") {
+    it("KNN Join with exact algorithms based on SPHEROID distance") {
       val df = sparkSession.sql(
         s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, true)")
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
@@ -270,6 +266,25 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       resultAll.mkString should be(
         "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19]")
     }
+
+    it("KNN Join should support broadcast join hints - left") {
+      val df = sparkSession.sql(
+        s"SELECT /*+ BROADCAST(QUERIES) */ QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, true)")
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.length should be(3 * 4) // 3 queries and 4 neighbors each
+      resultAll.mkString should be(
+        "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19]")
+    }
+
+    it("KNN Join should support broadcast join hints - right") {
+      val df = sparkSession.sql(
+        s"SELECT /*+ BROADCAST(OBJECTS) */ QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, true)")
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.length should be(3 * 4) // 3 queries and 4 neighbors each
+      resultAll.mkString should be(
+        "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19]")
+    }
+
     it(
       "KNN Join with approximate algorithms should work on tiny datasets with lots of partitions") {
       val df = sparkSession
@@ -285,7 +300,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         "[0,0][0,1][0,2][0,3][1,0][1,1][1,2][1,3][2,0][2,1][2,2][2,3][3,0][3,1][3,2][3,3]")
     }
 
-    it("KNN Join with approximate algorithms with additional join conditions on id") {
+    it("KNN Join with exact algorithms with additional join conditions on id") {
       val df = sparkSession.sql(
         s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false) AND QUERIES.ID > 1")
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
@@ -306,7 +321,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     }
 
     it(
-      "KNN Join with approximate algorithms based on EUCLIDEAN distance with additional inequality (<) join conditions") {
+      "KNN Join with exact algorithms based on EUCLIDEAN distance with additional inequality (<) join conditions") {
       val df = sparkSession.sql(
         s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false) AND QUERIES.ID < OBJECTS.ID")
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
@@ -315,7 +330,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     }
 
     it(
-      "KNN Join with approximate algorithms based on EUCLIDEAN distance with additional inequality (!=)  join conditions") {
+      "KNN Join with exact algorithms based on EUCLIDEAN distance with additional inequality (!=)  join conditions") {
       val df = sparkSession.sql(
         s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false) AND QUERIES.ID != OBJECTS.ID")
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
@@ -325,7 +340,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     }
 
     it(
-      "KNN Join with approximate algorithms based on EUCLIDEAN distance with additional equality (=) join conditions") {
+      "KNN Join with exact algorithms based on EUCLIDEAN distance with additional equality (=) join conditions") {
       withOptimizationMode("all") {
         val df = sparkSession.sql(
           s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false) AND QUERIES.ID = OBJECTS.ID")
@@ -334,10 +349,153 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         resultAll.mkString should be("[3,3]")
       }
     }
+
+    it("AKNN Join should correctly match the join side and swap them if necessary") {
+      val df1 =
+        sparkSession.range(0, 100).toDF("id1").withColumn("geometry", expr("ST_Point(id1, id1)"))
+      val df2 =
+        sparkSession
+          .range(0, 100)
+          .toDF("id2")
+          .withColumn("geometry", expr("ST_Point(id2 + 0.1, id2 + 0.1)"))
+          .withColumn("id2", expr("concat('str', id2)"))
+      df1.createOrReplaceTempView("df1")
+      df2.createOrReplaceTempView("df2")
+
+      var dfResult = sparkSession.sql(
+        "SELECT df1.id1, df2.id2 FROM df1 JOIN df2 ON ST_KNN(df1.geometry, df2.geometry, 1)")
+      println("ST_KNN(df1.geometry, df2.geometry, 1)")
+      var resultAll = dfResult.orderBy("id1").take(1)
+      resultAll.mkString should be("[0,str0]")
+
+      dfResult = sparkSession.sql(
+        "SELECT df1.id1, df2.id2 FROM df1 JOIN df2 ON ST_KNN(df2.geometry, df1.geometry, 1)")
+      resultAll = dfResult.orderBy("id1").take(1)
+      resultAll.mkString should be("[0,str0]")
+    }
+
+    it("KNN Join with exact algorithms based on EUCLIDEAN distance using random data") {
+      val queryNumRows = 200
+      val objectNumRows = 10000
+      val seed = 12345L
+      val coordRange = (-50.0, 50.0)
+      val (df1, df2) = generateRandomPointsDataFrames(
+        sparkSession,
+        queryNumRows,
+        objectNumRows,
+        seed,
+        coordRange)
+
+      df1.repartition(numPartitions).createOrReplaceTempView("QUERIES")
+      df2.repartition(numPartitions).createOrReplaceTempView("OBJECTS")
+
+      val df = sparkSession.sql(
+        s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false)")
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.length should be(queryNumRows * 4)
+    }
+
+    it("KNN Join with exact algorithms based on EUCLIDEAN distance using manually generated data") {
+      val points1 = Seq(
+        (0, "POINT(2.0 2.0)", "0"),
+        (1, "POINT(2.0 3.0)", "1"),
+        (2, "POINT(3.0 3.0)", "2"),
+        (3, "POINT(3.0 2.0)", "3"),
+        (4, "POINT(3.0 1.0)", "4"),
+        (5, "POINT(2.0 1.0)", "5"),
+        (6, "POINT(1.0 1.0)", "6"),
+        (7, "POINT(1.0 2.0)", "7"),
+        (8, "POINT(1.0 3.0)", "8"),
+        (9, "POINT(0.0 2.0)", "9"),
+        (10, "POINT(4.0 2.0)", "10"))
+
+      val points2 = Seq(
+        (0, "POINT(2.0 2.0)", "0"),
+        (1, "POINT(2.0 3.0)", "1"),
+        (2, "POINT(3.0 3.0)", "2"),
+        (3, "POINT(3.0 2.0)", "3"),
+        (4, "POINT(3.0 1.0)", "4"),
+        (5, "POINT(2.0 1.0)", "5"),
+        (6, "POINT(1.0 1.0)", "6"),
+        (7, "POINT(1.0 2.0)", "7"),
+        (8, "POINT(1.0 3.0)", "8"),
+        (9, "POINT(0.0 2.0)", "9"),
+        (10, "POINT(4.0 2.0)", "10"))
+
+      val (df1, df2) = createPointsDataFrames(sparkSession, points1, points2)
+
+      df1.createOrReplaceTempView("QUERIES")
+      df2.createOrReplaceTempView("OBJECTS")
+
+      val df = sparkSession.sql(
+        s"SELECT QUERIES.ID as qid, OBJECTS.ID as oid FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 5, false)")
+
+      val df_group =
+        df.groupBy("qid").agg(collect_list("oid").as("collected_points")).orderBy("qid")
+
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.length should be(points1.size * 5)
+    }
+
+    it("KNN Join with exact algorithms with ties exported") {
+      val points1 = Seq((0, "POINT(1.0 1.0)", "0"))
+
+      val points2 = Seq(
+        (0, "POINT(2.0 2.0)", "0"),
+        (1, "POINT(2.0 3.0)", "1"),
+        (2, "POINT(3.0 3.0)", "2"),
+        (3, "POINT(3.0 2.0)", "3"),
+        (4, "POINT(3.0 1.0)", "4"),
+        (5, "POINT(2.0 1.0)", "5"),
+        (6, "POINT(1.0 1.0)", "6"),
+        (7, "POINT(1.0 2.0)", "7"),
+        (8, "POINT(1.0 3.0)", "8"),
+        (9, "POINT(0.0 2.0)", "9"),
+        (10, "POINT(4.0 2.0)", "10"))
+
+      val (df1, df2) = createPointsDataFrames(sparkSession, points1, points2)
+
+      df1.createOrReplaceTempView("QUERIES")
+      df2.createOrReplaceTempView("OBJECTS")
+
+      withExportTies(export = true) {
+        val df = sparkSession.sql(
+          s"SELECT QUERIES.ID as qid, OBJECTS.ID as oid FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 2, false)")
+
+        val df_group =
+          df.groupBy("qid").agg(collect_list("oid").as("collected_points")).orderBy("qid")
+
+        val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+        print(resultAll.mkString)
+        resultAll.length should be(3)
+        resultAll.mkString should be("[0,5][0,6][0,7]")
+      }
+
+      withExportTies(export = false) {
+        val df = sparkSession.sql(
+          s"SELECT QUERIES.ID as qid, OBJECTS.ID as oid FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 2, false)")
+
+        val df_group =
+          df.groupBy("qid").agg(collect_list("oid").as("collected_points")).orderBy("qid")
+
+        val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+        print(resultAll.mkString)
+        resultAll.length should be(2)
+        resultAll.mkString should be("[0,6][0,7]")
+      }
+    }
   }
 
   private def withOptimizationMode(mode: String)(body: => Unit): Unit = {
     withConf(Map("sedona.join.optimizationmode" -> mode))(body)
+  }
+
+  private def withExportTies(export: Boolean)(body: => Unit): Unit = {
+    if (export) {
+      withConf(Map("spark.sedona.join.knn.includeTieBreakers" -> "true"))(body)
+    } else {
+      withConf(Map("spark.sedona.join.knn.includeTieBreakers" -> "false"))(body)
+    }
   }
 
   def validateQueryPlan(
@@ -392,6 +550,80 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
 
     df1.createOrReplaceTempView("df1")
     df2.createOrReplaceTempView("df2")
+    (df1, df2)
+  }
+
+  def generateRandomPointsDataFrames(
+      sparkSession: SparkSession,
+      numRows1: Int,
+      numRows2: Int,
+      seed: Long,
+      coordRange: (Double, Double)): (DataFrame, DataFrame) = {
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, nullable = false),
+        StructField("geom", StringType, nullable = false),
+        StructField("shape", StringType, nullable = false)))
+
+    def generateRandomData(numRows: Int, seed: Long, coordRange: (Double, Double)): Seq[Row] = {
+      val random = new Random(seed)
+      val (minCoord, maxCoord) = coordRange
+      (1 to numRows).map { id =>
+        val x =
+          minCoord + random
+            .nextDouble() * (maxCoord - minCoord) // Random x coordinate in the range
+        val y =
+          minCoord + random
+            .nextDouble() * (maxCoord - minCoord) // Random y coordinate in the range
+        val geom = s"POINT($x $y)"
+        val shape = s"bank$id"
+        Row(id, geom, shape)
+      }
+    }
+
+    val data1 = generateRandomData(numRows1, seed, coordRange)
+    val data2 = generateRandomData(
+      numRows2,
+      seed + 1,
+      coordRange
+    ) // Use a different seed for the second DataFrame
+
+    val rdd1 = sparkSession.sparkContext.parallelize(data1)
+    val rdd2 = sparkSession.sparkContext.parallelize(data2)
+
+    val df1 = sparkSession
+      .createDataFrame(rdd1, schema)
+      .withColumn("geom", expr("ST_GeomFromText(geom)"))
+
+    val df2 = sparkSession
+      .createDataFrame(rdd2, schema)
+      .withColumn("geom", expr("ST_GeomFromText(geom)"))
+
+    (df1, df2)
+  }
+
+  def createPointsDataFrames(
+      sparkSession: SparkSession,
+      points1: Seq[(Int, String, String)],
+      points2: Seq[(Int, String, String)]): (DataFrame, DataFrame) = {
+    val schema = StructType(
+      Seq(
+        StructField("id", IntegerType, nullable = false),
+        StructField("geom", StringType, nullable = false),
+        StructField("shape", StringType, nullable = false)))
+
+    def createDataFrame(points: Seq[(Int, String, String)]): DataFrame = {
+      val rows = points.map { case (id, geom, shape) => Row(id, geom, shape) }
+      val rdd = sparkSession.sparkContext.parallelize(rows)
+      val df = sparkSession
+        .createDataFrame(rdd, schema)
+        .withColumn("geom", expr("ST_GeomFromText(geom)"))
+      df
+    }
+
+    val df1 = createDataFrame(points1)
+    val df2 = createDataFrame(points2)
+
     (df1, df2)
   }
 }

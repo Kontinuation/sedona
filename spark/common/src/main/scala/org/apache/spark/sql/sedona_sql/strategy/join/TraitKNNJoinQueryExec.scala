@@ -24,8 +24,9 @@ import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateUnsafeProjection, GenerateUnsafeRowJoiner}
-import org.apache.spark.sql.catalyst.expressions.{BindReferences, Predicate, UnsafeProjection, UnsafeRow}
-import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression, Predicate, UnsafeProjection, UnsafeRow}
+import org.apache.spark.sql.execution.{ProjectExec, SparkPlan}
+import org.apache.spark.sql.execution.adaptive.ShuffleQueryStageExec
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.locationtech.jts.geom.Geometry
 
@@ -39,6 +40,9 @@ import org.locationtech.jts.geom.Geometry
  */
 trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
   self: SparkPlan =>
+
+  protected var broadcastJoin: Boolean = false
+  protected var querySide: JoinSide = null
 
   private lazy val sedonaConf = SedonaConf.fromActiveSession
   override lazy val metrics: Map[String, SQLMetric] = Map.empty
@@ -68,20 +72,25 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
    *   RDD[InternalRow] The result of the KNN join as an RDD of InternalRows.
    */
   private def executeKNNJoin(sedonaConf: SedonaConf): RDD[InternalRow] = {
-    val boundLeftShape = BindReferences.bindReference(leftShape, left.output)
-    val boundRightShape = BindReferences.bindReference(rightShape, right.output)
+    val (querySparkPlan: SparkPlan, objectSparkPlan: SparkPlan, swapped: Boolean) =
+      getQueryAndObjectPlans(leftShape)
 
-    val leftResultsRaw = left.execute().asInstanceOf[RDD[UnsafeRow]]
-    val rightResultsRaw = right.execute().asInstanceOf[RDD[UnsafeRow]]
+    val boundQueryShape = BindReferences.bindReference(leftShape, querySparkPlan.output)
+    val boundObjectShape = BindReferences.bindReference(rightShape, objectSparkPlan.output)
+
+    val queryResultsRaw = querySparkPlan.execute().asInstanceOf[RDD[UnsafeRow]]
+    val objectResultsRaw = objectSparkPlan.execute().asInstanceOf[RDD[UnsafeRow]]
 
     val sedonaConf = SedonaConf.fromActiveSession
 
     val (queryShapes, objectShapes) =
-      toSpatialRddPair(leftResultsRaw, boundLeftShape, rightResultsRaw, boundRightShape)
+      toSpatialRddPair(queryResultsRaw, boundQueryShape, objectResultsRaw, boundObjectShape)
 
     objectShapes.analyze()
     log.info(
-      "[SedonaSQL] Number of partitions on the objectShapes (right): " + rightResultsRaw.partitions.size)
+      "[SedonaSQL] Number of partitions on the objectShapes (right): " + objectResultsRaw.partitions.size)
+
+    val joinParams: JoinParams = getKNNJoinParams
 
     // calculate the optimized or predefined number of partitions
     // and do spatial partitioning
@@ -91,10 +100,11 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
         numPartitions = sedonaConf.getFallbackPartitionNum
       } else {
         // object shapes are the dominant side
-        numPartitions = joinPartitionNumOptimizer(
+        numPartitions = knnJoinPartitionNumOptimizer(
           objectShapes.rawSpatialRDD.partitions.size(),
           queryShapes.rawSpatialRDD.partitions.size(),
-          objectShapes.approximateTotalCount)
+          objectShapes.approximateTotalCount,
+          joinParams.k)
       }
       // object shapes are the dominant side
       doSpatialPartitioning(objectShapes, queryShapes, numPartitions, sedonaConf)
@@ -115,17 +125,85 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
         sedonaConf.getSpatialPartitionerSavePath)
     }
 
-    val joinParams: JoinParams = getKNNJoinParams
-
     val matchesRDD: RDD[(Geometry, Geometry)] =
       (queryShapes.spatialPartitionedRDD, objectShapes.spatialPartitionedRDD) match {
         case (null, null) =>
-          sparkContext.parallelize(Seq[(Geometry, Geometry)]())
-        case _ => JoinQuery.knnJoin(queryShapes, objectShapes, joinParams).rdd
+          if (broadcastJoin) {
+            JoinQuery
+              .knnJoin(
+                queryShapes,
+                objectShapes,
+                joinParams,
+                sedonaConf.isIncludeTieBreakersInKNNJoins,
+                broadcastJoin)
+              .rdd
+          } else {
+            sparkContext.parallelize(Seq[(Geometry, Geometry)]())
+          }
+        case _ =>
+          JoinQuery
+            .knnJoin(
+              queryShapes,
+              objectShapes,
+              joinParams,
+              sedonaConf.isIncludeTieBreakersInKNNJoins,
+              broadcastJoin)
+            .rdd
       }
 
     // Convert the matchesRDD to RowRDD
-    joinedRddToRowRdd(matchesRDD)
+    joinedRddToRowRdd(matchesRDD, swapped)
+  }
+
+  def knnJoinPartitionNumOptimizer(
+      objectSidePartNum: Int,
+      querySidePartNum: Int,
+      objectSideCount: Long,
+      numNeighbor: Int): Int = {
+    log.info("[SedonaSQL] object side count: " + objectSideCount)
+    var numPartition = -1
+    val candidatePartitionNum = (objectSideCount / (numNeighbor * 2)).intValue()
+    if (objectSidePartNum * 2 > objectSideCount) {
+      log.warn(
+        s"[SedonaSQL] KNN join object side partition number $objectSidePartNum is larger than 1/2 of the object side count $objectSideCount")
+      log.warn(
+        s"[SedonaSQL] Try to use object (follower) side partition number $querySidePartNum")
+      if (querySidePartNum * 2 > objectSideCount) {
+        log.warn(
+          s"[SedonaSQL] KNN join object (follower) side partition number is also larger than 1/2 of the object side count $objectSideCount")
+        log.warn(
+          s"[SedonaSQL] Try to use 1/2 of the object side count $candidatePartitionNum as the partition number of both sides")
+        if (candidatePartitionNum == 0) {
+          log.warn(
+            s"[SedonaSQL] 1/2 of $candidatePartitionNum is equal to 0. Use 1 as the partition number of both sides instead.")
+          numPartition = 1
+        } else numPartition = candidatePartitionNum
+      } else numPartition = querySidePartNum
+    } else numPartition = objectSidePartNum
+    numPartition
+  }
+
+  /**
+   * Gets the query and object plans based on the left shape.
+   *
+   * This method checks if the left shape is part of the left or right plan and returns the query
+   * and object plans accordingly.
+   *
+   * @param leftShape
+   *   The left shape expression.
+   * @return
+   *   (SparkPlan, SparkPlan) The query and object plans.
+   */
+  private def getQueryAndObjectPlans(leftShape: Expression) = {
+    val isLeftQuerySide =
+      left.toString().toLowerCase().contains(leftShape.toString().toLowerCase())
+    if (isLeftQuerySide) {
+      querySide = LeftSide
+      (left, right, false)
+    } else {
+      querySide = RightSide
+      (right, left, true)
+    }
   }
 
   /**
@@ -142,8 +220,9 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
    * @return
    *   RDD[InternalRow] The resulting RDD of joined InternalRows.
    */
-  override protected def joinedRddToRowRdd(
-      joinedRdd: RDD[(Geometry, Geometry)]): RDD[InternalRow] = {
+  protected def joinedRddToRowRdd(
+      joinedRdd: RDD[(Geometry, Geometry)],
+      swapped: Boolean): RDD[InternalRow] = {
     joinedRdd.mapPartitions { iter =>
       val joinRow = {
         val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
@@ -153,7 +232,10 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
       val joined = iter.map { case (l, r) =>
         val leftRow = l.getUserData.asInstanceOf[UnsafeRow]
         val rightRow = r.getUserData.asInstanceOf[UnsafeRow]
-        joinRow(leftRow, rightRow)
+        if (swapped)
+          joinRow(rightRow, leftRow)
+        else
+          joinRow(leftRow, rightRow)
       }
 
       // Apply the extra join conditions if it exists (e.g., S.ID < Q.ID)

@@ -61,6 +61,7 @@ import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.LinearRing;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.index.SpatialIndex;
+import org.locationtech.jts.index.strtree.STRtree;
 import org.locationtech.jts.io.WKBWriter;
 import org.locationtech.jts.io.WKTWriter;
 import org.wololo.geojson.Feature;
@@ -619,6 +620,17 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
       }
       this.indexedRDD = this.spatialPartitionedRDD.mapPartitions(new IndexBuilder(indexType));
     }
+  }
+
+  /**
+   * Builds the index on coalesced raw spatial RDD.
+   *
+   * @param indexType the index type
+   * @throws Exception the exception
+   */
+  public STRtree coalesceAndBuildRawIndex(final IndexType indexType) {
+    return (STRtree)
+        this.rawSpatialRDD.coalesce(1).mapPartitions(new IndexBuilder(indexType)).take(1).get(0);
   }
 
   /**

@@ -209,13 +209,13 @@ trait TraitJoinQueryBase {
   }
 
   def doSpatialPartitioning(
-      dominantShapes: SpatialRDD[Geometry],
-      followerShapes: SpatialRDD[Geometry],
+      objectsShapes: SpatialRDD[Geometry],
+      queryShapes: SpatialRDD[Geometry],
       numPartitions: Integer,
       sedonaConf: SedonaConf): Unit = {
-    if (dominantShapes.approximateTotalCount > 0 && numPartitions > 0) {
-      dominantShapes.spatialPartitioning(sedonaConf.getJoinGridType, numPartitions)
-      followerShapes.spatialPartitioning(dominantShapes.getPartitioner)
+    if (objectsShapes.approximateTotalCount > 0 && numPartitions > 0) {
+      objectsShapes.spatialPartitioning(sedonaConf.getJoinGridType, numPartitions)
+      queryShapes.spatialPartitioning(objectsShapes.getPartitioner)
     }
   }
 }

@@ -30,6 +30,9 @@ import org.apache.spark.sql.sedona_sql.expressions._
 import org.apache.spark.sql.sedona_sql.expressions.raster._
 import org.apache.spark.sql.sedona_sql.optimization.ExpressionUtils.{matchDistanceExpressionToJoinSide, matchExpressionsToPlans, matches, splitConjunctivePredicates}
 import org.apache.spark.sql.{SparkSession, Strategy}
+import org.json4s.scalap.scalasig.Children
+
+import scala.collection.immutable
 
 case class JoinQueryDetection(
     left: LogicalPlan,
@@ -829,8 +832,46 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       return Nil
     }
 
-    // Check if the filters in the plans are supported
-    checkPredicatesInBroadcastHint(spatialPredicate)
+    if (spatialPredicate == SpatialPredicate.KNN || spatialPredicate == SpatialPredicate.AKNN) {
+      {
+        val leftShape = children.head
+        val rightShape = children.tail.head
+
+        val querySide = getKNNQuerySide(left, leftShape)
+
+        if (querySide == broadcastSide.get) {
+          // broadcast is on query side
+          return BroadcastQuerySideKNNJoinExec(
+            planLater(left),
+            planLater(right),
+            leftShape,
+            rightShape,
+            broadcastSide.get,
+            joinType,
+            k = distance.get,
+            useApproximate = false,
+            spatialPredicate,
+            isGeography = false,
+            condition = null,
+            extraCondition = None) :: Nil
+        } else {
+          // broadcast is on object side
+          return BroadcastObjectSideKNNJoinExec(
+            planLater(left),
+            planLater(right),
+            leftShape,
+            rightShape,
+            broadcastSide.get,
+            joinType,
+            k = distance.get,
+            useApproximate = false,
+            spatialPredicate,
+            isGeography = false,
+            condition = null,
+            extraCondition = None) :: Nil
+        }
+      }
+    }
 
     val a = children.head
     val b = children.tail.head
@@ -948,6 +989,27 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
   }
 
   /**
+   * Gets the query and object plans based on the left shape.
+   *
+   * This method checks if the left shape is part of the left or right plan and returns the query
+   * and object plans accordingly.
+   *
+   * @param leftShape
+   *   The left shape expression.
+   * @return
+   *   The join side where the left shape is located.
+   */
+  private def getKNNQuerySide(left: LogicalPlan, leftShape: Expression) = {
+    val isLeftQuerySide =
+      left.toString().toLowerCase().contains(leftShape.toString().toLowerCase())
+    if (isLeftQuerySide) {
+      LeftSide
+    } else {
+      RightSide
+    }
+  }
+
+  /**
    * Check if the given condition is an equi-join between the given plans. This method basically
    * replicates the logic of
    * [[org.apache.spark.sql.catalyst.planning.ExtractEquiJoinKeys.unapply]] but it does not
@@ -1025,19 +1087,6 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       case Some(filter) if unsupportedFilters.contains(filter) =>
         throw new UnsupportedOperationException(unsupportedFilters(filter))
       case _ => // Do nothing
-    }
-  }
-
-  /**
-   * Check if the given spatial predicate is supported with broadcast hint.
-   * @param spatialPredicate
-   */
-  def checkPredicatesInBroadcastHint(spatialPredicate: SpatialPredicate): Unit = {
-    val unsupportedPredicates = Set(SpatialPredicate.KNN, SpatialPredicate.AKNN)
-
-    if (unsupportedPredicates.contains(spatialPredicate)) {
-      throw new UnsupportedOperationException(
-        s"$spatialPredicate joins are not supported with broadcast hint")
     }
   }
 }

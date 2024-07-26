@@ -21,7 +21,7 @@ package org.apache.spark.sql.sedona_sql.strategy.join
 import org.apache.sedona.core.enums.{DistanceMetric, GridType, IndexType}
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
 import org.apache.sedona.core.spatialOperator.SpatialPredicate
-import org.apache.sedona.core.spatialPartitioning.{QuadTreeRTPartitioner, ZOrderPartitioner}
+import org.apache.sedona.core.spatialPartitioning.QuadTreeRTPartitioner
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.internal.Logging
@@ -32,39 +32,12 @@ import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sedona_sql.execution.SedonaBinaryExecNode
 import org.locationtech.jts.geom.Geometry
 
-/**
- * KNN / AKNN joins requires target geometries (objects) to be in the same partition as the query
- * geometries. To create an overlap and guarantee matching geometries end up in the same
- * partition, the target geometry is expanded during partitioning.
- *
- * E.g., SELECT * FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, $numNeighbors,
- * true) SELECT * FROM QUERIES JOIN OBJECTS ON ST_AKNN(QUERIES.GEOM, OBJECTS.GEOM, $numNeighbors,
- * true)
- *
- * @param left
- *   left side of the join
- * @param right
- *   right side of the join
- * @param leftShape
- *   shape expression for the left side
- * @param rightShape
- *   shape expression for the right side
- * @param k
- *   \- number of neighbors to find
- * @param useApproximate
- *   whether to use approximate distance for the join
- * @param spatialPredicate
- *   spatial predicate as join condition
- * @param condition
- *   full join condition
- * @param extraCondition
- *   extra join condition other than spatialPredicate
- */
-case class KNNJoinExec(
+case class BroadcastQuerySideKNNJoinExec(
     left: SparkPlan,
     right: SparkPlan,
     leftShape: Expression,
     rightShape: Expression,
+    joinSide: JoinSide,
     joinType: JoinType,
     k: Expression,
     useApproximate: Boolean,
@@ -134,21 +107,12 @@ case class KNNJoinExec(
   }
 
   /**
-   * Copy the plan with new children
-   * @param newLeft
-   * @param newRight
-   * @return
-   */
-  protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): SparkPlan = {
-    copy(left = newLeft, right = newRight)
-  }
-
-  /**
-   * Execute the spatial partitioning for KNN join This is required to ensure that the target
-   * geometries (objects) are in the same partition as the query geometries.
+   * Broadcast the dominant shapes (objects) to all the partitions
    *
-   * Different KNN algorithms require different partitioning strategies. E.g., approximate KNN
-   * join requires a different partitioning strategy than exact KNN join.
+   * This type of the join does not need to do spatial partition.
+   *
+   * For left side (queries) broadcast: the join needs to be reduced after the join. For right
+   * side (objects) broadcast: the join does not need to be reduced after the join.
    *
    * @param objectsShapes
    *   the dominant shapes (objects)
@@ -169,60 +133,19 @@ case class KNNJoinExec(
     require(kValue > 0, "The number of neighbors must be greater than 0.")
     objectsShapes.setNeighborSampleNumber(kValue)
 
-    if (useApproximate) {
-      approximateSpatialPartitioning(objectsShapes, queryShapes, numPartitions)
-    } else {
-      exactSpatialPartitioning(objectsShapes, queryShapes, numPartitions)
-    }
-  }
-
-  /**
-   * Approximate spatial partitioning for KNN join
-   * @param dominantShapes
-   *   the dominant (objects) shapes
-   * @param followerShapes
-   *   the follower (queries) shapes
-   * @param kValue
-   */
-  private def approximateSpatialPartitioning(
-      dominantShapes: SpatialRDD[Geometry],
-      followerShapes: SpatialRDD[Geometry],
-      numPartitions: Integer): Unit = {
-    // use z-order partitioning, as it is an approximate algorithm
-    dominantShapes.spatialPartitioning(GridType.ZORDER, numPartitions)
-    followerShapes.spatialPartitioning(
-      dominantShapes.getPartitioner.asInstanceOf[ZOrderPartitioner].nonOverlappedPartitioner())
-
-    dominantShapes.buildIndex(IndexType.RTREE, true)
-  }
-
-  /**
-   * Exact spatial partitioning for KNN join
-   * @param dominantShapes
-   *   the dominant (objects) shapes
-   * @param followerShapes
-   *   the follower (queries) shapes
-   */
-  private def exactSpatialPartitioning(
-      dominantShapes: SpatialRDD[Geometry],
-      followerShapes: SpatialRDD[Geometry],
-      numPartitions: Integer): Unit = {
-    // analyze the both RDDs to get the statistics (e.g., boundary)
-    dominantShapes.advancedAnalyze()
-    followerShapes.advancedAnalyze()
+    val joinPartitions: Integer = numPartitions;
+    broadcastJoin = false
 
     // expand the boundary for partition to include both RDDs
-    dominantShapes.getStatistics.getBoundary.expandToInclude(
-      followerShapes.getStatistics.getBoundary)
+    objectsShapes.advancedAnalyze()
+    queryShapes.advancedAnalyze()
+    objectsShapes.getStatistics.getBoundary.expandToInclude(queryShapes.getStatistics.getBoundary)
 
-    // use modified quadtree partitioning, as it is an exact algorithm
-    dominantShapes.spatialPartitioning(GridType.QUADTREE_RTREE, numPartitions)
-    followerShapes.spatialPartitioning(
-      dominantShapes.getPartitioner
-        .asInstanceOf[QuadTreeRTPartitioner]
-        .nonOverlappedPartitioner())
+    objectsShapes.spatialPartitioning(GridType.QUADTREE_RTREE, joinPartitions)
+    queryShapes.spatialPartitioning(
+      objectsShapes.getPartitioner.asInstanceOf[QuadTreeRTPartitioner].nonOverlappedPartitioner())
 
-    dominantShapes.buildIndex(IndexType.RTREE, true)
+    objectsShapes.buildIndex(IndexType.RTREE, true)
   }
 
   /**
@@ -241,5 +164,15 @@ case class KNNJoinExec(
     val distanceMetric = if (isGeography) DistanceMetric.SPHEROID else DistanceMetric.EUCLIDEAN
     val joinParams = new JoinParams(IndexType.RTREE, kValue, distanceMetric)
     joinParams
+  }
+
+  /**
+   * Copy the plan with new children
+   * @param newLeft
+   * @param newRight
+   * @return
+   */
+  protected def withNewChildrenInternal(newLeft: SparkPlan, newRight: SparkPlan): SparkPlan = {
+    copy(left = newLeft, right = newRight)
   }
 }
