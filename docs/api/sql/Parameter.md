@@ -59,6 +59,10 @@ The advanced spatial join algorithm is enabled by default, users can disable adv
 	* Spatial partitioning grid type for join query
 	* Default: kdbtree
 	* Possible values: quadtree, kdbtree
+* spark.sedona.join.knn.includeTieBreakers
+	* KNN join will include all ties in the result, possibly returning more than k results
+	* Default: false
+	* Possible values: true, false
 * sedona.join.indexbuildside **(Advanced users only!)**
 	* The side which Sedona builds spatial indices on, only valid when "sedona.join.advanced" is false
 	* Default: left
