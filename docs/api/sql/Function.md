@@ -368,11 +368,21 @@ POINT ZM(1 1 1 1)
 
 Introduction: Return the [GeoJSON](https://geojson.org/) string representation of a geometry
 
-Format: `ST_AsGeoJSON (A: Geometry)`
+The type parameter (Since: `v1.6.1`) takes the following options -
+
+- "Simple" (default): Returns a simple GeoJSON geometry.
+- "Feature": Wraps the geometry in a GeoJSON Feature.
+- "FeatureCollection": Wraps the Feature in a GeoJSON FeatureCollection.
+
+Format:
+
+`ST_AsGeoJSON (A: Geometry)`
+
+`ST_AsGeoJSON (A: Geometry, type: String)`
 
 Since: `v1.0.0`
 
-SQL Example
+SQL Example (Simple GeoJSON):
 
 ```sql
 SELECT ST_AsGeoJSON(ST_GeomFromWKT('POLYGON((1 1, 8 1, 8 8, 1 8, 1 1))'))
@@ -389,6 +399,50 @@ Output:
       [8.0,8.0],
       [1.0,8.0],
       [1.0,1.0]]
+  ]
+}
+```
+
+SQL Example (Feature GeoJSON):
+
+Output:
+
+```json
+{
+  "type":"Feature",
+  "geometry": {
+      "type":"Polygon",
+      "coordinates":[
+        [[1.0,1.0],
+          [8.0,1.0],
+          [8.0,8.0],
+          [1.0,8.0],
+          [1.0,1.0]]
+      ]
+  }
+}
+```
+
+SQL Example (FeatureCollection GeoJSON):
+
+Output:
+
+```json
+{
+  "type":"FeatureCollection",
+  "features": [{
+      "type":"Feature",
+      "geometry": {
+          "type":"Polygon",
+          "coordinates":[
+            [[1.0,1.0],
+              [8.0,1.0],
+              [8.0,8.0],
+              [1.0,8.0],
+              [1.0,1.0]]
+          ]
+      }
+    }
   ]
 }
 ```
