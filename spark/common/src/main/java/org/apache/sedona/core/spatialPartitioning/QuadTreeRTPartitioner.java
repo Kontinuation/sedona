@@ -20,6 +20,7 @@ package org.apache.sedona.core.spatialPartitioning;
 
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.apache.sedona.core.spatialPartitioning.quadtree.ExtendedQuadTree;
 import org.locationtech.jts.geom.Envelope;
@@ -96,5 +97,9 @@ public class QuadTreeRTPartitioner extends QuadTreePartitioner {
   @Override
   public int numPartitions() {
     return super.numPartitions();
+  }
+
+  public Map<Integer, List<Envelope>> getOverlappedGrids() {
+    return extendedQuadTree.getExpandedBoundaries();
   }
 }

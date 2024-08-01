@@ -58,6 +58,10 @@ public class ExtendedQuadTree<T> extends PartitioningUtils implements Serializab
 
   private boolean useNonOverlapped = false;
 
+  public HashMap<Integer, List<Envelope>> getExpandedBoundaries() {
+    return expandedBoundaries;
+  }
+
   /**
    * Constructor to initialize the partitions list.
    *

@@ -31,6 +31,7 @@ import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.prop.TableDrivenPropertyChecks
 import org.apache.spark.sql.functions._
 
+import java.nio.file.Files
 import java.util.Random
 
 /**
@@ -350,6 +351,19 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       }
     }
 
+    it("KNN Join should respect export partitioner info ") {
+      val tempDir =
+        Files
+          .createTempDirectory("spatial_partitioner_export")
+          .toString // Create temporary directory
+      withSpatialPartitionerExport(tempDir) {
+        val df = sparkSession.sql(
+          s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false)")
+        val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+        resultAll.length should be(12)
+      }
+    }
+
     it("AKNN Join should correctly match the join side and swap them if necessary") {
       val df1 =
         sparkSession.range(0, 100).toDF("id1").withColumn("geometry", expr("ST_Point(id1, id1)"))
@@ -496,6 +510,10 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     } else {
       withConf(Map("spark.sedona.join.knn.includeTieBreakers" -> "false"))(body)
     }
+  }
+
+  private def withSpatialPartitionerExport(path: String)(body: => Unit): Unit = {
+    withConf(Map("spark.sedona.join.debug.spatialPartitionerSavePath" -> path))(body)
   }
 
   def validateQueryPlan(

@@ -20,15 +20,19 @@ package org.apache.spark.sql.sedona_sql.strategy.join
 
 import org.apache.sedona.core.spatialOperator.JoinQuery
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
+import org.apache.sedona.core.spatialPartitioning.{QuadTreeRTPartitioner, SpatialPartitioner, ZOrderPartitioner}
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateUnsafeProjection, GenerateUnsafeRowJoiner}
 import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression, Predicate, UnsafeProjection, UnsafeRow}
-import org.apache.spark.sql.execution.{ProjectExec, SparkPlan}
+import org.apache.spark.sql.execution.{ProjectExec, SQLExecution, SparkPlan}
 import org.apache.spark.sql.execution.adaptive.ShuffleQueryStageExec
 import org.apache.spark.sql.execution.metric.SQLMetric
-import org.locationtech.jts.geom.Geometry
+import org.locationtech.jts.geom.{Envelope, Geometry}
+
+import java.io.PrintWriter
+import java.nio.file.Paths
 
 /**
  * TraitKNNJoinQueryExec is a trait that extends the TraitJoinQueryExec trait and provides the
@@ -120,8 +124,8 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
 
     // Save the spatial partitioner to file if the path is set
     if (sedonaConf.getSpatialPartitionerSavePath.nonEmpty) {
-      saveSpatialPartitionerToFile(
-        queryShapes.getPartitioner,
+      saveKNNPartitionerToFile(
+        objectShapes.getPartitioner,
         sedonaConf.getSpatialPartitionerSavePath)
     }
 
@@ -245,6 +249,63 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
           joined.filter(row => boundCondition.eval(row))
         case None => joined
       }
+    }
+  }
+
+  private def saveKNNPartitionerToFile(
+      partitioner: SpatialPartitioner,
+      savePath: String): Unit = {
+    partitioner match {
+      case null =>
+        log.warn("[SedonaSQL] Spatial partitioner is null. Skip saving to file.")
+
+      case qt: QuadTreeRTPartitioner =>
+        val filePath = createFilePath(savePath, "quadtree-rt")
+        log.info(s"[SedonaSQL] Saving QuadTreeRT partitioner to file: $filePath")
+        writeGridsToFile(filePath, qt.getOverlappedGrids)
+
+      case zo: ZOrderPartitioner =>
+        val filePath = createFilePath(savePath, "zorder")
+        log.info(s"[SedonaSQL] Saving ZOrder partitioner to file: $filePath")
+        writeGridsToFile(filePath, zo.getGrids)
+
+      case _ =>
+        log.info("[SedonaSQL] Spatial partitioner type is not supported for saving to file.")
+    }
+  }
+
+  private def createFilePath(savePath: String, partitionerType: String): String = {
+    val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
+    Paths.get(savePath).toFile.mkdirs()
+    Paths
+      .get(savePath, s"partitioner-$partitionerType-$executionId-${System.currentTimeMillis()}")
+      .toString
+  }
+
+  private def writeGridsToFile(
+      filePath: String,
+      grids: java.util.Map[Integer, java.util.List[Envelope]]): Unit = {
+    val writer = new PrintWriter(filePath)
+    try {
+      grids.forEach { case (key, envelopes) =>
+        envelopes.forEach { envelope =>
+          writer.write(
+            s"$key,${envelope.getMinX},${envelope.getMinY},${envelope.getMaxX},${envelope.getMaxY}\n")
+        }
+      }
+    } finally {
+      writer.close()
+    }
+  }
+
+  private def writeGridsToFile(filePath: String, grids: java.util.List[Envelope]): Unit = {
+    val writer = new PrintWriter(filePath)
+    try {
+      grids.forEach { grid =>
+        writer.write(s"${grid.getMinX},${grid.getMinY},${grid.getMaxX},${grid.getMaxY}\n")
+      }
+    } finally {
+      writer.close()
     }
   }
 
