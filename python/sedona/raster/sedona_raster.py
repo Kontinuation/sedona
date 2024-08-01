@@ -260,6 +260,13 @@ class OutDbSedonaRasterBase(SedonaRaster):
     def outdb_meta(self) -> OutDbMeta:
         return self._outdb_meta
 
+    @property
+    def path(self) -> str:
+        return self.outdb_meta.path
+
+    def set_path(self, path: str):
+        self.outdb_meta.path = path
+
     def as_numpy(self) -> np.ndarray:
         ds = self.as_rasterio()
         band_indices = [b + 1 for b in self._outdb_meta.band_indices]
@@ -294,45 +301,59 @@ class OutDbSedonaRaster(OutDbSedonaRasterBase):
             return self.rasterio_dataset_reader, None
 
         src_path = _normalize_path(self._outdb_meta.path)
-        if self.rasterio_memfile is None:
-            # XXX: WarpedVRT does not support specifying panSrcBands and
-            # panDstBands options of GDAL's GDALWarpOptions, so we cannot use
-            # WarpedVRT directly. As a workaround we construct an in-memory VRT
-            # XML file and open it using the VRT driver.
-            with _rasterio_open(src_path) as src:
-                ip_x, scale_x, skew_x, ip_y, skew_y, scale_y = src.get_transform()
-                crs_wkt = src.crs.wkt if src.crs is not None else None
-            off_x = round((self._affine_trans.ip_x - ip_x) / scale_x)
-            off_y = round((self._affine_trans.ip_y - ip_y) / scale_y)
-            width  = self._width
-            height = self._height
-            band_indices = self.outdb_meta.band_indices
-            geo_transform = (f"{self._affine_trans.ip_x}, {self._affine_trans.scale_x}, {self._affine_trans.skew_x}, " +
-                             f"{self._affine_trans.ip_y}, {self._affine_trans.skew_y}, {self._affine_trans.scale_y}")
+        src = _rasterio_open(src_path)
+        ip_x, scale_x, skew_x, ip_y, skew_y, scale_y = src.get_transform()
+        crs_wkt = src.crs.wkt if src.crs is not None else None
+        if not self.is_vrt_needed(src):
+            # Fast path: the geo-reference of the out-db raster is the same as the original raster,
+            # the original raster is not clipped, no need to construct VRT.
+            self.rasterio_dataset_reader = src
+            return src, None
+        else:
+            src.close()
+            if self.rasterio_memfile is None:
+                # XXX: WarpedVRT does not support specifying panSrcBands and
+                # panDstBands options of GDAL's GDALWarpOptions, so we cannot use
+                # WarpedVRT directly. As a workaround we construct an in-memory VRT
+                # XML file and open it using the VRT driver.
+                off_x = round((self._affine_trans.ip_x - ip_x) / scale_x)
+                off_y = round((self._affine_trans.ip_y - ip_y) / scale_y)
+                width  = self._width
+                height = self._height
+                band_indices = self.outdb_meta.band_indices
+                geo_transform = (f"{self._affine_trans.ip_x}, {self._affine_trans.scale_x}, {self._affine_trans.skew_x}, " +
+                                 f"{self._affine_trans.ip_y}, {self._affine_trans.skew_y}, {self._affine_trans.scale_y}")
 
-            dt = self._outdb_meta.data_type
-            if dt == DataBuffer.TYPE_BYTE:
-                data_type = 'Byte'
-            elif dt == DataBuffer.TYPE_USHORT:
-                data_type = 'UInt16'
-            elif dt == DataBuffer.TYPE_SHORT:
-                data_type = 'Int16'
-            elif dt == DataBuffer.TYPE_INT:
-                data_type = 'Int32'
-            elif dt == DataBuffer.TYPE_FLOAT:
-                data_type = 'Float32'
-            elif dt == DataBuffer.TYPE_DOUBLE:
-                data_type = 'Float64'
-            else:
-                raise RuntimeError("unknown outdb band data type: " + str(dt))
+                dt = self._outdb_meta.data_type
+                if dt == DataBuffer.TYPE_BYTE:
+                    data_type = 'Byte'
+                elif dt == DataBuffer.TYPE_USHORT:
+                    data_type = 'UInt16'
+                elif dt == DataBuffer.TYPE_SHORT:
+                    data_type = 'Int16'
+                elif dt == DataBuffer.TYPE_INT:
+                    data_type = 'Int32'
+                elif dt == DataBuffer.TYPE_FLOAT:
+                    data_type = 'Float32'
+                elif dt == DataBuffer.TYPE_DOUBLE:
+                    data_type = 'Float64'
+                else:
+                    raise RuntimeError("unknown outdb band data type: " + str(dt))
 
-            # assemble a VRT XML file to describe how we want to retrieve the sub region
-            vrt_xml = self.generate_vrt_xml(src_path, data_type, width, height, geo_transform, crs_wkt, off_x, off_y, band_indices)
-            self.rasterio_memfile = MemoryFile(vrt_xml, ext='.vrt')
+                # assemble a VRT XML file to describe how we want to retrieve the sub region
+                vrt_xml = self.generate_vrt_xml(src_path, data_type, width, height, geo_transform, crs_wkt, off_x, off_y, band_indices)
+                self.rasterio_memfile = MemoryFile(vrt_xml, ext='.vrt')
 
-        ds, arr = _rasterio_open_memfile(src_path, self.rasterio_memfile, driver='VRT', band_indices=load_bands)
-        self.rasterio_dataset_reader = ds
-        return ds, arr
+            ds, arr = _rasterio_open_memfile(src_path, self.rasterio_memfile, driver='VRT', band_indices=load_bands)
+            self.rasterio_dataset_reader = ds
+            return ds, arr
+
+    def is_vrt_needed(self, ds: DatasetReader) -> bool:
+        return not (
+            self._width == ds.width and
+            self._height == ds.height and
+            self._outdb_meta.band_indices == [k - 1 for k in ds.indexes]
+        )
 
     def close(self):
         if self.rasterio_dataset_reader is not None:
@@ -380,14 +401,14 @@ class OutDbSedonaRaster(OutDbSedonaRasterBase):
 
 
 class LazyLoadOutDbSedonaRaster(OutDbSedonaRasterBase):
-    path: str
+    _path: str
     params: Optional[Dict[str, str]]
     rasterio_dataset_reader: Optional[DatasetReader]
 
     def __init__(self, path: str, params: Optional[Dict[str, str]]):
         super().__init__(-1, -1, [], AffineTransform(0, 0, 0, 0, 0, 0, PixelAnchor.UPPER_LEFT), "")
         self._outdb_meta = OutDbMeta(DataBuffer.TYPE_BYTE, [], "", None)
-        self.path = path
+        self._path = path
         self.params = params
         self.rasterio_dataset_reader = None
 
@@ -396,7 +417,7 @@ class LazyLoadOutDbSedonaRaster(OutDbSedonaRasterBase):
             return
 
         # Load the raster file and extract its metadata
-        src_path = _normalize_path(self.path)
+        src_path = _normalize_path(self._path)
         ds = _rasterio_open(src_path)
         ip_x, scale_x, skew_x, ip_y, skew_y, scale_y = ds.get_transform()
         crs_wkt = ds.crs.wkt if ds.crs is not None else None
@@ -430,7 +451,7 @@ class LazyLoadOutDbSedonaRaster(OutDbSedonaRasterBase):
 
         # Initialize the internal states with raster metadata
         super().__init__(width, height, bands_meta, affine_trans, crs_wkt)
-        self._outdb_meta = OutDbMeta(data_type, band_indices, self.path, self.params)
+        self._outdb_meta = OutDbMeta(data_type, band_indices, self._path, self.params)
 
         # Keep the reference to the rasterio DatasetReader for future usage
         self.rasterio_dataset_reader = ds
@@ -443,6 +464,15 @@ class LazyLoadOutDbSedonaRaster(OutDbSedonaRasterBase):
         if self.rasterio_dataset_reader is not None:
            self.rasterio_dataset_reader.close()
            self.rasterio_dataset_reader = None
+
+    @property
+    def path(self) -> str:
+        return self._path
+
+    def set_path(self, path: str):
+        if self.rasterio_dataset_reader is not None:
+            raise RuntimeError("Cannot set the path of an already loaded lazy-loaded out-db raster")
+        self._path = path
 
     @property
     def width(self) -> int:

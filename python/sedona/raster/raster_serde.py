@@ -34,6 +34,14 @@ class RasterTypes:
     LAZY_LOAD_OUT_DB = 2
 
 
+def peek_raster_type(buf: Union[bytearray, bytes]) -> Optional[int]:
+    if buf is None:
+        return None
+    bio = BytesIO(buf)
+    raster_type = int(bio.read(1)[0])
+    return raster_type
+
+
 def deserialize(buf: Union[bytearray, bytes]) -> Optional[SedonaRaster]:
     if buf is None:
         return None
