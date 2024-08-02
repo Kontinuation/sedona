@@ -25,6 +25,7 @@ import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.apache.sedona.core.spatialPartitioning.quadtree.ExtendedQuadTree;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.index.strtree.STRtree;
 import scala.Tuple2;
 
 /**
@@ -72,6 +73,10 @@ public class QuadTreeRTPartitioner extends QuadTreePartitioner {
     return new QuadTreeRTPartitioner(nonOverlappedTree);
   }
 
+  public Envelope getBoundary() {
+    return extendedQuadTree.getBoundary();
+  }
+
   /**
    * Depending on overlappedPartitioner, return the expanded boundaries or the original boundaries.
    *
@@ -101,5 +106,9 @@ public class QuadTreeRTPartitioner extends QuadTreePartitioner {
 
   public Map<Integer, List<Envelope>> getOverlappedGrids() {
     return extendedQuadTree.getExpandedBoundaries();
+  }
+
+  public STRtree getSTRForOverlappedGrids() {
+    return extendedQuadTree.getSpatialExpandedBoundaryIndex();
   }
 }

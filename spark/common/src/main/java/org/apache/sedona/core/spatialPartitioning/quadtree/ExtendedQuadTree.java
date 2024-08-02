@@ -26,6 +26,7 @@ import org.apache.sedona.core.spatialPartitioning.QuadTreeRTPartitioning;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.index.strtree.STRtree;
 import scala.Tuple2;
 
 /**
@@ -56,10 +57,18 @@ public class ExtendedQuadTree<T> extends PartitioningUtils implements Serializab
   // for overlapped partitioning, the expanded boundaries are used
   private HashMap<Integer, List<Envelope>> expandedBoundaries;
 
+  // The spatial index for partitioned MBRs
+  // for overlapped partitioning, the spatial index is used
+  private STRtree spatialExpandedBoundaryIndex;
+
   private boolean useNonOverlapped = false;
 
   public HashMap<Integer, List<Envelope>> getExpandedBoundaries() {
     return expandedBoundaries;
+  }
+
+  public STRtree getSpatialExpandedBoundaryIndex() {
+    return spatialExpandedBoundaryIndex;
   }
 
   /**
@@ -83,6 +92,7 @@ public class ExtendedQuadTree<T> extends PartitioningUtils implements Serializab
     this.boundary = extendedQuadTree.boundary;
     this.numPartitions = extendedQuadTree.numPartitions;
     this.expandedBoundaries = extendedQuadTree.expandedBoundaries;
+    this.spatialExpandedBoundaryIndex = extendedQuadTree.spatialExpandedBoundaryIndex;
     this.partitionTree = extendedQuadTree.partitionTree;
     this.useNonOverlapped = useNonOverlapped;
   }
@@ -151,17 +161,14 @@ public class ExtendedQuadTree<T> extends PartitioningUtils implements Serializab
       List<Tuple2<Integer, Geometry>> result = new ArrayList<>();
       Envelope objectEnvelope = geometry.getEnvelopeInternal();
 
-      for (Integer partitionId : expandedBoundaries.keySet()) {
-        for (Envelope envelope : expandedBoundaries.get(partitionId)) {
-          if (envelope.intersects(objectEnvelope)) {
-            result.add(new Tuple2<>(partitionId, geometry));
-            break; // Assuming an object belongs to a partition if it intersects at least one
-            // expanded boundary
-          }
-        }
+      // Query the spatial index for intersecting envelopes
+      List<Integer> intersectingIds = spatialExpandedBoundaryIndex.query(objectEnvelope);
+
+      for (Integer partitionId : intersectingIds) {
+        result.add(new Tuple2<>(partitionId, geometry));
       }
-      Iterator<Tuple2<Integer, Geometry>> iterator = result.iterator();
-      return iterator;
+
+      return result.iterator();
     }
   }
 
@@ -183,15 +190,11 @@ public class ExtendedQuadTree<T> extends PartitioningUtils implements Serializab
       Set<Integer> keys = new HashSet<>();
       Envelope objectEnvelope = geometry.getEnvelopeInternal();
 
-      for (Integer partitionId : expandedBoundaries.keySet()) {
-        for (Envelope envelope : expandedBoundaries.get(partitionId)) {
-          if (envelope.intersects(objectEnvelope)) {
-            keys.add(partitionId);
-            break; // Assuming an object belongs to a partition if it intersects at least one
-            // expanded boundary
-          }
-        }
-      }
+      // Query the spatial index for intersecting envelopes
+      List<Integer> intersectingIds = spatialExpandedBoundaryIndex.query(objectEnvelope);
+
+      keys.addAll(intersectingIds);
+
       return keys;
     }
   }
@@ -228,6 +231,7 @@ public class ExtendedQuadTree<T> extends PartitioningUtils implements Serializab
     // Create the expanded boundaries
     quadTreeRTPartitioning.buildSTRTree(samples, neighborSampleNumber, samplingProbability);
     expandedBoundaries = quadTreeRTPartitioning.getMbrs();
+    spatialExpandedBoundaryIndex = quadTreeRTPartitioning.getMbrSpatialIndex();
 
     // Make sure not to broadcast all the samples used to build the Quad
     // tree to all nodes which are doing partitioning

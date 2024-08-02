@@ -41,9 +41,10 @@ import org.locationtech.jts.index.strtree.STRtree;
 public class QuadTreeRTPartitioning extends QuadtreePartitioning {
   // A query-only R-tree created using the Sort-Tile-Recursive (STR) algorithm.
   private STRtree strTree;
-
   // The expanded partitioned boundaries based on the quad tree
   private HashMap<Integer, List<Envelope>> mbrs;
+  // The spatial index for partitioned MBRs
+  private STRtree mbrSpatialIndex;
 
   public QuadTreeRTPartitioning(List<Envelope> samples, Envelope boundary, int partitions) {
     super(samples, boundary, partitions);
@@ -56,6 +57,10 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
 
   public HashMap<Integer, List<Envelope>> getMbrs() {
     return mbrs;
+  }
+
+  public STRtree getMbrSpatialIndex() {
+    return mbrSpatialIndex;
   }
 
   /**
@@ -156,6 +161,14 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       // 6 - Compute all the MBRs that intersect with the circle and add them to a hash map
       List<Envelope> intersectingMBRs = strTree.query(circleEnvelope);
       mbrs.put(quadRect.partitionId, intersectingMBRs);
+    }
+
+    // 7 - Construct a spatial index for the MBRs
+    this.mbrSpatialIndex = new STRtree();
+    for (Integer id : mbrs.keySet()) {
+      for (Envelope envelope : mbrs.get(id)) {
+        mbrSpatialIndex.insert(envelope, id);
+      }
     }
 
     // 6 - Return the STR tree

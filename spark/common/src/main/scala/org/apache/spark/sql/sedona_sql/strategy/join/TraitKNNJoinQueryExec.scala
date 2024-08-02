@@ -24,11 +24,10 @@ import org.apache.sedona.core.spatialPartitioning.{QuadTreeRTPartitioner, Spatia
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.codegen.{GenerateUnsafeProjection, GenerateUnsafeRowJoiner}
-import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression, Predicate, UnsafeProjection, UnsafeRow}
-import org.apache.spark.sql.execution.{ProjectExec, SQLExecution, SparkPlan}
-import org.apache.spark.sql.execution.adaptive.ShuffleQueryStageExec
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
+import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression, Predicate, UnsafeRow}
 import org.apache.spark.sql.execution.metric.SQLMetric
+import org.apache.spark.sql.execution.{SQLExecution, SparkPlan}
 import org.locationtech.jts.geom.{Envelope, Geometry}
 
 import java.io.PrintWriter
