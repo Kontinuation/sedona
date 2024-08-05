@@ -137,8 +137,20 @@ class TestRasterSerde(TestBase):
             df = df.withColumn("meta", expr("RS_Metadata(rast)"))
             rows = df.collect()
             for row in rows:
-                ip_x, ip_y, width, height, scale_x, scale_y, skew_x, skew_y, srid, num_bands = row['meta']
                 r_tile = row['rast']
+                meta = row['meta']
+                ip_x, ip_y, width, height, scale_x, scale_y, skew_x, skew_y, srid, num_bands = (
+                    meta['upperLeftX'],
+                    meta['upperLeftY'],
+                    meta['gridWidth'],
+                    meta['gridHeight'],
+                    meta['scaleX'],
+                    meta['scaleY'],
+                    meta['skewX'],
+                    meta['skewY'],
+                    meta['srid'],
+                    meta['numSampleDimensions']
+                )
                 assert width == r_tile.width
                 assert height == r_tile.height
                 assert ip_x == r_tile.affine_trans.ip_x
