@@ -98,6 +98,9 @@ POLYGON ((0.703125 0.87890625, 0.703125 1.0546875, 1.0546875 1.0546875, 1.054687
 
 Introduction: Construct a Geometry from GML.
 
+!!!note
+    This function only supports GML1 and GML2. GML3 is not supported.
+
 Format:
 `ST_GeomFromGML (gml:string)`
 
