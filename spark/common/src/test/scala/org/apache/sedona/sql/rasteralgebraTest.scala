@@ -1748,37 +1748,44 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
         .load(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif")
       df = df.selectExpr(
         "RS_FromGeoTiff(content) as raster",
+        "RS_FromPath(path) as outdb_raster",
         "ST_GeomFromWKT('POLYGON ((236722 4204770, 243900 4204770, 243900 4197590, 221170 4197590, 236722 4204770))', 26918) as geom")
-      var actual = df.selectExpr("RS_ZonalStats(raster, geom, 1, 'sum', true)").first().get(0)
-      assertEquals(1.0719726e7, actual)
 
-      actual = df.selectExpr("RS_ZonalStats(raster, geom, 1, 'count', false)").first().get(0)
-      assertEquals(184792.0, actual)
+      Seq("raster", "outdb_raster").foreach { raster_name =>
+        var actual =
+          df.selectExpr(s"RS_ZonalStats($raster_name, geom, 1, 'sum', true)").first().get(0)
+        assertEquals(1.0719726e7, actual)
 
-      actual = df.selectExpr("RS_ZonalStats(raster, geom, 1, 'mean', false)").first().get(0)
-      assertEquals(58.00968656653401, actual)
+        actual =
+          df.selectExpr(s"RS_ZonalStats($raster_name, geom, 1, 'count', false)").first().get(0)
+        assertEquals(184792.0, actual)
 
-      actual = df.selectExpr("RS_ZonalStats(raster, geom, 1, 'variance')").first().get(0)
-      assertEquals(8491.631251863151, actual)
+        actual =
+          df.selectExpr(s"RS_ZonalStats($raster_name, geom, 1, 'mean', false)").first().get(0)
+        assertEquals(58.00968656653401, actual)
 
-      actual = df.selectExpr("RS_ZonalStats(raster, geom, 'sd')").first().get(0)
-      assertEquals(92.15004748703687, actual)
+        actual = df.selectExpr(s"RS_ZonalStats($raster_name, geom, 1, 'variance')").first().get(0)
+        assertEquals(8491.631251863151, actual)
 
-      // Test with a polygon in EPSG:4326
-      actual = df
-        .selectExpr(
-          "RS_ZonalStats(raster, ST_GeomFromWKT('POLYGON ((-77.96672569800863073 37.91971182746296876, -77.9688630154902711 37.89620133516485367, -77.93936803424354309 37.90517806858776595, -77.96672569800863073 37.91971182746296876))'), 1, 'mean', false)")
-        .first()
-        .get(0)
-      assertNotNull(actual)
+        actual = df.selectExpr(s"RS_ZonalStats($raster_name, geom, 'sd')").first().get(0)
+        assertEquals(92.15004748703687, actual)
 
-      // Test with a polygon that does not intersect the raster in lenient mode
-      actual = df
-        .selectExpr(
-          "RS_ZonalStats(raster, ST_GeomFromWKT('POLYGON ((-78.22106647832458748 37.76411511479908967, -78.20183062098976734 37.72863564460374874, -78.18088490966962922 37.76753482276972562, -78.22106647832458748 37.76411511479908967))'), 1, 'mean', false)")
-        .first()
-        .get(0)
-      assertNull(actual)
+        // Test with a polygon in EPSG:4326
+        actual = df
+          .selectExpr(
+            s"RS_ZonalStats($raster_name, ST_GeomFromWKT('POLYGON ((-77.96672569800863073 37.91971182746296876, -77.9688630154902711 37.89620133516485367, -77.93936803424354309 37.90517806858776595, -77.96672569800863073 37.91971182746296876))'), 1, 'mean', false)")
+          .first()
+          .get(0)
+        assertNotNull(actual)
+
+        // Test with a polygon that does not intersect the raster in lenient mode
+        actual = df
+          .selectExpr(
+            s"RS_ZonalStats($raster_name, ST_GeomFromWKT('POLYGON ((-78.22106647832458748 37.76411511479908967, -78.20183062098976734 37.72863564460374874, -78.18088490966962922 37.76753482276972562, -78.22106647832458748 37.76411511479908967))'), 1, 'mean', false)")
+          .first()
+          .get(0)
+        assertNull(actual)
+      }
     }
 
     it("Passed RS_ZonalStats - Raster with no data") {

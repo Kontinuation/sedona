@@ -22,7 +22,10 @@ import static org.junit.Assert.*;
 
 import java.io.IOException;
 import java.util.Arrays;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.Constructors;
+import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.junit.Test;
 import org.locationtech.jts.geom.Geometry;
@@ -86,58 +89,72 @@ public class RasterBandAccessorsTest extends RasterTestBase {
 
   @Test
   public void testZonalStats() throws FactoryException, ParseException, IOException {
-    GridCoverage2D raster =
+    Configuration conf = new Configuration();
+    GridCoverage2D inDbRaster =
         rasterFromGeoTiff(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif");
-    String polygon =
-        "POLYGON ((236722 4204770, 243900 4204770, 243900 4197590, 221170 4197590, 236722 4204770))";
-    Geometry geom = Constructors.geomFromWKT(polygon, RasterAccessors.srid(raster));
+    GridCoverage2D outDbRaster =
+        new LazyLoadOutDbGridCoverage2D(
+            "test-outdb-raster",
+            new Path(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif"),
+            conf);
+    GridCoverage2D[] rasters = {inDbRaster, outDbRaster};
 
-    double actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "sum", false);
-    double expected = 1.0719726E7;
-    assertEquals(expected, actual, 0d);
+    for (GridCoverage2D raster : rasters) {
+      String polygon =
+          "POLYGON ((236722 4204770, 243900 4204770, 243900 4197590, 221170 4197590, 236722 4204770))";
+      Geometry geom = Constructors.geomFromWKT(polygon, RasterAccessors.srid(raster));
+      double actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "sum", false);
+      double expected = 1.0719726E7;
+      assertEquals(expected, actual, 0d);
 
-    actual = RasterBandAccessors.getZonalStats(raster, geom, 2, "mean", false);
-    expected = 220.7527;
-    assertEquals(expected, actual, FP_TOLERANCE);
+      actual = RasterBandAccessors.getZonalStats(raster, geom, 2, "mean", false);
+      expected = 220.7527;
+      assertEquals(expected, actual, FP_TOLERANCE);
 
-    actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "count");
-    expected = 184792.0;
-    assertEquals(expected, actual, 0.1d);
+      actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "count");
+      expected = 184792.0;
+      assertEquals(expected, actual, 0.1d);
 
-    actual = RasterBandAccessors.getZonalStats(raster, geom, 3, "variance", false);
-    expected = 13549.6263;
-    assertEquals(expected, actual, FP_TOLERANCE);
+      actual = RasterBandAccessors.getZonalStats(raster, geom, 3, "variance", false);
+      expected = 13549.6263;
+      assertEquals(expected, actual, FP_TOLERANCE);
 
-    actual = RasterBandAccessors.getZonalStats(raster, geom, "max");
-    expected = 255.0;
-    assertEquals(expected, actual, 1E-1);
+      actual = RasterBandAccessors.getZonalStats(raster, geom, "max");
+      expected = 255.0;
+      assertEquals(expected, actual, 1E-1);
 
-    actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "min", false);
-    expected = 0.0;
-    assertEquals(expected, actual, 1E-1);
+      actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "min", false);
+      expected = 0.0;
+      assertEquals(expected, actual, 1E-1);
 
-    actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "sd", false);
-    expected = 92.1500;
-    assertEquals(expected, actual, FP_TOLERANCE);
+      actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "sd", false);
+      expected = 92.1500;
+      assertEquals(expected, actual, FP_TOLERANCE);
 
-    geom =
-        Constructors.geomFromWKT(
-            "POLYGON ((-77.96672569800863073 37.91971182746296876, -77.9688630154902711 37.89620133516485367, -77.93936803424354309 37.90517806858776595, -77.96672569800863073 37.91971182746296876))",
-            0);
-    Double statValue = RasterBandAccessors.getZonalStats(raster, geom, 1, "sum", false, true);
-    assertNotNull(statValue);
+      geom =
+          Constructors.geomFromWKT(
+              "POLYGON ((-77.96672569800863073 37.91971182746296876, -77.9688630154902711 37.89620133516485367, -77.93936803424354309 37.90517806858776595, -77.96672569800863073 37.91971182746296876))",
+              0);
+      Double statValue = RasterBandAccessors.getZonalStats(raster, geom, 1, "sum", false, true);
+      assertNotNull(statValue);
 
-    Geometry nonIntersectingGeom =
-        Constructors.geomFromWKT(
-            "POLYGON ((-78.22106647832458748 37.76411511479908967, -78.20183062098976734 37.72863564460374874, -78.18088490966962922 37.76753482276972562, -78.22106647832458748 37.76411511479908967))",
-            0);
-    statValue =
-        RasterBandAccessors.getZonalStats(raster, nonIntersectingGeom, 1, "sum", false, true);
-    assertNull(statValue);
-    assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            RasterBandAccessors.getZonalStats(raster, nonIntersectingGeom, 1, "sum", false, false));
+      Geometry nonIntersectingGeom =
+          Constructors.geomFromWKT(
+              "POLYGON ((-78.22106647832458748 37.76411511479908967, -78.20183062098976734 37.72863564460374874, -78.18088490966962922 37.76753482276972562, -78.22106647832458748 37.76411511479908967))",
+              0);
+      statValue =
+          RasterBandAccessors.getZonalStats(raster, nonIntersectingGeom, 1, "sum", false, true);
+      assertNull(statValue);
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              RasterBandAccessors.getZonalStats(
+                  raster, nonIntersectingGeom, 1, "sum", false, false));
+    }
+
+    for (GridCoverage2D raster : rasters) {
+      raster.dispose(true);
+    }
   }
 
   @Test
@@ -181,43 +198,56 @@ public class RasterBandAccessorsTest extends RasterTestBase {
   @Test
   public void testZonalStatsAll()
       throws IOException, FactoryException, ParseException, TransformException {
-    GridCoverage2D raster =
+    Configuration conf = new Configuration();
+    GridCoverage2D inDbRaster =
         rasterFromGeoTiff(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif");
-    String polygon =
-        "POLYGON ((-8673439.6642 4572993.5327, -8673155.5737 4563873.2099, -8701890.3259 4562931.7093, -8682522.8735 4572703.8908, -8673439.6642 4572993.5327))";
-    Geometry geom = Constructors.geomFromWKT(polygon, 3857);
+    GridCoverage2D outDbRaster =
+        new LazyLoadOutDbGridCoverage2D(
+            "test-outdb-raster",
+            new Path(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif"),
+            conf);
+    GridCoverage2D[] rasters = {inDbRaster, outDbRaster};
 
-    double[] actual = RasterBandAccessors.getZonalStatsAll(raster, geom, 1, false);
-    double[] expected =
-        new double[] {
-          184792.0,
-          1.0719726E7,
-          58.00968656653401,
-          0.0,
-          0.0,
-          92.15004748703687,
-          8491.631251863151,
-          0.0,
-          255.0
-        };
-    assertArrayEquals(expected, actual, FP_TOLERANCE);
+    for (GridCoverage2D raster : rasters) {
+      String polygon =
+          "POLYGON ((-8673439.6642 4572993.5327, -8673155.5737 4563873.2099, -8701890.3259 4562931.7093, -8682522.8735 4572703.8908, -8673439.6642 4572993.5327))";
+      Geometry geom = Constructors.geomFromWKT(polygon, 3857);
+      double[] actual = RasterBandAccessors.getZonalStatsAll(raster, geom, 1, false);
+      double[] expected =
+          new double[] {
+            184792.0,
+            1.0719726E7,
+            58.00968656653401,
+            0.0,
+            0.0,
+            92.15004748703687,
+            8491.631251863151,
+            0.0,
+            255.0
+          };
+      assertArrayEquals(expected, actual, FP_TOLERANCE);
 
-    geom =
-        Constructors.geomFromWKT(
-            "POLYGON ((-77.96672569800863073 37.91971182746296876, -77.9688630154902711 37.89620133516485367, -77.93936803424354309 37.90517806858776595, -77.96672569800863073 37.91971182746296876))",
-            0);
-    actual = RasterBandAccessors.getZonalStatsAll(raster, geom, 1, false);
-    assertNotNull(actual);
+      geom =
+          Constructors.geomFromWKT(
+              "POLYGON ((-77.96672569800863073 37.91971182746296876, -77.9688630154902711 37.89620133516485367, -77.93936803424354309 37.90517806858776595, -77.96672569800863073 37.91971182746296876))",
+              0);
+      actual = RasterBandAccessors.getZonalStatsAll(raster, geom, 1, false);
+      assertNotNull(actual);
 
-    Geometry nonIntersectingGeom =
-        Constructors.geomFromWKT(
-            "POLYGON ((-78.22106647832458748 37.76411511479908967, -78.20183062098976734 37.72863564460374874, -78.18088490966962922 37.76753482276972562, -78.22106647832458748 37.76411511479908967))",
-            0);
-    actual = RasterBandAccessors.getZonalStatsAll(raster, nonIntersectingGeom, 1, false, true);
-    assertNull(actual);
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> RasterBandAccessors.getZonalStatsAll(raster, nonIntersectingGeom, 1, false, false));
+      Geometry nonIntersectingGeom =
+          Constructors.geomFromWKT(
+              "POLYGON ((-78.22106647832458748 37.76411511479908967, -78.20183062098976734 37.72863564460374874, -78.18088490966962922 37.76753482276972562, -78.22106647832458748 37.76411511479908967))",
+              0);
+      actual = RasterBandAccessors.getZonalStatsAll(raster, nonIntersectingGeom, 1, false, true);
+      assertNull(actual);
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> RasterBandAccessors.getZonalStatsAll(raster, nonIntersectingGeom, 1, false, false));
+    }
+
+    for (GridCoverage2D raster : rasters) {
+      raster.dispose(true);
+    }
   }
 
   @Test

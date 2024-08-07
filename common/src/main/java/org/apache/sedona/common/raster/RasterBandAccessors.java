@@ -29,11 +29,14 @@ import org.apache.commons.math3.stat.StatUtils;
 import org.apache.commons.math3.stat.descriptive.DescriptiveStatistics;
 import org.apache.commons.math3.stat.descriptive.moment.StandardDeviation;
 import org.apache.sedona.common.Functions;
+import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.referencing.FactoryException;
+import org.opengis.referencing.operation.TransformException;
 
 public class RasterBandAccessors {
 
@@ -296,6 +299,44 @@ public class RasterBandAccessors {
       }
     }
 
+    // Clip the raster if the raster is an out-db raster, and the geometry only covers a small part
+    // of the raster.
+    if (raster instanceof OutDbGridCoverage2D) {
+      Envelope geomEnvelope = roi.getEnvelopeInternal();
+      Geometry rasterEnvelope = GeometryFunctions.envelope(raster);
+      if (geomEnvelope.getArea() < 0.25 * rasterEnvelope.getArea()) {
+        double pixelWidth = Math.abs(RasterAccessors.getScaleX(raster));
+        double pixelHeight = Math.abs(RasterAccessors.getScaleY(raster));
+        Envelope expandedGeomEnvelope =
+            new Envelope(
+                geomEnvelope.getMinX() - pixelWidth,
+                geomEnvelope.getMaxX() + pixelWidth,
+                geomEnvelope.getMinY() - pixelHeight,
+                geomEnvelope.getMaxY() + pixelHeight);
+        GridCoverage2D clippedRaster;
+        try {
+          clippedRaster =
+              RasterBandEditors.clip(
+                  raster, band, roi.getFactory().toGeometry(expandedGeomEnvelope));
+        } catch (TransformException e) {
+          throw new RuntimeException("Error while clipping the raster: " + e.getMessage(), e);
+        }
+        try {
+          return getStatObjectsInternal(clippedRaster, roi, 1, excludeNoData);
+        } finally {
+          clippedRaster.dispose(true);
+        }
+      }
+    }
+
+    // For in-db rasters or when the geometry covers a large part of the raster, we simply use
+    // the original raster without clipping.
+    return getStatObjectsInternal(raster, roi, band, excludeNoData);
+  }
+
+  private static List<Object> getStatObjectsInternal(
+      GridCoverage2D raster, Geometry roi, int band, boolean excludeNoData)
+      throws FactoryException {
     Raster rasterData = RasterUtils.getRaster(raster.getRenderedImage());
     String datatype = RasterBandAccessors.getBandType(raster, band);
     Double noDataValue = RasterBandAccessors.getBandNoDataValue(raster, band);
