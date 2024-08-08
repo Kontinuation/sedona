@@ -18,6 +18,7 @@
  */
 package org.apache.spark.sql.sedona_sql.strategy.join
 
+import org.apache.commons.lang3.Range
 import org.apache.sedona.core.spatialOperator.JoinQuery
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
 import org.apache.sedona.core.spatialPartitioning.{QuadTreeRTPartitioner, SpatialPartitioner, ZOrderPartitioner}
@@ -32,6 +33,8 @@ import org.locationtech.jts.geom.{Envelope, Geometry}
 
 import java.io.PrintWriter
 import java.nio.file.Paths
+import java.util
+import java.util.List
 
 /**
  * TraitKNNJoinQueryExec is a trait that extends the TraitJoinQueryExec trait and provides the
@@ -266,7 +269,7 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
       case zo: ZOrderPartitioner =>
         val filePath = createFilePath(savePath, "zorder")
         log.info(s"[SedonaSQL] Saving ZOrder partitioner to file: $filePath")
-        writeGridsToFile(filePath, zo.getGrids)
+        writeGridsToFile(filePath, zo.getOverlappedRanges)
 
       case _ =>
         log.info("[SedonaSQL] Spatial partitioner type is not supported for saving to file.")
@@ -297,11 +300,15 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
     }
   }
 
-  private def writeGridsToFile(filePath: String, grids: java.util.List[Envelope]): Unit = {
+  private def writeGridsToFile(
+      filePath: String,
+      ranges: util.List[Range[java.lang.Long]]): Unit = {
     val writer = new PrintWriter(filePath)
     try {
-      grids.forEach { grid =>
-        writer.write(s"${grid.getMinX},${grid.getMinY},${grid.getMaxX},${grid.getMaxY}\n")
+      var rangeId = 1
+      ranges.forEach { range =>
+        writer.write(s"$rangeId,${range.getMinimum},${range.getMaximum}\n")
+        rangeId += 1
       }
     } finally {
       writer.close()

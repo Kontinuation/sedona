@@ -83,6 +83,14 @@ public class QuadRectangle implements Serializable {
     return new Envelope(x, x + width, y, y + height);
   }
 
+  public Integer getPartitionId() {
+    return partitionId;
+  }
+
+  public void setPartitionId(Integer partitionId) {
+    this.partitionId = partitionId;
+  }
+
   @Override
   public String toString() {
     return "x: "

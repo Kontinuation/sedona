@@ -229,7 +229,7 @@ public class ExtendedQuadTree<T> extends PartitioningUtils implements Serializab
     partitionTree = quadTreeRTPartitioning.getPartitionTree();
 
     // Create the expanded boundaries
-    quadTreeRTPartitioning.buildSTRTree(samples, neighborSampleNumber, samplingProbability);
+    quadTreeRTPartitioning.buildSTRTree(samples, neighborSampleNumber);
     expandedBoundaries = quadTreeRTPartitioning.getMbrs();
     spatialExpandedBoundaryIndex = quadTreeRTPartitioning.getMbrSpatialIndex();
 

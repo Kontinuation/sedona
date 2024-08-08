@@ -49,6 +49,7 @@ public class ZOrderPartitioning implements Serializable {
     this.boundary = boundary;
     this.numPartitions = numPartitions;
     this.coordScaleFactor = calculateScaleFactorForRange(boundary);
+    System.out.println("coordScaleFactor: " + coordScaleFactor);
   }
 
   public List<Range<Long>> createZOrderRanges(List<Envelope> samples, int neighborSampleNumber) {
@@ -76,6 +77,9 @@ public class ZOrderPartitioning implements Serializable {
     // Calculate Z-order values for the boundary corners
     long minZBoundary = calculateZOrder(new Coordinate(boundary.getMinX(), boundary.getMinY()));
     long maxZBoundary = calculateZOrder(new Coordinate(boundary.getMaxX(), boundary.getMaxY()));
+
+    long minZBoundary2 = calculateZOrder(new Coordinate(boundary.getMinX(), boundary.getMaxY()));
+    long maxZBoundary2 = calculateZOrder(new Coordinate(boundary.getMaxX(), boundary.getMinY()));
 
     if (samples.isEmpty()) {
       // Return a single range covering the entire boundary from sample points
@@ -122,7 +126,7 @@ public class ZOrderPartitioning implements Serializable {
 
     this.nonOverlappedRanges = ranges;
     // expand the ranges to include k nearest samples from neighboring ranges
-    int scaleFactor = calculateScalaFactor(samplingProbability);
+    int scaleFactor = calculateCorrectionFactor(samplingProbability);
     int k = Math.max(neighborSampleNumber * scaleFactor, 0);
     List<Range<Long>> adjustedRanges = new ArrayList<>();
 
@@ -162,12 +166,11 @@ public class ZOrderPartitioning implements Serializable {
     double minY = boundary.getMinY();
     double maxY = boundary.getMaxY();
 
-    double xRange = maxX - minX;
-    double yRange = maxY - minY;
-
     // The scale factor should cover the largest range to ensure all coordinates fit within the
     // int32 range
-    double maxRange = Math.max(xRange, yRange);
+    double minCoord = Math.max(Math.abs(minX), Math.abs(minY));
+    double maxCoord = Math.max(Math.abs(maxX), Math.abs(maxY));
+    double maxRange = Math.max(minCoord, maxCoord);
 
     // Calculate the initial scale factor
     double initialScaleFactor = (double) Integer.MAX_VALUE / maxRange;
@@ -175,8 +178,8 @@ public class ZOrderPartitioning implements Serializable {
     return (int) Math.pow(10, Math.floor(Math.log10(initialScaleFactor)) - 1);
   }
 
-  // Method to calculate the scaling factor for Z-order range expansion
-  int calculateScalaFactor(double samplingProbability) {
+  // Method to calculate the correction factor for Z-order range expansion
+  int calculateCorrectionFactor(double samplingProbability) {
     // larger scaling factor for higher sampling probability
     if (samplingProbability >= 0.1) return ZORDER_CORRECTION_FACTOR;
     else return ZORDER_CORRECTION_FACTOR / 2;

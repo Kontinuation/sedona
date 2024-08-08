@@ -21,6 +21,7 @@ package org.apache.sedona.core.spatialPartitioning;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import org.apache.commons.lang3.Range;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.joinJudgement.DedupParams;
 import org.locationtech.jts.geom.Envelope;
@@ -65,5 +66,9 @@ public class ZOrderPartitioner extends SpatialPartitioner {
   @Override
   public int numPartitions() {
     return intervalTree.getPartitionNum();
+  }
+
+  public List<Range<Long>> getOverlappedRanges() {
+    return intervalTree.getRanges();
   }
 }

@@ -156,4 +156,8 @@ public class IntervalTree extends PartitioningUtils implements Serializable {
     // clear the samples list to free up memory and reduce the object size for serialization
     this.samples.clear();
   }
+
+  public List<Range<Long>> getRanges() {
+    return ranges;
+  }
 }

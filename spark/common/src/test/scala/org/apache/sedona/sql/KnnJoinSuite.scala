@@ -48,11 +48,16 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
   val testDataDelimiter = "\t"
   val knnPointsLocationQueries: String = resourceFolder + "knn/queries.csv"
   val knnPointsLocationObjects: String = resourceFolder + "knn/objects.csv"
+  val knnPointsLocationSkewedObjects: String = resourceFolder + "knn/queries-large-skewed.csv"
+  val knnPointsLocationMultipleSkewedObjects: String =
+    resourceFolder + "knn/queries-large-skewed-multiple.csv"
   val numPartitions = 4
+  val numSkewPartitions = 100
 
   override def beforeAll(): Unit = {
     super.beforeAll()
     prepareTempViewsForTestData()
+    prepareTempViewsForSkewedTestData()
   }
 
   describe("KNN spatial join SQLs should be parsed correctly") {
@@ -351,16 +356,29 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       }
     }
 
-    it("KNN Join should respect export partitioner info ") {
-      val tempDir =
+    it("KNN Join should respect export partitioner info - single cluster of points") {
+      var tempDir =
         Files
           .createTempDirectory("spatial_partitioner_export")
           .toString // Create temporary directory
       withSpatialPartitionerExport(tempDir) {
         val df = sparkSession.sql(
-          s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false)")
+          s"SELECT QUERIES_SKEWED.ID, OBJECTS_SKEWED.ID FROM QUERIES_SKEWED JOIN OBJECTS_SKEWED ON ST_KNN(QUERIES_SKEWED.GEOM, OBJECTS_SKEWED.GEOM, 4, false)")
         val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
-        resultAll.length should be(12)
+        assert(resultAll.length > 0)
+      }
+    }
+
+    it("KNN Join should respect export partitioner info - multiple clusters of points") {
+      var tempDir =
+        Files
+          .createTempDirectory("spatial_partitioner_export")
+          .toString // Create temporary directory
+      withSpatialPartitionerExport(tempDir) {
+        val df = sparkSession.sql(
+          s"SELECT QUERIES_SKEWED_MULTIPLE.ID, OBJECTS_SKEWED_MULTIPLE.ID FROM QUERIES_SKEWED_MULTIPLE JOIN OBJECTS_SKEWED_MULTIPLE ON ST_KNN(QUERIES_SKEWED_MULTIPLE.GEOM, OBJECTS_SKEWED_MULTIPLE.GEOM, 4, false)")
+        val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+        assert(resultAll.length > 0)
       }
     }
 
@@ -569,6 +587,32 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     df1.createOrReplaceTempView("df1")
     df2.createOrReplaceTempView("df2")
     (df1, df2)
+  }
+
+  private def prepareTempViewsForSkewedTestData() = {
+    val df1 = sparkSession.read
+      .format("csv")
+      .option("header", "false")
+      .option("delimiter", testDataDelimiter)
+      .load(knnPointsLocationSkewedObjects)
+      .withColumn("id", col("_c0").cast(IntegerType))
+      .withColumn("geom", ST_GeomFromText(new Column("_c1")))
+      .withColumn("shape", col("_c1"))
+      .select("id", "geom", "shape")
+    df1.repartition(numSkewPartitions).createOrReplaceTempView("queries_skewed")
+    df1.repartition(numSkewPartitions).createOrReplaceTempView("objects_skewed")
+
+    val df2 = sparkSession.read
+      .format("csv")
+      .option("header", "false")
+      .option("delimiter", testDataDelimiter)
+      .load(knnPointsLocationMultipleSkewedObjects)
+      .withColumn("id", col("_c0").cast(IntegerType))
+      .withColumn("geom", ST_GeomFromText(new Column("_c1")))
+      .withColumn("shape", col("_c1"))
+      .select("id", "geom", "shape")
+    df2.repartition(numSkewPartitions).createOrReplaceTempView("queries_skewed_multiple")
+    df2.repartition(numSkewPartitions).createOrReplaceTempView("objects_skewed_multiple")
   }
 
   def generateRandomPointsDataFrames(

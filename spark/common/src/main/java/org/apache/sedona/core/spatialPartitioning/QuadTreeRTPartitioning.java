@@ -20,11 +20,11 @@ package org.apache.sedona.core.spatialPartitioning;
 
 import static org.apache.sedona.core.formatMapper.shapefileParser.ShapefileRDD.geometryFactory;
 
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 import org.apache.sedona.core.knnJudgement.EuclideanItemDistance;
 import org.apache.sedona.core.spatialPartitioning.quadtree.QuadRectangle;
+import org.apache.sedona.core.utils.SedonaConf;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.index.strtree.STRtree;
 
@@ -39,6 +39,12 @@ import org.locationtech.jts.index.strtree.STRtree;
  * <p>It generates List<List<Integer>> expandedParitionedBoundaries based on the quad tree.
  */
 public class QuadTreeRTPartitioning extends QuadtreePartitioning {
+
+  private SedonaConf sedonaConf;
+
+  private double skewnessCutoffRatio = 0.1;
+  private double skewnessMinimumMBRCount = 100;
+
   // A query-only R-tree created using the Sort-Tile-Recursive (STR) algorithm.
   private STRtree strTree;
   // The expanded partitioned boundaries based on the quad tree
@@ -71,7 +77,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
    * @param k the number of neighbor samples
    * @return
    */
-  public STRtree buildSTRTree(List<Envelope> samples, int k, double samplingProbability) {
+  public STRtree buildSTRTree(List<Envelope> samples, int k) {
     // The partitioned MBRs
     mbrs = new HashMap<>();
 
@@ -80,12 +86,12 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
 
     // Get all MBRs (partitions) from the quad-tree
     // The zones might include the one with null partition ids
-    List<QuadRectangle> partitionMBRsList =
+    List<QuadRectangle> partitionMBRs =
         partitionTree.getAllZones().stream()
             .filter(quadRect -> quadRect.partitionId != null)
             .collect(Collectors.toList());
 
-    for (QuadRectangle quadRect : partitionMBRsList) {
+    for (QuadRectangle quadRect : partitionMBRs) {
       Envelope mbr = quadRect.getEnvelope();
       strTree.insert(mbr, mbr);
     }
@@ -100,70 +106,37 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       sampleTree.insert(sample, point);
     }
 
+    double minimalGridWidth = getMinimalEnvelopeWidth(partitionMBRs);
+
     // For each MBR in the quad-tree
-    for (QuadRectangle quadRect : partitionMBRsList) {
+    for (QuadRectangle quadRect : partitionMBRs) {
       Envelope partitionMBR = quadRect.getEnvelope();
 
-      // 1- Calculate the centroid of each MBR in the STR tree
+      // Calculate the centroid of each MBR in the STR tree
       double centroidX = (partitionMBR.getMinX() + partitionMBR.getMaxX()) / 2.0;
       double centroidY = (partitionMBR.getMinY() + partitionMBR.getMaxY()) / 2.0;
       Coordinate centroidCoord = new Coordinate(centroidX, centroidY);
       Point centroid = geometryFactory.createPoint(centroidCoord);
 
-      // 2- Compute the maximum distance ui from the centroid to any point inside the partition
-      double ui =
-          Math.max(
-              centroid.distance(
-                  geometryFactory.createPoint(
-                      new Coordinate(partitionMBR.getMinX(), partitionMBR.getMinY()))),
-              Math.max(
-                  centroid.distance(
-                      geometryFactory.createPoint(
-                          new Coordinate(partitionMBR.getMinX(), partitionMBR.getMaxY()))),
-                  Math.max(
-                      centroid.distance(
-                          geometryFactory.createPoint(
-                              new Coordinate(partitionMBR.getMaxX(), partitionMBR.getMinY()))),
-                      centroid.distance(
-                          geometryFactory.createPoint(
-                              new Coordinate(partitionMBR.getMaxX(), partitionMBR.getMaxY()))))));
+      // Compute the maximum distance ui from the centroid to any point inside the partition
+      double ui = getUi(centroid, partitionMBR);
 
-      // 3 - Find the k-nearest neighbors in the samples of the centroid in the STR tree
-      Object[] kNearestNeighbors =
-          sampleTree.nearestNeighbour(
-              centroid.getEnvelopeInternal(), centroid, new EuclideanItemDistance(), k);
+      // Calculate the maximum distance from the centroid to the k-nearest neighbors in the samples
+      double maxDistance = getMaxDistanceFromSamples(k, sampleTree, centroid);
+      List<Envelope> intersectingMBRs =
+          getMBRIntersectEnvelopes(ui, maxDistance, centroidX, centroidY);
 
-      // 4 - Calculate the distance to the farthest neighbor
-      double maxDistance = 0;
-      for (Object neighbor : kNearestNeighbors) {
-        if (neighbor instanceof Envelope) {
-          Envelope neighborEnvelope = (Envelope) neighbor;
-          Coordinate neighborCoord =
-              new Coordinate(neighborEnvelope.centre().getX(), neighborEnvelope.centre().getY());
-          Point neighborPoint = geometryFactory.createPoint(neighborCoord);
-          double distance = centroid.distance(neighborPoint);
-          if (distance > maxDistance) {
-            maxDistance = distance;
-          }
-        }
+      // Calculate the MBRs (Minimum Bounding Rectangles) that intersect with the circle.
+      // If the number of intersecting MBRs is too large, we optimize by considering all vertices of
+      // the MBRs to construct the circle.
+      if (isSkewed(intersectingMBRs, partitionMBRs)) {
+        int divide = (int) Math.ceil(quadRect.width / minimalGridWidth);
+        intersectingMBRs = getEnvelopesForSubDividedGrids(k, partitionMBR, sampleTree, divide);
       }
-
-      // 5 - Construct the circle with radius ui and center centroid
-      // Calculate the radius of the circle
-      double gamma_i = 2 * ui + maxDistance;
-      // Since we're working with rectangles, this would be an envelope that fully contains the
-      // circle
-      Envelope circleEnvelope =
-          new Envelope(
-              centroidX - gamma_i, centroidX + gamma_i,
-              centroidY - gamma_i, centroidY + gamma_i);
-
-      // 6 - Compute all the MBRs that intersect with the circle and add them to a hash map
-      List<Envelope> intersectingMBRs = strTree.query(circleEnvelope);
       mbrs.put(quadRect.partitionId, intersectingMBRs);
     }
 
-    // 7 - Construct a spatial index for the MBRs
+    // Construct a spatial index for the MBRs
     this.mbrSpatialIndex = new STRtree();
     for (Integer id : mbrs.keySet()) {
       for (Envelope envelope : mbrs.get(id)) {
@@ -171,7 +144,191 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       }
     }
 
-    // 6 - Return the STR tree
+    // Return the STR tree
     return strTree;
+  }
+
+  /**
+   * This function is used to calculate the minimal envelope width of the partitioned MBRs.
+   *
+   * @param partitionMBRs
+   * @return
+   */
+  public double getMinimalEnvelopeWidth(List<QuadRectangle> partitionMBRs) {
+    double minEnvelopeWidth = Double.MAX_VALUE;
+
+    for (QuadRectangle quadRect : partitionMBRs) {
+      Envelope partitionMBR = quadRect.getEnvelope();
+
+      // Calculate the width and height of the envelope
+      double width = partitionMBR.getMaxX() - partitionMBR.getMinX();
+
+      // Update the minimal envelope length if the current one is smaller
+      if (width < minEnvelopeWidth) {
+        minEnvelopeWidth = width;
+      }
+    }
+
+    return minEnvelopeWidth;
+  }
+
+  /**
+   * This function is used to check if the partitioned MBRs are from a skewed partitioning strategy.
+   * It simply checks preset ratios and minimum MBR count, but it can be extended to include more
+   * sophisticated skewness detection algorithms.
+   *
+   * @param intersectingMBRs
+   * @param partitionMBRs
+   * @return
+   */
+  private boolean isSkewed(List<Envelope> intersectingMBRs, List<QuadRectangle> partitionMBRs) {
+    try {
+      if (sedonaConf == null) {
+        sedonaConf = SedonaConf.fromActiveSession();
+        skewnessCutoffRatio = sedonaConf.getSkewnessCutoffRatioInKNNJoins();
+        skewnessMinimumMBRCount = sedonaConf.getSkewnessMinimumMBRCountInKNNJoins();
+      }
+      return intersectingMBRs.size() > partitionMBRs.size() * skewnessCutoffRatio
+          && partitionMBRs.size() > skewnessMinimumMBRCount;
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  /**
+   * This function is used to calculate the maximum distance from the centroid to the k-nearest
+   * neighbors in the samples. It is used to expand the partitioned boundaries.
+   *
+   * @param centroid
+   * @param partitionMBR
+   * @return
+   */
+  private static double getUi(Point centroid, Envelope partitionMBR) {
+    double ui =
+        Math.max(
+            centroid.distance(
+                geometryFactory.createPoint(
+                    new Coordinate(partitionMBR.getMinX(), partitionMBR.getMinY()))),
+            Math.max(
+                centroid.distance(
+                    geometryFactory.createPoint(
+                        new Coordinate(partitionMBR.getMinX(), partitionMBR.getMaxY()))),
+                Math.max(
+                    centroid.distance(
+                        geometryFactory.createPoint(
+                            new Coordinate(partitionMBR.getMaxX(), partitionMBR.getMinY()))),
+                    centroid.distance(
+                        geometryFactory.createPoint(
+                            new Coordinate(partitionMBR.getMaxX(), partitionMBR.getMaxY()))))));
+    return ui;
+  }
+
+  /**
+   * This function is used to get the MBRs that intersect with the circle constructed around the
+   * centroid. It is used to expand the partitioned boundaries. If the number of intersecting MBRs
+   * is too large, we optimize by considering all vertices of the MBRs to construct the circle.
+   *
+   * @param k
+   * @param partitionMBR
+   * @param sampleTree
+   * @param divide
+   * @return
+   */
+  private List<Envelope> getEnvelopesForSubDividedGrids(
+      int k, Envelope partitionMBR, STRtree sampleTree, int divide) {
+    Set<Envelope> optimizedIntersectingMBRs = new HashSet<>();
+    double minX = partitionMBR.getMinX();
+    double minY = partitionMBR.getMinY();
+    double maxX = partitionMBR.getMaxX();
+    double maxY = partitionMBR.getMaxY();
+    double xStep = (maxX - minX) / divide;
+    double yStep = (maxY - minY) / divide;
+
+    // Process each grid point
+    for (int i = 0; i <= divide; i++) {
+      for (int j = 0; j <= divide; j++) {
+        double x = minX + i * xStep;
+        double y = minY + j * yStep;
+        Point point = geometryFactory.createPoint(new Coordinate(x, y));
+        double maxKNNDistance = getMaxDistanceFromSamples(k, sampleTree, point);
+        optimizedIntersectingMBRs.addAll(
+            getMBRIntersectEnvelopes(0.0, maxKNNDistance, point.getX(), point.getY()));
+      }
+    }
+
+    return new ArrayList<>(optimizedIntersectingMBRs);
+  }
+
+  /**
+   * This function is used to calculate the maximum distance from the centroid to the k-nearest
+   * neighbors in the samples. It is used to expand the partitioned boundaries.
+   *
+   * @param k
+   * @param sampleTree
+   * @param centroid
+   * @return
+   */
+  private static double getMaxDistanceFromSamples(int k, STRtree sampleTree, Point centroid) {
+    // 3 - Find the k-nearest neighbors in the samples of the centroid in the STR tree
+    Object[] kNearestNeighbors =
+        sampleTree.nearestNeighbour(
+            centroid.getEnvelopeInternal(), centroid, new EuclideanItemDistance(), k);
+
+    // 4 - Calculate the distance to the farthest neighbor
+    double maxDistance = 0;
+    for (Object neighbor : kNearestNeighbors) {
+      if (neighbor instanceof Geometry) {
+        Envelope neighborEnvelope = ((Geometry) neighbor).getEnvelopeInternal();
+        Coordinate neighborCoord =
+            new Coordinate(neighborEnvelope.centre().getX(), neighborEnvelope.centre().getY());
+        Point neighborPoint = geometryFactory.createPoint(neighborCoord);
+        double distance = centroid.distance(neighborPoint);
+        if (distance > maxDistance) {
+          maxDistance = distance;
+        }
+      }
+    }
+    return maxDistance;
+  }
+
+  /**
+   * This function is used to get the MBRs that intersect with the circle constructed around the
+   * centroid. It is used to expand the partitioned boundaries. If the number of intersecting MBRs
+   * is too large, we optimize by considering all vertices of the MBRs to construct the circle. This
+   * approach eliminates the need to add an additional margin (ui) to the maxDistance.
+   *
+   * @param ui
+   * @param maxDistance
+   * @param centroidX
+   * @param centroidY
+   * @return
+   */
+  private List<Envelope> getMBRIntersectEnvelopes(
+      double ui, double maxDistance, double centroidX, double centroidY) {
+    // 5 - Construct the circle with radius ui and center centroid
+    // Calculate the radius of the circle
+    double gamma_i = 2 * ui + maxDistance;
+    // Since we're working with rectangles, this would be an envelope that fully contains the
+    // circle
+    Envelope circleEnvelope =
+        new Envelope(
+            centroidX - gamma_i, centroidX + gamma_i,
+            centroidY - gamma_i, centroidY + gamma_i);
+
+    Coordinate center = new Coordinate(centroidX, centroidY);
+    Geometry circle = geometryFactory.createPoint(center).buffer(gamma_i);
+
+    // 6 - Compute all the MBRs that intersect with the circle and add them to a hash map
+    List<Envelope> candidateEnvelopes = strTree.query(circleEnvelope);
+
+    // Filter the candidate envelopes to find those that intersect with the circle
+    List<Envelope> intersectingMBRs = new ArrayList<>();
+    for (Envelope candidateEnvelope : candidateEnvelopes) {
+      Geometry envelopeGeometry = geometryFactory.toGeometry(candidateEnvelope);
+      if (circle.intersects(envelopeGeometry)) {
+        intersectingMBRs.add(candidateEnvelope);
+      }
+    }
+    return intersectingMBRs;
   }
 }
