@@ -21,6 +21,7 @@ package org.apache.sedona.sql
 import org.apache.spark.sql.Row
 import org.locationtech.jts.geom.{Coordinate, Geometry, GeometryFactory}
 import org.apache.spark.sql.DataFrame
+
 import scala.util.Random
 
 class aggregateFunctionTestScala extends TestBaseScala {

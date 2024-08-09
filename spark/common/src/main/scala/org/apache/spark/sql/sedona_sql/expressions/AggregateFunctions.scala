@@ -59,8 +59,10 @@ trait TraitSTAggregateExec {
 }
 
 class ST_Union_Aggr(bufferSize: Int = 1000)
-    extends Aggregator[Geometry, ListBuffer[Geometry], Geometry]
-    with Serializable {
+    extends Aggregator[Geometry, ListBuffer[Geometry], Geometry] {
+
+  val serde = ExpressionEncoder[Geometry]()
+  val bufferSerde = ExpressionEncoder[ListBuffer[Geometry]]()
 
   override def reduce(buffer: ListBuffer[Geometry], input: Geometry): ListBuffer[Geometry] = {
     buffer += input
@@ -90,10 +92,9 @@ class ST_Union_Aggr(bufferSize: Int = 1000)
     OverlayNGRobust.union(reduction.asJava)
   }
 
-  def bufferEncoder: ExpressionEncoder[ListBuffer[Geometry]] =
-    ExpressionEncoder[ListBuffer[Geometry]]()
+  def bufferEncoder: ExpressionEncoder[ListBuffer[Geometry]] = bufferSerde
 
-  def outputEncoder: ExpressionEncoder[Geometry] = ExpressionEncoder[Geometry]()
+  def outputEncoder: ExpressionEncoder[Geometry] = serde
 
   override def zero: ListBuffer[Geometry] = ListBuffer.empty
 }
