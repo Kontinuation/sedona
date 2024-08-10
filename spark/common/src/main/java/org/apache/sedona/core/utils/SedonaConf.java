@@ -263,7 +263,7 @@ public class SedonaConf implements Serializable {
             runtimeConfig.get("spark.sedona.join.knn.includeTieBreakers", "false"));
 
     this.skewnessCutoffRatioInKNNJoins =
-        Double.parseDouble(runtimeConfig.get("spark.sedona.join.knn.skewnessCutoffRatio", "0.1"));
+        Double.parseDouble(runtimeConfig.get("spark.sedona.join.knn.skewnessCutoffRatio", "1.0"));
 
     this.skewnessMinimumMBRCountInKNNJoins =
         Integer.parseInt(runtimeConfig.get("spark.sedona.join.knn.skewnessMinimumMBRCount", "100"));

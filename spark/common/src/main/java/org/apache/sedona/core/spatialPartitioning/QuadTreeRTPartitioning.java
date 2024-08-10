@@ -22,6 +22,7 @@ import static org.apache.sedona.core.formatMapper.shapefileParser.ShapefileRDD.g
 
 import java.util.*;
 import java.util.stream.Collectors;
+import org.apache.log4j.Logger;
 import org.apache.sedona.core.knnJudgement.EuclideanItemDistance;
 import org.apache.sedona.core.spatialPartitioning.quadtree.QuadRectangle;
 import org.apache.sedona.core.utils.SedonaConf;
@@ -39,6 +40,7 @@ import org.locationtech.jts.index.strtree.STRtree;
  * <p>It generates List<List<Integer>> expandedParitionedBoundaries based on the quad tree.
  */
 public class QuadTreeRTPartitioning extends QuadtreePartitioning {
+  static final Logger log = Logger.getLogger(QuadTreeRTPartitioning.class);
 
   private SedonaConf sedonaConf;
 
@@ -130,6 +132,13 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       // If the number of intersecting MBRs is too large, we optimize by considering all vertices of
       // the MBRs to construct the circle.
       if (isSkewed(intersectingMBRs, partitionMBRs)) {
+        log.warn(
+            "Found skewed partition: "
+                + quadRect.partitionId
+                + " with width: "
+                + quadRect.width
+                + " and minimalGridWidth: "
+                + minimalGridWidth);
         int divide = (int) Math.ceil(quadRect.width / minimalGridWidth);
         intersectingMBRs = getEnvelopesForSubDividedGrids(k, partitionMBR, sampleTree, divide);
       }
@@ -244,16 +253,38 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
     double xStep = (maxX - minX) / divide;
     double yStep = (maxY - minY) / divide;
 
-    // Process each grid point
+    // Process points on the edges of the grid
     for (int i = 0; i <= divide; i++) {
-      for (int j = 0; j <= divide; j++) {
-        double x = minX + i * xStep;
-        double y = minY + j * yStep;
-        Point point = geometryFactory.createPoint(new Coordinate(x, y));
-        double maxKNNDistance = getMaxDistanceFromSamples(k, sampleTree, point);
-        optimizedIntersectingMBRs.addAll(
-            getMBRIntersectEnvelopes(0.0, maxKNNDistance, point.getX(), point.getY()));
-      }
+      double x = minX + i * xStep;
+
+      // Top edge (minY)
+      Point pointTop = geometryFactory.createPoint(new Coordinate(x, minY));
+      double maxKNNDistanceTop = getMaxDistanceFromSamples(k, sampleTree, pointTop);
+      optimizedIntersectingMBRs.addAll(
+          getMBRIntersectEnvelopes(0.0, maxKNNDistanceTop, pointTop.getX(), pointTop.getY()));
+
+      // Bottom edge (maxY)
+      Point pointBottom = geometryFactory.createPoint(new Coordinate(x, maxY));
+      double maxKNNDistanceBottom = getMaxDistanceFromSamples(k, sampleTree, pointBottom);
+      optimizedIntersectingMBRs.addAll(
+          getMBRIntersectEnvelopes(
+              0.0, maxKNNDistanceBottom, pointBottom.getX(), pointBottom.getY()));
+    }
+
+    for (int j = 1; j < divide; j++) {
+      double y = minY + j * yStep;
+
+      // Left edge (minX)
+      Point pointLeft = geometryFactory.createPoint(new Coordinate(minX, y));
+      double maxKNNDistanceLeft = getMaxDistanceFromSamples(k, sampleTree, pointLeft);
+      optimizedIntersectingMBRs.addAll(
+          getMBRIntersectEnvelopes(0.0, maxKNNDistanceLeft, pointLeft.getX(), pointLeft.getY()));
+
+      // Right edge (maxX)
+      Point pointRight = geometryFactory.createPoint(new Coordinate(maxX, y));
+      double maxKNNDistanceRight = getMaxDistanceFromSamples(k, sampleTree, pointRight);
+      optimizedIntersectingMBRs.addAll(
+          getMBRIntersectEnvelopes(0.0, maxKNNDistanceRight, pointRight.getX(), pointRight.getY()));
     }
 
     return new ArrayList<>(optimizedIntersectingMBRs);
