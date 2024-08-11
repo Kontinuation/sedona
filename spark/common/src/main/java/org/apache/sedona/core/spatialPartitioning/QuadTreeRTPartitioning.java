@@ -44,8 +44,9 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
 
   private SedonaConf sedonaConf;
 
-  private double skewnessCutoffRatio = 0.1;
+  private double skewnessCutoffRatio = 1.0;
   private double skewnessMinimumMBRCount = 100;
+  private int skewnessMaximumMBRDivides = 100;
 
   // A query-only R-tree created using the Sort-Tile-Recursive (STR) algorithm.
   private STRtree strTree;
@@ -132,14 +133,21 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       // If the number of intersecting MBRs is too large, we optimize by considering all vertices of
       // the MBRs to construct the circle.
       if (isSkewed(intersectingMBRs, partitionMBRs)) {
-        log.warn(
-            "Found skewed partition: "
-                + quadRect.partitionId
-                + " with width: "
-                + quadRect.width
-                + " and minimalGridWidth: "
-                + minimalGridWidth);
         int divide = (int) Math.ceil(quadRect.width / minimalGridWidth);
+        if (skewnessMaximumMBRDivides > 0 && divide > skewnessMaximumMBRDivides) {
+          log.debug(
+              "Found skewed partition, and the number of divides is too large: "
+                  + divide
+                  + " for partition: "
+                  + quadRect.partitionId
+                  + " with width: "
+                  + quadRect.width
+                  + " and minimalGridWidth: "
+                  + minimalGridWidth
+                  + ". Using the maximum number of divides: "
+                  + skewnessMaximumMBRDivides);
+          divide = skewnessMaximumMBRDivides;
+        }
         intersectingMBRs = getEnvelopesForSubDividedGrids(k, partitionMBR, sampleTree, divide);
       }
       mbrs.put(quadRect.partitionId, intersectingMBRs);
@@ -196,6 +204,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
         sedonaConf = SedonaConf.fromActiveSession();
         skewnessCutoffRatio = sedonaConf.getSkewnessCutoffRatioInKNNJoins();
         skewnessMinimumMBRCount = sedonaConf.getSkewnessMinimumMBRCountInKNNJoins();
+        skewnessMaximumMBRDivides = sedonaConf.getSkewnessMaximumMBRDividesInKNNJoins();
       }
       return intersectingMBRs.size() > partitionMBRs.size() * skewnessCutoffRatio
           && partitionMBRs.size() > skewnessMinimumMBRCount;
