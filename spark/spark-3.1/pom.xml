@@ -25,10 +25,10 @@
         <version>1.3.3</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
-	<artifactId>sedona-spark-3.0_${scala.compat.version}</artifactId>
+	<artifactId>sedona-spark-3.1_${scala.compat.version}</artifactId>
 
 	<name>${project.groupId}:${project.artifactId}</name>
-	<description>A cluster computing system for processing large-scale spatial data: SQL API for Spark 3.0.</description>
+	<description>A cluster computing system for processing large-scale spatial data: SQL API for Spark 3.1.</description>
     <url>http://sedona.apache.org/</url>
 	<packaging>jar</packaging>
 
