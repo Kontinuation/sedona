@@ -27,15 +27,21 @@ import java.awt.image.RenderedImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.Constructors;
+import org.apache.sedona.common.raster.outdb.HadoopConfigSerializer;
 import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
+import org.apache.sedona.common.raster.serde.Serde;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
@@ -88,6 +94,66 @@ public class RasterConstructorsTest extends RasterTestBase {
     assertEquals(
         10d, gridCoverage2D.getRenderedImage().getData().getPixel(5, 5, (double[]) null)[0], 0.1);
     assertEquals(4, gridCoverage2D.getNumSampleDimensions());
+  }
+
+  @Test
+  public void fromGeoTiffWithRescaling() throws IOException {
+    byte[] content =
+        Files.readAllBytes(Paths.get(resourceFolder + "raster_geotiff_rescale/test.tif"));
+    GridCoverage2D gridCoverage2D = RasterConstructors.fromGeoTiff(content);
+    int dataType = gridCoverage2D.getRenderedImage().getSampleModel().getDataType();
+    assertEquals(DataBuffer.TYPE_DOUBLE, dataType);
+    gridCoverage2D.dispose(true);
+
+    gridCoverage2D = RasterConstructors.fromGeoTiff(content, true);
+    dataType = gridCoverage2D.getRenderedImage().getSampleModel().getDataType();
+    assertEquals(DataBuffer.TYPE_DOUBLE, dataType);
+    gridCoverage2D.dispose(true);
+
+    gridCoverage2D = RasterConstructors.fromGeoTiff(content, false);
+    dataType = gridCoverage2D.getRenderedImage().getSampleModel().getDataType();
+    assertEquals(DataBuffer.TYPE_USHORT, dataType);
+    gridCoverage2D.dispose(true);
+  }
+
+  @Test
+  public void fromPath() throws IOException, ClassNotFoundException {
+    Configuration conf = new Configuration();
+    byte[] serializedConf = HadoopConfigSerializer.serialize(conf);
+    String path = resourceFolder + "raster_geotiff_rescale/test.tif";
+
+    boolean[] eagerLoadMetadataOptions = new boolean[] {true, false};
+    for (boolean eagerLoadMetadata : eagerLoadMetadataOptions) {
+      GridCoverage2D raster =
+          RasterConstructors.fromPath(path, serializedConf, null, eagerLoadMetadata);
+      int dataType = raster.getRenderedImage().getSampleModel().getDataType();
+      assertEquals(DataBuffer.TYPE_DOUBLE, dataType);
+      raster.dispose(true);
+
+      Map<String, String> params = new HashMap<>();
+      params.put("raster.reader.auto-rescale", "false");
+      raster = RasterConstructors.fromPath(path, serializedConf, params, eagerLoadMetadata);
+      dataType = raster.getRenderedImage().getSampleModel().getDataType();
+      assertEquals(DataBuffer.TYPE_USHORT, dataType);
+
+      // The params should be kept after serialization and deserialization
+      byte[] serialized = Serde.serialize(raster, false);
+      GridCoverage2D deserialized = Serde.deserialize(serialized, serializedConf);
+      dataType = deserialized.getRenderedImage().getSampleModel().getDataType();
+      assertEquals(DataBuffer.TYPE_USHORT, dataType);
+
+      // Reading the same raster file with different param should not reuse the previous raster
+      params = new HashMap<>();
+      params.put("raster.reader.auto-rescale", "true");
+      GridCoverage2D raster2 =
+          RasterConstructors.fromPath(path, serializedConf, params, eagerLoadMetadata);
+      dataType = raster2.getRenderedImage().getSampleModel().getDataType();
+      assertEquals(DataBuffer.TYPE_DOUBLE, dataType);
+
+      deserialized.dispose(true);
+      raster.dispose(true);
+      raster2.dispose(true);
+    }
   }
 
   @Test

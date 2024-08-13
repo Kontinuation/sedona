@@ -59,6 +59,8 @@ import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.geotools.util.factory.Hints;
 import org.opengis.coverage.CannotEvaluateException;
 import org.opengis.geometry.DirectPosition;
+import org.opengis.parameter.GeneralParameterValue;
+import org.opengis.parameter.ParameterValue;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 
@@ -72,6 +74,13 @@ import org.opengis.referencing.operation.MathTransform;
  * grid coverage is no longer needed, and don't pass the grid coverage to other threads.
  */
 public class OutDbGridCoverage2D extends GridCoverage2D {
+
+  /**
+   * Automatically rescale pixel values to the range of the data type. This is useful when the
+   * GeoTiff has scale and offset values in the metadata. Default is true.
+   */
+  public static final String READER_AUTO_RESCALE_CONF_KEY = "raster.reader.auto-rescale";
+
   private final OutDbResourcePool.ResourceKey resourceKey;
   private OutDbResourcePool.OutDbResource pooledResource;
   private final int[] bandIndices;
@@ -481,10 +490,10 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
     OutDbResourcePool.OutDbResource resource = pool.acquire(key);
     if (resource == null) {
       AbstractGridFormat format = getFileFormat(key.path);
-      ImageInputStream stream =
-          HadoopImageInputStreamFactory.create(key.path, key.getConfWithParams());
+      Configuration conf = key.getConfWithParams();
+      ImageInputStream stream = HadoopImageInputStreamFactory.create(key.path, conf);
       try {
-        GridCoverage2D sourceGrid = readGridCoverage(format, stream);
+        GridCoverage2D sourceGrid = readGridCoverage(format, stream, conf);
         resource = new OutDbResourcePool.OutDbResource(key, sourceGrid, stream);
         pool.add(resource);
       } catch (Exception e) {
@@ -567,10 +576,14 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
     return format;
   }
 
-  private static GridCoverage2D readGridCoverage(AbstractGridFormat format, ImageInputStream stream)
-      throws IOException {
+  private static GridCoverage2D readGridCoverage(
+      AbstractGridFormat format, ImageInputStream stream, Configuration conf) throws IOException {
     Hints hints = new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE);
-    return format.getReader(stream, hints).read(null);
+    boolean rescale = conf.getBoolean(READER_AUTO_RESCALE_CONF_KEY, true);
+    ParameterValue<Boolean> rescalePixels = AbstractGridFormat.RESCALE_PIXELS.createValue();
+    rescalePixels.setValue(rescale);
+    GeneralParameterValue[] parameters = {rescalePixels};
+    return format.getReader(stream, hints).read(parameters);
   }
 
   /**

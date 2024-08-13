@@ -34,7 +34,10 @@ df = df.withColumn("raster", f.expr("RS_FromArcInfoAsciiGrid(content)"))
 
 Introduction: Returns a raster geometry from a GeoTiff file.
 
-Format: `RS_FromGeoTiff(asc: ARRAY[Byte])`
+Format: `RS_FromGeoTiff(content: ARRAY[Byte], autoRescale: Boolean = true)`
+
+- `content` is a byte array that contains the content of the GeoTiff file.
+- `autoRescale` (since `v1.7.0`) is an optional parameter that specifies whether to rescale the pixel values using the scale and offset values in the GeoTiff file. The default value is `true`.
 
 Since: `v1.4.0`
 
@@ -53,7 +56,8 @@ Out-db rasters can be used interchangeably with ordinary rasters. The only diffe
 Pixel data won't be loaded until pixel values were accessed by functions such as `RS_Value` or `RS_BandAsArray`. It is more appropriate to load large raster files as out-db rasters.
 
 Introduction: Returns an out-db raster from path to image file. Currently, it supports loading GeoTiff files (`*.tiff` or `*.tif`) and Arc Info Ascii Grid files (`*.asc`).
-Additional parameters for configuring the Hadoop file system can be passed in as a `;` delimited string.
+Additional parameters for configuring the Hadoop file system can be passed in as a `;` delimited string. For example, `fs.s3a.access.key=xxx;fs.s3a.secret.key=xxx`. To load
+GeoTiff files without automatic rescaling, please add `raster.reader.auto-rescale=false` to the parameters.
 
 `RS_FromPath` will load the metadata of the raster file immediately when `eagerLoadMetadata` is set to `true`, and report any errors encountered
 reading the raster file, otherwise it will only keep the path to raster file without loading it, until the metadata of the raster is actually needed.
@@ -91,8 +95,8 @@ Format:
 RS_MakeEmptyRaster(numBands: Integer, bandDataType: String = 'D', width: Integer, height: Integer, upperleftX: Double, upperleftY: Double, cellSize: Double)
 ```
 
-* NumBands: The number of bands in the raster. If not specified, the raster will have a single band.
-* BandDataType: Optional parameter specifying the data types of all the bands in the created raster.
+- NumBands: The number of bands in the raster. If not specified, the raster will have a single band.
+- BandDataType: Optional parameter specifying the data types of all the bands in the created raster.
 Accepts one of:
     1. "D" - 64 bits Double
     2. "F" - 32 bits Float
@@ -100,11 +104,11 @@ Accepts one of:
     4. "S" - 16 bits signed Short
     5. "US" - 16 bits unsigned Short
     6. "B" - 8 bits unsigned Byte
-* Width: The width of the raster in pixels.
-* Height: The height of the raster in pixels.
-* UpperleftX: The X coordinate of the upper left corner of the raster, in terms of the CRS units.
-* UpperleftY: The Y coordinate of the upper left corner of the raster, in terms of the CRS units.
-* Cell Size (pixel size): The size of the cells in the raster, in terms of the CRS units.
+- Width: The width of the raster in pixels.
+- Height: The height of the raster in pixels.
+- UpperleftX: The X coordinate of the upper left corner of the raster, in terms of the CRS units.
+- UpperleftY: The Y coordinate of the upper left corner of the raster, in terms of the CRS units.
+- Cell Size (pixel size): The size of the cells in the raster, in terms of the CRS units.
 
 It uses the default Cartesian coordinate system.
 
@@ -114,8 +118,8 @@ Format:
 RS_MakeEmptyRaster(numBands: Integer, bandDataType: String = 'D', width: Integer, height: Integer, upperleftX: Double, upperleftY: Double, scaleX: Double, scaleY: Double, skewX: Double, skewY: Double, srid: Integer)
 ```
 
-* NumBands: The number of bands in the raster. If not specified, the raster will have a single band.
-* BandDataType: Optional parameter specifying the data types of all the bands in the created raster.
+- NumBands: The number of bands in the raster. If not specified, the raster will have a single band.
+- BandDataType: Optional parameter specifying the data types of all the bands in the created raster.
 Accepts one of:
     1. "D" - 64 bits Double
     2. "F" - 32 bits Float
@@ -123,15 +127,15 @@ Accepts one of:
     4. "S" - 16 bits signed Short
     5. "US" - 16 bits unsigned Short
     6. "B" - 8 bits Byte
-* Width: The width of the raster in pixels.
-* Height: The height of the raster in pixels.
-* UpperleftX: The X coordinate of the upper left corner of the raster, in terms of the CRS units.
-* UpperleftY: The Y coordinate of the upper left corner of the raster, in terms of the CRS units.
-* ScaleX: The scaling factor of the cells on the X axis
-* ScaleY: The scaling factor of the cells on the Y axis
-* SkewX: The skew of the raster on the X axis, effectively tilting them in the horizontal direction
-* SkewY: The skew of the raster on the Y axis, effectively tilting them in the vertical direction
-* SRID: The SRID of the raster. Use 0 if you want to use the default Cartesian coordinate system. Use 4326 if you want to use WGS84.
+- Width: The width of the raster in pixels.
+- Height: The height of the raster in pixels.
+- UpperleftX: The X coordinate of the upper left corner of the raster, in terms of the CRS units.
+- UpperleftY: The Y coordinate of the upper left corner of the raster, in terms of the CRS units.
+- ScaleX: The scaling factor of the cells on the X axis
+- ScaleY: The scaling factor of the cells on the Y axis
+- SkewX: The skew of the raster on the X axis, effectively tilting them in the horizontal direction
+- SkewY: The skew of the raster on the Y axis, effectively tilting them in the vertical direction
+- SRID: The SRID of the raster. Use 0 if you want to use the default Cartesian coordinate system. Use 4326 if you want to use WGS84.
 
 For more information about ScaleX, ScaleY, SkewX, SkewY, please refer to the [Affine Transformations](Raster-affine-transformation.md) section.
 
@@ -212,9 +216,9 @@ Since: `v1.6.0`
 
 Format: `RS_MakeRaster(refRaster: Raster, bandDataType: String, data: ARRAY[Double])`
 
-* refRaster: The reference raster from which the width, height, geo-reference information, and the CRS will be taken.
-* bandDataType: The data type of the bands in the resulting raster. Please refer to the `RS_MakeEmptyRaster` function for the accepted values.
-* data: The array of pixel values. The size of the array cannot be 0, and should be multiple of width * height of the reference raster.
+- refRaster: The reference raster from which the width, height, geo-reference information, and the CRS will be taken.
+- bandDataType: The data type of the bands in the resulting raster. Please refer to the `RS_MakeEmptyRaster` function for the accepted values.
+- data: The array of pixel values. The size of the array cannot be 0, and should be multiple of width * height of the reference raster.
 
 SQL example:
 

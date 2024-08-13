@@ -41,6 +41,7 @@ import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
+import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.feature.DefaultFeatureCollection;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
@@ -58,6 +59,8 @@ import org.locationtech.jts.geom.Geometry;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.metadata.spatial.PixelOrientation;
+import org.opengis.parameter.GeneralParameterValue;
+import org.opengis.parameter.ParameterValue;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.datum.PixelInCell;
@@ -75,11 +78,18 @@ public class RasterConstructors {
   }
 
   public static GridCoverage2D fromGeoTiff(byte[] bytes) throws IOException {
+    return fromGeoTiff(bytes, true);
+  }
+
+  public static GridCoverage2D fromGeoTiff(byte[] bytes, boolean autoRescale) throws IOException {
     GeoTiffReader geoTiffReader =
         new GeoTiffReader(
             new ByteArrayImageInputStream(bytes),
             new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE));
-    return geoTiffReader.read(null);
+    ParameterValue<Boolean> rescalePixels = AbstractGridFormat.RESCALE_PIXELS.createValue();
+    rescalePixels.setValue(autoRescale);
+    GeneralParameterValue[] parameters = {rescalePixels};
+    return geoTiffReader.read(parameters);
   }
 
   public static GridCoverage2D fromPath(

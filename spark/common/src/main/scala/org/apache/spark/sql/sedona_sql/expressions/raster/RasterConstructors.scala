@@ -58,7 +58,9 @@ case class RS_AsRaster(inputExpressions: Seq[Expression])
 }
 
 case class RS_FromGeoTiff(inputExpressions: Seq[Expression])
-    extends InferredExpression(RasterConstructors.fromGeoTiff _) {
+    extends InferredExpression(
+      inferrableFunction1(RasterConstructors.fromGeoTiff),
+      inferrableFunction2(RasterConstructors.fromGeoTiff)) {
 
   override def foldable: Boolean = false
 

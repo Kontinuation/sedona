@@ -19,8 +19,6 @@
 package org.apache.spark.sql.sedona_sql.utils
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory
-import org.apache.sedona.common.raster.outdb.ThreadLocalOutDbResourcePool
 import org.apache.spark.SparkConf
 
 /**
@@ -41,17 +39,10 @@ object SparkHadoopUtil {
     val hadoopConf = org.apache.spark.deploy.SparkHadoopUtil.get.newConfiguration(sparkConf)
 
     // Add wherobots specific configurations to the Hadoop configuration
-    wherobotsConfigKeys.foreach { key =>
-      sparkConf.getOption("spark." + key).foreach(hadoopConf.set(key, _))
+    sparkConf.getAllWithPrefix("spark.wherobots.").foreach { case (key, value) =>
+      hadoopConf.set(key.stripPrefix("spark."), value)
     }
 
     hadoopConf
   }
-
-  private val wherobotsConfigKeys = Seq(
-    ThreadLocalOutDbResourcePool.FREE_RESOURCES_POOL_SIZE_CONF_KEY,
-    HadoopImageInputStreamFactory.READ_AHEAD_SIZE_CONF_KEY,
-    HadoopImageInputStreamFactory.ENABLE_CACHE_CONF_KEY,
-    HadoopImageInputStreamFactory.CACHE_DIR_CONF_KEY,
-    HadoopImageInputStreamFactory.DONT_CACHE_LOCAL_FILE_CONF_KEY)
 }

@@ -371,6 +371,30 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       assert(result.isInstanceOf[GridCoverage2D])
     }
 
+    it("Passed RS_FromGeoTiff with auto rescaling parameter") {
+      val dfBinary = sparkSession.read
+        .format("binaryFile")
+        .load(resourceFolder + "raster_geotiff_rescale/test.tif")
+      val dfRasters = dfBinary
+        .withColumn("rast1", expr("RS_FromGeoTiff(content)"))
+        .withColumn("rast2", expr("RS_FromGeoTiff(content, false)"))
+        .withColumn("rast1_datatype", expr("RS_BandPixelType(rast1)"))
+        .withColumn("rast2_datatype", expr("RS_BandPixelType(rast2)"))
+        .drop("content")
+      dfRasters.collect().foreach { row =>
+        val raster1 = row.getAs[GridCoverage2D]("rast1")
+        val raster2 = row.getAs[GridCoverage2D]("rast2")
+        assert(raster1.getRenderedImage.getSampleModel.getDataType == DataBuffer.TYPE_DOUBLE)
+        assert(raster2.getRenderedImage.getSampleModel.getDataType == DataBuffer.TYPE_USHORT)
+        val dataType1 = row.getAs[String]("rast1_datatype")
+        val dataType2 = row.getAs[String]("rast2_datatype")
+        assert(dataType1 == "REAL_64BITS")
+        assert(dataType2 == "UNSIGNED_16BITS")
+        raster1.dispose(true)
+        raster2.dispose(true)
+      }
+    }
+
     it("Passed RS_FromArcInfoAsciiGrid should handle null values") {
       val result = sparkSession.sql("select RS_FromArcInfoAsciiGrid(null)").first().get(0)
       assert(result == null)
@@ -473,6 +497,27 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
         val gridCoverage2D = row.getAs[GridCoverage2D]("rast_eager")
         assert(gridCoverage2D.isInstanceOf[OutDbGridCoverage2D])
         assert(!gridCoverage2D.isInstanceOf[LazyLoadOutDbGridCoverage2D])
+      }
+    }
+
+    it("Passed RS_FromPath with raster.reader.auto-rescale") {
+      val dfRasters = Seq(resourceFolder + "raster_geotiff_rescale/test.tif")
+        .toDF("path")
+        .withColumn("rast1", expr("RS_FromPath(path)"))
+        .withColumn("rast2", expr("RS_FromPath(path, 'raster.reader.auto-rescale=false')"))
+        .withColumn("rast1_datatype", expr("RS_BandPixelType(rast1)"))
+        .withColumn("rast2_datatype", expr("RS_BandPixelType(rast2)"))
+      dfRasters.collect().foreach { row =>
+        val raster1 = row.getAs[GridCoverage2D]("rast1")
+        val raster2 = row.getAs[GridCoverage2D]("rast2")
+        assert(raster1.getRenderedImage.getSampleModel.getDataType == DataBuffer.TYPE_DOUBLE)
+        assert(raster2.getRenderedImage.getSampleModel.getDataType == DataBuffer.TYPE_USHORT)
+        val dataType1 = row.getAs[String]("rast1_datatype")
+        val dataType2 = row.getAs[String]("rast2_datatype")
+        assert(dataType1 == "REAL_64BITS")
+        assert(dataType2 == "UNSIGNED_16BITS")
+        raster1.dispose(true)
+        raster2.dispose(true)
       }
     }
 
