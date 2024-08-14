@@ -114,7 +114,7 @@ jobs:
           SCALA_VERSION: ${{ matrix.scala }}
         run: |
             SPARK_COMPAT_VERSION=${SPARK_VERSION:0:3}
-            mvn -q clean install -DskipTests -Dspark=${SPARK_COMPAT_VERSION} -Dscala=${SCALA_VERSION:0:4} -Dgeotools
+            mvn -q clean install -DskipTests -Dspark=${SPARK_COMPAT_VERSION} -Dscala=${SCALA_VERSION:0:4} -Dspark.version=${SPARK_VERSION} -Dgeotools
       - env:
           SPARK_VERSION: ${{ matrix.spark }}
           HADOOP_VERSION: ${{ matrix.hadoop }}
