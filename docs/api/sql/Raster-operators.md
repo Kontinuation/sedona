@@ -2144,6 +2144,52 @@ Output:
 3857
 ```
 
+### RS_StackTileExplode
+
+Introduction: Stack a given array of rasters into a single raster. The rasters are stacked in the order they are provided in the array. The function also explode the stacked raster into multiple tiles.
+
+This function handles rasters that are not aligned and having different resolutions, data types and coordinate reference systems:
+
+- The CRS and resolution of the output raster will be the same as the selected reference raster.
+- The data type of the output raster will be the most precise data type among all stacked bands.
+
+Format:
+
+```
+RS_StackTileExplode(rasters: Array[Raster], refRasterIndex: Integer, tileWidth: Integer, tileHeight: Integer, padWithNoData: Boolean = false, noDataValue: Double = NaN)
+```
+
+- `rasters` is an array of rasters to be stacked.
+- `refRasterIndex` is the zero-based index of the reference raster in the array of rasters. The CRS and resolution of the output raster will be the same as the reference raster. If `refRasterIndex` is -1, the last raster in the array will be used as the reference raster.
+- `tileWidth` and `tileHeight` are the dimensions of the tiles in the output raster.
+- `padWithNoData` is a boolean flag to determine whether to pad the output raster with no data values. If `padWithNoData` is true, the output raster will be padded with `noDataValue`.
+
+Since: `v1.7.0`
+
+SQL Example
+
+```sql
+SELECT RS_StackTileExplode(ARRAY(RS_FromPath('/path/to/raster1.tif'), RS_FromPath('/path/to/raster2.tif')), 0, 100, 100, true, 255)
+```
+
+Output:
+
+```
++---+---+--------------------+
+|  x|  y|                tile|
++---+---+--------------------+
+|  0|  0|GridCoverage2D["g...|
+|  1|  0|GridCoverage2D["g...|
+|  2|  0|GridCoverage2D["g...|
+|  0|  1|GridCoverage2D["g...|
+|  1|  1|GridCoverage2D["g...|
+|  2|  1|GridCoverage2D["g...|
+|  0|  2|GridCoverage2D["g...|
+|  1|  2|GridCoverage2D["g...|
+|  2|  2|GridCoverage2D["g...|
++---+---+--------------------+
+```
+
 ### RS_Union
 
 Introduction: Returns a combined multi-band raster from 2 or more input Rasters. The order of bands in the resultant raster will be in the order of the input rasters. For example if `RS_Union` is called on two 2-banded raster, raster1 and raster2, the first 2 bands of the resultant 4-banded raster will be from raster1 and the last 2 from raster 2.

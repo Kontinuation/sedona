@@ -335,6 +335,7 @@ object Catalog {
     function[RS_ReprojectMatch]("nearestneighbor"),
     function[RS_FromNetCDF](),
     function[RS_NetCDFInfo](),
+    function[RS_StackTileExplode](false, Double.NaN),
     // Expression for raster AI
     function[RS_SEGMENT_TO_GEOMS]())
 

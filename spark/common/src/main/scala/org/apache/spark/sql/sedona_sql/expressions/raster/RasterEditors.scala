@@ -19,10 +19,25 @@
 package org.apache.spark.sql.sedona_sql.expressions.raster
 
 import org.apache.sedona.common.raster.RasterEditors
+import org.apache.sedona.sql.utils.RasterSerializer
 import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions.Generator
+import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.ImplicitCastInputTypes
+import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.sedona_sql.expressions.InferrableFunctionConverter._
 import org.apache.spark.sql.sedona_sql.expressions.InferrableRasterTypes._
 import org.apache.spark.sql.sedona_sql.expressions.InferredExpression
+import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
+import org.apache.spark.sql.sedona_sql.expressions.raster.implicits.RasterEnhancer
+import org.apache.spark.sql.types.AbstractDataType
+import org.apache.spark.sql.types.ArrayType
+import org.apache.spark.sql.types.BooleanType
+import org.apache.spark.sql.types.DoubleType
+import org.apache.spark.sql.types.IntegerType
+import org.apache.spark.sql.types.StructType
+import org.geotools.coverage.grid.GridCoverage2D
 
 case class RS_SetSRID(inputExpressions: Seq[Expression])
     extends InferredExpression(RasterEditors.setSrid _) {
@@ -89,4 +104,60 @@ case class RS_Interpolate(inputExpressions: Seq[Expression])
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
   }
+}
+
+case class RS_StackTileExplode(children: Seq[Expression])
+    extends Generator
+    with ImplicitCastInputTypes
+    with CodegenFallback {
+
+  override def elementSchema: StructType = new StructType()
+    .add("x", IntegerType, nullable = false)
+    .add("y", IntegerType, nullable = false)
+    .add("tile", RasterUDT, nullable = false)
+
+  override def inputTypes: Seq[AbstractDataType] =
+    Seq(ArrayType(RasterUDT), IntegerType, IntegerType, IntegerType, BooleanType, DoubleType)
+
+  override def eval(input: InternalRow): TraversableOnce[InternalRow] = {
+    val rasterExpr = children.head
+    val refRasterIndex = children(1).eval(input).asInstanceOf[Int]
+    val tileWidth = children(2).eval(input).asInstanceOf[Int]
+    val tileHeight = children(3).eval(input).asInstanceOf[Int]
+    val padWithNoData = children(4).eval(input).asInstanceOf[Boolean]
+    val noDataVal = children(5).eval(input).asInstanceOf[Double]
+
+    val arrayData = rasterExpr.eval(input).asInstanceOf[ArrayData]
+    val length = arrayData.numElements()
+    val rasters = new Array[GridCoverage2D](length)
+    for (i <- 0 until length) {
+      rasters(i) = RasterSerializer.deserialize(arrayData.getBinary(i))
+    }
+
+    try {
+      import scala.collection.JavaConverters._
+      val tileIterator = RasterEditors.stackTileExplode(
+        rasters,
+        refRasterIndex,
+        tileWidth,
+        tileHeight,
+        padWithNoData,
+        noDataVal)
+      tileIterator.setAutoDisposeSource(true)
+      tileIterator.setDisposeFunction(() => rasters.foreach(_.dispose(true)))
+      tileIterator.asScala.map { tile =>
+        val gridCoverage2D = tile.getCoverage
+        val row = InternalRow(tile.getTileX, tile.getTileY, gridCoverage2D.serialize)
+        gridCoverage2D.dispose(true)
+        row
+      }
+    } catch {
+      case e: Exception =>
+        rasters.foreach(_.dispose(true))
+        throw e
+    }
+  }
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression =
+    copy(children = newChildren)
 }

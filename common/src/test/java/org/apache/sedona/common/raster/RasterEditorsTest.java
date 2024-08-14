@@ -24,6 +24,7 @@ import static org.junit.Assert.assertThrows;
 import java.awt.image.DataBuffer;
 import java.io.IOException;
 import java.util.Arrays;
+import org.apache.sedona.common.raster.TileGenerator.TileIterator;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
@@ -38,6 +39,7 @@ import org.opengis.geometry.Envelope;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
+import org.opengis.referencing.operation.MathTransform2D;
 import org.opengis.referencing.operation.TransformException;
 
 public class RasterEditorsTest extends RasterTestBase {
@@ -4209,5 +4211,176 @@ public class RasterEditorsTest extends RasterTestBase {
         }
       }
     }
+  }
+
+  @Test
+  public void testStackRasters() throws TransformException {
+    // Create rasters for testing
+    double upperLeftX = 401547;
+    double upperLeftY = 3598729;
+
+    // Raster 1 and 2: rasters with the same CRS, resolution and coverage
+    GridCoverage2D raster1 =
+        createRandomRaster(
+            DataBuffer.TYPE_BYTE, 100, 100, upperLeftX, upperLeftY, 20, 1, "EPSG:32612");
+    GridCoverage2D raster2 =
+        createRandomRaster(
+            DataBuffer.TYPE_BYTE, 100, 100, upperLeftX, upperLeftY, 20, 1, "EPSG:32612");
+
+    // Raster 3: raster with the same CRS, coverage, but lower resolution
+    GridCoverage2D raster3 =
+        createRandomRaster(
+            DataBuffer.TYPE_BYTE, 50, 50, upperLeftX, upperLeftY, 40, 1, "EPSG:32612");
+
+    // Raster 4: raster with the same CRS, resolution and coverage, but wider data type
+    GridCoverage2D raster4 =
+        createRandomRaster(
+            DataBuffer.TYPE_USHORT, 50, 50, upperLeftX, upperLeftY, 40, 1, "EPSG:32612");
+
+    // Raster 5: raster with different CRS
+    GridCoverage2D raster5 =
+        createRandomRaster(DataBuffer.TYPE_BYTE, 50, 50, -12473352, 3831620, 40, 1, "EPSG:3857");
+
+    // Raster 6: raster with different CRS and data type
+    GridCoverage2D raster6 =
+        createRandomRaster(DataBuffer.TYPE_USHORT, 50, 50, -12473352, 3831620, 40, 1, "EPSG:3857");
+
+    // Raster 7: raster with different coverage
+    GridCoverage2D raster7 =
+        createRandomRaster(DataBuffer.TYPE_USHORT, 50, 50, -12461592, 3825841, 40, 1, "EPSG:3857");
+
+    // Stack the rasters
+    GridCoverage2D[] rasters = {raster1, raster2, raster3, raster4, raster5, raster6, raster7};
+    GridCoverage2D stacked = RasterEditors.stackRasters(rasters, 0);
+
+    // Verify the result
+    Assert.assertEquals(7, stacked.getNumSampleDimensions());
+    GridEnvelope2D gridRange = stacked.getGridGeometry().getGridRange2D();
+
+    for (int y = gridRange.y; y < gridRange.y + gridRange.height; y++) {
+      for (int x = gridRange.x; x < gridRange.x + gridRange.width; x++) {
+        // Read pixel value
+        double[] values = new double[7];
+        stacked.evaluate(new GridCoordinates2D(x, y), values);
+
+        // Convert grid coordinates to world coordinates
+        DirectPosition worldPos =
+            stacked.getGridGeometry().gridToWorld(new GridCoordinates2D(x, y));
+
+        // Verify the pixel values
+        for (int b = 0; b < 7; b++) {
+          GridCoverage2D raster = rasters[b];
+
+          // Convert world coordinates to grid coordinates in the source raster
+          GridCoordinates2D gridPos = raster.getGridGeometry().worldToGrid(worldPos);
+          if (raster.getGridGeometry().getGridRange2D().contains(gridPos)) {
+            // Check if any of the 9 pixels around the current pixel in the source raster matches
+            // the
+            // pixel value
+            boolean isValid = validatePixelApprox(raster, gridPos, values[b]);
+            Assert.assertTrue(isValid);
+          }
+        }
+      }
+    }
+
+    TileIterator tileIterator = RasterEditors.stackTileExplode(rasters, 0, 50, 50, true, 0);
+    tileIterator.setAutoDisposeSource(true);
+    tileIterator.setDisposeFunction(
+        () -> {
+          for (GridCoverage2D raster : rasters) {
+            raster.dispose(true);
+          }
+        });
+    RasterConstructorsTest.assertTilesSameWithGridCoverage(tileIterator, stacked, null, 50, 50, 0);
+  }
+
+  @Test
+  public void testStackRastersBandMergeWorkaround() throws TransformException {
+    // Create rasters for testing
+    double upperLeftX = 401547;
+    double upperLeftY = 3598729;
+
+    // Raster 1: raster with higher resolution
+    GridCoverage2D raster1 =
+        createRandomRaster(
+            DataBuffer.TYPE_BYTE, 100, 100, upperLeftX, upperLeftY, 10, 1, "EPSG:32612");
+    // Raster 2: raster with lower resolution
+    GridCoverage2D raster2 =
+        createRandomRaster(
+            DataBuffer.TYPE_BYTE, 50, 50, upperLeftX, upperLeftY, 20, 1, "EPSG:32612");
+    GridCoverage2D[] rasters = {raster1, raster2};
+
+    // Stack the rasters, using raster 1 as reference raster
+    GridCoverage2D stacked = RasterEditors.stackRasters(rasters, 0);
+    Assert.assertEquals(2, stacked.getNumSampleDimensions());
+    GridEnvelope2D gridRange = stacked.getGridGeometry().getGridRange2D();
+    Assert.assertEquals(100, gridRange.width);
+    Assert.assertEquals(100, gridRange.height);
+    MathTransform2D trans = stacked.getGridGeometry().getGridToCRS2D();
+    Assert.assertEquals(raster1.getGridGeometry().getGridToCRS2D(), trans);
+    for (int y = gridRange.y; y < gridRange.y + gridRange.height; y++) {
+      for (int x = gridRange.x; x < gridRange.x + gridRange.width; x++) {
+        // Read pixel value
+        double[] values = new double[2];
+        stacked.evaluate(new GridCoordinates2D(x, y), values);
+
+        // Validate pixel value from raster 1
+        double[] values1 = new double[1];
+        raster1.evaluate(new GridCoordinates2D(x, y), values1);
+        Assert.assertEquals(values1[0], values[0], 1e-6);
+
+        // Validate pixel value from raster 2
+        GridCoordinates2D gridPos = new GridCoordinates2D(x / 2, y / 2);
+        validatePixelApprox(raster2, gridPos, values[1]);
+      }
+    }
+
+    // Stack the rasters, using raster 2 as reference raster
+    stacked = RasterEditors.stackRasters(rasters, 1);
+    Assert.assertEquals(2, stacked.getNumSampleDimensions());
+    gridRange = stacked.getGridGeometry().getGridRange2D();
+    Assert.assertEquals(50, gridRange.width);
+    Assert.assertEquals(50, gridRange.height);
+    trans = stacked.getGridGeometry().getGridToCRS2D();
+    Assert.assertEquals(raster2.getGridGeometry().getGridToCRS2D(), trans);
+    for (int y = gridRange.y; y < gridRange.y + gridRange.height; y++) {
+      for (int x = gridRange.x; x < gridRange.x + gridRange.width; x++) {
+        // Read pixel value
+        double[] values = new double[2];
+        stacked.evaluate(new GridCoordinates2D(x, y), values);
+
+        // Validate pixel value from raster 1
+        double[] values1 = new double[1];
+        raster1.evaluate(new GridCoordinates2D(2 * x, 2 * y), values1);
+        Assert.assertEquals(values1[0], values[0], 1e-6);
+
+        // Validate pixel value from raster 2
+        double[] values2 = new double[1];
+        raster2.evaluate(new GridCoordinates2D(x, y), values2);
+        Assert.assertEquals(values2[0], values[1], 1e-6);
+      }
+    }
+  }
+
+  private boolean validatePixelApprox(
+      GridCoverage2D raster, GridCoordinates2D gridPos, double expectedValue) {
+    for (int iy = -1; iy <= 1; iy++) {
+      for (int ix = -1; ix <= 1; ix++) {
+        int x1 = gridPos.x + ix;
+        int y1 = gridPos.y + iy;
+        if (raster.getGridGeometry().getGridRange2D().contains(x1, y1)) {
+          double[] values = new double[1];
+          raster.evaluate(new GridCoordinates2D(x1, y1), values);
+          if (Math.abs(values[0] - expectedValue) < 1e-6) {
+            return true;
+          }
+        } else {
+          // Tolerant on pixel values at the edge of the raster
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

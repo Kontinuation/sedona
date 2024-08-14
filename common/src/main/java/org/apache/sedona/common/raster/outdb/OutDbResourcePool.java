@@ -95,7 +95,7 @@ public class OutDbResourcePool {
     public final Path path;
     public final byte[] serializedConf;
     private Configuration conf;
-    public Map<String, String> params;
+    public final Map<String, String> params;
 
     public ResourceKey(Path path, Configuration conf) {
       this(path, conf, null);

@@ -18,7 +18,6 @@
  */
 package org.apache.sedona.common.raster;
 
-import java.awt.Rectangle;
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
@@ -30,14 +29,14 @@ import java.util.Map;
 import javax.media.jai.RasterFactory;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.FunctionsGeoTools;
+import org.apache.sedona.common.raster.TileGenerator.Tile;
+import org.apache.sedona.common.raster.TileGenerator.TileIterator;
 import org.apache.sedona.common.raster.inputstream.ByteArrayImageInputStream;
 import org.apache.sedona.common.raster.netcdf.NetCdfReader;
 import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbResourcePool;
-import org.apache.sedona.common.utils.ImageUtils;
 import org.apache.sedona.common.utils.RasterUtils;
-import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
@@ -58,7 +57,6 @@ import org.geotools.util.factory.Hints;
 import org.locationtech.jts.geom.Geometry;
 import org.opengis.feature.simple.SimpleFeature;
 import org.opengis.feature.simple.SimpleFeatureType;
-import org.opengis.metadata.spatial.PixelOrientation;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValue;
 import org.opengis.referencing.FactoryException;
@@ -660,30 +658,6 @@ public class RasterConstructors {
         wr, gridCoverage2D.getGridGeometry(), gridCoverage2D.getSampleDimensions());
   }
 
-  public static class Tile {
-    private final int tileX;
-    private final int tileY;
-    private final GridCoverage2D coverage;
-
-    public Tile(int tileX, int tileY, GridCoverage2D coverage) {
-      this.tileX = tileX;
-      this.tileY = tileY;
-      this.coverage = coverage;
-    }
-
-    public int getTileX() {
-      return tileX;
-    }
-
-    public int getTileY() {
-      return tileY;
-    }
-
-    public GridCoverage2D getCoverage() {
-      return coverage;
-    }
-  }
-
   /**
    * Generate tiles from a grid coverage
    *
@@ -697,7 +671,7 @@ public class RasterConstructors {
    *     If the value is NaN, the no data value of the original band will be used.
    * @return the tiles
    */
-  public static Tile[] generateTiles(
+  public static TileIterator generateTiles(
       GridCoverage2D gridCoverage2D,
       int[] bandIndices,
       int tileWidth,
@@ -721,179 +695,12 @@ public class RasterConstructors {
       }
     }
     if (gridCoverage2D instanceof OutDbGridCoverage2D) {
-      return generateOutDbTiles(
+      return TileGenerator.generateOutDbTiles(
           (OutDbGridCoverage2D) gridCoverage2D, bandIndices, tileWidth, tileHeight);
     } else {
-      return generateInDbTiles(
+      return TileGenerator.generateInDbTiles(
           gridCoverage2D, bandIndices, tileWidth, tileHeight, padWithNoData, padNoDataValue);
     }
-  }
-
-  /**
-   * Generate tiles from an in-db grid coverage. The generated tiles are also in-db grid coverages.
-   * Pixel data will be copied into the tiles.
-   *
-   * @param gridCoverage2D the in-db grid coverage
-   * @param bandIndices the indices of the bands to select (1-based)
-   * @param tileWidth the width of the tiles
-   * @param tileHeight the height of the tiles
-   * @param padWithNoData whether to pad the tiles with no data value
-   * @param padNoDataValue the no data value for padded tiles, only used when padWithNoData is true.
-   *     If the value is NaN, the no data value of the original band will be used.
-   * @return the tiles
-   */
-  private static Tile[] generateInDbTiles(
-      GridCoverage2D gridCoverage2D,
-      int[] bandIndices,
-      int tileWidth,
-      int tileHeight,
-      boolean padWithNoData,
-      double padNoDataValue) {
-    AffineTransform2D affine =
-        RasterUtils.getAffineTransform(gridCoverage2D, PixelOrientation.CENTER);
-    RenderedImage image = gridCoverage2D.getRenderedImage();
-    double[] noDataValues = new double[bandIndices.length];
-    for (int i = 0; i < bandIndices.length; i++) {
-      noDataValues[i] =
-          RasterUtils.getNoDataValue(gridCoverage2D.getSampleDimension(bandIndices[i] - 1));
-    }
-    int width = image.getWidth();
-    int height = image.getHeight();
-    int numTileX = (int) Math.ceil((double) width / tileWidth);
-    int numTileY = (int) Math.ceil((double) height / tileHeight);
-    Tile[] tiles = new Tile[numTileX * numTileY];
-    for (int tileY = 0; tileY < numTileY; tileY++) {
-      for (int tileX = 0; tileX < numTileX; tileX++) {
-        int x0 = tileX * tileWidth;
-        int y0 = tileY * tileHeight;
-
-        // Rect to copy from the original image
-        int rectWidth = Math.min(tileWidth, width - x0);
-        int rectHeight = Math.min(tileHeight, height - y0);
-
-        // If we don't pad with no data, the tiles on the boundary may have a different size
-        int currentTileWidth = padWithNoData ? tileWidth : rectWidth;
-        int currentTileHeight = padWithNoData ? tileHeight : rectHeight;
-        boolean needPadding = padWithNoData && (rectWidth < tileWidth || rectHeight < tileHeight);
-
-        // Create a new affine transformation for this tile
-        AffineTransform2D tileAffine = RasterUtils.translateAffineTransform(affine, x0, y0);
-        GridGeometry2D gridGeometry2D =
-            new GridGeometry2D(
-                new GridEnvelope2D(0, 0, currentTileWidth, currentTileHeight),
-                PixelInCell.CELL_CENTER,
-                tileAffine,
-                gridCoverage2D.getCoordinateReferenceSystem(),
-                null);
-
-        // Prepare a new image for this tile, and copy the data from the original image
-        WritableRaster raster =
-            RasterFactory.createBandedRaster(
-                image.getSampleModel().getDataType(),
-                currentTileWidth,
-                currentTileHeight,
-                bandIndices.length,
-                null);
-        GridSampleDimension[] sampleDimensions = new GridSampleDimension[bandIndices.length];
-        Raster sourceRaster = image.getData(new Rectangle(x0, y0, rectWidth, rectHeight));
-        for (int k = 0; k < bandIndices.length; k++) {
-          int bandIndex = bandIndices[k] - 1;
-
-          // Copy sample dimensions from source bands, and pad with no data value if necessary
-          GridSampleDimension sampleDimension = gridCoverage2D.getSampleDimension(bandIndex);
-          double noDataValue = noDataValues[k];
-          if (needPadding && !Double.isNaN(padNoDataValue)) {
-            sampleDimension =
-                RasterUtils.createSampleDimensionWithNoDataValue(sampleDimension, padNoDataValue);
-            noDataValue = padNoDataValue;
-          }
-          sampleDimensions[k] = sampleDimension;
-
-          // Copy data from original image to tile image
-          ImageUtils.copyRasterWithPadding(sourceRaster, bandIndex, raster, k, noDataValue);
-        }
-
-        GridCoverage2D tile = RasterUtils.create(raster, gridGeometry2D, sampleDimensions);
-        tiles[tileY * numTileX + tileX] = new Tile(tileX, tileY, tile);
-      }
-    }
-
-    return tiles;
-  }
-
-  /**
-   * Generate tiles from an out-db grid coverage. The generated tiles are also out-db grid
-   * coverages. The generated tiles will have various geo-referencing and band indices metadata,
-   * while sharing the same out-db raster file with the original grid coverage. No pixel data will
-   * be copied during this process.
-   *
-   * <p>Please note that tiling for out-db grid coverage does not support padding
-   *
-   * @param gridCoverage2D the out-db grid coverage
-   * @param bandIndices the indices of the bands to select (1-based)
-   * @param tileWidth the width of the tiles
-   * @param tileHeight the height of the tiles
-   * @return the tiles
-   */
-  private static Tile[] generateOutDbTiles(
-      OutDbGridCoverage2D gridCoverage2D, int[] bandIndices, int tileWidth, int tileHeight) {
-    AffineTransform2D affine =
-        RasterUtils.getAffineTransform(gridCoverage2D, PixelOrientation.CENTER);
-    GridEnvelope2D gridRange = gridCoverage2D.getGridGeometry().getGridRange2D();
-    int[] outDbBandIndices = gridCoverage2D.getOutDbBandIndices();
-    Path outDbPath = gridCoverage2D.getOutDbPath();
-    byte[] serializedConf = gridCoverage2D.getSerializedConfiguration();
-    Map<String, String> outDbParams = gridCoverage2D.getOutDbParams();
-    int[] tileBandIndices = new int[bandIndices.length];
-    for (int i = 0; i < bandIndices.length; i++) {
-      int bandIndex = bandIndices[i] - 1;
-      tileBandIndices[i] = outDbBandIndices[bandIndex];
-    }
-    int width = gridRange.width;
-    int height = gridRange.height;
-    int numTileX = (int) Math.ceil((double) width / tileWidth);
-    int numTileY = (int) Math.ceil((double) height / tileHeight);
-    Tile[] tiles = new Tile[numTileX * numTileY];
-    for (int tileY = 0; tileY < numTileY; tileY++) {
-      for (int tileX = 0; tileX < numTileX; tileX++) {
-        int x0 = tileX * tileWidth;
-        int y0 = tileY * tileHeight;
-
-        // XXX: We do not handle padding with no data value for OutDbGridCoverage2D. If we want to
-        // handle it,
-        //  we can add a Border Operation before cropping the image.
-        int currentTileWidth = Math.min(tileWidth, width - x0);
-        int currentTileHeight = Math.min(tileHeight, height - y0);
-        AffineTransform2D tileAffine = RasterUtils.translateAffineTransform(affine, x0, y0);
-        GridGeometry2D gridGeometry2D =
-            new GridGeometry2D(
-                new GridEnvelope2D(0, 0, currentTileWidth, currentTileHeight),
-                PixelInCell.CELL_CENTER,
-                tileAffine,
-                gridCoverage2D.getCoordinateReferenceSystem(),
-                null);
-
-        // For out-db rasters, we only need to change the geo-referencing information and select a
-        // subset
-        // of bands. The reference to data (path and conf) does not need to be changed.
-        GridSampleDimension[] sampleDimensions = new GridSampleDimension[bandIndices.length];
-        for (int k = 0; k < bandIndices.length; k++) {
-          int bandIndex = bandIndices[k] - 1;
-          sampleDimensions[k] = gridCoverage2D.getSampleDimension(bandIndex);
-        }
-        OutDbGridCoverage2D tile =
-            OutDbGridCoverage2D.create(
-                gridCoverage2D.getName(),
-                gridGeometry2D,
-                sampleDimensions,
-                tileBandIndices,
-                outDbPath,
-                serializedConf,
-                outDbParams);
-        tiles[tileY * numTileX + tileX] = new Tile(tileX, tileY, tile);
-      }
-    }
-    return tiles;
   }
 
   public static GridCoverage2D[] rsTile(
@@ -909,12 +716,14 @@ public class RasterConstructors {
     if (padNoDataValue == null) {
       padNoDataValue = Double.NaN;
     }
-    Tile[] tiles =
+    TileIterator tileIterator =
         generateTiles(
             gridCoverage2D, bandIndices, tileWidth, tileHeight, padWithNoData, padNoDataValue);
-    GridCoverage2D[] result = new GridCoverage2D[tiles.length];
-    for (int i = 0; i < tiles.length; i++) {
-      result[i] = tiles[i].getCoverage();
+    GridCoverage2D[] result = new GridCoverage2D[tileIterator.getNumTiles()];
+    int i = 0;
+    while (tileIterator.hasNext()) {
+      Tile tile = tileIterator.next();
+      result[i++] = tile.getCoverage();
     }
     return result;
   }

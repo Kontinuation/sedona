@@ -190,21 +190,24 @@ case class RS_TileExplode(children: Seq[Expression]) extends Generator with Code
           throw new IllegalArgumentException(
             "Unsupported class for noDataValue: " + value.getClass)
       }
-      val tiles = RasterConstructors.generateTiles(
+      val tileIterator = RasterConstructors.generateTiles(
         raster,
         bandIndices,
         tileWidth,
         tileHeight,
         padWithNoDataValue,
         noDataValue)
-      tiles.map { tile =>
+      tileIterator.setAutoDisposeSource(true)
+      tileIterator.asScala.map { tile =>
         val gridCoverage2D = tile.getCoverage
         val row = InternalRow(tile.getTileX, tile.getTileY, gridCoverage2D.serialize)
         gridCoverage2D.dispose(true)
         row
       }
-    } finally {
-      raster.dispose(true)
+    } catch {
+      case e: Exception =>
+        raster.dispose(true)
+        throw e
     }
   }
 

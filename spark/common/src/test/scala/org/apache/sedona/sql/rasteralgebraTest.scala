@@ -25,6 +25,7 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.{DataFrame, Row, SaveMode}
 import org.apache.spark.sql.functions.{col, collect_list, expr, lit, row_number}
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
+import org.geotools.coverage.grid.GridCoordinates2D
 import org.geotools.coverage.grid.GridCoverage2D
 import org.junit.Assert.{assertEquals, assertFalse, assertNotNull, assertNull, assertTrue}
 import org.locationtech.jts.geom.{Coordinate, Geometry}
@@ -2846,6 +2847,44 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
           alignRast.getGridGeometry.getGridToCRS2D,
           transformedRast.getGridGeometry.getGridToCRS2D)
       }
+    }
+
+    it("Passed RS_StackTileExplode") {
+      val path1 = resourceFolder + "raster/test4.tiff"
+      val path2 = resourceFolder + "raster/test5.tiff"
+      val path3 = resourceFolder + "raster/test6.tiff"
+      val rasterDf = sparkSession.sql(
+        s"SELECT RS_FromPath('$path1') rast1, " +
+          s"RS_FromPath('$path2') rast2, " +
+          s"RS_FromPath('$path3') rast3")
+      val rasters = rasterDf.first()
+      val raster1 = rasters.getAs[GridCoverage2D]("rast1")
+      val raster2 = rasters.getAs[GridCoverage2D]("rast2")
+      val raster3 = rasters.getAs[GridCoverage2D]("rast3")
+      val stacked = rasterDf
+        .selectExpr("RS_StackTileExplode(ARRAY(rast1, rast2, rast3), 0, 4, 4) AS (x, y, tile)")
+        .collect()
+      assert(stacked.length == 9)
+      stacked.foreach { row =>
+        val x = row.getInt(0)
+        val y = row.getInt(1)
+        val tile = row.getAs[GridCoverage2D]("tile")
+        val values = Array.fill[Double](3)(0)
+        tile.evaluate(new GridCoordinates2D(0, 0), values)
+
+        val expected = Array.fill[Double](1)(0)
+        raster1.evaluate(new GridCoordinates2D(4 * x, 4 * y), expected)
+        assert(values(0) == expected(0))
+        raster2.evaluate(new GridCoordinates2D(4 * x, 4 * y), expected)
+        assert(values(1) == expected(0))
+        raster3.evaluate(new GridCoordinates2D(4 * x, 4 * y), expected)
+        assert(values(2) == expected(0))
+
+        tile.dispose(true)
+      }
+      raster1.dispose(true)
+      raster2.dispose(true)
+      raster3.dispose(true)
     }
 
     it("Passed RS_FromNetCDF with NetCDF classic") {

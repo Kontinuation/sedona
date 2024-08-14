@@ -18,10 +18,15 @@
  */
 package org.apache.sedona.common.utils;
 
+import com.sun.media.imageioimpl.common.BogusColorSpace;
+import java.awt.RenderingHints;
+import java.awt.Transparency;
+import java.awt.image.ComponentColorModel;
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
 import java.awt.image.renderable.ParameterBlock;
+import javax.media.jai.ImageLayout;
 import javax.media.jai.JAI;
 import javax.media.jai.RenderedOp;
 
@@ -142,5 +147,34 @@ public class ImageUtils {
         destRaster.setSample(x, y, destBand, padValue);
       }
     }
+  }
+
+  /**
+   * Cast the data type of a rendered image.
+   *
+   * @param image the image
+   * @param dataType the data type
+   * @return the image with the specified data type
+   */
+  public static RenderedImage castDataType(RenderedImage image, int dataType) {
+    ParameterBlock params = new ParameterBlock();
+
+    // Using the image layout hint to force the output image to have the same number of
+    // bands as the input image. This is necessary because the default behavior of the
+    // "format" operation will convert the color model and sample model. For instance,
+    // the source image may have 1 band and an indexed color model, but the output image
+    // will have 3 bands and a component color model.
+    ImageLayout il = new ImageLayout();
+    int numBands = image.getSampleModel().getNumBands();
+    ComponentColorModel colorModel =
+        new ComponentColorModel(
+            new BogusColorSpace(numBands), false, false, Transparency.OPAQUE, dataType);
+    il.setColorModel(colorModel);
+    il.setSampleModel(image.getSampleModel());
+    RenderingHints hint = new RenderingHints(JAI.KEY_IMAGE_LAYOUT, il);
+
+    params.addSource(image);
+    params.add(dataType);
+    return JAI.create("format", params, hint);
   }
 }

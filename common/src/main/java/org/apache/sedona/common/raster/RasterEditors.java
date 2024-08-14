@@ -21,15 +21,22 @@ package org.apache.sedona.common.raster;
 import static org.apache.sedona.common.raster.MapAlgebra.addBandFromArray;
 import static org.apache.sedona.common.raster.MapAlgebra.bandAsArray;
 
-import java.awt.*;
+import it.geosolutions.jaiext.ConcurrentOperationRegistry;
+import it.geosolutions.jaiext.JAIExt;
 import java.awt.geom.Point2D;
 import java.awt.image.*;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import javax.media.jai.Interpolation;
 import javax.media.jai.RasterFactory;
+import javax.media.jai.registry.RenderedRegistryMode;
 import org.apache.sedona.common.FunctionsGeoTools;
+import org.apache.sedona.common.raster.TileGenerator.TileIterator;
+import org.apache.sedona.common.raster.workarounds.jaiext.SedonaBandMergeCRIF;
+import org.apache.sedona.common.utils.ImageUtils;
 import org.apache.sedona.common.utils.RasterInterpolate;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.CoverageFactoryFinder;
@@ -38,14 +45,18 @@ import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
+import org.geotools.coverage.processing.CoverageProcessor;
 import org.geotools.coverage.processing.Operations;
 import org.geotools.geometry.Envelope2D;
+import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultEngineeringCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.locationtech.jts.index.strtree.STRtree;
 import org.opengis.coverage.grid.GridCoverage;
 import org.opengis.coverage.grid.GridGeometry;
+import org.opengis.coverage.processing.Operation;
 import org.opengis.metadata.spatial.PixelOrientation;
+import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.datum.PixelInCell;
@@ -711,5 +722,114 @@ public class RasterEditors {
 
     return RasterUtils.clone(
         raster, inputRaster.getGridGeometry(), gridSampleDimensions, inputRaster, null, true);
+  }
+
+  /**
+   * Stacks multiple rasters into a single raster, and then split the stacked raster into tiles.
+   *
+   * @param rasters Array of rasters to be stacked
+   * @param refRasterIndex Index of the reference raster. 0: first, 1: second, etc. -1: last
+   * @param tileWidth Width of the tile
+   * @param tileHeight Height of the tile
+   * @return TileIterator for the stacked raster
+   */
+  public static TileIterator stackTileExplode(
+      GridCoverage2D[] rasters,
+      int refRasterIndex,
+      int tileWidth,
+      int tileHeight,
+      boolean padWithNoData,
+      double padNoDataValue) {
+    GridCoverage2D stacked = stackRasters(rasters, refRasterIndex);
+    return RasterConstructors.generateTiles(
+        stacked, null, tileWidth, tileHeight, padWithNoData, padNoDataValue);
+  }
+
+  /**
+   * Stacks multiple rasters into a single raster
+   *
+   * @param rasters Array of rasters to be stacked
+   * @param refRasterIndex Index of the reference raster. 0: first, 1: second, etc. -1: last
+   * @return Stacked raster
+   */
+  public static GridCoverage2D stackRasters(GridCoverage2D[] rasters, int refRasterIndex) {
+    // HACK: Patch a bug of the BandMerge operator in JAI-Ext. Please see the following link for
+    // more details:
+    // https://github.com/geosolutions-it/jai-ext/issues/299
+    ConcurrentOperationRegistry registry = JAIExt.getRegistry();
+    Object factory = new SedonaBandMergeCRIF();
+    registry.registerFactory(
+        RenderedRegistryMode.MODE_NAME, "BandMerge", "it.geosolutions.jaiext", factory);
+
+    List<Integer> dataTypes = new ArrayList<>();
+    for (GridCoverage2D raster : rasters) {
+      SampleModel sampleModel = raster.getRenderedImage().getSampleModel();
+      int dataType = sampleModel.getDataType();
+      dataTypes.add(dataType);
+    }
+    int mergedDataType = resolveMergedDataType(dataTypes);
+    CoordinateReferenceSystem crs = rasters[0].getCoordinateReferenceSystem();
+
+    GridCoverage2D[] inputRasters = new GridCoverage2D[rasters.length];
+    for (int k = 0; k < rasters.length; k++) {
+      GridCoverage2D raster = rasters[k];
+      RenderedImage image = raster.getRenderedImage();
+      SampleModel sampleModel = image.getSampleModel();
+      int dataType = sampleModel.getDataType();
+      GridCoverage2D inputRaster;
+      boolean shouldCast = false;
+      if (dataType != mergedDataType) {
+        shouldCast = true;
+      } else if (image.getSampleModel().getNumBands() != image.getColorModel().getNumComponents()) {
+        // Force using BogusColorSpace, otherwise the number of bands will change in subsequent
+        // operations
+        shouldCast = true;
+      }
+      if (shouldCast) {
+        RenderedImage castedImage = ImageUtils.castDataType(image, mergedDataType);
+        inputRaster =
+            RasterUtils.clone(castedImage, raster.getSampleDimensions(), raster, null, true);
+      } else {
+        inputRaster = raster;
+      }
+      if (!CRS.equalsIgnoreMetadata(inputRaster.getCoordinateReferenceSystem(), crs)) {
+        inputRaster = (GridCoverage2D) Operations.DEFAULT.resample(inputRaster, crs);
+      }
+      inputRasters[k] = inputRaster;
+    }
+
+    CoverageProcessor processor = CoverageProcessor.getInstance();
+    Operation bandMerge = processor.getOperation("BandMerge");
+    ParameterValueGroup param = bandMerge.getParameters();
+    List<GridCoverage2D> rasterCollection = Arrays.asList(inputRasters);
+    param.parameter("Sources").setValue(rasterCollection);
+    if (refRasterIndex == -1) {
+      param.parameter("transform_choice").setValue("LAST");
+    } else {
+      param.parameter("transform_choice").setValue("INDEX");
+      param.parameter("coverage_idx").setValue(refRasterIndex);
+    }
+    return (GridCoverage2D) processor.doOperation(param);
+  }
+
+  /**
+   * Resolves the merged data type from a list of data types. We choose the most broad data type as
+   * the merged data type.
+   *
+   * @param dataTypes List of data types
+   * @return Merged data type
+   */
+  private static int resolveMergedDataType(List<Integer> dataTypes) {
+    if (dataTypes.isEmpty()) {
+      throw new IllegalArgumentException("dataTypes cannot be empty");
+    }
+    int dataType = dataTypes.get(0);
+    for (int k = 1; k < dataTypes.size(); k++) {
+      int thisType = dataTypes.get(k);
+      if (thisType > dataType) {
+        dataType = thisType;
+      }
+    }
+    return dataType;
   }
 }
