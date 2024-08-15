@@ -2589,7 +2589,15 @@ RS_MapAlgebra (raster: Raster, pixelType: String, script: String, noDataValue: D
 ```
 
 ```
+RS_MapAlgebra(rast: Raster, pixelType: String, script: String, noDataValue: Double, numBands: Int)
+```
+
+```
 RS_MapAlgebra(rast0: Raster, rast1: Raster, pixelType: String, script: String, noDataValue: Double)
+```
+
+```
+RS_MapAlgebra(rast0: Raster, rast1: Raster, pixelType: String, script: String, noDataValue: Double, numBands: Int)
 ```
 
 Since: `v1.5.0`
@@ -2615,6 +2623,14 @@ Output:
 +--------------------+
 |GridCoverage2D["g...|
 +--------------------+
+```
+
+Spark SQL Example for generating multi-band raster output:
+
+```sql
+-- The output band can be specified in the same way as with the input rasters.
+-- Please specify the number of output bands using the numBands parameter.
+SELECT RS_MapAlgebra(rast, 'D', 'out[0] = rast[0] - rast[1]; out[1] = rast[0] + rast[1];', null, 2) FROM raster_table
 ```
 
 Spark SQL Example for two raster input `RS_MapAlgebra`:

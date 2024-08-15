@@ -650,4 +650,52 @@ public class MapAlgebraTest extends RasterTestBase {
       }
     }
   }
+
+  @Test
+  public void testMapAlgebraMultiBandOutput() {
+    // single-raster multi-band version
+    GridCoverage2D raster0 =
+        createRandomRaster(DataBuffer.TYPE_USHORT, 100, 100, 0, 0, 1, 2, "EPSG:3857");
+    GridCoverage2D result =
+        MapAlgebra.mapAlgebra(
+            raster0,
+            "US",
+            "out[0] = rast[0] + rast[1]; out[1] = rast[0] + 10; out[2] = rast[1] + 10;",
+            null,
+            3);
+    assertEquals(3, RasterAccessors.numBands(result));
+    double[] band00 = MapAlgebra.bandAsArray(raster0, 1);
+    double[] band01 = MapAlgebra.bandAsArray(raster0, 2);
+    double[] bandResult0 = MapAlgebra.bandAsArray(result, 1);
+    double[] bandResult1 = MapAlgebra.bandAsArray(result, 2);
+    double[] bandResult2 = MapAlgebra.bandAsArray(result, 3);
+    for (int i = 0; i < band00.length; i++) {
+      assertEquals(band00[i] + band01[i], bandResult0[i], 1e-9);
+      assertEquals(band00[i] + 10, bandResult1[i], 1e-9);
+      assertEquals(band01[i] + 10, bandResult2[i], 1e-9);
+    }
+
+    // multi-raster multi-band version
+    GridCoverage2D raster1 =
+        createRandomRaster(DataBuffer.TYPE_USHORT, 100, 100, 0, 0, 1, 2, "EPSG:3857");
+    result =
+        MapAlgebra.mapAlgebra(
+            raster0,
+            raster1,
+            "US",
+            "out[0] = rast0[0] + rast1[0]; out[1] = rast0[1] + rast1[1]; out[2] = rast0[0] + rast1[1];",
+            null,
+            3);
+    assertEquals(3, RasterAccessors.numBands(result));
+    double[] band10 = MapAlgebra.bandAsArray(raster1, 1);
+    double[] band11 = MapAlgebra.bandAsArray(raster1, 2);
+    bandResult0 = MapAlgebra.bandAsArray(result, 1);
+    bandResult1 = MapAlgebra.bandAsArray(result, 2);
+    bandResult2 = MapAlgebra.bandAsArray(result, 3);
+    for (int i = 0; i < band00.length; i++) {
+      assertEquals(band00[i] + band10[i], bandResult0[i], 1e-9);
+      assertEquals(band01[i] + band11[i], bandResult1[i], 1e-9);
+      assertEquals(band00[i] + band11[i], bandResult2[i], 1e-9);
+    }
+  }
 }

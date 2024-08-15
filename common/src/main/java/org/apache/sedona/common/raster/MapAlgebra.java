@@ -18,10 +18,13 @@
  */
 package org.apache.sedona.common.raster;
 
+import com.sun.media.imageioimpl.common.BogusColorSpace;
 import it.geosolutions.jaiext.jiffle.JiffleBuilder;
 import it.geosolutions.jaiext.jiffle.runtime.JiffleDirectRuntime;
+import java.awt.Transparency;
 import java.awt.image.BufferedImage;
 import java.awt.image.ColorModel;
+import java.awt.image.ComponentColorModel;
 import java.awt.image.DataBuffer;
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
@@ -127,10 +130,15 @@ public class MapAlgebra {
    *     raster is used.
    * @param script The script to apply
    * @param noDataValue The no data value of the output raster.
+   * @param numOutputBands The number of bands in the output raster.
    * @return The result of the map algebra script
    */
   public static GridCoverage2D mapAlgebra(
-      GridCoverage2D gridCoverage2D, String pixelType, String script, Double noDataValue) {
+      GridCoverage2D gridCoverage2D,
+      String pixelType,
+      String script,
+      Double noDataValue,
+      int numOutputBands) {
     if (gridCoverage2D == null || script == null) {
       return null;
     }
@@ -146,7 +154,8 @@ public class MapAlgebra {
     // It also eliminates the data-copying overhead when converting raster data types after running
     // jiffle script.
     WritableRaster resultRaster =
-        RasterFactory.createBandedRaster(DataBuffer.TYPE_DOUBLE, width, height, 1, null);
+        RasterFactory.createBandedRaster(
+            DataBuffer.TYPE_DOUBLE, width, height, numOutputBands, null);
     ColorModel cm = fetchColorModel(renderedImage.getColorModel(), resultRaster);
     WritableRenderedImage resultImage = new BufferedImage(cm, resultRaster, false, null);
     try {
@@ -174,14 +183,17 @@ public class MapAlgebra {
       runtime.evaluateAll(null);
 
       // If pixelType does not match with the data type of the result image (should be double since
-      // Jiffle only supports
-      // double destination image), we need to convert the resultImage to the specified pixel type.
+      // Jiffle only supports double destination image), we need to convert the resultImage to the
+      // specified pixel type.
       if (rasterDataType != resultImage.getSampleModel().getDataType()) {
         // Copy the resultImage to a new raster with the specified pixel type
         WritableRaster convertedRaster =
-            RasterFactory.createBandedRaster(rasterDataType, width, height, 1, null);
-        double[] samples = resultRaster.getSamples(0, 0, width, height, 0, (double[]) null);
-        convertedRaster.setSamples(0, 0, width, height, 0, samples);
+            RasterFactory.createBandedRaster(rasterDataType, width, height, numOutputBands, null);
+        double[] samples = new double[width * height];
+        for (int b = 0; b < numOutputBands; b++) {
+          resultRaster.getSamples(0, 0, width, height, b, samples);
+          convertedRaster.setSamples(0, 0, width, height, b, samples);
+        }
         return RasterUtils.clone(convertedRaster, null, gridCoverage2D, noDataValue, false);
       } else {
         // build a new GridCoverage2D from the resultImage
@@ -197,12 +209,25 @@ public class MapAlgebra {
     return mapAlgebra(gridCoverage2D, pixelType, script, null);
   }
 
+  public static GridCoverage2D mapAlgebra(
+      GridCoverage2D gridCoverage2D, String pixelType, String script, Double noDataValue) {
+    return mapAlgebra(gridCoverage2D, pixelType, script, noDataValue, 1);
+  }
+
   private static ColorModel fetchColorModel(
       ColorModel originalColorModel, WritableRaster resultRaster) {
     if (originalColorModel.isCompatibleRaster(resultRaster)) {
       return originalColorModel;
     } else {
-      return PlanarImage.createColorModel(resultRaster.getSampleModel());
+      ColorModel cm = PlanarImage.createColorModel(resultRaster.getSampleModel());
+      if (cm != null) {
+        return cm;
+      } else {
+        int numBands = resultRaster.getNumBands();
+        int dataType = resultRaster.getDataBuffer().getDataType();
+        return new ComponentColorModel(
+            new BogusColorSpace(numBands), false, false, Transparency.OPAQUE, dataType);
+      }
     }
   }
 
@@ -211,7 +236,8 @@ public class MapAlgebra {
       GridCoverage2D rast1,
       String pixelType,
       String script,
-      Double noDataValue) {
+      Double noDataValue,
+      int numOutputBands) {
     if (rast0 == null || rast1 == null || script == null) {
       return null;
     }
@@ -229,7 +255,8 @@ public class MapAlgebra {
     // It also eliminates the data-copying overhead when converting raster data types after running
     // jiffle script.
     WritableRaster resultRaster =
-        RasterFactory.createBandedRaster(DataBuffer.TYPE_DOUBLE, width, height, 1, null);
+        RasterFactory.createBandedRaster(
+            DataBuffer.TYPE_DOUBLE, width, height, numOutputBands, null);
 
     ColorModel cmRast0 = fetchColorModel(renderedImageRast0.getColorModel(), resultRaster);
     RenderedImage renderedImageRast1 = rast1.getRenderedImage();
@@ -262,14 +289,17 @@ public class MapAlgebra {
       runtime.evaluateAll(null);
 
       // If pixelType does not match with the data type of the result image (should be double since
-      // Jiffle only supports
-      // double destination image), we need to convert the resultImage to the specified pixel type.
+      // Jiffle only supports double destination image), we need to convert the resultImage to the
+      // specified pixel type.
       if (rasterDataType != resultImage.getSampleModel().getDataType()) {
         // Copy the resultImage to a new raster with the specified pixel type
         WritableRaster convertedRaster =
-            RasterFactory.createBandedRaster(rasterDataType, width, height, 1, null);
-        double[] samples = resultRaster.getSamples(0, 0, width, height, 0, (double[]) null);
-        convertedRaster.setSamples(0, 0, width, height, 0, samples);
+            RasterFactory.createBandedRaster(rasterDataType, width, height, numOutputBands, null);
+        double[] samples = new double[width * height];
+        for (int b = 0; b < numOutputBands; b++) {
+          resultRaster.getSamples(0, 0, width, height, b, samples);
+          convertedRaster.setSamples(0, 0, width, height, b, samples);
+        }
         return RasterUtils.clone(convertedRaster, null, rast0, noDataValue, false);
       } else {
         // build a new GridCoverage2D from the resultImage
@@ -278,6 +308,15 @@ public class MapAlgebra {
     } catch (Exception e) {
       throw new RuntimeException("Failed to run map algebra", e);
     }
+  }
+
+  public static GridCoverage2D mapAlgebra(
+      GridCoverage2D rast0,
+      GridCoverage2D rast1,
+      String pixelType,
+      String script,
+      Double noDataValue) {
+    return mapAlgebra(rast0, rast1, pixelType, script, noDataValue, 1);
   }
 
   /**

@@ -25,6 +25,9 @@ import org.apache.spark.sql.catalyst.util.{ArrayData, GenericArrayData}
 import org.apache.spark.sql.sedona_sql.expressions.InferrableFunctionConverter._
 import org.apache.spark.sql.sedona_sql.expressions.InferrableRasterTypes._
 import org.apache.spark.sql.sedona_sql.expressions.InferredExpression
+import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
+import org.apache.spark.sql.sedona_sql.expressions.InferrableFunction
+import org.geotools.coverage.grid.GridCoverage2D
 
 /// Calculate Normalized Difference between two bands
 case class RS_NormalizedDifference(inputExpressions: Seq[Expression])
@@ -222,7 +225,33 @@ case class RS_MapAlgebra(inputExpressions: Seq[Expression])
     extends InferredExpression(
       nullTolerantInferrableFunction3(MapAlgebra.mapAlgebra),
       nullTolerantInferrableFunction4(MapAlgebra.mapAlgebra),
-      nullTolerantInferrableFunction5(MapAlgebra.mapAlgebra)) {
+      nullTolerantInferrableFunction5(
+        MapAlgebra.mapAlgebra(
+          _: GridCoverage2D,
+          _: GridCoverage2D,
+          _: String,
+          _: String,
+          _: java.lang.Double)),
+      nullTolerantInferrableFunction5(
+        MapAlgebra
+          .mapAlgebra(_: GridCoverage2D, _: String, _: String, _: java.lang.Double, _: Int)),
+      nullTolerantInferrableFunction6(MapAlgebra.mapAlgebra)) {
+
+  override protected def resolveFunction(fSeq: Seq[InferrableFunction]): InferrableFunction = {
+    if (inputExpressions.size == 5) {
+      // Distinguish between the single-raster-multi-band and multi-raster-single-band versions
+      val arg2Expr = inputExpressions(1)
+      if (arg2Expr.dataType.isInstanceOf[RasterUDT]) {
+        // Resolve to the multi-raster version
+        fSeq(2)
+      } else {
+        // Resolve to the multi-band output version
+        fSeq(3)
+      }
+    } else {
+      super.resolveFunction(fSeq)
+    }
+  }
 
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)

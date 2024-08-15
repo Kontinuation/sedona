@@ -55,19 +55,30 @@ abstract class InferredExpression(fSeq: InferrableFunction*)
 
   def inputExpressions: Seq[Expression]
 
-  lazy val f: InferrableFunction = fSeq match {
-    // If there is only one function, simply use it and let org.apache.sedona.sql.UDF.Catalog handle default arguments.
-    case Seq(f) => f
-    // If there are multiple overloaded functions, find the one with the same number of arguments as the input
-    // expressions. Please note that the Catalog won't be able to handle default arguments in this case. We'll
-    // move default argument handling from Catalog to this class in the future.
-    case _ =>
-      fSeq.find(f => f.sparkInputTypes.size == inputExpressions.size) match {
-        case Some(f) => f
-        case None =>
-          throw new IllegalArgumentException(
-            s"No overloaded function ${getClass.getName} has ${inputExpressions.size} arguments")
-      }
+  lazy val f: InferrableFunction = resolveFunction(fSeq)
+
+  /**
+   * Resolve the function to be used based on the inputExpression.
+   * @param fSeq
+   *   The wrapped functions.
+   * @return
+   *   The resolved function.
+   */
+  protected def resolveFunction(fSeq: Seq[InferrableFunction]): InferrableFunction = {
+    fSeq match {
+      // If there is only one function, simply use it and let org.apache.sedona.sql.UDF.Catalog handle default arguments.
+      case Seq(f) => f
+      // If there are multiple overloaded functions, find the one with the same number of arguments as the input
+      // expressions. Please note that the Catalog won't be able to handle default arguments in this case. We'll
+      // move default argument handling from Catalog to this class in the future.
+      case _ =>
+        fSeq.find(f => f.sparkInputTypes.size == inputExpressions.size) match {
+          case Some(f) => f
+          case None =>
+            throw new IllegalArgumentException(
+              s"No overloaded function ${getClass.getName} has ${inputExpressions.size} arguments")
+        }
+    }
   }
 
   override def children: Seq[Expression] = inputExpressions
@@ -78,7 +89,6 @@ abstract class InferredExpression(fSeq: InferrableFunction*)
 
   private lazy val argExtractors: Array[InternalRow => Any] = buildExtractors(inputExpressions)
   private lazy val evaluator: InternalRow => Any = buildEvaluator()
-  private lazy val serializer: Any => Any = buildSerializer()
 
   // Keeps track of input rasters for disposal after evaluation.
   // - Input raster arguments will be saved to this ArrayBuffer by argument extractors
@@ -152,8 +162,6 @@ abstract class InferredExpression(fSeq: InferrableFunction*)
     }
   }
 
-  private def buildSerializer(): Any => Any = f.serializer
-
   private def findAllLiterals(expression: Expression): Seq[Literal] = {
     expression match {
       case lit: Literal => Seq(lit)
@@ -166,7 +174,6 @@ abstract class InferredExpression(fSeq: InferrableFunction*)
   }
 
   override def eval(input: InternalRow): Any = {
-
     try {
       f.serializer(evaluator(input))
     } catch {

@@ -2676,6 +2676,44 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       }
     }
 
+    it("Passed RS_MapAlgebra with multi-band output") {
+      val df = sparkSession.read
+        .format("binaryFile")
+        .option("recursiveFileLookup", "true")
+        .option("pathGlobFilter", "*.tif*")
+        .load(resourceFolder + "raster")
+        .selectExpr("RS_FromGeoTiff(content) as rast")
+      val dfResult = df
+        .withColumn(
+          "rast_2",
+          expr(
+            "RS_MapAlgebra(rast, 'us', 'out[0] = rast[0] * 0.2; out[1] = rast[0] * 0.4;', null, 2)"))
+        .withColumn(
+          "rast_3",
+          expr(
+            "RS_MapAlgebra(rast, rast, 'us', 'out[0] = rast0[0] * 0.2; out[1] = rast1[0] * 0.4;', null, 2)"))
+        .select("rast", "rast_2", "rast_3")
+      dfResult.collect().foreach { row =>
+        val rast = row.getAs[GridCoverage2D]("rast")
+        val rast2 = row.getAs[GridCoverage2D]("rast_2")
+        val rast3 = row.getAs[GridCoverage2D]("rast_3")
+        assert(rast2.getRenderedImage.getSampleModel.getDataType == DataBuffer.TYPE_USHORT)
+        assert(rast2.getNumSampleDimensions == 2)
+        assert(rast3.getRenderedImage.getSampleModel.getDataType == DataBuffer.TYPE_USHORT)
+        assert(rast3.getNumSampleDimensions == 2)
+        val band = MapAlgebra.bandAsArray(rast, 1)
+        Seq(rast2, rast3).foreach { resultRast =>
+          val resultBand1 = MapAlgebra.bandAsArray(resultRast, 1)
+          val resultBand2 = MapAlgebra.bandAsArray(resultRast, 2)
+          assert(band.size == resultBand1.size)
+          for (i <- band.indices) {
+            assert((band(i) * 0.2).toShort == resultBand1(i))
+            assert((band(i) * 0.4).toShort == resultBand2(i))
+          }
+        }
+      }
+    }
+
     it("Passed RS_AsMatrix with given band and precision") {
       val inputDf =
         Seq(Seq(1, 3.333333, 4, 0.0001, 2.2222, 9, 10, 11.11111111, 3, 4, 5, 6)).toDF("band")

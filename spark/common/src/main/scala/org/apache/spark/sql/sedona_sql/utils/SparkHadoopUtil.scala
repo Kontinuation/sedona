@@ -40,7 +40,7 @@ object SparkHadoopUtil {
 
     // Add wherobots specific configurations to the Hadoop configuration
     sparkConf.getAllWithPrefix("spark.wherobots.").foreach { case (key, value) =>
-      hadoopConf.set(key.stripPrefix("spark."), value)
+      hadoopConf.set("wherobots." + key, value)
     }
 
     hadoopConf

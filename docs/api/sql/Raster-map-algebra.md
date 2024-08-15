@@ -36,6 +36,19 @@ Spark SQL Example for two raster input `RS_MapAlgebra`:
 RS_MapAlgebra(rast0, rast1, 'D', 'out = rast0[0] * 0.5 + rast1[0] * 0.5;', null)
 ```
 
+As of version `v1.7.0`, the `RS_MapAlgebra` function supports returning multi-band rasters:
+
+```
+RS_MapAlgebra(rast: Raster, pixelType: String, script: String, noDataValue: Double, numBands: Int)
+RS_MapAlgebra(rast0: Raster, rast1: Raster, pixelType: String, script: String, noDataValue: Double, numBands: Int)
+```
+
+The number of bands in the output raster should be passed into the `numBands` parameter. The output band can be specified in the same way as with the input rasters in the script, e.g:
+
+```sql
+SELECT RS_MapAlgebra(rast, 'D', 'out[0] = rast[0] - rast[1]; out[1] = rast[0] + rast[1];', null, 2) FROM raster_table
+```
+
 `RS_MapAlgebra` also has good performance, since it is backed by [Jiffle](https://github.com/geosolutions-it/jai-ext/wiki/Jiffle) and can be compiled to Java bytecode for
 execution. We'll demonstrate both approaches to implementing commonly used map algebra operations.
 
