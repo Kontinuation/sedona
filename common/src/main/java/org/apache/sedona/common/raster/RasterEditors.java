@@ -21,8 +21,6 @@ package org.apache.sedona.common.raster;
 import static org.apache.sedona.common.raster.MapAlgebra.addBandFromArray;
 import static org.apache.sedona.common.raster.MapAlgebra.bandAsArray;
 
-import it.geosolutions.jaiext.ConcurrentOperationRegistry;
-import it.geosolutions.jaiext.JAIExt;
 import java.awt.geom.Point2D;
 import java.awt.image.*;
 import java.util.ArrayList;
@@ -32,10 +30,9 @@ import java.util.Map;
 import java.util.Objects;
 import javax.media.jai.Interpolation;
 import javax.media.jai.RasterFactory;
-import javax.media.jai.registry.RenderedRegistryMode;
 import org.apache.sedona.common.FunctionsGeoTools;
 import org.apache.sedona.common.raster.TileGenerator.TileIterator;
-import org.apache.sedona.common.raster.workarounds.jaiext.SedonaBandMergeCRIF;
+import org.apache.sedona.common.raster.workarounds.RuntimePatches;
 import org.apache.sedona.common.utils.ImageUtils;
 import org.apache.sedona.common.utils.RasterInterpolate;
 import org.apache.sedona.common.utils.RasterUtils;
@@ -753,13 +750,7 @@ public class RasterEditors {
    * @return Stacked raster
    */
   public static GridCoverage2D stackRasters(GridCoverage2D[] rasters, int refRasterIndex) {
-    // HACK: Patch a bug of the BandMerge operator in JAI-Ext. Please see the following link for
-    // more details:
-    // https://github.com/geosolutions-it/jai-ext/issues/299
-    ConcurrentOperationRegistry registry = JAIExt.getRegistry();
-    Object factory = new SedonaBandMergeCRIF();
-    registry.registerFactory(
-        RenderedRegistryMode.MODE_NAME, "BandMerge", "it.geosolutions.jaiext", factory);
+    RuntimePatches.patchBandMerge();
 
     List<Integer> dataTypes = new ArrayList<>();
     for (GridCoverage2D raster : rasters) {

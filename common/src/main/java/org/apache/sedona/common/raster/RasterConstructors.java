@@ -36,16 +36,17 @@ import org.apache.sedona.common.raster.netcdf.NetCdfReader;
 import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbResourcePool;
+import org.apache.sedona.common.raster.workarounds.RuntimePatches;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
+import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.feature.DefaultFeatureCollection;
 import org.geotools.feature.simple.SimpleFeatureBuilder;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.gce.arcgrid.ArcGridReader;
-import org.geotools.gce.geotiff.GeoTiffReader;
 import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
@@ -67,6 +68,7 @@ import ucar.nc2.NetcdfFile;
 import ucar.nc2.NetcdfFiles;
 
 public class RasterConstructors {
+
   public static GridCoverage2D fromArcInfoAsciiGrid(byte[] bytes) throws IOException {
     ArcGridReader reader =
         new ArcGridReader(
@@ -80,8 +82,8 @@ public class RasterConstructors {
   }
 
   public static GridCoverage2D fromGeoTiff(byte[] bytes, boolean autoRescale) throws IOException {
-    GeoTiffReader geoTiffReader =
-        new GeoTiffReader(
+    AbstractGridCoverage2DReader geoTiffReader =
+        RuntimePatches.createGeoTiffReader(
             new ByteArrayImageInputStream(bytes),
             new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE));
     ParameterValue<Boolean> rescalePixels = AbstractGridFormat.RESCALE_PIXELS.createValue();

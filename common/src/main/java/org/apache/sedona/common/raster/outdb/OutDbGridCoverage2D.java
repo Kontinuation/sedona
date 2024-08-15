@@ -40,6 +40,7 @@ import org.apache.sedona.common.raster.serde.CRSSerializer;
 import org.apache.sedona.common.raster.serde.GridEnvelopeSerializer;
 import org.apache.sedona.common.raster.serde.GridSampleDimensionSerializer;
 import org.apache.sedona.common.raster.serde.KryoUtil;
+import org.apache.sedona.common.raster.workarounds.RuntimePatches;
 import org.apache.sedona.common.utils.ImageUtils;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.TypeMap;
@@ -583,7 +584,11 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
     ParameterValue<Boolean> rescalePixels = AbstractGridFormat.RESCALE_PIXELS.createValue();
     rescalePixels.setValue(rescale);
     GeneralParameterValue[] parameters = {rescalePixels};
-    return format.getReader(stream, hints).read(parameters);
+    if (format instanceof GeoTiffFormat) {
+      return RuntimePatches.createGeoTiffReader(stream, hints).read(parameters);
+    } else {
+      return format.getReader(stream, hints).read(parameters);
+    }
   }
 
   /**

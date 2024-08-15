@@ -119,6 +119,33 @@ public class RasterConstructorsTest extends RasterTestBase {
   }
 
   @Test
+  public void fromGeoTiffLZWPredictor3() throws IOException {
+    byte[] content =
+        Files.readAllBytes(
+            Paths.get(resourceFolder + "raster_geotiff_usgs/USGS_13_pred_clip_ref.tif"));
+    GridCoverage2D ref = RasterConstructors.fromGeoTiff(content);
+    int dataType = ref.getRenderedImage().getSampleModel().getDataType();
+    assertEquals(DataBuffer.TYPE_FLOAT, dataType);
+
+    String[] paths = {
+      resourceFolder + "raster_geotiff_usgs/USGS_13_pred_clip_deflate_pred_2.tif",
+      resourceFolder + "raster_geotiff_usgs/USGS_13_pred_clip_deflate_pred_3.tif",
+      resourceFolder + "raster_geotiff_usgs/USGS_13_pred_clip_lzw_pred_2.tif",
+      resourceFolder + "raster_geotiff_usgs/USGS_13_pred_clip_lzw_pred_3.tif"
+    };
+    for (String path : paths) {
+      byte[] content2 = Files.readAllBytes(Paths.get(path));
+      GridCoverage2D gridCoverage2D = RasterConstructors.fromGeoTiff(content2);
+      dataType = gridCoverage2D.getRenderedImage().getSampleModel().getDataType();
+      assertEquals(DataBuffer.TYPE_FLOAT, dataType);
+      assertSameCoverage(ref, gridCoverage2D);
+      gridCoverage2D.dispose(true);
+    }
+
+    ref.dispose(true);
+  }
+
+  @Test
   public void fromPath() throws IOException, ClassNotFoundException {
     Configuration conf = new Configuration();
     byte[] serializedConf = HadoopConfigSerializer.serialize(conf);
@@ -156,6 +183,37 @@ public class RasterConstructorsTest extends RasterTestBase {
       raster.dispose(true);
       raster2.dispose(true);
     }
+  }
+
+  @Test
+  public void fromGeoTiffLZWPredictor3OutDb() throws IOException {
+    Configuration conf = new Configuration();
+    byte[] serializedConf = HadoopConfigSerializer.serialize(conf);
+    GridCoverage2D ref =
+        RasterConstructors.fromPath(
+            resourceFolder + "raster_geotiff_usgs/USGS_13_pred_clip_ref.tif",
+            serializedConf,
+            null,
+            false);
+    int dataType = ref.getRenderedImage().getSampleModel().getDataType();
+    assertEquals(DataBuffer.TYPE_FLOAT, dataType);
+
+    String[] paths = {
+      resourceFolder + "raster_geotiff_usgs/USGS_13_pred_clip_deflate_pred_2.tif",
+      resourceFolder + "raster_geotiff_usgs/USGS_13_pred_clip_deflate_pred_3.tif",
+      resourceFolder + "raster_geotiff_usgs/USGS_13_pred_clip_lzw_pred_2.tif",
+      resourceFolder + "raster_geotiff_usgs/USGS_13_pred_clip_lzw_pred_3.tif"
+    };
+    for (String path : paths) {
+      GridCoverage2D gridCoverage2D =
+          RasterConstructors.fromPath(path, serializedConf, null, false);
+      dataType = gridCoverage2D.getRenderedImage().getSampleModel().getDataType();
+      assertEquals(DataBuffer.TYPE_FLOAT, dataType);
+      assertSameCoverage(ref, gridCoverage2D);
+      gridCoverage2D.dispose(true);
+    }
+
+    ref.dispose(true);
   }
 
   @Test
