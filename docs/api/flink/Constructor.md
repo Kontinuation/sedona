@@ -235,6 +235,8 @@ Introduction: Construct a Geometry from WKT. Alias of  [ST_GeomFromWKT](#st_geom
 Format:
 `ST_GeomFromText (Wkt: String)`
 
+`ST_GeomFromText (Wkt: String, srid: Integer)`
+
 Since: `v1.2.1`
 
 Example:
@@ -303,6 +305,8 @@ Introduction: Construct a Geometry from WKT
 
 Format:
 `ST_GeomFromWKT (Wkt: String)`
+
+`ST_GeomFromWKT (Wkt: String, srid: Integer)`
 
 Since: `v1.2.0`
 
@@ -448,7 +452,11 @@ LINESTRING (-2.1047439575195312 -0.354827880859375, -1.49606454372406 -0.6676061
 
 Introduction: Construct a MultiLineString from Text and Optional SRID
 
-Format: `ST_MLineFromText (Text: String, Srid: Integer)`
+Format:
+
+`ST_MLineFromText (Wkt: String)`
+
+`ST_MLineFromText (Wkt: String, Srid: Integer)`
 
 Since: `1.3.1`
 
@@ -492,7 +500,11 @@ MULTIPOINT ((10 10), (20 20), (30 30))
 
 Introduction: Construct a MultiPolygon from Text and Optional SRID
 
-Format: `ST_MPolyFromText (Text: String, Srid: Integer)`
+Format:
+
+`ST_MPolyFromText (Wkt: String)`
+
+`ST_MPolyFromText (Wkt: String, Srid: Integer)`
 
 Since: `1.3.1`
 
