@@ -38,6 +38,7 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
     .config("spark.sql.warehouse.dir", warehouseLocation)
     // We need to be explicit about broadcasting in tests.
     .config("sedona.join.autoBroadcastJoinThreshold", "-1")
+    .config("spark.sedona.enableParserExtensions", "true")
     .getOrCreate()
 
   val resourceFolder = System.getProperty("user.dir") + "/../common/src/test/resources/"

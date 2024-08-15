@@ -78,7 +78,9 @@ object SedonaContext {
     UdtRegistrator.registerAll()
     UdfRegistrator.registerAll(sparkSession)
     ListenerRegistrator.registerAll(sparkSession)
-    ParserRegistrator.register(sparkSession)
+    if (sparkSession.conf.get("spark.sedona.enableParserExtensions", "false").toBoolean) {
+      ParserRegistrator.register(sparkSession)
+    }
     jsc = new JavaSparkContext(sparkSession.sparkContext)
     jconf = jsc.getConf
     try {
