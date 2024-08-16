@@ -351,28 +351,41 @@ public class ZOrderPartitioningTest extends TestCase {
     // Test 1: boundary with range 10 in x and y
     zOrderPartitioning = new ZOrderPartitioning(new Envelope(0, 10, 0, 10), 4);
     assertEquals(
-        10_000_000, zOrderPartitioning.calculateScaleFactorForRange(new Envelope(0, 10, 0, 10)));
+        1.0E7, zOrderPartitioning.calculateScaleFactorForRange(new Envelope(0, 10, 0, 10)));
 
     // Test 2: boundary with range 100 in x and y
     zOrderPartitioning = new ZOrderPartitioning(new Envelope(0, 100, 0, 100), 4);
     assertEquals(
-        1_000_000, zOrderPartitioning.calculateScaleFactorForRange(new Envelope(0, 100, 0, 100)));
+        1.0E6, zOrderPartitioning.calculateScaleFactorForRange(new Envelope(0, 100, 0, 100)));
 
     // Test 3: boundary with range 1000 in x and y
     zOrderPartitioning = new ZOrderPartitioning(new Envelope(0, 1000, 0, 1000), 4);
     assertEquals(
-        100_000, zOrderPartitioning.calculateScaleFactorForRange(new Envelope(0, 1000, 0, 1000)));
+        1.0E5, zOrderPartitioning.calculateScaleFactorForRange(new Envelope(0, 1000, 0, 1000)));
 
     // Test 4: boundary with range 0.1 in x and y
     zOrderPartitioning = new ZOrderPartitioning(new Envelope(0, 0.1, 0, 0.1), 4);
     assertEquals(
-        1_000_000_000,
-        zOrderPartitioning.calculateScaleFactorForRange(new Envelope(0, 0.1, 0, 0.1)));
+        1.0E9, zOrderPartitioning.calculateScaleFactorForRange(new Envelope(0, 0.1, 0, 0.1)));
 
-    // Test 45: boundary with range -180, 180 in x and y
+    // Test 5: boundary with range -180, 180 in x and y
     zOrderPartitioning = new ZOrderPartitioning(new Envelope(-180, 180, -180, 180), 4);
     assertEquals(
-        1_000_000_000,
-        zOrderPartitioning.calculateScaleFactorForRange(new Envelope(0, 0.1, 0, 0.1)));
+        1.0E9, zOrderPartitioning.calculateScaleFactorForRange(new Envelope(0, 0.1, 0, 0.1)));
+
+    // Test 8: boundary with large range (projection coordinates)
+    zOrderPartitioning =
+        new ZOrderPartitioning(new Envelope(349999, 13877025, -14430592, 5572088), 4);
+    assertEquals(
+        1.0E1,
+        zOrderPartitioning.calculateScaleFactorForRange(
+            new Envelope(349999, 13877025, -14430592, 5572088)));
+
+    // Test 9: boundary with extremely large range requiring a scale factor of 0.1 or 0.01
+    // Create an instance of the class containing the calculateScaleFactorForRange method
+    zOrderPartitioning = new ZOrderPartitioning(new Envelope(-1e9, 1e9, -1e9, 1e9), 4);
+    assertEquals(
+        1.0E-1,
+        zOrderPartitioning.calculateScaleFactorForRange(new Envelope(-1e9, 1e9, -1e9, 1e9)));
   }
 }

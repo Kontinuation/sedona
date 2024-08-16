@@ -28,7 +28,7 @@ import org.locationtech.jts.geom.Envelope;
 public class ZOrderPartitioning implements Serializable {
 
   // scale factor for coordinates
-  private final int coordScaleFactor;
+  private final double coordScaleFactor;
   // correction factor for Z-order range expansion due to ordering differences between Z-order and
   // Euclidean distance
   public static final int ZORDER_CORRECTION_FACTOR = 4;
@@ -160,7 +160,7 @@ public class ZOrderPartitioning implements Serializable {
     return adjustedRanges;
   }
 
-  public int calculateScaleFactorForRange(Envelope boundary) {
+  public double calculateScaleFactorForRange(Envelope boundary) {
     double minX = boundary.getMinX();
     double maxX = boundary.getMaxX();
     double minY = boundary.getMinY();
@@ -175,7 +175,15 @@ public class ZOrderPartitioning implements Serializable {
     // Calculate the initial scale factor
     double initialScaleFactor = (double) Integer.MAX_VALUE / maxRange;
 
-    return (int) Math.pow(10, Math.floor(Math.log10(initialScaleFactor)) - 1);
+    // Calculate the scale factor as a power of 10
+    double scaleFactor = Math.pow(10, Math.floor(Math.log10(initialScaleFactor)) - 1);
+
+    // Ensure the scale factor doesn't result in values exceeding the Integer range
+    while ((maxRange * scaleFactor) > Integer.MAX_VALUE) {
+      scaleFactor /= 10;
+    }
+
+    return scaleFactor;
   }
 
   // Method to calculate the correction factor for Z-order range expansion
@@ -195,14 +203,14 @@ public class ZOrderPartitioning implements Serializable {
     return calculateZOrder(envelope, coordScaleFactor);
   }
 
-  private static long calculateZOrder(Envelope envelope, int precision) {
+  private static long calculateZOrder(Envelope envelope, double precision) {
     int x = scaleAndConvert((envelope.getMinX() + envelope.getMaxX()) / 2, precision);
     int y = scaleAndConvert((envelope.getMinY() + envelope.getMaxY()) / 2, precision);
     return interleaveBits(x, y);
   }
 
   // Method to calculate the Z-order value for a given coordinate with specified precision
-  private long calculateZOrder(Coordinate coordinate, int precision) {
+  private long calculateZOrder(Coordinate coordinate, double precision) {
     // Scale the coordinates and convert to integers
     int x = scaleAndConvert(coordinate.x, precision);
     int y = scaleAndConvert(coordinate.y, precision);
@@ -210,7 +218,7 @@ public class ZOrderPartitioning implements Serializable {
   }
 
   // Method to scale and convert double to int
-  private static int scaleAndConvert(double value, int precision) {
+  private static int scaleAndConvert(double value, double precision) {
     return (int) (value * precision);
   }
 
