@@ -57,6 +57,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
   override def beforeAll(): Unit = {
     super.beforeAll()
     prepareTempViewsForTestData()
+    prepareTempViewsForDifferentPartitionsTestData()
     prepareTempViewsForSkewedTestData()
   }
 
@@ -285,6 +286,24 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     it("KNN Join should support broadcast join hints - right") {
       val df = sparkSession.sql(
         s"SELECT /*+ BROADCAST(OBJECTS) */ QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, true)")
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.length should be(3 * 4) // 3 queries and 4 neighbors each
+      resultAll.mkString should be(
+        "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19]")
+    }
+
+    it("KNN Join should support broadcast join hints with different partitions - left") {
+      val df = sparkSession.sql(
+        s"SELECT /*+ BROADCAST(QUERIES_PAR2) */ QUERIES_PAR2.ID, OBJECTS_PAR4.ID FROM QUERIES_PAR2 JOIN OBJECTS_PAR4 ON ST_KNN(QUERIES_PAR2.GEOM, OBJECTS_PAR4.GEOM, 4, true)")
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.length should be(3 * 4) // 3 queries and 4 neighbors each
+      resultAll.mkString should be(
+        "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19]")
+    }
+
+    it("KNN Join should support broadcast join hints with different partitions - right") {
+      val df = sparkSession.sql(
+        s"SELECT /*+ BROADCAST(OBJECTS_PAR4) */ QUERIES_PAR2.ID, OBJECTS_PAR4.ID FROM QUERIES_PAR2 JOIN OBJECTS_PAR4 ON ST_KNN(QUERIES_PAR2.GEOM, OBJECTS_PAR4.GEOM, 4, true)")
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
       resultAll.length should be(3 * 4) // 3 queries and 4 neighbors each
       resultAll.mkString should be(
@@ -586,6 +605,30 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
 
     df1.createOrReplaceTempView("df1")
     df2.createOrReplaceTempView("df2")
+    (df1, df2)
+  }
+
+  private def prepareTempViewsForDifferentPartitionsTestData(): (DataFrame, DataFrame) = {
+    val df1 = sparkSession.read
+      .format("csv")
+      .option("header", "false")
+      .option("delimiter", testDataDelimiter)
+      .load(knnPointsLocationQueries)
+      .withColumn("id", col("_c0").cast(IntegerType))
+      .withColumn("geom", ST_GeomFromText(new Column("_c1")))
+      .withColumn("shape", col("_c1"))
+      .select("id", "geom", "shape")
+    val df2 = sparkSession.read
+      .format("csv")
+      .option("header", "false")
+      .option("delimiter", testDataDelimiter)
+      .load(knnPointsLocationObjects)
+      .withColumn("id", col("_c0").cast(IntegerType))
+      .withColumn("geom", ST_GeomFromText(new Column("_c1")))
+      .withColumn("shape", col("_c1"))
+      .select("id", "geom", "shape")
+    df1.repartition(2).createOrReplaceTempView("queries_par2")
+    df2.repartition(4).createOrReplaceTempView("objects_par4")
     (df1, df2)
   }
 

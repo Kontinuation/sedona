@@ -891,7 +891,12 @@ public class JoinQuery {
               streamCount,
               resultCount,
               candidateCount);
-      joinResult = queryRDD.rawSpatialRDD.zipPartitions(objectRDD.rawSpatialRDD, judgement);
+      int numPartitionsObjects = objectRDD.rawSpatialRDD.getNumPartitions();
+      joinResult =
+          queryRDD
+              .rawSpatialRDD
+              .repartition(numPartitionsObjects)
+              .zipPartitions(objectRDD.rawSpatialRDD, judgement);
     } else {
       throw new IllegalArgumentException("No index found on the input RDDs.");
     }
