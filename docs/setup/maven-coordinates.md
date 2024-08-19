@@ -40,7 +40,7 @@ The optional GeoTools library is required if you want to use CRS transformation,
 		</dependency>
 		```
 
-	=== "Spark 3.4+ and Scala 2.12"
+	=== "Spark 3.4 and Scala 2.12"
 
 		```xml
 		<dependency>
@@ -99,7 +99,7 @@ The optional GeoTools library is required if you want to use CRS transformation,
 		</dependency>
 		```
 
-	=== "Spark 3.4+ and Scala 2.13"
+	=== "Spark 3.4 and Scala 2.13"
 
 		```xml
 		<dependency>
@@ -262,7 +262,7 @@ The optional GeoTools library is required if you want to use CRS transformation,
 		    <version>{{ sedona.current_geotools }}</version>
 		</dependency>
 		```
-	=== "Spark 3.4+ and Scala 2.12"
+	=== "Spark 3.4 and Scala 2.12"
 		```xml
 		<dependency>
 		  <groupId>org.apache.sedona</groupId>
@@ -336,7 +336,7 @@ The optional GeoTools library is required if you want to use CRS transformation,
 		    <version>{{ sedona.current_geotools }}</version>
 		</dependency>
 		```
-	=== "Spark 3.4+ and Scala 2.13"
+	=== "Spark 3.4 and Scala 2.13"
 		```xml
 		<dependency>
 		  <groupId>org.apache.sedona</groupId>
