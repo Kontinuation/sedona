@@ -1,5 +1,5 @@
 
-Sedona supports nearest-neighhour searching on geospatial data by providing a geospatial k-Nearest Neighbors (kNN) join method. This method involves identifying the k-nearest neighbors for a given spatial point or region based on geographic proximity, typically using spatial coordinates and a suitable distance metric like Euclidean or great-circle distance.
+Sedona supports nearest-neighbour searching on geospatial data by providing a geospatial k-Nearest Neighbors (kNN) join method. This method involves identifying the k-nearest neighbors for a given spatial point or region based on geographic proximity, typically using spatial coordinates and a suitable distance metric like Euclidean or great-circle distance.
 
 ## ST_KNN
 
@@ -18,8 +18,6 @@ In case there are ties in the distance, the result will include all the tied geo
 ```
 spark.sedona.join.knn.includeTieBreakers=true
 ```
-
-Since: `v1.6.1`
 
 SQL Example
 
@@ -96,8 +94,6 @@ Introduction: join operation to find the k-nearest neighbors of a point or regio
 Format: `ST_AKNN(R: Table, S: Table, k: Integer, use_spheroid: Boolean)`
 
 The `ST_AKNN` function is similar to `ST_KNN`, but it uses approximate algorithms to find the k-nearest neighbors. This can be useful for large datasets where exact kNN search is computationally expensive. The trade-off is that approximate algorithms may not always return the exact k-nearest neighbors, but they provide a good approximation in a reasonable amount of time.
-
-Since: `v1.6.1`
 
 SQL Example
 
