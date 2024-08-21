@@ -105,6 +105,13 @@ object SedonaContext {
       case e: NoSuchElementException =>
         logger.warn("Python files are not set. Sedona will not pre-load Python UDFs.")
     }
+
+    // Set checkpoint dir by default for WBC
+    val checkpointDir = sparkSession.conf.getOption("spark.wherobots.checkpoint.dir")
+    if (checkpointDir.isDefined) {
+      sparkSession.sparkContext.setCheckpointDir(checkpointDir.get)
+    }
+
     sparkSession
   }
 
