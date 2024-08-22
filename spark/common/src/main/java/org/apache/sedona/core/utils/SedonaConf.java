@@ -102,6 +102,7 @@ public class SedonaConf implements Serializable {
   private double skewnessCutoffRatioInKNNJoins = 1.0;
   private int skewnessMinimumMBRCountInKNNJoins = 100;
   private int skewnessMaximumMBRDividesInKNNJoins = 100;
+  private boolean enableParallelPartitioningInKNNJoins = true;
 
   // Parameters for testing
   private boolean allowPlanBroadcastJoin;
@@ -272,6 +273,10 @@ public class SedonaConf implements Serializable {
     this.skewnessMaximumMBRDividesInKNNJoins =
         Integer.parseInt(
             runtimeConfig.get("spark.sedona.join.knn.skewnessMaximumMBRDivides", "100"));
+
+    this.enableParallelPartitioningInKNNJoins =
+        Boolean.parseBoolean(
+            runtimeConfig.get("spark.sedona.join.knn.enableParallelPartitioning", "true"));
 
     // Parameters for testing
     this.allowPlanBroadcastJoin =
@@ -493,6 +498,10 @@ public class SedonaConf implements Serializable {
 
   public int getSkewnessMaximumMBRDividesInKNNJoins() {
     return skewnessMaximumMBRDividesInKNNJoins;
+  }
+
+  public boolean isEnableParallelPartitioningInKNNJoins() {
+    return enableParallelPartitioningInKNNJoins;
   }
 
   public boolean allowPlanBroadcastJoin() {

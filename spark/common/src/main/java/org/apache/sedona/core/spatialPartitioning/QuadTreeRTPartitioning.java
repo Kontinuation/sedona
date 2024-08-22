@@ -21,6 +21,9 @@ package org.apache.sedona.core.spatialPartitioning;
 import static org.apache.sedona.core.formatMapper.shapefileParser.ShapefileRDD.geometryFactory;
 
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
 import org.apache.sedona.core.knnJudgement.EuclideanItemDistance;
@@ -47,6 +50,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
   private double skewnessCutoffRatio = 1.0;
   private double skewnessMinimumMBRCount = 100;
   private int skewnessMaximumMBRDivides = 100;
+  private boolean enableParallelPartitioning = true;
 
   // A query-only R-tree created using the Sort-Tile-Recursive (STR) algorithm.
   private STRtree strTree;
@@ -111,46 +115,26 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
 
     double minimalGridWidth = getMinimalEnvelopeWidth(partitionMBRs);
 
-    // For each MBR in the quad-tree
-    for (QuadRectangle quadRect : partitionMBRs) {
-      Envelope partitionMBR = quadRect.getEnvelope();
-
-      // Calculate the centroid of each MBR in the STR tree
-      double centroidX = (partitionMBR.getMinX() + partitionMBR.getMaxX()) / 2.0;
-      double centroidY = (partitionMBR.getMinY() + partitionMBR.getMaxY()) / 2.0;
-      Coordinate centroidCoord = new Coordinate(centroidX, centroidY);
-      Point centroid = geometryFactory.createPoint(centroidCoord);
-
-      // Compute the maximum distance ui from the centroid to any point inside the partition
-      double ui = getUi(centroid, partitionMBR);
-
-      // Calculate the maximum distance from the centroid to the k-nearest neighbors in the samples
-      double maxDistance = getMaxDistanceFromSamples(k, sampleTree, centroid);
-      List<Envelope> intersectingMBRs =
-          getMBRIntersectEnvelopes(ui, maxDistance, centroidX, centroidY);
-
-      // Calculate the MBRs (Minimum Bounding Rectangles) that intersect with the circle.
-      // If the number of intersecting MBRs is too large, we optimize by considering all vertices of
-      // the MBRs to construct the circle.
-      if (isSkewed(intersectingMBRs, partitionMBRs)) {
-        int divide = (int) Math.ceil(quadRect.width / minimalGridWidth);
-        if (skewnessMaximumMBRDivides > 0 && divide > skewnessMaximumMBRDivides) {
-          log.debug(
-              "Found skewed partition, and the number of divides is too large: "
-                  + divide
-                  + " for partition: "
-                  + quadRect.partitionId
-                  + " with width: "
-                  + quadRect.width
-                  + " and minimalGridWidth: "
-                  + minimalGridWidth
-                  + ". Using the maximum number of divides: "
-                  + skewnessMaximumMBRDivides);
-          divide = skewnessMaximumMBRDivides;
-        }
-        intersectingMBRs = getEnvelopesForSubDividedGrids(k, partitionMBR, sampleTree, divide);
-      }
-      mbrs.put(quadRect.partitionId, intersectingMBRs);
+    if (isEnableParallelPartitioning()) {
+      processPartitions(
+          partitionMBRs,
+          mbrs,
+          k,
+          sampleTree,
+          geometryFactory,
+          minimalGridWidth,
+          skewnessMaximumMBRDivides,
+          true);
+    } else {
+      processPartitions(
+          partitionMBRs,
+          mbrs,
+          k,
+          sampleTree,
+          geometryFactory,
+          minimalGridWidth,
+          skewnessMaximumMBRDivides,
+          false);
     }
 
     // Construct a spatial index for the MBRs
@@ -163,6 +147,152 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
 
     // Return the STR tree
     return strTree;
+  }
+
+  public void processPartitions(
+      List<QuadRectangle> partitionMBRs,
+      Map<Integer, List<Envelope>> mbrs,
+      int k,
+      STRtree sampleTree,
+      GeometryFactory geometryFactory,
+      double minimalGridWidth,
+      int skewnessMaximumMBRDivides,
+      boolean parallel) {
+
+    if (parallel) {
+      processPartitionsInParallel(
+          partitionMBRs,
+          mbrs,
+          k,
+          sampleTree,
+          geometryFactory,
+          minimalGridWidth,
+          skewnessMaximumMBRDivides);
+    } else {
+      processPartitionsSequentially(
+          partitionMBRs,
+          mbrs,
+          k,
+          sampleTree,
+          geometryFactory,
+          minimalGridWidth,
+          skewnessMaximumMBRDivides);
+    }
+  }
+
+  private void processPartitionsInParallel(
+      List<QuadRectangle> partitionMBRs,
+      Map<Integer, List<Envelope>> mbrs,
+      int k,
+      STRtree sampleTree,
+      GeometryFactory geometryFactory,
+      double minimalGridWidth,
+      int skewnessMaximumMBRDivides) {
+
+    ExecutorService executor =
+        Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+
+    List<Future<Void>> futures = new ArrayList<>();
+
+    for (QuadRectangle quadRect : partitionMBRs) {
+      futures.add(
+          executor.submit(
+              () -> {
+                processPartition(
+                    partitionMBRs,
+                    quadRect,
+                    mbrs,
+                    k,
+                    sampleTree,
+                    geometryFactory,
+                    minimalGridWidth,
+                    skewnessMaximumMBRDivides);
+                return null;
+              }));
+    }
+
+    // Wait for all tasks to complete
+    for (Future<Void> future : futures) {
+      try {
+        future.get();
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+    }
+
+    executor.shutdown();
+  }
+
+  private void processPartitionsSequentially(
+      List<QuadRectangle> partitionMBRs,
+      Map<Integer, List<Envelope>> mbrs,
+      int k,
+      STRtree sampleTree,
+      GeometryFactory geometryFactory,
+      double minimalGridWidth,
+      int skewnessMaximumMBRDivides) {
+    for (QuadRectangle quadRect : partitionMBRs) {
+      processPartition(
+          partitionMBRs,
+          quadRect,
+          mbrs,
+          k,
+          sampleTree,
+          geometryFactory,
+          minimalGridWidth,
+          skewnessMaximumMBRDivides);
+    }
+  }
+
+  private void processPartition(
+      List<QuadRectangle> partitionMBRs,
+      QuadRectangle quadRect,
+      Map<Integer, List<Envelope>> mbrs,
+      int k,
+      STRtree sampleTree,
+      GeometryFactory geometryFactory,
+      double minimalGridWidth,
+      int skewnessMaximumMBRDivides) {
+
+    Envelope partitionMBR = quadRect.getEnvelope();
+
+    // Calculate the centroid of each MBR in the STR tree
+    double centroidX = (partitionMBR.getMinX() + partitionMBR.getMaxX()) / 2.0;
+    double centroidY = (partitionMBR.getMinY() + partitionMBR.getMaxY()) / 2.0;
+    Coordinate centroidCoord = new Coordinate(centroidX, centroidY);
+    Point centroid = geometryFactory.createPoint(centroidCoord);
+
+    // Compute the maximum distance ui from the centroid to any point inside the partition
+    double ui = getUi(centroid, partitionMBR);
+
+    // Calculate the maximum distance from the centroid to the k-nearest neighbors in the samples
+    double maxDistance = getMaxDistanceFromSamples(k, sampleTree, centroid);
+    List<Envelope> intersectingMBRs =
+        getMBRIntersectEnvelopes(ui, maxDistance, centroidX, centroidY);
+
+    // Calculate the MBRs (Minimum Bounding Rectangles) that intersect with the circle.
+    if (isSkewed(intersectingMBRs, partitionMBRs)) {
+      int divide = (int) Math.ceil(quadRect.width / minimalGridWidth);
+      if (skewnessMaximumMBRDivides > 0 && divide > skewnessMaximumMBRDivides) {
+        log.debug(
+            "Found skewed partition, and the number of divides is too large: "
+                + divide
+                + " for partition: "
+                + quadRect.partitionId
+                + " with width: "
+                + quadRect.width
+                + " and minimalGridWidth: "
+                + minimalGridWidth
+                + ". Using the maximum number of divides: "
+                + skewnessMaximumMBRDivides);
+        divide = skewnessMaximumMBRDivides;
+      }
+      intersectingMBRs = getEnvelopesForSubDividedGrids(k, partitionMBR, sampleTree, divide);
+    }
+
+    synchronized (mbrs) {
+      mbrs.put(quadRect.partitionId, intersectingMBRs);
+    }
   }
 
   /**
@@ -200,16 +330,31 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
    */
   private boolean isSkewed(List<Envelope> intersectingMBRs, List<QuadRectangle> partitionMBRs) {
     try {
-      if (sedonaConf == null) {
-        sedonaConf = SedonaConf.fromActiveSession();
-        skewnessCutoffRatio = sedonaConf.getSkewnessCutoffRatioInKNNJoins();
-        skewnessMinimumMBRCount = sedonaConf.getSkewnessMinimumMBRCountInKNNJoins();
-        skewnessMaximumMBRDivides = sedonaConf.getSkewnessMaximumMBRDividesInKNNJoins();
-      }
+      tryLoadConfig();
       return intersectingMBRs.size() > partitionMBRs.size() * skewnessCutoffRatio
           && partitionMBRs.size() > skewnessMinimumMBRCount;
     } catch (Exception e) {
       return false;
+    }
+  }
+
+  private boolean isEnableParallelPartitioning() {
+    try {
+      tryLoadConfig();
+      return enableParallelPartitioning;
+    } catch (Exception e) {
+      return true;
+    }
+  }
+
+  /** This function is used to load the Sedona configuration. */
+  private void tryLoadConfig() {
+    if (sedonaConf == null) {
+      sedonaConf = SedonaConf.fromActiveSession();
+      skewnessCutoffRatio = sedonaConf.getSkewnessCutoffRatioInKNNJoins();
+      skewnessMinimumMBRCount = sedonaConf.getSkewnessMinimumMBRCountInKNNJoins();
+      skewnessMaximumMBRDivides = sedonaConf.getSkewnessMaximumMBRDividesInKNNJoins();
+      enableParallelPartitioning = sedonaConf.isEnableParallelPartitioningInKNNJoins();
     }
   }
 

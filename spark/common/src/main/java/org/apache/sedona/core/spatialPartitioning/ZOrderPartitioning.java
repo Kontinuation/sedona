@@ -22,10 +22,12 @@ import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.Range;
+import org.apache.log4j.Logger;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 
 public class ZOrderPartitioning implements Serializable {
+  static final Logger log = Logger.getLogger(ZOrderPartitioning.class);
 
   // scale factor for coordinates
   private final double coordScaleFactor;
@@ -49,7 +51,7 @@ public class ZOrderPartitioning implements Serializable {
     this.boundary = boundary;
     this.numPartitions = numPartitions;
     this.coordScaleFactor = calculateScaleFactorForRange(boundary);
-    System.out.println("coordScaleFactor: " + coordScaleFactor);
+    log.info("ZOrderPartitioning coordScaleFactor: " + coordScaleFactor);
   }
 
   public List<Range<Long>> createZOrderRanges(List<Envelope> samples, int neighborSampleNumber) {
@@ -77,9 +79,6 @@ public class ZOrderPartitioning implements Serializable {
     // Calculate Z-order values for the boundary corners
     long minZBoundary = calculateZOrder(new Coordinate(boundary.getMinX(), boundary.getMinY()));
     long maxZBoundary = calculateZOrder(new Coordinate(boundary.getMaxX(), boundary.getMaxY()));
-
-    long minZBoundary2 = calculateZOrder(new Coordinate(boundary.getMinX(), boundary.getMaxY()));
-    long maxZBoundary2 = calculateZOrder(new Coordinate(boundary.getMaxX(), boundary.getMinY()));
 
     if (samples.isEmpty()) {
       // Return a single range covering the entire boundary from sample points
