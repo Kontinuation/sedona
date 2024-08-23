@@ -331,9 +331,263 @@ This prevents Spark from interpreting the property and allows us to use the ST_G
 		.printSchema())
 	```
 
-## Load Shapefile and GeoJSON using SpatialRDD
+## Load GeoJSON Data
 
-Shapefile and GeoJSON can be loaded by SpatialRDD and converted to DataFrame using Adapter. Please read [Load SpatialRDD](rdd.md#create-a-generic-spatialrdd) and [DataFrame <-> RDD](#convert-between-dataframe-and-spatialrdd).
+Since `v1.6.1`, Sedona supports reading GeoJSON files using the `geojson` data source. It is designed to handle JSON files that use [GeoJSON format](https://datatracker.ietf.org/doc/html/rfc7946) for their geometries.
+
+This includes SpatioTemporal Asset Catalog (STAC) files, GeoJSON features, GeoJSON feature collections and other variations.
+The key functionality lies in the way 'geometry' fields are processed: these are specifically read as Sedona's `GeometryUDT` type, ensuring integration with Sedona's suite of spatial functions.
+
+### Key features
+
+- Broad Support: The reader and writer are versatile, supporting all GeoJSON-formatted files, including STAC files, feature collections, and more.
+- Geometry Transformation: When reading, fields named 'geometry' are automatically converted from GeoJSON format to Sedona's `GeometryUDT` type and vice versa when writing.
+
+### Load MultiLine GeoJSON FeatureCollection
+
+Suppose we have a GeoJSON FeatureCollection file as follows.
+This entire file is considered as a single GeoJSON FeatureCollection object.
+Multiline format is preferable for scenarios where files need to be human-readable or manually edited.
+
+```json
+{ "type": "FeatureCollection",
+    "features": [
+      { "type": "Feature",
+        "geometry": {"type": "Point", "coordinates": [102.0, 0.5]},
+        "properties": {"prop0": "value0"}
+        },
+      { "type": "Feature",
+        "geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [102.0, 0.0], [103.0, 1.0], [104.0, 0.0], [105.0, 1.0]
+            ]
+          },
+        "properties": {
+          "prop0": "value1",
+          "prop1": 0.0
+          }
+        },
+      { "type": "Feature",
+         "geometry": {
+           "type": "Polygon",
+           "coordinates": [
+             [ [100.0, 0.0], [101.0, 0.0], [101.0, 1.0],
+               [100.0, 1.0], [100.0, 0.0] ]
+             ]
+         },
+         "properties": {
+           "prop0": "value2",
+           "prop1": {"this": "that"}
+           }
+         }
+       ]
+}
+```
+
+Set the `multiLine` option to `True` to read multiline GeoJSON files.
+
+=== "Python"
+
+    ```python
+    df = sedona.read.format("geojson").option("multiLine", "true").load("PATH/TO/MYFILE.json")
+     .selectExpr("explode(features) as features") # Explode the envelope to get one feature per row.
+     .select("features.*") # Unpack the features struct.
+     .withColumn("prop0", f.expr("properties['prop0']")).drop("properties").drop("type")
+
+    df.show()
+    df.printSchema()
+    ```
+
+=== "Scala"
+
+    ```scala
+    val df = sedona.read.format("geojson").option("multiLine", "true").load("PATH/TO/MYFILE.json")
+    val parsedDf = df.selectExpr("explode(features) as features").select("features.*")
+            .withColumn("prop0", expr("properties['prop0']")).drop("properties").drop("type")
+
+    parsedDf.show()
+    parsedDf.printSchema()
+    ```
+
+=== "Java"
+
+    ```java
+    Dataset<Row> df = sedona.read.format("geojson").option("multiLine", "true").load("PATH/TO/MYFILE.json")
+     .selectExpr("explode(features) as features") // Explode the envelope to get one feature per row.
+     .select("features.*") // Unpack the features struct.
+     .withColumn("prop0", expr("properties['prop0']")).drop("properties").drop("type")
+
+    df.show();
+    df.printSchema();
+    ```
+
+The output is as follows:
+
+```
++--------------------+------+
+|            geometry| prop0|
++--------------------+------+
+|     POINT (102 0.5)|value0|
+|LINESTRING (102 0...|value1|
+|POLYGON ((100 0, ...|value2|
++--------------------+------+
+
+root
+ |-- geometry: geometry (nullable = false)
+ |-- prop0: string (nullable = true)
+
+```
+
+### Load Single Line GeoJSON Features
+
+Suppose we have a single-line GeoJSON Features dataset as follows. Each line is a single GeoJSON Feature.
+This format is efficient for processing large datasets where each line is a separate, self-contained GeoJSON object.
+
+```json
+{"type":"Feature","geometry":{"type":"Point","coordinates":[102.0,0.5]},"properties":{"prop0":"value0"}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[102.0,0.0],[103.0,1.0],[104.0,0.0],[105.0,1.0]]},"properties":{"prop0":"value1"}}
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[100.0,0.0],[101.0,0.0],[101.0,1.0],[100.0,1.0],[100.0,0.0]]]},"properties":{"prop0":"value2"}}
+```
+
+By default, when `option` is not specified, Sedona reads a GeoJSON file as a single line GeoJSON.
+
+=== "Python"
+
+	```python
+	df = sedona.read.format("geojson").load("PATH/TO/MYFILE.json")
+	   .withColumn("prop0", f.expr("properties['prop0']")).drop("properties").drop("type")
+
+	df.show()
+	df.printSchema()
+	```
+
+=== "Scala"
+
+	```scala
+	val df = sedona.read.format("geojson").load("PATH/TO/MYFILE.json")
+	   .withColumn("prop0", expr("properties['prop0']")).drop("properties").drop("type")
+
+	df.show()
+	df.printSchema()
+	```
+
+=== "Java"
+
+	```java
+	Dataset<Row> df = sedona.read.format("geojson").load("PATH/TO/MYFILE.json")
+	   .withColumn("prop0", expr("properties['prop0']")).drop("properties").drop("type")
+
+	df.show()
+	df.printSchema()
+	```
+
+The output is as follows:
+
+```
++--------------------+------+
+|            geometry| prop0|
++--------------------+------+
+|     POINT (102 0.5)|value0|
+|LINESTRING (102 0...|value1|
+|POLYGON ((100 0, ...|value2|
++--------------------+------+
+
+root
+ |-- geometry: geometry (nullable = false)
+ |-- prop0: string (nullable = true)
+```
+
+## Load Shapefile
+
+Since v`1.7.0`, Sedona supports loading Shapefile as a DataFrame.
+
+=== "Scala/Java"
+
+    ```scala
+    val df = sedona.read.format("shapefile").load("/path/to/shapefile")
+    ```
+
+=== "Java"
+
+    ```java
+    Dataset<Row> df = sedona.read().format("shapefile").load("/path/to/shapefile")
+    ```
+
+=== "Python"
+
+    ```python
+    df = sedona.read.format("shapefile").load("/path/to/shapefile")
+    ```
+
+The input path can be a directory containing one or multiple shapefiles, or path to a `.shp` file.
+
+- When the input path is a directory, all shapefiles directly under the directory will be loaded. If you want to load all shapefiles in subdirectories, please specify `.option("recursiveFileLookup", "true")`.
+- When the input path is a `.shp` file, that shapefile will be loaded. Sedona will look for sibling files (`.dbf`, `.shx`, etc.) with the same main file name and load them automatically.
+
+The name of the geometry column is `geometry` by default. You can change the name of the geometry column using the `geometry.name` option. If one of the non-spatial attributes is named "geometry", `geometry.name` must be configured to avoid conflict.
+
+=== "Scala/Java"
+
+    ```scala
+    val df = sedona.read.format("shapefile").option("geometry.name", "geom").load("/path/to/shapefile")
+    ```
+
+=== "Java"
+
+    ```java
+    Dataset<Row> df = sedona.read().format("shapefile").option("geometry.name", "geom").load("/path/to/shapefile")
+    ```
+
+=== "Python"
+
+    ```python
+    df = sedona.read.format("shapefile").option("geometry.name", "geom").load("/path/to/shapefile")
+    ```
+
+Each record in shapefile has a unique record number, that record number is not loaded by default. If you want to include record number in the loaded DataFrame, you can set the `key.name` option to the name of the record number column:
+
+=== "Scala/Java"
+
+    ```scala
+    val df = sedona.read.format("shapefile").option("key.name", "FID").load("/path/to/shapefile")
+    ```
+
+=== "Java"
+
+    ```java
+    Dataset<Row> df = sedona.read().format("shapefile").option("key.name", "FID").load("/path/to/shapefile")
+    ```
+
+=== "Python"
+
+    ```python
+    df = sedona.read.format("shapefile").option("key.name", "FID").load("/path/to/shapefile")
+    ```
+
+The character encoding of string attributes are inferred from the `.cpg` file. If you see garbled values in string fields, you can manually specify the correct charset using the `charset` option. For example:
+
+=== "Scala/Java"
+
+    ```scala
+    val df = sedona.read.format("shapefile").option("charset", "UTF-8").load("/path/to/shapefile")
+    ```
+
+=== "Java"
+
+    ```java
+    Dataset<Row> df = sedona.read().format("shapefile").option("charset", "UTF-8").load("/path/to/shapefile")
+    ```
+
+=== "Python"
+
+    ```python
+    df = sedona.read.format("shapefile").option("charset", "UTF-8").load("/path/to/shapefile")
+    ```
+
+### (Deprecated) Loading Shapefile using SpatialRDD
+
+If you are using Sedona earlier than v`1.7.0`, you can load shapefiles as SpatialRDD and converted to DataFrame using Adapter. Please read [Load SpatialRDD](rdd.md#create-a-generic-spatialrdd) and [DataFrame <-> RDD](#convert-between-dataframe-and-spatialrdd).
 
 ## Load GeoParquet
 
