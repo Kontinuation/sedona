@@ -34,7 +34,6 @@ import org.locationtech.jts.geom.{Envelope, Geometry}
 import java.io.PrintWriter
 import java.nio.file.Paths
 import java.util
-import java.util.List
 
 /**
  * TraitKNNJoinQueryExec is a trait that extends the TraitJoinQueryExec trait and provides the

@@ -24,15 +24,14 @@ import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.sql.catalyst.expressions.{And, Attribute, EqualNullSafe, EqualTo, Expression, LessThan, LessThanOrEqual}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
+import org.apache.spark.sql.execution.datasources.LogicalRelation
+import org.apache.spark.sql.execution.datasources.v2.DataSourceV2ScanRelation
 import org.apache.spark.sql.execution.{ProjectExec, SparkPlan}
 import org.apache.spark.sql.sedona_sql.UDT.{GeometryUDT, RasterUDT}
 import org.apache.spark.sql.sedona_sql.expressions._
 import org.apache.spark.sql.sedona_sql.expressions.raster._
 import org.apache.spark.sql.sedona_sql.optimization.ExpressionUtils.{matchDistanceExpressionToJoinSide, matchExpressionsToPlans, matches, splitConjunctivePredicates}
 import org.apache.spark.sql.{SparkSession, Strategy}
-import org.json4s.scalap.scalasig.Children
-
-import scala.collection.immutable
 
 case class JoinQueryDetection(
     left: LogicalPlan,
@@ -784,16 +783,21 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       return Nil
     }
 
-    val a = children.head
-    val b = children.tail.head
+    val leftShape = children.head
+    val rightShape = children.tail.head
+
+    val querySide = getKNNQuerySide(left, leftShape)
+    val objectSidePlan = if (querySide == LeftSide) right else left
+
+    checkObjectPlanFilterPushdown(objectSidePlan)
 
     logInfo(
       "Planning knn join, left side is for queries and right size is for the object to be searched")
     KNNJoinExec(
       planLater(left),
       planLater(right),
-      a,
-      b,
+      leftShape,
+      rightShape,
       joinType,
       distance,
       useApproximate = useApproximate,
@@ -838,6 +842,9 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
         val rightShape = children.tail.head
 
         val querySide = getKNNQuerySide(left, leftShape)
+        val objectSidePlan = if (querySide == LeftSide) right else left
+
+        checkObjectPlanFilterPushdown(objectSidePlan)
 
         if (querySide == broadcastSide.get) {
           // broadcast is on query side
@@ -1087,6 +1094,64 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       case Some(filter) if unsupportedFilters.contains(filter) =>
         throw new UnsupportedOperationException(unsupportedFilters(filter))
       case _ => // Do nothing
+    }
+  }
+
+  /**
+   * Check if the given logic plan has a filter that can be pushed down to the data source.
+   * @param plan
+   * @return
+   */
+  private def containPlanFilterPushdown(plan: LogicalPlan): Boolean = {
+    plan match {
+      case Filter(condition, child) =>
+        // If a Filter node is found, check if it is applied to a scan relation (indicating potential pushdown)
+        child match {
+          case _: LogicalRelation | _: DataSourceV2ScanRelation =>
+            true
+          case _ => containPlanFilterPushdown(child)
+        }
+
+      // Continue recursively checking for other potential cases
+      case Project(_, child) => containPlanFilterPushdown(child)
+      case Join(left, right, _, _, _) =>
+        containPlanFilterPushdown(left) || containPlanFilterPushdown(right)
+      case Aggregate(_, _, child) => containPlanFilterPushdown(child)
+      case _: LogicalRelation | _: DataSourceV2ScanRelation => false
+
+      // Default case to check other children
+      case other => other.children.exists(containPlanFilterPushdown)
+    }
+  }
+
+  /**
+   * Check if the given plan has a filter that can be pushed down to the object side of the KNN
+   * join. Print a warning if a filter pushdown is detected.
+   * @param objectSidePlan
+   */
+  private def checkObjectPlanFilterPushdown(objectSidePlan: LogicalPlan): Unit = {
+    if (containPlanFilterPushdown(objectSidePlan)) {
+      val warnings = Seq(
+        "Warning: One or more filter pushdowns have been detected on the object side of the KNN join. \n" +
+          "These filters will be applied to the object side reader before the KNN join is executed. \n" +
+          "If you intend to apply the filters after the KNN join, please ensure that you materialize the KNN join results before applying the filters. \n" +
+          "For example, you can use the following approach:\n\n" +
+
+          // Scala Example
+          "Scala Example:\n" +
+          "val knnResult = knnJoinDF.cache()\n" +
+          "val filteredResult = knnResult.filter(condition)\n\n" +
+
+          // SQL Example
+          "SQL Example:\n" +
+          "CREATE OR REPLACE TEMP VIEW knnResult AS\n" +
+          "SELECT * FROM (\n" +
+          "  -- Your KNN join SQL here\n" +
+          ") AS knnView\n" +
+          "CACHE TABLE knnResult;\n" +
+          "SELECT * FROM knnResult WHERE condition;")
+      logWarning(warnings.mkString("\n"))
+      println(warnings.mkString("\n"))
     }
   }
 }
