@@ -18,6 +18,7 @@
  */
 package org.apache.spark.sql.sedona_sql.expressions
 
+import org.apache.commons.lang3.StringUtils
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
 import org.apache.spark.sql.catalyst.expressions.{Expression, ImplicitCastInputTypes, Literal}
@@ -98,6 +99,10 @@ abstract class InferredExpression(fSeq: InferrableFunction*)
   // no need to worry about contention and thread safety here.
   private val inputRasters: ArrayBuffer[AnyRef] = ArrayBuffer.empty[AnyRef]
 
+  // Remember input args to generate error messages when exceptions occur. The input arguments are
+  // helpful for troubleshooting the cause of errors.
+  private val inputArgs: ArrayBuffer[AnyRef] = ArrayBuffer.empty[AnyRef]
+
   private def buildExtractors(expressions: Seq[Expression]): Array[InternalRow => Any] = {
     f.argExtractorBuilders
       .zipAll(expressions, null, null)
@@ -110,13 +115,18 @@ abstract class InferredExpression(fSeq: InferrableFunction*)
             // will be done in the evaluator. Please see buildEvaluator for details.
             Some((input: InternalRow) => {
               val raster = extractor(input).asInstanceOf[AnyRef]
+              inputArgs += raster
               if (raster != null) {
                 inputRasters += raster
               }
               raster
             })
           } else {
-            Some(extractor)
+            Some((input: InternalRow) => {
+              val arg = extractor(input)
+              inputArgs += arg.asInstanceOf[AnyRef]
+              arg
+            })
           }
       }
       .toArray
@@ -162,23 +172,17 @@ abstract class InferredExpression(fSeq: InferrableFunction*)
     }
   }
 
-  private def findAllLiterals(expression: Expression): Seq[Literal] = {
-    expression match {
-      case lit: Literal => Seq(lit)
-      case _ => expression.children.flatMap(findAllLiterals)
-    }
-  }
-
-  private def findAllLiteralsInExpressions(expressions: Seq[Expression]): Seq[String] = {
-    expressions.flatMap(findAllLiterals).map(_.value.toString)
-  }
-
   override def eval(input: InternalRow): Any = {
     try {
       f.serializer(evaluator(input))
     } catch {
       case e: Exception =>
-        InferredExpression.throwExpressionInferenceException(input, inputExpressions, e)
+        InferredExpression.throwExpressionInferenceException(
+          getClass.getSimpleName,
+          inputArgs.toSeq,
+          e)
+    } finally {
+      inputArgs.clear()
     }
   }
 
@@ -187,32 +191,32 @@ abstract class InferredExpression(fSeq: InferrableFunction*)
       evaluator(input)
     } catch {
       case e: Exception =>
-        InferredExpression.throwExpressionInferenceException(input, inputExpressions, e)
+        InferredExpression.throwExpressionInferenceException(
+          getClass.getSimpleName,
+          inputArgs.toSeq,
+          e)
+    } finally {
+      inputArgs.clear()
     }
   }
 }
 
 object InferredExpression {
   def throwExpressionInferenceException(
-      input: InternalRow,
-      inputExpressions: Seq[Expression],
+      name: String,
+      inputArgs: Seq[Any],
       e: Exception): Nothing = {
-    val literalsAsStrings = if (input == null) {
-      // In case no input row is provided, we can't extract literals from the input expressions.
-      inputExpressions.flatMap(findAllLiterals).map(_.value.toString)
+    if (e.isInstanceOf[InferredExpressionException]) {
+      throw e
     } else {
-      Seq.empty[String]
-    }
-    val literalsOrInputString = literalsAsStrings.mkString(", ")
-    throw new InferredExpressionException(
-      s"Exception occurred while evaluating expression - source: [$literalsOrInputString]",
-      e)
-  }
-
-  def findAllLiterals(expression: Expression): Seq[Literal] = {
-    expression match {
-      case lit: Literal => Seq(lit)
-      case _ => expression.children.flatMap(findAllLiterals)
+      val inputsAsStrings = inputArgs.map { arg =>
+        val argStr = if (arg != null) arg.toString else "null"
+        StringUtils.abbreviate(argStr, 5000)
+      }
+      val inputsString = inputsAsStrings.mkString(", ")
+      throw new InferredExpressionException(
+        s"Exception occurred while evaluating expression $name - inputs: [$inputsString]",
+        e)
     }
   }
 }
