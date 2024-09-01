@@ -19,6 +19,30 @@ In case there are ties in the distance, the result will include all the tied geo
 spark.sedona.join.knn.includeTieBreakers=true
 ```
 
+Filter Pushdown Considerations:
+
+When using ST_KNN with filters applied to the resulting DataFrame, some of these filters may be pushed down to the object side of the kNN join. This means the filters will be applied to the object side reader before the kNN join is executed. If you want the filters to be applied after the kNN join, ensure that you first materialize the kNN join results and then apply the filters.
+
+For example, you can use the following approach:
+
+Scala Example:
+
+```
+val knnResult = knnJoinDF.cache()
+val filteredResult = knnResult.filter(condition)
+```
+
+SQL Example:
+
+```
+CREATE OR REPLACE TEMP VIEW knnResult AS
+SELECT * FROM (
+  -- Your KNN join SQL here
+) AS knnView;
+CACHE TABLE knnResult;
+SELECT * FROM knnResult WHERE condition;
+```
+
 SQL Example
 
 Suppose we have two tables `QUERIES` and `OBJECTS` with the following data:
@@ -94,6 +118,10 @@ Introduction: join operation to find the k-nearest neighbors of a point or regio
 Format: `ST_AKNN(R: Table, S: Table, k: Integer, use_spheroid: Boolean)`
 
 The `ST_AKNN` function is similar to `ST_KNN`, but it uses approximate algorithms to find the k-nearest neighbors. This can be useful for large datasets where exact kNN search is computationally expensive. The trade-off is that approximate algorithms may not always return the exact k-nearest neighbors, but they provide a good approximation in a reasonable amount of time.
+
+Filter Pushdown Considerations:
+
+Filter pushdown behavior in ST_AKNN is similar to that in ST_KNN. If filters are applied to the resulting DataFrame, they might be pushed down to the object side reader before the kNN join is executed. To apply filters after the join, ensure you materialize the kNN join results before applying any filters.
 
 SQL Example
 
