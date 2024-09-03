@@ -22,17 +22,22 @@ import org.apache.sedona.core.enums.JoinSparitionDominantSide
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
 import org.apache.sedona.core.spatialOperator.{JoinQuery, SpatialPredicate}
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner
+import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, Predicate, UnsafeRow}
 import org.apache.spark.sql.catalyst.plans.JoinType
-import org.apache.spark.sql.execution.{SparkPlan, SQLExecution}
+import org.apache.spark.sql.execution.{SQLExecution, SparkPlan}
 import org.locationtech.jts.geom.Geometry
 
 import java.io.PrintWriter
 import java.nio.file.Paths
+import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
+import scala.concurrent.duration.{Duration, MILLISECONDS}
+import scala.util.Try
 
 trait TraitJoinQueryExec extends TraitJoinQueryBase {
   self: SparkPlan =>
@@ -200,6 +205,65 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
         } finally {
           writer.close()
         }
+    }
+  }
+
+  protected def analyzeLeftAndRight(
+      leftShapes: SpatialRDD[Geometry],
+      rightShapes: SpatialRDD[Geometry],
+      reAnalyze: Boolean = false): Unit = {
+    val counter = TraitAdvancedJoinQueryExec.counter.getAndIncrement()
+    val jobGroupName = s"AnalyzeSpatialData - $counter"
+    val descPrefix = if (reAnalyze) "Re-analyzing" else "Analyzing"
+    val session = SparkSession.getActiveSession.orNull
+    val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
+
+    // Run left and right side analysis in parallel
+    val executionContext = ExecutionContext.global
+    val analyzeLeftFuture = Future {
+      SQLExecution.withExecutionId(session, executionId) {
+        sparkContext.setJobGroup(jobGroupName, s"$descPrefix left shapes")
+        leftShapes.advancedAnalyze()
+      }
+    }(executionContext)
+    val analyzeRightFuture = Future {
+      SQLExecution.withExecutionId(session, executionId) {
+        sparkContext.setJobGroup(jobGroupName, s"$descPrefix right shapes")
+        rightShapes.advancedAnalyze()
+      }
+    }(executionContext)
+
+    // Wait for both sides to finish. If any side fails, cancel the other side and throw an exception
+    var leftResult: Option[Try[Boolean]] = None
+    var rightResult: Option[Try[Boolean]] = None
+    val waitTimeout = Duration(200, MILLISECONDS)
+    while (leftResult.isEmpty || rightResult.isEmpty) {
+      if (leftResult.isEmpty) {
+        leftResult = waitForAnalyzeJobToFinish(analyzeLeftFuture, jobGroupName, waitTimeout)
+      }
+      if (rightResult.isEmpty) {
+        rightResult = waitForAnalyzeJobToFinish(analyzeRightFuture, jobGroupName, waitTimeout)
+      }
+    }
+  }
+
+  private def waitForAnalyzeJobToFinish[T](
+      future: Future[T],
+      jobGroupName: String,
+      duration: Duration): Option[Try[T]] = {
+    try {
+      Await.ready(future, duration)
+      val result = future.value
+      result.get.failed.foreach { e =>
+        sparkContext.cancelJobGroup(jobGroupName)
+        throw new RuntimeException("Failed to analyze dataset", e)
+      }
+      result
+    } catch {
+      case _: TimeoutException => None
+      case e: Throwable =>
+        sparkContext.cancelJobGroup(jobGroupName)
+        throw e
     }
   }
 }

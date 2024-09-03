@@ -915,65 +915,6 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     joinedRdd
   }
 
-  private def analyzeLeftAndRight(
-      leftShapes: SpatialRDD[Geometry],
-      rightShapes: SpatialRDD[Geometry],
-      reAnalyze: Boolean = false): Unit = {
-    val counter = TraitAdvancedJoinQueryExec.counter.getAndIncrement()
-    val jobGroupName = s"AnalyzeSpatialData - $counter"
-    val descPrefix = if (reAnalyze) "Re-analyzing" else "Analyzing"
-    val session = SparkSession.getActiveSession.orNull
-    val executionId = sparkContext.getLocalProperty(SQLExecution.EXECUTION_ID_KEY)
-
-    // Run left and right side analysis in parallel
-    val executionContext = ExecutionContext.global
-    val analyzeLeftFuture = Future {
-      SQLExecution.withExecutionId(session, executionId) {
-        sparkContext.setJobGroup(jobGroupName, s"$descPrefix left shapes")
-        leftShapes.advancedAnalyze()
-      }
-    }(executionContext)
-    val analyzeRightFuture = Future {
-      SQLExecution.withExecutionId(session, executionId) {
-        sparkContext.setJobGroup(jobGroupName, s"$descPrefix right shapes")
-        rightShapes.advancedAnalyze()
-      }
-    }(executionContext)
-
-    // Wait for both sides to finish. If any side fails, cancel the other side and throw an exception
-    var leftResult: Option[Try[Boolean]] = None
-    var rightResult: Option[Try[Boolean]] = None
-    val waitTimeout = Duration(200, MILLISECONDS)
-    while (leftResult.isEmpty || rightResult.isEmpty) {
-      if (leftResult.isEmpty) {
-        leftResult = waitForAnalyzeJobToFinish(analyzeLeftFuture, jobGroupName, waitTimeout)
-      }
-      if (rightResult.isEmpty) {
-        rightResult = waitForAnalyzeJobToFinish(analyzeRightFuture, jobGroupName, waitTimeout)
-      }
-    }
-  }
-
-  private def waitForAnalyzeJobToFinish[T](
-      future: Future[T],
-      jobGroupName: String,
-      duration: Duration): Option[Try[T]] = {
-    try {
-      Await.ready(future, duration)
-      val result = future.value
-      result.get.failed.foreach { e =>
-        sparkContext.cancelJobGroup(jobGroupName)
-        throw new RuntimeException("Failed to analyze dataset", e)
-      }
-      result
-    } catch {
-      case _: TimeoutException => None
-      case e: Throwable =>
-        sparkContext.cancelJobGroup(jobGroupName)
-        throw e
-    }
-  }
-
   /**
    * Run the body with the given job description.
    *

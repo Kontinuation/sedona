@@ -22,18 +22,24 @@ import org.apache.commons.lang3.Range
 import org.apache.sedona.core.spatialOperator.JoinQuery
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
 import org.apache.sedona.core.spatialPartitioning.{QuadTreeRTPartitioner, SpatialPartitioner, ZOrderPartitioner}
-import org.apache.sedona.core.utils.SedonaConf
+import org.apache.sedona.core.spatialRDD.SpatialRDD
+import org.apache.sedona.core.utils.{ExecutorResourceUtils, SedonaConf}
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression, Predicate, UnsafeRow}
-import org.apache.spark.sql.execution.metric.SQLMetric
+import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
 import org.apache.spark.sql.execution.{SQLExecution, SparkPlan}
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitKNNJoinQueryExec.knnJoinPartitionNumOptimizer
 import org.locationtech.jts.geom.{Envelope, Geometry}
 
 import java.io.PrintWriter
 import java.nio.file.Paths
 import java.util
+import scala.concurrent.duration.{Duration, MILLISECONDS}
+import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
+import scala.util.Try
 
 /**
  * TraitKNNJoinQueryExec is a trait that extends the TraitJoinQueryExec trait and provides the
@@ -91,9 +97,8 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
     val (queryShapes, objectShapes) =
       toSpatialRddPair(queryResultsRaw, boundQueryShape, objectResultsRaw, boundObjectShape)
 
-    objectShapes.analyze()
-    log.info(
-      "[SedonaSQL] Number of partitions on the objectShapes (right): " + objectResultsRaw.partitions.size)
+    // Analyze both sides for doing spatial partitioning, and probably subdivide the datasets
+    analyzeLeftAndRight(objectShapes, queryShapes)
 
     val joinParams: JoinParams = getKNNJoinParams
 
@@ -104,11 +109,22 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
       if (sedonaConf.getFallbackPartitionNum != -1) {
         numPartitions = sedonaConf.getFallbackPartitionNum
       } else {
+        // Infer the amount of available executor memory for running local spatial join.
+        val context = objectShapes.rawSpatialRDD.context
+        val availableMemory = ExecutorResourceUtils.inferExecutionMemory(context)
+        val stat = objectShapes.getStatistics
+        val estimatedRowSizeInBytes =
+          if (stat != null && stat.getEstimatedSizeInBytes > 0) stat.getEstimatedSizeInBytes
+          else -1
         // object shapes are the dominant side
         numPartitions = knnJoinPartitionNumOptimizer(
+          availableMemory,
+          estimatedRowSizeInBytes,
           objectShapes.rawSpatialRDD.partitions.size(),
           queryShapes.rawSpatialRDD.partitions.size(),
           objectShapes.approximateTotalCount,
+          queryShapes.approximateTotalCount,
+          sedonaConf.getMaxRowsPerPartitionInKNNJoins,
           joinParams.k)
       }
       // object shapes are the dominant side
@@ -158,34 +174,6 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
 
     // Convert the matchesRDD to RowRDD
     joinedRddToRowRdd(matchesRDD, swapped)
-  }
-
-  def knnJoinPartitionNumOptimizer(
-      objectSidePartNum: Int,
-      querySidePartNum: Int,
-      objectSideCount: Long,
-      numNeighbor: Int): Int = {
-    log.info("[SedonaSQL] object side count: " + objectSideCount)
-    var numPartition = -1
-    val candidatePartitionNum = (objectSideCount / (numNeighbor * 2)).intValue()
-    if (objectSidePartNum * 2 > objectSideCount) {
-      log.warn(
-        s"[SedonaSQL] KNN join object side partition number $objectSidePartNum is larger than 1/2 of the object side count $objectSideCount")
-      log.warn(
-        s"[SedonaSQL] Try to use object (follower) side partition number $querySidePartNum")
-      if (querySidePartNum * 2 > objectSideCount) {
-        log.warn(
-          s"[SedonaSQL] KNN join object (follower) side partition number is also larger than 1/2 of the object side count $objectSideCount")
-        log.warn(
-          s"[SedonaSQL] Try to use 1/2 of the object side count $candidatePartitionNum as the partition number of both sides")
-        if (candidatePartitionNum == 0) {
-          log.warn(
-            s"[SedonaSQL] 1/2 of $candidatePartitionNum is equal to 0. Use 1 as the partition number of both sides instead.")
-          numPartition = 1
-        } else numPartition = candidatePartitionNum
-      } else numPartition = querySidePartNum
-    } else numPartition = objectSidePartNum
-    numPartition
   }
 
   /**
@@ -322,4 +310,105 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
 
 object TraitKNNJoinQueryExec {
   val counter = new java.util.concurrent.atomic.AtomicLong(0)
+
+  /**
+   * This method optimizes the number of partitions for a k-Nearest Neighbors (kNN) join in Spark.
+   * It determines an appropriate number of partitions to ensure sufficient parallelism without
+   * introducing too much overhead due to a large number of partitions. The method considers
+   * object-side partitions, query-side partitions, the count of objects, the number of neighbors,
+   * a defined maximum row count per partition, and ensures the final partition number is not less
+   * than `querySidePartNum / numNeighbor`.
+   *
+   * @param objectSidePartNum
+   *   The number of partitions on the object side.
+   * @param querySidePartNum
+   *   The number of partitions on the query side.
+   * @param objectSideCount
+   *   The total count of objects in the object side dataset.
+   * @param querySideCount
+   *   The total count of objects in the query side dataset.
+   * @param numNeighbor
+   *   The number of neighbors to consider in the kNN join.
+   * @param maxRowsPerPartitionByConfig
+   *   The maximum number of rows allowed per partition, calculated based on the available memory
+   *   and the average row size.
+   * @return
+   *   The optimized number of partitions to use for the kNN join.
+   *
+   * Step-by-Step Estimation to Determine maxRowsPerPartition:
+   *
+   *   1. Determine Target Partition Size:
+   *      - With 36GB of executor memory and 6 cores per executor, allocate a portion of the
+   *        memory to each partition.
+   *      - Target partition size is set to 512MB per partition for a balanced approach.
+   *
+   * 2. Estimate Partition Size:
+   *   - Target Partition Size: 512MB per partition.
+   *   - Memory Available per Core:
+   *     - 36GB / 6 cores = 6GB per core.
+   *     - Allocating approximately 1/12th of this memory per partition gives around 512MB per
+   *       partition.
+   *
+   * 3. Calculate Max Rows Per Partition:
+   *   - Average Row Size: Assume an average row size of 1KB (adjust based on actual data).
+   *   - Convert target partition size into KB:
+   *     - 512MB = 512 * 1024 KB = 524,288KB.
+   *   - Max rows per partition = 524,288KB / 1KB per row = 524,288 rows.
+   *
+   * 4. Adjust Based on Workload:
+   *   - Increase maxRowsPerPartition if the job has too many small tasks, which can cause
+   *     overhead in task scheduling.
+   *   - Decrease maxRowsPerPartition if high memory usage or frequent garbage collection is
+   *     observed, indicating that partitions are too large.
+   *
+   * Additional Considerations:
+   *   - Ensure the final partition number is not less than `querySidePartNum / numNeighbor` to
+   *     account for the query side's parallelism needs.
+   */
+  def knnJoinPartitionNumOptimizer(
+      availableMemory: Long,
+      estimatedSizeInBytes: Long,
+      objectSidePartNum: Int,
+      querySidePartNum: Int,
+      objectSideCount: Long,
+      querySideCount: Long,
+      maxRowsPerPartitionByConfig: Long,
+      numNeighbor: Int): Int = {
+
+    // Determine the maximum number of rows per partition
+    val maxRowsPerPartition = if (estimatedSizeInBytes > 0) {
+      val maxRowsPerPartitionByMemoryCal =
+        math.ceil(availableMemory / (estimatedSizeInBytes * 2)).toLong
+      math.min(maxRowsPerPartitionByMemoryCal, maxRowsPerPartitionByConfig)
+    } else {
+      maxRowsPerPartitionByConfig
+    }
+
+    // Determine candidatePartitionNum based on the maxRowsPerPartition
+    val candidatePartitionNum = (objectSideCount / maxRowsPerPartition).toInt
+
+    // Ensure the final partition number is not less than querySidePartNum / numNeighbor
+    val minQuerySidePartitionNum = querySidePartNum / numNeighbor
+
+    // Ensure the final partition number does not cause the query side to exceed maxRowsPerPartition
+    val minAllowedQueryPartitions =
+      math.max((querySideCount / maxRowsPerPartition).toInt, minQuerySidePartitionNum)
+
+    // Determine the final number of partitions
+    val finalPartitionNum = if (objectSidePartNum > candidatePartitionNum) {
+      objectSidePartNum
+    } else if (candidatePartitionNum > 0) {
+      candidatePartitionNum
+    } else {
+      200 // Default to 200 partitions if no other condition is met
+    }
+
+    // Cap the partition number to be no more than half of the object side count
+    val maxAllowedPartitions = math.min((objectSideCount / 2), Int.MaxValue.toLong).toInt
+
+    // Ensure finalPartitionNum is not less than minQuerySidePartitionNum and not more than minAllowedQueryPartitions
+    math.max(
+      math.min(math.max(finalPartitionNum, minAllowedQueryPartitions), maxAllowedPartitions),
+      1)
+  }
 }
