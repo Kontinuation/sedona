@@ -25,6 +25,16 @@ println(sedonaConf)
 sparkSession.conf.set("sedona.global.index","false")
 ```
 
+In addition, you can also add `spark` prefix to the parameter name, for example:
+
+```scala
+sparkSession.conf.set("spark.sedona.global.index","false")
+```
+
+However, any parameter set through `spark` prefix will be honored by Spark, which means you can set these parameters before hand via `spark-defaults.conf` or Spark on Kubernetes configuration.
+
+If you set the same parameter through both `sedona` and `spark.sedona` prefixes, the parameter set through `sedona` prefix will override the parameter set through `spark.sedona` prefix.
+
 ## Tuning for Spatial Join
 
 SedonaDB features an advanced spatial join algorithm since v1.2.1, which does not require tuning to achieve good performance. Advanced spatial join would analyze both joined datasets and tune spatial join parameters automatically. The following parameters for tuning spatial join won't work when using advanced spatial join:
