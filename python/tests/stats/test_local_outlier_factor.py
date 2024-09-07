@@ -1,0 +1,157 @@
+#  Licensed to the Apache Software Foundation (ASF) under one
+#  or more contributor license agreements.  See the NOTICE file
+#  distributed with this work for additional information
+#  regarding copyright ownership.  The ASF licenses this file
+#  to you under the Apache License, Version 2.0 (the
+#  "License"); you may not use this file except in compliance
+#  with the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing,
+#  software distributed under the License is distributed on an
+#  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+#  KIND, either express or implied.  See the License for the
+#  specific language governing permissions and limitations
+#  under the License.
+
+import numpy as np
+import pyspark.sql.functions as f
+from pyspark.sql import DataFrame
+from pyspark.sql.types import StructType, StructField, IntegerType, DoubleType
+from sedona.sql.st_constructors import ST_MakePoint
+from sedona.sql.st_functions import ST_X, ST_Y
+from sklearn.neighbors import LocalOutlierFactor
+
+from tests.test_base import TestBase
+from sedona.stats.outlier_detection.local_outlier_factor import local_outlier_factor
+
+
+class TestLOF(TestBase):
+    def get_small_data(self) -> DataFrame:
+        schema = StructType(
+            [
+                StructField("id", IntegerType(), True),
+                StructField("x", DoubleType(), True),
+                StructField("y", DoubleType(), True),
+            ]
+        )
+        return self.spark.createDataFrame(
+            [
+                (1, 1.0, 2.0),
+                (2, 2.0, 2.0),
+                (3, 3.0, 3.0),
+            ],
+            schema,
+        ).select("id", ST_MakePoint("x", "y").alias("geometry"))
+
+    def get_medium_data(self):
+        np.random.seed(42)
+
+        X_inliers = 0.3 * np.random.randn(100, 2)
+        X_inliers = np.r_[X_inliers + 2, X_inliers - 2]
+        X_outliers = np.random.uniform(low=-4, high=4, size=(20, 2))
+        return np.r_[X_inliers, X_outliers]
+
+    def get_medium_dataframe(self, data):
+        schema = StructType([
+            StructField("x", DoubleType(), True),
+            StructField("y", DoubleType(), True)
+        ])
+
+        return (
+            self.spark.createDataFrame(data, schema)
+            .select(ST_MakePoint("x", "y").alias("geometry"))
+            .withColumn("anotherColumn", f.rand())
+        )
+
+    def compare_results(self, actual, expected, k):
+        assert len(actual) == len(expected)
+        missing = set(expected.keys()) - set(actual.keys())
+        assert len(missing) == 0
+        big_diff = {
+            k: (v, expected[k], abs(1 - v / expected[k]))
+            for k, v in actual.items()
+            if abs(1 - v / expected[k]) > 0.0000000001
+        }
+        assert len(big_diff) == 0
+
+    def test_lof_matches_sklearn(self):
+        self.spark.conf.set(
+            "sedona.join.autoBroadcastJoinThreshold", -1
+        )  # TODO remove when KNN broadcast bug fixed
+        data = self.get_medium_data()
+        for k in range(5, 21, 3):
+            actual = {
+                tuple(x[0]): x[1]
+                for x in
+                # TODO remove repartition once knn correctness bug is fixed
+                local_outlier_factor(self.get_medium_dataframe(data.tolist()).repartition(2), k)
+                .select(f.array(ST_X("geometry"), ST_Y("geometry")), "lof")
+                .collect()
+            }
+            clf = LocalOutlierFactor(n_neighbors=k, contamination="auto")
+            clf.fit_predict(data)
+            expected = dict(
+                zip(
+                    [tuple(x) for x in data],
+                    [float(-x) for x in clf.negative_outlier_factor_],
+                )
+            )
+            self.compare_results(actual, expected, k)
+
+    def test_lof_approx_results_match_sklearn(self):
+        k = 4
+        data = [
+            [2.0, 2.0],
+            [2.0, 3.0],
+            [3.0, 3.0],
+            [3.0, 2.0],
+            [3.0, 1.0],
+            [2.0, 1.0],
+            [1.0, 1.0],
+            [1.0, 2.0],
+            [1.0, 3.0],
+            [0.0, 2.0],
+            [4.0, 2.0],
+        ]
+
+        clf = LocalOutlierFactor(n_neighbors=k, contamination="auto")
+        clf.fit_predict(data)
+        expected = dict(
+            zip([tuple(x) for x in data], [-x for x in clf.negative_outlier_factor_])
+        )
+
+        actual = {
+            tuple(x[0]): x[1]
+            for x in local_outlier_factor(
+                self.get_medium_dataframe(data), k, approximate_knn=True
+            )
+            .select(f.array(ST_X("geometry"), ST_Y("geometry")), "lof")
+            .collect()
+        }
+
+        self.compare_results(actual, expected, k)
+
+    def test_calculate_lof_correctly_for_all_points(self):
+        result_df = local_outlier_factor(self.get_small_data(), 2, approximate_knn=True)
+        assert "lof" in result_df.columns
+
+    # TODO uncomment when empty df is supported by KNN
+    # def test_handle_empty_dataframe(self):
+    #     empty_df = self.spark.createDataFrame([], self.get_data().schema)
+    #     result_df = local_outlier_factor(empty_df, 2)
+    #
+    #     assert 0 == result_df.count()
+
+    def test_raise_error_for_invalid_k_value(self):
+        try:
+            local_outlier_factor(self.get_small_data(), -1)
+            assert False
+        except Exception:
+            assert True
+
+    def test_work_with_approximate_knn(self):
+        data = self.get_medium_dataframe(self.get_medium_data().tolist())
+        result_df = local_outlier_factor(data, 2, approximate_knn=True)
+        assert result_df.count() == data.count()

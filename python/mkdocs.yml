@@ -1,0 +1,32 @@
+site_name: "wherobots"
+
+docs_dir: docs
+
+plugins:
+  - search
+  - autorefs
+  - gen-files:
+      scripts:
+        - scripts/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: "google"
+            show_inheritance_diagram: True
+            show_source: False
+          paths: [../sedona/stats/]
+theme:
+  font:
+    text: Space Grotesk
+  name: 'material'
+  logo: 'logo-symbol-no-background.png'
+  palette:
+    scheme: slate
+    primary: 'black'
+    accent: 'deep purple'
+nav:
+  - Code Reference: reference/

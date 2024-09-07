@@ -32,6 +32,7 @@ import org.locationtech.jts.geom._
 import org.scalatest.{BeforeAndAfterAll, FunSpec}
 
 import java.io.File
+import java.nio.file.Files
 
 trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
   Logger.getRootLogger.setLevel(Level.WARN)
@@ -99,6 +100,8 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
   override def beforeAll(): Unit = {
     super.beforeAll()
     SedonaContext.create(sparkSession)
+    sc.setCheckpointDir(Files.createTempDirectory("checkpoints").toString)
+
   }
 
   override def afterAll(): Unit = {
@@ -318,4 +321,12 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
     val hdfsCluster = builder.build
     (hdfsCluster, "hdfs://127.0.0.1:" + hdfsCluster.getNameNodePort + "/")
   }
+
+  protected def assertDataFramesEqual(df1: DataFrame, df2: DataFrame): Unit = {
+    val dfDiff1 = df1.except(df2)
+    val dfDiff2 = df2.except(df1)
+
+    assert(dfDiff1.isEmpty && dfDiff2.isEmpty)
+  }
+
 }

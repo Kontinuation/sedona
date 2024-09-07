@@ -57,7 +57,8 @@ setup(
         "spark": ["pyspark>=2.3.0"],
         "pydeck-map": ["geopandas", "pydeck==0.8.0"],
         "kepler-map": ["geopandas", "keplergl==0.3.2"],
-        "all": ["pyspark>=2.3.0", "geopandas","pydeck==0.8.0", "keplergl==0.3.2"],
+        "stats": ["kneed<=0.8.5"],
+        "all": ["pyspark>=2.3.0", "geopandas","pydeck==0.8.0", "keplergl==0.3.2", "kneed<=0.8.5"],
     },
     project_urls={
         'Documentation': 'https://sedona.apache.org',

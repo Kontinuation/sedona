@@ -1,0 +1,39 @@
+name: Docs build
+on:
+  push:
+    branches:
+      - master
+
+  pull_request:
+    branches:
+      - '*'
+    types: [opened, synchronize, reopened]
+
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install pipenv
+        run: pip install -U pipenv
+      - name: Install dependencies
+        run: |
+          cd python
+          pipenv --python "3.10"
+          pipenv install --dev
+      - name: run mkdocstrings
+        run: cd python && pipenv run mkdocs build && mkdir -p ../docs/api/pythondoc/stats && cp -r site/* ../docs/api/pythondoc/stats/
+      - name: zip docs
+        run: zip -r docs.zip docs
+      - uses: actions/upload-artifact@v3
+        with:
+          name: docs
+          path: docs.zip

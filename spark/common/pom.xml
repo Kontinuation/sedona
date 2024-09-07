@@ -162,6 +162,11 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>graphframes</groupId>
+            <artifactId>graphframes</artifactId>
+            <version>${graphframe.version}-s_${scala.compat.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
         </dependency>
@@ -233,6 +238,9 @@
             <plugin>
                 <groupId>org.scalatest</groupId>
                 <artifactId>scalatest-maven-plugin</artifactId>
+                <configuration>
+                    <parallel>false</parallel>
+                </configuration>
             </plugin>
             <plugin>
                 <groupId>org.scalastyle</groupId>
