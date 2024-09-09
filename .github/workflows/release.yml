@@ -68,7 +68,7 @@ jobs:
   build-docs:
     needs:
       - prepare
-    uses: wherobots/wherobots-compute/.github/workflows/python-docs.yml@master
+    uses: wherobots/wherobots-compute/.github/workflows/docs.yml@master
 
   build-jars:
     runs-on: ubuntu-latest

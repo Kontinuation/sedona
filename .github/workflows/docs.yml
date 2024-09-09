@@ -1,0 +1,58 @@
+name: Docs build
+on:
+  push:
+    branches:
+      - master
+
+  pull_request:
+    branches:
+      - '*'
+    types: [opened, synchronize, reopened]
+
+  workflow_call:
+
+
+env:
+  MAVEN_OPTS: -Dmaven.wagon.httpconnectionManager.ttlSeconds=60
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '8'
+      - name: Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+      - name: Compile ScalaDoc
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_PKG_GITHUB_TOKEN }}
+        run: mvn -q install scala:doc -DskipTests -Dspark=3.4 -Dscala=2.12 && mkdir -p docs/api/scaladoc/wherobots-compute && cp -r spark/common/target/site/scaladocs/* docs/api/scaladoc/wherobots-compute/
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      - name: Install pipenv
+        run: pip install -U pipenv
+      - name: Install dependencies
+        run: |
+          cd python
+          pipenv --python "3.10"
+          pipenv install --dev
+      - name: run mkdocstrings
+        run: cd python && pipenv run mkdocs build && mkdir -p ../docs/api/pythondoc/wherobots-compute && cp -r site/* ../docs/api/pythondoc/wherobots-compute/
+      - name: zip docs
+        run: zip -r docs.zip docs
+      - uses: actions/upload-artifact@v3
+        with:
+          name: docs
+          path: docs.zip
