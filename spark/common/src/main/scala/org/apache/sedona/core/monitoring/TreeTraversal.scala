@@ -126,7 +126,7 @@ object TreeTraversal {
       pattern
         .findAllMatchIn(inputStr)
         .foreach(f => nodeNames += f.matched.split("\\.").last.toLowerCase())
-      val pattern2: Regex = """(binaryFile|raster|geoparquet)""".r
+      val pattern2: Regex = """(binaryFile|raster|geoparquet|geojson|shapefile)""".r
       pattern2.findAllMatchIn(inputStr).foreach(f => nodeNames += f.matched.toLowerCase())
     }
   }

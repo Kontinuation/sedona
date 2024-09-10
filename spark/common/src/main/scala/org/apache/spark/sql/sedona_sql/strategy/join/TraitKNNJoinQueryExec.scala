@@ -22,10 +22,8 @@ import org.apache.commons.lang3.Range
 import org.apache.sedona.core.spatialOperator.JoinQuery
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
 import org.apache.sedona.core.spatialPartitioning.{QuadTreeRTPartitioner, SpatialPartitioner, ZOrderPartitioner}
-import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.utils.{ExecutorResourceUtils, SedonaConf}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression, Predicate, UnsafeRow}
@@ -37,9 +35,6 @@ import org.locationtech.jts.geom.{Envelope, Geometry}
 import java.io.PrintWriter
 import java.nio.file.Paths
 import java.util
-import scala.concurrent.duration.{Duration, MILLISECONDS}
-import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
-import scala.util.Try
 
 /**
  * TraitKNNJoinQueryExec is a trait that extends the TraitJoinQueryExec trait and provides the

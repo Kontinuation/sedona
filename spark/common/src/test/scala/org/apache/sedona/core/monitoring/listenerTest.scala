@@ -20,6 +20,7 @@ package org.apache.sedona.core.monitoring
 
 import org.apache.sedona.sql.TestBaseScala
 import org.apache.spark.SparkEnv
+import org.apache.spark.sql.functions.expr
 import org.junit.Assert.assertEquals
 
 class listenerTest extends TestBaseScala {
@@ -94,5 +95,16 @@ class listenerTest extends TestBaseScala {
     assertEquals(1, funcStat.getOrElse("binaryfile", 0))
     assertEquals(0, funcStat.getOrElse("rs_fromgeotiff", 0))
     assertEquals(1, funcStat.getOrElse("rs_envelope", 0))
+  }
+
+  it("Should find Sedona KNN join") {
+    // we need to cache the dataframes due to the current spark logic plan generation strategy
+    val df1 = sparkSession.sql("SELECT ST_Point(0.0, 0.0) as geom1").cache()
+    val df2 = sparkSession.sql("SELECT ST_Point(0.0, 0.0) as geom2").cache()
+    val df = df1.join(df2, expr("ST_KNN(geom1, geom2, 1)"))
+    val functions = TreeTraversal.execute(df.queryExecution)
+    val funcStat = functions.toList.groupBy(identity).mapValues(_.size)
+    SparkEnv.get.metricsSystem.report
+    assertEquals(1, funcStat.getOrElse("knnjoinexec", 0))
   }
 }

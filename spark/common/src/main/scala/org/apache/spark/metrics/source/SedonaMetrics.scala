@@ -65,9 +65,12 @@ class SedonaMetrics extends Source {
       "BroadcastIndexJoin",
       "RangeJoinExec",
       "DistanceJoinExec",
+      "KNNJoinExec",
       "geoparquet",
       "raster",
-      "binaryFile").map(_.toLowerCase)
+      "binaryFile",
+      "geojson",
+      "shapefile").map(_.toLowerCase)
 
     functionNameSetBuilder.result()
   }
