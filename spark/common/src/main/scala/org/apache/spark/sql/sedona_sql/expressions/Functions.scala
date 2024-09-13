@@ -1786,6 +1786,13 @@ case class ST_RotateX(inputExpressions: Seq[Expression])
     copy(inputExpressions = newChildren)
 }
 
+case class ST_RotateY(inputExpressions: Seq[Expression])
+    extends InferredExpression(inferrableFunction2(Functions.rotateY)) {
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) =
+    copy(inputExpressions = newChildren)
+}
+
 case class ST_Rotate(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(Functions.rotate),
