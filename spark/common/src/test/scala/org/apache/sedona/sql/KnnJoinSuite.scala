@@ -69,7 +69,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         df,
         numNeighbors = 3,
         useApproximate = true,
-        expressionSize = 5,
+        expressionSize = 4,
         isGeography = false,
         mustInclude = "")
     }
@@ -82,7 +82,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         df,
         numNeighbors = 3,
         useApproximate = true,
-        expressionSize = 5,
+        expressionSize = 4,
         isGeography = false,
         mustInclude = "")
     }
@@ -95,7 +95,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         df,
         numNeighbors = 3,
         useApproximate = true,
-        expressionSize = 5,
+        expressionSize = 4,
         isGeography = false,
         mustInclude = "")
     }
@@ -108,7 +108,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         df,
         numNeighbors = 3,
         useApproximate = true,
-        expressionSize = 5,
+        expressionSize = 4,
         isGeography = false,
         mustInclude = "")
     }
@@ -121,7 +121,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         df,
         numNeighbors = 3,
         useApproximate = true,
-        expressionSize = 5,
+        expressionSize = 4,
         isGeography = false,
         mustInclude = "")
     }
@@ -133,7 +133,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         df,
         numNeighbors = 3,
         useApproximate = false,
-        expressionSize = 5,
+        expressionSize = 4,
         isGeography = true,
         mustInclude = "")
     }
@@ -146,7 +146,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           df,
           numNeighbors = 3,
           useApproximate = true,
-          expressionSize = 5,
+          expressionSize = 4,
           isGeography = false,
           mustInclude = "")
       }
@@ -161,7 +161,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           df,
           numNeighbors = 3,
           useApproximate = true,
-          expressionSize = 5,
+          expressionSize = 4,
           isGeography = false,
           mustInclude = "")
       }
@@ -175,7 +175,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         df,
         numNeighbors = 3,
         useApproximate = true,
-        expressionSize = 5,
+        expressionSize = 4,
         isGeography = false,
         mustInclude = "as int) <= 88))")
     }
@@ -187,7 +187,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         df,
         numNeighbors = 3,
         useApproximate = true,
-        expressionSize = 5,
+        expressionSize = 4,
         isGeography = false,
         mustInclude = "= point))")
     }
@@ -199,7 +199,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         df,
         numNeighbors = 3,
         useApproximate = true,
-        expressionSize = 5,
+        expressionSize = 4,
         isGeography = false,
         mustInclude = "= point))")
     }
@@ -211,7 +211,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         df,
         numNeighbors = 3,
         useApproximate = true,
-        expressionSize = 5,
+        expressionSize = 4,
         isGeography = false,
         mustInclude = "")
     }
@@ -331,6 +331,12 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
       resultAll.length should be(8) // 2 queries (filtered out 1) and 4 neighbors each
       resultAll.mkString should be("[2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19]")
+    }
+
+    it("Should throw KNN predicate is not supported exception") {
+      intercept[Exception] {
+        sparkSession.sql("SELECT ST_KNN(ST_Point(0.0, 0.0), ST_Point(0.0, 0.0), 1)").show()
+      }
     }
   }
 

@@ -27,7 +27,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2ScanRelation
 import org.apache.spark.sql.execution.{ProjectExec, SparkPlan}
-import org.apache.spark.sql.sedona_sql.UDT.{GeometryUDT, RasterUDT}
+import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
 import org.apache.spark.sql.sedona_sql.expressions._
 import org.apache.spark.sql.sedona_sql.expressions.raster._
 import org.apache.spark.sql.sedona_sql.optimization.ExpressionUtils.{matchDistanceExpressionToJoinSide, matchExpressionsToPlans, matches, splitConjunctivePredicates}
@@ -804,7 +804,27 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       spatialPredicate = null,
       isGeography,
       condition,
-      extraCondition) :: Nil
+      extractExtraKNNJoinCondition(condition)) :: Nil
+  }
+
+  private def extractExtraKNNJoinCondition(condition: Expression): Option[Expression] = {
+    condition match {
+      case and: And =>
+        // Check both left and right sides for ST_KNN or ST_AKNN
+        if (and.left.isInstanceOf[ST_KNN] || and.left.isInstanceOf[ST_AKNN]) {
+          Some(and.right)
+        } else if (and.right.isInstanceOf[ST_KNN] || and.right.isInstanceOf[ST_AKNN]) {
+          Some(and.left)
+        } else {
+          None
+        }
+      case _: ST_KNN =>
+        None
+      case _: ST_AKNN =>
+        None
+      case _ =>
+        Some(condition)
+    }
   }
 
   private def planBroadcastJoin(
