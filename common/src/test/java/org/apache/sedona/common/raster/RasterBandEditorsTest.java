@@ -36,6 +36,7 @@ import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.raster.serde.Serde;
 import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.coverage.processing.CannotCropException;
 import org.geotools.geometry.DirectPosition2D;
 import org.geotools.geometry.jts.JTS;
 import org.junit.Test;
@@ -325,15 +326,46 @@ public class RasterBandEditorsTest extends RasterTestBase {
     assertTrue(clipped instanceof OutDbGridCoverage2D);
     RasterConstructors.asInDbRaster(clipped);
 
+    // Throw exception for non-intersecting geometries in non-lenient mode
     assertThrows(
         IllegalArgumentException.class,
         () -> {
           Geometry geom2 = Constructors.polygonFromEnvelope(-13050398, 4013378, -13025157, 4025967);
           geom2.setSRID(3857);
-          RasterBandEditors.clip(raster, 1, geom2);
+          RasterBandEditors.clip(raster, 1, geom2, Integer.MIN_VALUE, true, false);
         });
+
+    // Return null for non-intersecting geometries in lenient mode
+    Geometry geom2 = Constructors.polygonFromEnvelope(-13050398, 4013378, -13025157, 4025967);
+    geom2.setSRID(3857);
+    GridCoverage2D result = RasterBandEditors.clip(raster, 1, geom2);
+    assertNull(result);
   }
 
+  @Test
+  public void testClipLenient()
+      throws FactoryException, IOException, ParseException, TransformException {
+    GridCoverage2D raster =
+        rasterFromGeoTiff(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif");
+
+    // Construct a polygon that does not intersect with the raster
+    Geometry nonIntersectingGeom =
+        Constructors.geomFromWKT(
+            "POLYGON ((-78.22106647832458748 37.76411511479908967, -78.20183062098976734 37.72863564460374874, -78.18088490966962922 37.76753482276972562, -78.22106647832458748 37.76411511479908967))",
+            0);
+
+    // Throws an exception in non-lenient mode
+    assertThrows(
+        CannotCropException.class,
+        () -> RasterBandEditors.clip(raster, 1, nonIntersectingGeom, 200, false, false));
+
+    // Returns null in lenient mode
+    GridCoverage2D result = RasterBandEditors.clip(raster, 1, nonIntersectingGeom, 200, false);
+    assertNull(result);
+    raster.dispose(true);
+  }
+
+  @Test
   public void testRasterUnion() throws FactoryException {
     double[][] rasterData1 =
         new double[][] {

@@ -1183,6 +1183,14 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
         .get(0)
       expectedValues = Seq(0.0, 0.0, 0.0, 0.0, null)
       assertTrue(expectedValues.equals(actualValues))
+
+      // Test with a polygon that does not intersect the raster in lenient mode
+      val actual = df
+        .selectExpr(
+          "RS_Clip(raster, 1, ST_GeomFromWKT('POLYGON((274157 4174899,263510 4174947,269859 4183348,274157 4174899))'))")
+        .first()
+        .get(0)
+      assertNull(actual)
     }
 
     it("Passed RS_Clip with out-db raster") {
@@ -1199,6 +1207,13 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       val rastInDb = dfInDb.first().get(0)
       assertTrue(rastInDb.isInstanceOf[GridCoverage2D])
       assertFalse(rastInDb.isInstanceOf[OutDbGridCoverage2D])
+
+      // Test with a rectangle that does not intersect the raster in lenient mode
+      val rectWkt2 =
+        "POLYGON((281597 4184411,281597 4192021,291477 4192021,291477 4184411,281597 4184411))"
+      val df2 = sparkSession.sql(
+        s"SELECT RS_Clip(RS_FromPath('$path'), 2, ST_GeomFromWKT('$rectWkt2', 26918)) AS rast")
+      assertNull(df2.first().get(0))
     }
 
     it("Passed RS_AsGeoTiff") {

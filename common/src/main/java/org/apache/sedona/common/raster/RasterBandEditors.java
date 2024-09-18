@@ -33,6 +33,7 @@ import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
+import org.geotools.coverage.processing.CannotCropException;
 import org.geotools.coverage.processing.operation.Crop;
 import org.geotools.geometry.Envelope2D;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
@@ -282,10 +283,17 @@ public class RasterBandEditors {
    * @param geometry Specify ROI
    * @param noDataValue no-Data value for empty cells
    * @param crop Specifies to keep the original extent or not
+   * @param lenient Return null if the raster and geometry do not intersect when set to true,
+   *     otherwise will throw an exception
    * @return A clip Raster with defined ROI by the geometry
    */
   public static GridCoverage2D clip(
-      GridCoverage2D raster, int band, Geometry geometry, double noDataValue, boolean crop)
+      GridCoverage2D raster,
+      int band,
+      Geometry geometry,
+      double noDataValue,
+      boolean crop,
+      boolean lenient)
       throws FactoryException, TransformException {
     if (raster instanceof OutDbGridCoverage2D && crop) {
       // Test if no-data value is left unspecified
@@ -322,14 +330,20 @@ public class RasterBandEditors {
         double regionWidth = env.getWidth();
         double regionHeight = env.getHeight();
         int[] bands = {band};
-        return clipOutDb((OutDbGridCoverage2D) raster, bands, x0, y0, regionWidth, regionHeight);
+        return clipOutDb(
+            (OutDbGridCoverage2D) raster, bands, x0, y0, regionWidth, regionHeight, lenient);
       }
     }
-    return clipInDB(raster, band, geometry, noDataValue, crop);
+    return clipInDB(raster, band, geometry, noDataValue, crop, lenient);
   }
 
   public static GridCoverage2D clipInDB(
-      GridCoverage2D raster, int band, Geometry geometry, double noDataValue, boolean crop)
+      GridCoverage2D raster,
+      int band,
+      Geometry geometry,
+      double noDataValue,
+      boolean crop,
+      boolean lenient)
       throws FactoryException, TransformException {
 
     // Selecting the band from original raster
@@ -349,7 +363,16 @@ public class RasterBandEditors {
     parameters.parameter(Crop.PARAMNAME_DEST_NODATA).setValue(new double[] {noDataValue});
     parameters.parameter(Crop.PARAMNAME_ROI).setValue(geometry);
 
-    GridCoverage2D newRaster = (GridCoverage2D) cropObject.doOperation(parameters, null);
+    GridCoverage2D newRaster;
+    try {
+      newRaster = (GridCoverage2D) cropObject.doOperation(parameters, null);
+    } catch (CannotCropException e) {
+      if (lenient) {
+        return null;
+      } else {
+        throw e;
+      }
+    }
 
     if (!crop) {
       double[] metadataOriginal = RasterAccessors.metadata(raster);
@@ -442,10 +465,15 @@ public class RasterBandEditors {
       double x0,
       double y0,
       double regionWidth,
-      double regionHeight) {
+      double regionHeight,
+      boolean lenient) {
     Envelope2D rasterEnvelope = raster.getEnvelope2D();
     if (!rasterEnvelope.intersects(x0, y0 - regionHeight, regionWidth, regionHeight)) {
-      throw new IllegalArgumentException("The region to clip is outside the raster bounds");
+      if (lenient) {
+        return null;
+      } else {
+        throw new IllegalArgumentException("The region to clip is outside the raster bounds");
+      }
     }
 
     int[] outDbBandIndices = raster.getOutDbBandIndices();
@@ -508,6 +536,22 @@ public class RasterBandEditors {
         raster.getOutDbPath(),
         raster.getSerializedConfiguration(),
         raster.getOutDbParams());
+  }
+
+  /**
+   * Return a clipped raster with the specified ROI by the geometry
+   *
+   * @param raster Raster to clip
+   * @param band Band number to perform clipping
+   * @param geometry Specify ROI
+   * @param noDataValue no-Data value for empty cells
+   * @param crop Specifies to keep the original extent or not
+   * @return A clip Raster with defined ROI by the geometry
+   */
+  public static GridCoverage2D clip(
+      GridCoverage2D raster, int band, Geometry geometry, double noDataValue, boolean crop)
+      throws FactoryException, TransformException {
+    return clip(raster, band, geometry, noDataValue, crop, true);
   }
 
   /**
