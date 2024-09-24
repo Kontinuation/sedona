@@ -31,6 +31,14 @@ public class ByteRangeTests {
   }
 
   @Test
+  public void testSize() {
+    ByteRange byteRange = new ByteRange(0, 10);
+    Assert.assertEquals(10, byteRange.size());
+    byteRange = new ByteRange(0, 1);
+    Assert.assertEquals(1, byteRange.size());
+  }
+
+  @Test
   public void testContains() {
     ByteRange byteRange = new ByteRange(0, 10);
     Assert.assertTrue(byteRange.contains(0));

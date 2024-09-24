@@ -20,11 +20,15 @@ package org.apache.sedona.common.raster.inputstream;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import javax.imageio.stream.ImageInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * A factory class for creating HadoopImageInputStream. It also tunes the Hadoop configuration for
@@ -32,14 +36,21 @@ import org.apache.hadoop.fs.Path;
  */
 public class HadoopImageInputStreamFactory {
 
+  private static final Logger logger = LoggerFactory.getLogger(HadoopImageInputStreamFactory.class);
+
   private HadoopImageInputStreamFactory() {}
 
   public static final String READ_AHEAD_SIZE_CONF_KEY = "wherobots.raster.outdb.readahead";
+  public static final int DEFAULT_READ_AHEAD_SIZE = 64 * 1024;
+
   public static final String ENABLE_CACHE_CONF_KEY = "wherobots.raster.outdb.enablecache";
   public static final String CACHE_DIR_CONF_KEY = "wherobots.raster.outdb.cache.dir";
   public static final String DONT_CACHE_LOCAL_FILE_CONF_KEY =
       "wherobots.raster.outdb.dont.cache.local.file";
-  public static final int DEFAULT_READ_AHEAD_SIZE = 64 * 1024;
+
+  public static final String CACHE_MAX_DISK_SPACE_PERCENT_CONF_KEY =
+      "wherobots.raster.outdb.cache.maxDiskSpacePercent";
+  public static final int DEFAULT_CACHE_MAX_DISK_SPACE_PERCENT = 8;
 
   /**
    * Create a HadoopImageInputStream for the given path.
@@ -89,5 +100,37 @@ public class HadoopImageInputStreamFactory {
       stream.close();
       throw e;
     }
+  }
+
+  /**
+   * Get the free space of the cache partition in bytes.
+   *
+   * @param conf the Hadoop configuration
+   * @return the free space of the cache partition in bytes
+   */
+  public static long cachePartitionFreeSpace(Configuration conf) {
+    boolean isCached = conf.getBoolean(ENABLE_CACHE_CONF_KEY, true);
+    if (!isCached) {
+      return 0;
+    }
+    String cacheDirString = conf.get(CACHE_DIR_CONF_KEY, null);
+    if (cacheDirString == null) {
+      return 0;
+    }
+    try {
+      return Files.getFileStore(Paths.get(cacheDirString)).getUsableSpace();
+    } catch (IOException e) {
+      logger.error(
+          String.format("Cannot get usable space of out-db cache directory %s", cacheDirString), e);
+      return 0;
+    }
+  }
+
+  public static int getCacheMaxDiskSpacePercent(Configuration conf) {
+    String cacheDirString = conf.get(CACHE_DIR_CONF_KEY, null);
+    if (cacheDirString == null) {
+      return 0;
+    }
+    return conf.getInt(CACHE_MAX_DISK_SPACE_PERCENT_CONF_KEY, DEFAULT_CACHE_MAX_DISK_SPACE_PERCENT);
   }
 }

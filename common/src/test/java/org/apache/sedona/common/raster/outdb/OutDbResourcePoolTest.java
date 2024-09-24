@@ -18,12 +18,20 @@
  */
 package org.apache.sedona.common.raster.outdb;
 
+import java.io.IOException;
+import javax.imageio.stream.ImageInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.sedona.common.raster.RasterTestBase;
+import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
+import org.apache.sedona.common.raster.outdb.OutDbResourcePool.OutDbResource;
+import org.apache.sedona.common.raster.outdb.OutDbResourcePool.ResourceKey;
+import org.geotools.coverage.grid.GridCoverage2D;
+import org.geotools.gce.geotiff.GeoTiffReader;
 import org.junit.Assert;
 import org.junit.Test;
 
-public class OutDbResourcePoolTest {
+public class OutDbResourcePoolTest extends RasterTestBase {
   @Test
   public void testAcquireAndRelease() {
     OutDbResourcePool pool = new OutDbResourcePool(3);
@@ -194,6 +202,51 @@ public class OutDbResourcePoolTest {
     verifyPool(pool, 0, 0);
   }
 
+  @Test
+  public void testDiskCacheCapacity() throws IOException {
+    OutDbResourcePool pool = new OutDbResourcePool(10);
+    Configuration conf = new Configuration();
+    conf.set(HadoopImageInputStreamFactory.DONT_CACHE_LOCAL_FILE_CONF_KEY, "false");
+    conf.set(HadoopImageInputStreamFactory.CACHE_DIR_CONF_KEY, "/tmp");
+    conf.set(HadoopImageInputStreamFactory.CACHE_MAX_DISK_SPACE_PERCENT_CONF_KEY, "10");
+
+    // We are using test4.tiff, test5.tiff and test6.tiff in spark/common/src/test/resources/raster.
+    // Each file is 467 bytes, so the capacity of 1000 is capable of holding 2 rasters, but not
+    // enough for 3 rasters.
+    pool.setFreeResourcesDiskSpaceLimit(10, 1000);
+
+    // Load 3 rasters
+    OutDbResource resource1 = newResource(resourceFolder + "/raster/test4.tiff", conf);
+    resource1.gridCoverage2D.getRenderedImage().getData();
+    OutDbResource resource2 = newResource(resourceFolder + "/raster/test5.tiff", conf);
+    resource2.gridCoverage2D.getRenderedImage().getData();
+    OutDbResource resource3 = newResource(resourceFolder + "/raster/test6.tiff", conf);
+    resource3.gridCoverage2D.getRenderedImage().getData();
+
+    // Add them into the pool as free resources
+    pool.release(resource1);
+    Assert.assertEquals(1, pool.getFreeResourceCount());
+    pool.release(resource2);
+    Assert.assertEquals(2, pool.getFreeResourceCount());
+    pool.release(resource3);
+    Assert.assertEquals(2, pool.getFreeResourceCount());
+
+    verifyPool(pool, 2, 2);
+
+    // test5.tiff and test6.tiff are still present in the pool, while test4.tiff is evicted
+    OutDbResource resource =
+        pool.acquire(new ResourceKey(new Path(resourceFolder + "/raster/test5.tiff"), conf));
+    Assert.assertNotNull(resource);
+    pool.release(resource);
+    resource = pool.acquire(new ResourceKey(new Path(resourceFolder + "/raster/test6.tiff"), conf));
+    Assert.assertNotNull(resource);
+    pool.release(resource);
+    resource = pool.acquire(new ResourceKey(new Path(resourceFolder + "/raster/test4.tiff"), conf));
+    Assert.assertNull(resource);
+
+    pool.cleanUp();
+  }
+
   private OutDbResourcePool.ResourceKey resourceKey(String path, String value) {
     Configuration conf = new Configuration(false);
     conf.set("test_key", value);
@@ -202,6 +255,15 @@ public class OutDbResourcePoolTest {
 
   private OutDbResourcePool.OutDbResource newResource(String path, String value) {
     return new OutDbResourcePool.OutDbResource(resourceKey(path, value), null, null);
+  }
+
+  private OutDbResourcePool.OutDbResource newResource(String path, Configuration conf)
+      throws IOException {
+    ImageInputStream stream = HadoopImageInputStreamFactory.create(new Path(path), conf);
+    GeoTiffReader reader = new GeoTiffReader(stream);
+    GridCoverage2D gridCoverage2D = reader.read(null);
+    ResourceKey resourceKey = new ResourceKey(new Path(path), conf);
+    return new OutDbResourcePool.OutDbResource(resourceKey, gridCoverage2D, stream);
   }
 
   private void verifyPool(OutDbResourcePool pool, int resourceCount, int freeResourceCount) {

@@ -49,6 +49,9 @@ public class DiskCachedImageInputStream extends ImageInputStreamImpl {
   // and hit EOF.
   private long streamLength;
 
+  // the size of cached data, which is the sum of the sizes of all cached ranges
+  private long cachedSize;
+
   public DiskCachedImageInputStream(ImageInputStream stream, int readAheadSize, File cacheDir)
       throws IOException {
     if (stream == null) {
@@ -80,6 +83,7 @@ public class DiskCachedImageInputStream extends ImageInputStreamImpl {
     this.cachedRanges = new ByteRangeSet();
     this.readAheadSize = readAheadSize;
     this.streamLength = Long.MAX_VALUE;
+    this.cachedSize = 0;
   }
 
   public ImageInputStream getStream() {
@@ -161,6 +165,7 @@ public class DiskCachedImageInputStream extends ImageInputStreamImpl {
       cache.seek(missingRange.inclusiveStart);
       cache.write(buf, 0, ret_len);
       cachedRanges.addRange(missingRange);
+      cachedSize += missingRange.size();
       if (ret_len < missingLen) {
         break;
       }
@@ -230,5 +235,10 @@ public class DiskCachedImageInputStream extends ImageInputStreamImpl {
       result.add(new ByteRange(start, exclusiveEnd));
     }
     return result;
+  }
+
+  /** Get the size of cached data in bytes. */
+  public long getCachedSize() {
+    return cachedSize;
   }
 }

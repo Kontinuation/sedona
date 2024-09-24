@@ -21,12 +21,11 @@ package org.apache.sedona.common.raster.inputstream;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.RandomAccessFile;
+import java.nio.file.Files;
 import java.util.Random;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
@@ -57,7 +56,7 @@ public class HadoopImageInputStreamTest {
   public void testReadSequentially() throws IOException {
     Path path = new Path(testFile.getPath());
     try (HadoopImageInputStream stream = new HadoopImageInputStream(path);
-        InputStream in = new BufferedInputStream(new FileInputStream(testFile))) {
+        InputStream in = new BufferedInputStream(Files.newInputStream(testFile.toPath()))) {
       byte[] bActual = new byte[8];
       byte[] bExpected = new byte[bActual.length];
       while (true) {
@@ -107,7 +106,7 @@ public class HadoopImageInputStreamTest {
     FileSystem fs = path.getFileSystem(new Configuration());
     try (FSDataInputStream unstable = new UnstableFSDataInputStream(fs.open(path));
         HadoopImageInputStream stream = new HadoopImageInputStream(unstable);
-        InputStream in = new BufferedInputStream(new FileInputStream(testFile))) {
+        InputStream in = new BufferedInputStream(Files.newInputStream(testFile.toPath()))) {
       byte[] bActual = new byte[8];
       byte[] bExpected = new byte[bActual.length];
       while (true) {
@@ -124,7 +123,7 @@ public class HadoopImageInputStreamTest {
   }
 
   private void prepareTestData(File testFile) throws IOException {
-    try (OutputStream out = new BufferedOutputStream(new FileOutputStream(testFile))) {
+    try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(testFile.toPath()))) {
       for (int k = 0; k < TEST_FILE_SIZE; k++) {
         out.write(random.nextInt());
       }

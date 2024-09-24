@@ -51,8 +51,10 @@ public class DiskCachedImageInputStreamTest {
   private final Configuration conf = new Configuration();
   private final Random random = new Random();
   private File testFile;
+  private final boolean disableCacheForLocalFile;
 
   public DiskCachedImageInputStreamTest(boolean disableCacheForLocalFile) {
+    this.disableCacheForLocalFile = disableCacheForLocalFile;
     conf.set(HadoopImageInputStreamFactory.READ_AHEAD_SIZE_CONF_KEY, "10B");
     conf.setBoolean(
         HadoopImageInputStreamFactory.DONT_CACHE_LOCAL_FILE_CONF_KEY, disableCacheForLocalFile);
@@ -67,6 +69,7 @@ public class DiskCachedImageInputStreamTest {
   @Test
   public void testReadSequentially() throws IOException {
     Path path = new Path(testFile.getPath());
+    long accumulatedLength = 0;
     try (ImageInputStream stream = HadoopImageInputStreamFactory.create(path, conf);
         InputStream in = new BufferedInputStream(Files.newInputStream(testFile.toPath()))) {
       byte[] bActual = new byte[8];
@@ -80,6 +83,14 @@ public class DiskCachedImageInputStreamTest {
           break;
         }
         Assert.assertArrayEquals(bExpected, bActual);
+        accumulatedLength += lenActual;
+
+        if (!disableCacheForLocalFile) {
+          DiskCachedImageInputStream diskCachedStream = (DiskCachedImageInputStream) stream;
+          long cachedSize = diskCachedStream.getCachedSize();
+          Assert.assertTrue(cachedSize >= accumulatedLength);
+          Assert.assertTrue(cachedSize <= accumulatedLength + 100);
+        }
       }
     }
   }

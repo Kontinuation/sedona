@@ -28,6 +28,8 @@ import java.util.Objects;
 import javax.imageio.stream.ImageInputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.sedona.common.raster.inputstream.DiskCachedImageInputStream;
+import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -87,6 +89,15 @@ public class OutDbResourcePool {
         } catch (Exception e) {
           logger.error("Failed to close stream when disposing OutDbResource", e);
         }
+      }
+    }
+
+    public long diskSpaceUsed() {
+      if (stream != null && stream instanceof DiskCachedImageInputStream) {
+        DiskCachedImageInputStream diskCachedStream = (DiskCachedImageInputStream) stream;
+        return diskCachedStream.getCachedSize();
+      } else {
+        return 0;
       }
     }
   }
@@ -194,6 +205,8 @@ public class OutDbResourcePool {
   private final OutDbResource freeResources;
   private int freeResourceCount;
   private int freeResourcesCapacity;
+  private int freeResourcesDiskSpacePercent;
+  private long freeResourcesDiskSpaceCapacity;
 
   public OutDbResourcePool(int freeResourcesCapacity) {
     if (freeResourcesCapacity < 0) {
@@ -207,6 +220,8 @@ public class OutDbResourcePool {
     freeResources = new OutDbResource();
     freeResourceCount = 0;
     this.freeResourcesCapacity = freeResourcesCapacity;
+    this.freeResourcesDiskSpacePercent = 0;
+    this.freeResourcesDiskSpaceCapacity = 0;
   }
 
   public OutDbResource acquire(ResourceKey key) {
@@ -255,16 +270,29 @@ public class OutDbResourcePool {
               ThreadLocalOutDbResourcePool.FREE_RESOURCES_POOL_SIZE_CONF_KEY,
               freeResourcesCapacity);
       if (newCapacity != freeResourcesCapacity) {
-        logger.debug(
+        logger.info(
             "Reconfiguring OutDbResourcePool for thread {}, free resources capacity: {}",
             threadId,
             newCapacity);
+        freeResourcesCapacity = newCapacity;
       }
-      freeResourcesCapacity = newCapacity;
+      int newDiskPercent = HadoopImageInputStreamFactory.getCacheMaxDiskSpacePercent(conf);
+      if (newDiskPercent != freeResourcesDiskSpacePercent) {
+        long cachePartitionFreeSpace = HadoopImageInputStreamFactory.cachePartitionFreeSpace(conf);
+        long newDiskSpaceCapacity = (long) (newDiskPercent / 100.0 * cachePartitionFreeSpace);
+        if (cachePartitionFreeSpace != 0) {
+          logger.info(
+              "Reconfiguring OutDbResourcePool for thread {}, free resource disk percent: {}, disk cache capacity: {}",
+              threadId,
+              newDiskPercent,
+              newDiskSpaceCapacity);
+          freeResourcesDiskSpacePercent = newDiskPercent;
+          freeResourcesDiskSpaceCapacity = newDiskSpaceCapacity;
+        }
+      }
 
       // Put the resource into the resource pool. This resource is still being used (refCount > 0),
-      // so we don't
-      // add it to the free list.
+      // so we don't add it to the free list.
       allResources.put(key, new WeakOutDbResource(resource, referenceQueue));
       logger.debug(
           "Added new OutDbResource object for thread {}, path={}. Pool stats: {}/{}",
@@ -426,15 +454,35 @@ public class OutDbResourcePool {
   }
 
   private void evictOldFreeResources() {
-    while (freeResourceCount > freeResourcesCapacity) {
+    long totalCacheSpaceUsed = 0;
+    if (freeResourcesDiskSpaceCapacity > 0) {
+      // Only take disk space used by cache into account when disk space capacity is set.
+      // Although we have to iterate through all free out-db resources, but diskSpaceUsed() method
+      // is very cheap so this won't produce performance problems.
+      for (OutDbResource current = freeResources.next;
+          current != freeResources;
+          current = current.next) {
+        totalCacheSpaceUsed += current.diskSpaceUsed();
+      }
+      logger.debug(
+          "OutDbResource for thread {} has used {} bytes disk space for caching",
+          threadId,
+          totalCacheSpaceUsed);
+    }
+
+    while (freeResourceCount > freeResourcesCapacity
+        || totalCacheSpaceUsed > freeResourcesDiskSpaceCapacity) {
       // Evict the oldest free resource.
       OutDbResource evicted = freeResources.prev;
       tryRemoveFreeResource(evicted);
+      long cacheSpaceUsed = evicted.diskSpaceUsed();
       allResources.remove(evicted.resourceKey);
+      totalCacheSpaceUsed -= cacheSpaceUsed;
       logger.debug(
-          "Evicted OutDbResource object for thread {}, path={}. Pool stats: {}/{}",
+          "Evicted OutDbResource object for thread {}, path={}, disk space used={} Pool stats: {}/{}",
           threadId,
           evicted.resourceKey.path,
+          cacheSpaceUsed,
           freeResourceCount,
           allResources.size());
       evicted.dispose();
@@ -449,5 +497,17 @@ public class OutDbResourcePool {
       resource.prev = resource;
       freeResourceCount -= 1;
     }
+  }
+
+  /**
+   * Overriding freeResourcesDiskSpaceCapacity, only for testing purposes.
+   *
+   * @param freeResourcesDiskSpacePercent the new value of freeResourcesDiskSpacePercent
+   * @param freeResourcesDiskSpaceCapacity the new value of freeResourcesDiskSpaceCapacity
+   */
+  public void setFreeResourcesDiskSpaceLimit(
+      int freeResourcesDiskSpacePercent, int freeResourcesDiskSpaceCapacity) {
+    this.freeResourcesDiskSpacePercent = freeResourcesDiskSpacePercent;
+    this.freeResourcesDiskSpaceCapacity = freeResourcesDiskSpaceCapacity;
   }
 }

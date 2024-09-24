@@ -64,6 +64,10 @@ public class ByteRange {
         || other.containsOrAdjacent(exclusiveEnd);
   }
 
+  public long size() {
+    return exclusiveEnd - inclusiveStart;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) {

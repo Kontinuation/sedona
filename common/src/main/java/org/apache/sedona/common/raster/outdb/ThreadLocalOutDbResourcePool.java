@@ -25,15 +25,11 @@ public class ThreadLocalOutDbResourcePool {
   public static final String FREE_RESOURCES_POOL_SIZE_CONF_KEY = "wherobots.raster.outdb.pool.size";
   public static final int DEFAULT_FREE_RESOURCES_POOL_SIZE = 100;
 
-  private static int freeResourcesCapacity =
+  private static final int freeResourcesCapacity =
       Integer.parseInt(
           System.getProperty(
               FREE_RESOURCES_POOL_SIZE_CONF_KEY,
               Integer.toString(DEFAULT_FREE_RESOURCES_POOL_SIZE)));
-
-  public static void setFreeResourcesCapacity(int freeResourcesCapacity) {
-    ThreadLocalOutDbResourcePool.freeResourcesCapacity = freeResourcesCapacity;
-  }
 
   private static final ThreadLocal<OutDbResourcePool> threadLocal =
       ThreadLocal.withInitial(() -> new OutDbResourcePool(freeResourcesCapacity));
