@@ -60,6 +60,8 @@ public class SedonaConf implements Serializable {
 
   private long autoBroadcastJoinThreshold;
 
+  private long adaptiveAutoBroadcastJoinThreshold;
+
   private SpatialJoinOptimizationMode spatialJoinOptimizationMode;
 
   private boolean useAdvancedSpatialJoin;
@@ -134,12 +136,16 @@ public class SedonaConf implements Serializable {
             getConfigValue(runtimeConfig, "join.spatitionside", "left"));
     this.fallbackPartitionNum =
         Integer.parseInt(getConfigValue(runtimeConfig, "join.numpartition", "-1"));
-    this.autoBroadcastJoinThreshold =
+    String joinThreshold =
+        getConfigValue(
+            runtimeConfig,
+            "join.autoBroadcastJoinThreshold",
+            runtimeConfig.get("spark.sql.autoBroadcastJoinThreshold"));
+    this.autoBroadcastJoinThreshold = bytesFromString(joinThreshold);
+    this.adaptiveAutoBroadcastJoinThreshold =
         bytesFromString(
             getConfigValue(
-                runtimeConfig,
-                "join.autoBroadcastJoinThreshold",
-                runtimeConfig.get("spark.sql.autoBroadcastJoinThreshold")));
+                runtimeConfig, "join.adaptiveAutoBroadcastJoinThreshold", joinThreshold));
     this.spatialJoinOptimizationMode =
         SpatialJoinOptimizationMode.getSpatialJoinOptimizationMode(
             getConfigValue(runtimeConfig, "join.optimizationmode", "nonequi"));
@@ -371,6 +377,10 @@ public class SedonaConf implements Serializable {
 
   public long getAutoBroadcastJoinThreshold() {
     return autoBroadcastJoinThreshold;
+  }
+
+  public long getAdaptiveAutoBroadcastJoinThreshold() {
+    return adaptiveAutoBroadcastJoinThreshold;
   }
 
   public String toString() {

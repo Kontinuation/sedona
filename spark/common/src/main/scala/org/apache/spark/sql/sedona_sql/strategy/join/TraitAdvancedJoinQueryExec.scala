@@ -215,22 +215,22 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       sedonaConf.getSpatialJoinSubdivideRight != JoinSubdivideMode.ALWAYS) {
       val leftSize = leftShapes.getStatistics.getEstimatedRDDSizeInBytes
       val rightSize = rightShapes.getStatistics.getEstimatedRDDSizeInBytes
-      val broadcastThreshold = sedonaConf.getAutoBroadcastJoinThreshold
+      val adaptiveBroadcastThreshold = sedonaConf.getAdaptiveAutoBroadcastJoinThreshold
       joinType match {
         case Inner =>
-          if (leftSize <= broadcastThreshold || rightSize <= broadcastThreshold) {
+          if (leftSize <= adaptiveBroadcastThreshold || rightSize <= adaptiveBroadcastThreshold) {
             return computeJoinResultUsingBroadcastJoin(
               leftShapes.getStatistics,
               rightShapes.getStatistics)
           }
         case LeftOuter =>
-          if (rightSize <= broadcastThreshold) {
+          if (rightSize <= adaptiveBroadcastThreshold) {
             return computeJoinResultUsingBroadcastJoin(
               leftShapes.getStatistics,
               rightShapes.getStatistics)
           }
         case RightOuter =>
-          if (leftSize <= broadcastThreshold) {
+          if (leftSize <= adaptiveBroadcastThreshold) {
             return computeJoinResultUsingBroadcastJoin(
               leftShapes.getStatistics,
               rightShapes.getStatistics)

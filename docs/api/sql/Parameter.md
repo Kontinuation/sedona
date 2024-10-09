@@ -65,6 +65,13 @@ The advanced spatial join algorithm is enabled by default, users can disable adv
       By setting this value to -1 automatic broadcasting can be disabled.
 	* Default: The default value is the same as spark.sql.autoBroadcastJoinThreshold
 	* Possible values: any integer with a byte suffix i.e. 10MB or 512KB
+* sedona.join.adaptiveAutoBroadcastJoinThreshold
+	* Sedona could adaptively switch from RangeJoin or DistanceJoin to BroadcastIndexJoin if the size of one of the
+      joined dataset is smaller than this threshold. The size of the dataset is derived by scanning the joined datasets
+      and doing an estimation, which is more accurate than Spark's own estimation. This configuration is the maximum
+      size of joined dataset that will be adaptively picked as the broadcast side of the join.
+	* Default: The default value is the same as sedona.join.autoBroadcastJoinThreshold
+	* Possible values: any integer with a byte suffix i.e. 10MB or 512KB
 * sedona.join.gridtype
 	* Spatial partitioning grid type for join query
 	* Default: kdbtree
