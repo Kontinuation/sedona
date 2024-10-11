@@ -155,6 +155,10 @@ public class OutDbResourcePool {
       if (obj instanceof ResourceKey) {
         ResourceKey other = (ResourceKey) obj;
         return path.equals(other.path)
+            // Fortunately, we'll be reusing the same serializedConf within the same executor
+            // all the time, so Arrays.equals(serializedConf, other.serializedConf) will find that
+            // we're comparing the same instance and won't have to go over the entire array so
+            // the equals method will be fast for most of the time.
             && Arrays.equals(serializedConf, other.serializedConf)
             && Objects.equals(params, other.params);
       }
@@ -163,7 +167,9 @@ public class OutDbResourcePool {
 
     @Override
     public int hashCode() {
-      return Objects.hash(path.hashCode(), Arrays.hashCode(serializedConf), params);
+      // XXX: computing the hash code of serializedConf will be very slow, since
+      // serializedConf is usually several tens of KB large.
+      return Objects.hash(path, params);
     }
   }
 
