@@ -15,6 +15,7 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
+import pytest
 import numpy as np
 import pyspark.sql.functions as f
 from pyspark.sql import DataFrame
@@ -76,29 +77,25 @@ class TestLOF(TestBase):
         }
         assert len(big_diff) == 0
 
-    def test_lof_matches_sklearn(self):
-        self.spark.conf.set(
-            "sedona.join.autoBroadcastJoinThreshold", -1
-        )  # TODO remove when KNN broadcast bug fixed
+    @pytest.mark.parametrize("k", [5, 21, 3])
+    def test_lof_matches_sklearn(self, k):
         data = self.get_medium_data()
-        for k in range(5, 21, 3):
-            actual = {
-                tuple(x[0]): x[1]
-                for x in
-                # TODO remove repartition once knn correctness bug is fixed
-                local_outlier_factor(self.get_medium_dataframe(data.tolist()).repartition(2), k)
-                .select(f.array(ST_X("geometry"), ST_Y("geometry")), "lof")
-                .collect()
-            }
-            clf = LocalOutlierFactor(n_neighbors=k, contamination="auto")
-            clf.fit_predict(data)
-            expected = dict(
-                zip(
-                    [tuple(x) for x in data],
-                    [float(-x) for x in clf.negative_outlier_factor_],
-                )
+        actual = {
+            tuple(x[0]): x[1]
+            for x in
+            local_outlier_factor(self.get_medium_dataframe(data.tolist()), k)
+            .select(f.array(ST_X("geometry"), ST_Y("geometry")), "lof")
+            .collect()
+        }
+        clf = LocalOutlierFactor(n_neighbors=k, contamination="auto")
+        clf.fit_predict(data)
+        expected = dict(
+            zip(
+                [tuple(x) for x in data],
+                [float(-x) for x in clf.negative_outlier_factor_],
             )
-            self.compare_results(actual, expected, k)
+        )
+        self.compare_results(actual, expected, k)
 
     def test_lof_approx_results_match_sklearn(self):
         k = 4
@@ -137,19 +134,16 @@ class TestLOF(TestBase):
         result_df = local_outlier_factor(self.get_small_data(), 2, approximate_knn=True)
         assert "lof" in result_df.columns
 
-    # TODO uncomment when empty df is supported by KNN
+    # TODO uncomment when KNN join supports empty dfs
     # def test_handle_empty_dataframe(self):
-    #     empty_df = self.spark.createDataFrame([], self.get_data().schema)
+    #     empty_df = self.spark.createDataFrame([], self.get_small_data().schema)
     #     result_df = local_outlier_factor(empty_df, 2)
     #
     #     assert 0 == result_df.count()
 
     def test_raise_error_for_invalid_k_value(self):
-        try:
+        with pytest.raises(Exception):
             local_outlier_factor(self.get_small_data(), -1)
-            assert False
-        except Exception:
-            assert True
 
     def test_work_with_approximate_knn(self):
         data = self.get_medium_dataframe(self.get_medium_data().tolist())

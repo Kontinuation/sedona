@@ -23,7 +23,7 @@ import org.apache.sedona.stats.Util.getGeometryColumnName
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_Distance, ST_DistanceSpheroid}
-import org.apache.spark.sql.{Column, DataFrame, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame}
 import org.graphframes.GraphFrame
 
 object DBSCAN {
@@ -38,10 +38,10 @@ object DBSCAN {
    * column name must be provided. The new column will be named 'cluster'.
    *
    * @param dataframe
-   *   apache sedona idDataframe containing the point geometries
+   *   dataframe to cluster. Must contain at least one GeometryType column
    * @param epsilon
    *   minimum distance parameter of DBSCAN algorithm
-   * @param min_pts
+   * @param minPts
    *   minimum number of points parameter of DBSCAN algorithm
    * @param geometry
    *   name of the geometry column
@@ -56,23 +56,19 @@ object DBSCAN {
   def dbscan(
       dataframe: DataFrame,
       epsilon: Double,
-      min_pts: Int,
+      minPts: Int,
       geometry: String = null,
       includeOutliers: Boolean = true,
       useSpheroid: Boolean = false): DataFrame = {
 
     MetricsRegistrator.getOrCreate.DBScanFitPerform.inc()
 
-    // We want to disable broadcast joins because the broadcast reference were using too much driver memory
-    val spark = SparkSession.getActiveSession.get
-    val priorAutoBroadcastJoinThreshold = spark.conf.get("spark.sql.autoBroadcastJoinThreshold")
-    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", -1)
-
     val geometryCol = geometry match {
       case null => getGeometryColumnName(dataframe)
       case _ => geometry
     }
-    validateInputs(dataframe, epsilon, min_pts, geometryCol)
+
+    validateInputs(dataframe, epsilon, minPts, geometryCol)
 
     val distanceFunction: (Column, Column) => Column =
       if (useSpheroid) ST_DistanceSpheroid else ST_Distance
@@ -96,7 +92,7 @@ object DBSCAN {
         first(struct("left.*")).alias("leftContents"),
         count(col(s"right.id")).alias("neighbors_count"),
         collect_list(col(s"right.id")).alias("neighbors"))
-      .withColumn("isCore", col("neighbors_count") >= lit(min_pts))
+      .withColumn("isCore", col("neighbors_count") >= lit(minPts))
       .select("leftContents.*", "neighbors", "isCore")
       .checkpoint()
 
@@ -139,8 +135,6 @@ object DBSCAN {
       completedDf.drop("neighbors", "id")
     }
 
-    spark.conf.set("spark.sql.autoBroadcastJoinThreshold", priorAutoBroadcastJoinThreshold)
-
     returnDf
 
   }
@@ -148,11 +142,11 @@ object DBSCAN {
   private def validateInputs(
       geo_df: DataFrame,
       epsilon: Double,
-      min_pts: Int,
+      minPts: Int,
       geometry: String): Unit = {
     require(epsilon > 0, "epsilon must be greater than 0")
-    require(min_pts > 0, "min_pts must be greater than 0")
-    require(geo_df.columns.contains(geometry), "geometry column not found in idDataframe")
+    require(minPts > 0, "minPts must be greater than 0")
+    require(geo_df.columns.contains(geometry), "geometry column not found in dataframe")
     require(
       geo_df.schema.fields(geo_df.schema.fieldIndex(geometry)).dataType == GeometryUDT,
       "geometry column must be of type GeometryType")

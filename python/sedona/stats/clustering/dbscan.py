@@ -34,12 +34,12 @@ DEFAULT_MAX_SAMPLE_SIZE = 1000000  # 1 million
 
 
 def dbscan(
-    dataframe: DataFrame,
-    epsilon: float,
-    min_pts: int,
-    geometry: Optional[str] = None,
-    include_outliers: bool = True,
-    use_spheroid=False,
+        dataframe: DataFrame,
+        epsilon: float,
+        min_pts: int,
+        geometry: Optional[str] = None,
+        include_outliers: bool = True,
+        use_spheroid=False,
 ):
     """Annotates a dataframe with a cluster label for each data record using the DBSCAN algorithm.
 
