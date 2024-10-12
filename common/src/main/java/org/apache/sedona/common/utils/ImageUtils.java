@@ -26,13 +26,32 @@ import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
 import java.awt.image.renderable.ParameterBlock;
+import java.util.Vector;
 import javax.media.jai.ImageLayout;
 import javax.media.jai.JAI;
+import javax.media.jai.PlanarImage;
 import javax.media.jai.RenderedOp;
 
 /** Utility functions for image processing. */
 public class ImageUtils {
   private ImageUtils() {}
+
+  /**
+   * Dispose a rendered image and its sources.
+   *
+   * @param image the image
+   */
+  public static void disposeWithSources(RenderedImage image) {
+    Vector<RenderedImage> sources = image.getSources();
+    if (sources != null) {
+      for (RenderedImage source : sources) {
+        disposeWithSources(source);
+      }
+    }
+    if (image instanceof PlanarImage) {
+      ((PlanarImage) image).dispose();
+    }
+  }
 
   /**
    * Crop and translate an image, so that the result image will have origin (0, 0), containing

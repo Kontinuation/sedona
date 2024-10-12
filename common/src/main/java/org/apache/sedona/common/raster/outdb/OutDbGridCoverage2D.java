@@ -152,6 +152,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
   @Override
   public synchronized boolean dispose(final boolean force) {
     boolean ret = super.dispose(force);
+    ImageUtils.disposeWithSources(image);
     if (ret) {
       if (pooledResource != null) {
         OutDbResourcePool pool = ThreadLocalOutDbResourcePool.get();
@@ -263,6 +264,9 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         PlanarImage planarImage =
             buildImageForGridGeometry(
                 gridGeometry, getSampleDimensions(), bandIndices, resource.gridCoverage2D);
+
+        // Dispose the placeholder
+        image.dispose();
 
         // image field is final in GridCoverage2D, so we need to use reflection to set it.
         final Field field = GridCoverage2D.class.getDeclaredField("image");

@@ -93,11 +93,15 @@ public class SerdeTest extends RasterTestBase {
           OutDbGridCoverage2D.create("test", new Path(testFilePath), new Configuration());
       GridCoverage2D roundTripRaster = testRoundTrip(raster);
       Assert.assertTrue(roundTripRaster instanceof OutDbGridCoverage2D);
+      roundTripRaster.dispose(true);
+      raster.dispose(true);
 
       // Out-DB raster referencing only a small portion of the entire GeoTiff file
       raster = createOutDbRasterTileFromGeoTiff(testFilePath);
       roundTripRaster = testRoundTrip(raster);
       Assert.assertTrue(roundTripRaster instanceof OutDbGridCoverage2D);
+      roundTripRaster.dispose(true);
+      raster.dispose(true);
     }
   }
 
@@ -174,6 +178,7 @@ public class SerdeTest extends RasterTestBase {
     assertNotNull(roundTripRaster);
     assertSameCoverage(raster, roundTripRaster, density);
     bytes = Serde.serialize(roundTripRaster);
+    roundTripRaster.dispose(true);
     roundTripRaster = Serde.deserialize(bytes);
     assertSameCoverage(raster, roundTripRaster, density);
     return roundTripRaster;

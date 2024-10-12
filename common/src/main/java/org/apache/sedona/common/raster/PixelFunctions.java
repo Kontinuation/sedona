@@ -263,6 +263,7 @@ public class PixelFunctions {
       throws TransformException, FactoryException {
     RasterUtils.ensureBand(rasterGeom, band); // Check for invalid band index
 
+    boolean shouldDispose = false;
     for (int i = 0; i < geometries.size(); i++) {
 
       if (geometries.get(i) == null) {
@@ -274,8 +275,15 @@ public class PixelFunctions {
 
       geometries.set(i, pair.getRight());
 
-      if (i == 0) {
-        rasterGeom = pair.getLeft();
+      if (pair.getLeft() != rasterGeom) {
+        if (i == 0) {
+          rasterGeom = pair.getLeft();
+          shouldDispose = true;
+        } else {
+          // Should never reach here
+          throw new RuntimeException(
+              "Internal error: raster should not be changed after the first transformation");
+        }
       }
     }
 
@@ -303,6 +311,10 @@ public class PixelFunctions {
           result.add(null);
         }
       }
+    }
+
+    if (shouldDispose) {
+      rasterGeom.dispose(true);
     }
     return result;
   }
