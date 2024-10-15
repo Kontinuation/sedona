@@ -18,12 +18,14 @@
  */
 package org.apache.sedona.common.raster;
 
+import java.awt.Dimension;
 import java.awt.image.Raster;
 import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import javax.media.jai.RasterFactory;
@@ -37,27 +39,23 @@ import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.raster.outdb.OutDbResourcePool;
 import org.apache.sedona.common.raster.workarounds.RuntimePatches;
+import org.apache.sedona.common.raster.workarounds.geotools.processor.vector.VectorToRasterProcess;
+import org.apache.sedona.common.raster.workarounds.geotools.processor.vector.VectorToRasterProcess.TransferType;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
-import org.geotools.feature.DefaultFeatureCollection;
-import org.geotools.feature.simple.SimpleFeatureBuilder;
-import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.gce.arcgrid.ArcGridReader;
 import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
-import org.geotools.process.vector.VectorToRasterProcess;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultEngineeringCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.geotools.util.factory.Hints;
 import org.locationtech.jts.geom.Geometry;
-import org.opengis.feature.simple.SimpleFeature;
-import org.opengis.feature.simple.SimpleFeatureType;
 import org.opengis.parameter.GeneralParameterValue;
 import org.opengis.parameter.ParameterValue;
 import org.opengis.referencing.FactoryException;
@@ -218,8 +216,9 @@ public class RasterConstructors {
       Double noDataValue,
       boolean useGeometryExtent)
       throws FactoryException {
-    DefaultFeatureCollection featureCollection =
-        getFeatureCollection(geom, raster.getCoordinateReferenceSystem());
+    CoordinateReferenceSystem crs = raster.getCoordinateReferenceSystem();
+    List<VectorToRasterProcess.Feature> features =
+        Collections.singletonList(new VectorToRasterProcess.Feature(geom, value));
 
     double[] metadata = RasterAccessors.metadata(raster);
     // The current implementation doesn't support rasters with properties below
@@ -250,8 +249,7 @@ public class RasterConstructors {
 
     int width, height;
     if (useGeometryExtent) {
-      bound =
-          JTS.getEnvelope2D(geom.getEnvelopeInternal(), raster.getCoordinateReferenceSystem2D());
+      bound = JTS.getEnvelope2D(geom.getEnvelopeInternal(), crs);
       double scaleX = Math.abs(metadata[4]), scaleY = Math.abs(metadata[5]);
       width = Math.max((int) Math.ceil(bound.getWidth() / scaleX), 1);
       height = Math.max((int) Math.ceil(bound.getHeight() / scaleY), 1);
@@ -263,18 +261,16 @@ public class RasterConstructors {
               width * scaleX,
               height * scaleY);
     } else {
-      ReferencedEnvelope envelope =
-          ReferencedEnvelope.create(raster.getEnvelope(), raster.getCoordinateReferenceSystem());
-      bound = JTS.getEnvelope2D(envelope, raster.getCoordinateReferenceSystem2D());
+      ReferencedEnvelope envelope = ReferencedEnvelope.create(raster.getEnvelope(), crs);
+      bound = JTS.getEnvelope2D(envelope, crs);
       GridEnvelope2D gridRange = raster.getGridGeometry().getGridRange2D();
       width = gridRange.width;
       height = gridRange.height;
     }
 
-    VectorToRasterProcess rasterProcess = new VectorToRasterProcess();
     GridCoverage2D rasterized =
-        rasterProcess.execute(
-            featureCollection, width, height, "value", Double.toString(value), bound, null);
+        VectorToRasterProcess.process(
+            features, crs, new Dimension(width, height), bound, TransferType.FLOAT, "rasterized");
     if (noDataValue != null) {
       rasterized = RasterBandEditors.setBandNoDataValue(rasterized, 1, noDataValue);
     }
@@ -309,23 +305,6 @@ public class RasterConstructors {
       Geometry geom, GridCoverage2D raster, String pixelType, double value, Double noDataValue)
       throws FactoryException {
     return asRaster(geom, raster, pixelType, value, noDataValue, false);
-  }
-
-  public static DefaultFeatureCollection getFeatureCollection(
-      Geometry geom, CoordinateReferenceSystem crs) {
-    SimpleFeatureTypeBuilder simpleFeatureTypeBuilder = new SimpleFeatureTypeBuilder();
-    simpleFeatureTypeBuilder.setName("Raster");
-    simpleFeatureTypeBuilder.setCRS(crs);
-    simpleFeatureTypeBuilder.add("geometry", Geometry.class);
-
-    SimpleFeatureType featureType = simpleFeatureTypeBuilder.buildFeatureType();
-    SimpleFeatureBuilder featureBuilder = new SimpleFeatureBuilder(featureType);
-    featureBuilder.add(geom);
-    SimpleFeature simpleFeature = featureBuilder.buildFeature("1");
-    DefaultFeatureCollection featureCollection = new DefaultFeatureCollection();
-    featureCollection.add(simpleFeature);
-
-    return featureCollection;
   }
 
   /**

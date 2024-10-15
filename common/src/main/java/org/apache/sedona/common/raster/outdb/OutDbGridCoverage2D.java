@@ -28,19 +28,15 @@ import java.awt.image.RenderedImage;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
-import java.util.Locale;
 import java.util.Map;
-import javax.imageio.stream.ImageInputStream;
 import javax.media.jai.PlanarImage;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
 import org.apache.sedona.common.raster.serde.AffineTransform2DSerializer;
 import org.apache.sedona.common.raster.serde.CRSSerializer;
 import org.apache.sedona.common.raster.serde.GridEnvelopeSerializer;
 import org.apache.sedona.common.raster.serde.GridSampleDimensionSerializer;
 import org.apache.sedona.common.raster.serde.KryoUtil;
-import org.apache.sedona.common.raster.workarounds.RuntimePatches;
 import org.apache.sedona.common.utils.ImageUtils;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.TypeMap;
@@ -49,19 +45,13 @@ import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
-import org.geotools.coverage.grid.io.AbstractGridFormat;
 import org.geotools.data.DataSourceException;
-import org.geotools.gce.arcgrid.ArcGridFormat;
-import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.geometry.Envelope2D;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultEngineeringCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
-import org.geotools.util.factory.Hints;
 import org.opengis.coverage.CannotEvaluateException;
 import org.opengis.geometry.DirectPosition;
-import org.opengis.parameter.GeneralParameterValue;
-import org.opengis.parameter.ParameterValue;
 import org.opengis.referencing.crs.CoordinateReferenceSystem;
 import org.opengis.referencing.operation.MathTransform;
 
@@ -75,12 +65,6 @@ import org.opengis.referencing.operation.MathTransform;
  * grid coverage is no longer needed, and don't pass the grid coverage to other threads.
  */
 public class OutDbGridCoverage2D extends GridCoverage2D {
-
-  /**
-   * Automatically rescale pixel values to the range of the data type. This is useful when the
-   * GeoTiff has scale and offset values in the metadata. Default is true.
-   */
-  public static final String READER_AUTO_RESCALE_CONF_KEY = "raster.reader.auto-rescale";
 
   private final OutDbResourcePool.ResourceKey resourceKey;
   private OutDbResourcePool.OutDbResource pooledResource;
@@ -155,8 +139,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
     ImageUtils.disposeWithSources(image);
     if (ret) {
       if (pooledResource != null) {
-        OutDbResourcePool pool = ThreadLocalOutDbResourcePool.get();
-        pool.release(pooledResource);
+        ThreadLocalOutDbResourcePool.releaseOutDbResource(pooledResource);
         pooledResource = null;
       }
     }
@@ -257,10 +240,9 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
    */
   private void replacePlaceHolderImage() {
     if (pooledResource == null) {
-      OutDbResourcePool pool = ThreadLocalOutDbResourcePool.get();
       OutDbResourcePool.OutDbResource resource = null;
       try {
-        resource = getOrCreateOutDbResource(pool, resourceKey);
+        resource = ThreadLocalOutDbResourcePool.getOrCreateOutDbResource(resourceKey);
         PlanarImage planarImage =
             buildImageForGridGeometry(
                 gridGeometry, getSampleDimensions(), bandIndices, resource.gridCoverage2D);
@@ -276,7 +258,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         pooledResource = resource;
       } catch (Exception e) {
         if (resource != null) {
-          pool.release(resource);
+          ThreadLocalOutDbResourcePool.releaseOutDbResource(resource);
         }
         throw new RuntimeException(
             "Failed to build planar image for out-db grid coverage, path=" + resourceKey.path, e);
@@ -468,8 +450,8 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
 
   public static OutDbGridCoverage2D create(
       CharSequence name, OutDbResourcePool.ResourceKey resourceKey) throws IOException {
-    OutDbResourcePool pool = ThreadLocalOutDbResourcePool.get();
-    OutDbResourcePool.OutDbResource resource = getOrCreateOutDbResource(pool, resourceKey);
+    OutDbResourcePool.OutDbResource resource =
+        ThreadLocalOutDbResourcePool.getOrCreateOutDbResource(resourceKey);
     GridCoverage2D sourceGrid = resource.gridCoverage2D;
     try {
       int[] bandIndices = new int[sourceGrid.getNumSampleDimensions()];
@@ -485,28 +467,9 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
           bandIndices,
           resource);
     } catch (Exception e) {
-      pool.release(resource);
+      ThreadLocalOutDbResourcePool.releaseOutDbResource(resource);
       throw new DataSourceException("Failed to create out-db grid coverage", e);
     }
-  }
-
-  private static OutDbResourcePool.OutDbResource getOrCreateOutDbResource(
-      OutDbResourcePool pool, OutDbResourcePool.ResourceKey key) throws IOException {
-    OutDbResourcePool.OutDbResource resource = pool.acquire(key);
-    if (resource == null) {
-      AbstractGridFormat format = getFileFormat(key.path);
-      Configuration conf = key.getConfWithParams();
-      ImageInputStream stream = HadoopImageInputStreamFactory.create(key.path, conf);
-      try {
-        GridCoverage2D sourceGrid = readGridCoverage(format, stream, conf);
-        resource = new OutDbResourcePool.OutDbResource(key, sourceGrid, stream);
-        pool.add(resource);
-      } catch (Exception e) {
-        stream.close();
-        throw new DataSourceException("Failed to create out-db grid coverage", e);
-      }
-    }
-    return resource;
   }
 
   private static PlanarImage buildImageForGridGeometry(
@@ -565,34 +528,6 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
     final RenderedImage image =
         new OutDbPlaceHolderImage(widthInPixel, heightInPixel, numBand, dataType);
     return PlanarImage.wrapRenderedImage(image);
-  }
-
-  private static AbstractGridFormat getFileFormat(Path path) {
-    String fileName = path.getName().toUpperCase(Locale.ROOT);
-    AbstractGridFormat format;
-    if (fileName.endsWith(".TIFF") || fileName.endsWith(".TIF")) {
-      format = new GeoTiffFormat();
-    } else if (fileName.endsWith(".ASC")) {
-      format = new ArcGridFormat();
-    } else {
-      // If we cannot infer the file type, we assume that it is GeoTIFF.
-      format = new GeoTiffFormat();
-    }
-    return format;
-  }
-
-  private static GridCoverage2D readGridCoverage(
-      AbstractGridFormat format, ImageInputStream stream, Configuration conf) throws IOException {
-    Hints hints = new Hints(Hints.FORCE_LONGITUDE_FIRST_AXIS_ORDER, Boolean.TRUE);
-    boolean rescale = conf.getBoolean(READER_AUTO_RESCALE_CONF_KEY, true);
-    ParameterValue<Boolean> rescalePixels = AbstractGridFormat.RESCALE_PIXELS.createValue();
-    rescalePixels.setValue(rescale);
-    GeneralParameterValue[] parameters = {rescalePixels};
-    if (format instanceof GeoTiffFormat) {
-      return RuntimePatches.createGeoTiffReader(stream, hints).read(parameters);
-    } else {
-      return format.getReader(stream, hints).read(parameters);
-    }
   }
 
   /**

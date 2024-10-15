@@ -184,28 +184,25 @@ public class OutDbResourcePool {
 
   private final long threadId;
 
-  // We track all resources in a map to avoid creating duplicated GridCoverage2D object for the same
-  // file.
-  // The key is the file path and the configuration used to open the file. The value is a weak
-  // reference
-  // to the OutDbResource object. We use weak reference to avoid preventing the resource from being
-  // garbage collected if users acquire the resource without releasing it. InferredExpression
-  // contains code
-  // for automatic releasing of OutDbGridCoverage2D objects, so for most of the time the resources
-  // will be given
-  // back to the pool in a timely manner.
+  // We track all resources in a map to avoid creating duplicated
+  // GridCoverage2D object for the same file. The key is the file path and the
+  // configuration used to open the file. The value is a weak reference to the
+  // OutDbResource object. We use weak reference to avoid preventing the
+  // resource from being garbage collected if users acquire the resource
+  // without releasing it. InferredExpression contains code for automatic
+  // releasing of OutDbGridCoverage2D objects, so for most of the time the
+  // resources will be given back to the pool in a timely manner.
   //
-  // OutDbResource objects were reference counted and will be added to the freeResources list when
-  // the refCount
-  // drops to 0. The freeResources list has a capacity and will evict the oldest free resource when
-  // the capacity
-  // is reached, so that we'll keep only a limited number of free resources in memory.
+  // OutDbResource objects were reference counted and will be added to the
+  // freeResources list when the refCount drops to 0. The freeResources list
+  // has a capacity and will evict the oldest free resource when the capacity
+  // is reached, so that we'll keep only a limited number of free resources in
+  // memory.
   //
-  // There are cases where the OutDbResource object is not released at all, for example, when
-  // calling
-  // show() or collect() on a dataframe containing out-db rasters. We'll rely on the garbage
-  // collector to clean
-  // up the resources in such cases. That's when the weak reference comes into play.
+  // There are cases where the OutDbResource object is not released at all, for
+  // example, when calling show() or collect() on a dataframe containing out-db
+  // rasters. We'll rely on the garbage collector to clean up the resources in
+  // such cases. That's when the weak reference comes into play.
   private final Map<ResourceKey, WeakOutDbResource> allResources;
   private final ReferenceQueue<OutDbResource> referenceQueue;
   private final OutDbResource freeResources;
@@ -259,6 +256,8 @@ public class OutDbResourcePool {
     if (resource.refCount <= 0) {
       throw new IllegalStateException("refCount of OutDbResource is not positive");
     }
+
+    drainReferenceQueue();
     ResourceKey key = resource.resourceKey;
     WeakOutDbResource ref = allResources.get(key);
     OutDbResource existing = (ref == null ? null : ref.get());
@@ -436,8 +435,23 @@ public class OutDbResourcePool {
     WeakOutDbResource ref;
     int count = 0;
     while ((ref = (WeakOutDbResource) referenceQueue.poll()) != null) {
-      if (allResources.remove(ref.resourceKey) != null) {
+      logger.debug(
+          "Garbage collected OutDbResource object for thread {}, path={}",
+          threadId,
+          ref.resourceKey.path);
+      WeakOutDbResource currentRef = allResources.get(ref.resourceKey);
+      if (currentRef == ref) {
+        allResources.remove(ref.resourceKey);
         count += 1;
+        logger.debug(
+            "Removed garbage collected OutDbResource object for thread {}, path={}",
+            threadId,
+            ref.resourceKey.path);
+      } else {
+        logger.debug(
+            "Ignored stale garbage collected OutDbResource object for thread {}, path={}",
+            threadId,
+            ref.resourceKey.path);
       }
     }
     if (count > 0) {
@@ -478,8 +492,12 @@ public class OutDbResourcePool {
 
     while (freeResourceCount > freeResourcesCapacity
         || totalCacheSpaceUsed > freeResourcesDiskSpaceCapacity) {
-      // Evict the oldest free resource.
+      // Evict the oldest free resource
       OutDbResource evicted = freeResources.prev;
+      if (evicted == freeResources) {
+        // free resource list is empty
+        break;
+      }
       tryRemoveFreeResource(evicted);
       long cacheSpaceUsed = evicted.diskSpaceUsed();
       allResources.remove(evicted.resourceKey);

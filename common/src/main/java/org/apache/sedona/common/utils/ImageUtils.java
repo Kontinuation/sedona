@@ -66,6 +66,10 @@ public class ImageUtils {
    */
   public static RenderedImage cropAndTranslateImage(
       RenderedImage image, int offsetX, int offsetY, int width, int height) {
+    if (offsetX == 0 && offsetY == 0 && width == image.getWidth() && height == image.getHeight()) {
+      return image;
+    }
+
     ParameterBlock cropParams = new ParameterBlock();
     cropParams.addSource(image);
     cropParams.add((float) offsetX);
