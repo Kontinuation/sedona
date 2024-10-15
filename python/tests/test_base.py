@@ -14,15 +14,19 @@
 #  KIND, either express or implied.  See the License for the
 #  specific language governing permissions and limitations
 #  under the License.
-
+import os
 from tempfile import mkdtemp
 from typing import Iterable, Union
 
 from pyspark.sql import DataFrame
+import pyspark
+
 from sedona.spark import *
 from sedona.utils.decorators import classproperty
 from shapely import wkt
 from shapely.geometry.base import BaseGeometry
+
+SPARK_REMOTE = os.getenv("SPARK_REMOTE")
 
 
 class TestBase:
@@ -30,10 +34,28 @@ class TestBase:
     @classproperty
     def spark(self):
         if not hasattr(self, "__spark"):
-            spark = SedonaContext.create(
-                SedonaContext.builder().master("local[*]").getOrCreate()
-            )
-            spark.sparkContext.setCheckpointDir(mkdtemp())
+
+            builder = SedonaContext.builder()
+            if SPARK_REMOTE:
+                builder = (
+                    builder.remote(SPARK_REMOTE)
+                    .config(
+                        "spark.jars.packages",
+                        f"org.apache.spark:spark-connect_2.12:{pyspark.__version__}",
+                    )
+                    .config(
+                        "spark.sql.extensions",
+                        "org.apache.sedona.sql.SedonaSqlExtensions",
+                    )
+                )
+            else:
+                builder = builder.master("local[*]")
+
+            spark = SedonaContext.create(builder.getOrCreate())
+
+            if not SPARK_REMOTE:
+                spark.sparkContext.setCheckpointDir(mkdtemp())
+
             setattr(self, "__spark", spark)
         return getattr(self, "__spark")
 
