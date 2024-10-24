@@ -237,6 +237,8 @@ object Catalog {
     function[ST_KNN](),
     function[ST_AKNN](),
     function[ST_IsValidReason](),
+    function[ST_Scale](),
+    function[ST_ScaleGeom](),
     function[ST_Rotate](),
     function[ST_RotateX](),
     function[ST_RotateY](),
