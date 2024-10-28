@@ -150,7 +150,7 @@ SEDONA_LISTED_SQL_FUNCTIONS = [
      .with_expected_result(5)),
     (SuiteContainer.empty()
      .with_function_name("ST_SimplifyPreserveTopology")
-     .with_arguments(["ST_GeomFromText('POLYGON ((21 53, 22 53, 22 52, 21 52, 21 53))')", "1.0"])
+     .with_arguments(["ST_GeomFromText('POLYGON ((21 53, 22 53, 22 52, 21 52, 21 53))')", "0.5"])
      .with_expected_result(1)
      .with_transform("ST_AREA")),
     (SuiteContainer.empty()
