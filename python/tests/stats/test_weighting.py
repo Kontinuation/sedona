@@ -19,15 +19,15 @@ import pyspark.sql.functions as f
 from sedona.sql.st_constructors import ST_MakePoint
 
 from tests.test_base import TestBase
-from sedona.stats.weighting import add_distance_band_column, add_binary_distance_band_column
+from sedona.stats.weighting import (
+    add_distance_band_column,
+    add_binary_distance_band_column,
+)
 
 
 class TestWeighting(TestBase):
     def get_dataframe(self):
-        data = [
-            [0, 1, 1],
-            [1, 1, 2]
-        ]
+        data = [[0, 1, 1], [1, 1, 2]]
 
         return (
             self.spark.createDataFrame(data)
@@ -42,6 +42,8 @@ class TestWeighting(TestBase):
     def test_calling_binary_weighting_matches_expected(self):
         df = self.get_dataframe()
         self.assert_dataframes_equal(
-            add_distance_band_column(df, 1.0, binary=True, include_zero_distance_neighbors=True),
-            add_binary_distance_band_column(df, 1.0)
+            add_distance_band_column(
+                df, 1.0, binary=True, include_zero_distance_neighbors=True
+            ),
+            add_binary_distance_band_column(df, 1.0),
         )

@@ -55,10 +55,9 @@ class TestLOF(TestBase):
         return np.r_[X_inliers, X_outliers]
 
     def get_medium_dataframe(self, data):
-        schema = StructType([
-            StructField("x", DoubleType(), True),
-            StructField("y", DoubleType(), True)
-        ])
+        schema = StructType(
+            [StructField("x", DoubleType(), True), StructField("y", DoubleType(), True)]
+        )
 
         return (
             self.spark.createDataFrame(data, schema)
@@ -82,8 +81,7 @@ class TestLOF(TestBase):
         data = self.get_medium_data()
         actual = {
             tuple(x[0]): x[1]
-            for x in
-            local_outlier_factor(self.get_medium_dataframe(data.tolist()), k)
+            for x in local_outlier_factor(self.get_medium_dataframe(data.tolist()), k)
             .select(f.array(ST_X("geometry"), ST_Y("geometry")), "lof")
             .collect()
         }

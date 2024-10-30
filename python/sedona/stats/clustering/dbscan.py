@@ -34,12 +34,12 @@ DEFAULT_MAX_SAMPLE_SIZE = 1000000  # 1 million
 
 
 def dbscan(
-        dataframe: DataFrame,
-        epsilon: float,
-        min_pts: int,
-        geometry: Optional[str] = None,
-        include_outliers: bool = True,
-        use_spheroid=False,
+    dataframe: DataFrame,
+    epsilon: float,
+    min_pts: int,
+    geometry: Optional[str] = None,
+    include_outliers: bool = True,
+    use_spheroid=False,
 ):
     """Annotates a dataframe with a cluster label for each data record using the DBSCAN algorithm.
 
@@ -120,7 +120,9 @@ def get_knee_locator(
     if "curve" not in kwargs:
         kwargs["curve"] = "convex"
 
-    dataframe = dataframe.withColumn(ID_COLUMN_NAME, f.sha2(f.to_json(f.struct("*")), 256))
+    dataframe = dataframe.withColumn(
+        ID_COLUMN_NAME, f.sha2(f.to_json(f.struct("*")), 256)
+    )
 
     if max_sample_size is not None:
         l_dataframe = reduce_dataset_size(dataframe, max_sample_size)
@@ -135,10 +137,16 @@ def get_knee_locator(
         l_dataframe.alias("l")
         .join(
             dataframe.alias("r"),
-            f.expr(f"{knn_function}(l.{geometry}, r.{geometry}, {min_points} + 1, {use_spheroid_string})"),
+            f.expr(
+                f"{knn_function}(l.{geometry}, r.{geometry}, {min_points} + 1, {use_spheroid_string})"
+            ),
         )
         .groupBy(f"l.{ID_COLUMN_NAME}")
-        .agg(f.max(ST_Distance(f.col(f"l.{geometry}"), f.col(f"r.{geometry}"))).alias("kth_distance"))
+        .agg(
+            f.max(ST_Distance(f.col(f"l.{geometry}"), f.col(f"r.{geometry}"))).alias(
+                "kth_distance"
+            )
+        )
         .select("kth_distance")
         .orderBy("kth_distance")
     )

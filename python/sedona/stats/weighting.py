@@ -69,13 +69,14 @@ def add_distance_band_column(
         use_spheroid,
     )
 
+
 def add_binary_distance_band_column(
-        dataframe: DataFrame,
-        threshold: float,
-        include_zero_distance_neighbors: bool = True,
-        include_self: bool = False,
-        geometry: Optional[str] = None,
-        use_spheroid: bool = False,
+    dataframe: DataFrame,
+    threshold: float,
+    include_zero_distance_neighbors: bool = True,
+    include_self: bool = False,
+    geometry: Optional[str] = None,
+    use_spheroid: bool = False,
 ) -> DataFrame:
     """Annotates a dataframe with a weights column containing the other records within the threshold and their weight.
 

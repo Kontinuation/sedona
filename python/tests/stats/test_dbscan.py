@@ -68,13 +68,13 @@ class TestDBScan(TestBase):
         return cluster_members
 
     def get_actual_results(
-            self,
-            input_data,
-            epsilon,
-            min_pts,
-            geometry=None,
-            id=None,
-            include_outliers=True,
+        self,
+        input_data,
+        epsilon,
+        min_pts,
+        geometry=None,
+        id=None,
+        include_outliers=True,
     ):
         result = dbscan(
             input_data, epsilon, min_pts, geometry, include_outliers=include_outliers
@@ -101,7 +101,7 @@ class TestDBScan(TestBase):
     @pytest.mark.parametrize("epsilon", [0.6, 0.7, 0.8])
     @pytest.mark.parametrize("min_pts", [3, 4, 5])
     def test_dbscan_valid_parameters(
-            self, sample_data, sample_dataframe, epsilon, min_pts
+        self, sample_data, sample_dataframe, epsilon, min_pts
     ):
         # repeated broadcast joins with this small data size use a lot of RAM on broadcast references
         self.spark.conf.set("sedona.join.autoBroadcastJoinThreshold", -1)
@@ -112,7 +112,7 @@ class TestDBScan(TestBase):
         ) == self.get_actual_results(sample_dataframe, epsilon, min_pts)
 
     def test_dbscan_valid_parameters_default_column_name(
-            self, sample_data, sample_dataframe
+        self, sample_data, sample_dataframe
     ):
         # repeated broadcast joins with this small data size use a lot of RAM on broadcast references
         self.spark.conf.set("sedona.join.autoBroadcastJoinThreshold", -1)
@@ -183,25 +183,25 @@ class TestDBScan(TestBase):
         min_pts = 10000
 
         assert (
-                dbscan(
-                    sample_dataframe,
-                    epsilon,
-                    min_pts,
-                    "arealandmark",
-                    include_outliers=False,
-                ).count()
-                == 0
+            dbscan(
+                sample_dataframe,
+                epsilon,
+                min_pts,
+                "arealandmark",
+                include_outliers=False,
+            ).count()
+            == 0
         )
         # picked some coefficient we know yields clusters and thus hit the happy case
         assert (
-                dbscan(
-                    sample_dataframe,
-                    epsilon,
-                    min_pts,
-                    "arealandmark",
-                    include_outliers=False,
-                ).schema
-                == dbscan(sample_dataframe, 0.6, 3, "arealandmark").schema
+            dbscan(
+                sample_dataframe,
+                epsilon,
+                min_pts,
+                "arealandmark",
+                include_outliers=False,
+            ).schema
+            == dbscan(sample_dataframe, 0.6, 3, "arealandmark").schema
         )
 
     def test_dbscan_doesnt_duplicate_border_points_in_two_clusters(self):
@@ -230,7 +230,7 @@ class TestDBScan(TestBase):
         assert output_df.select("cluster").distinct().count() == 2
 
     def test_return_outliers_false_doesnt_return_outliers(
-            self, sample_data, sample_dataframe
+        self, sample_data, sample_dataframe
     ):
         # repeated broadcast joins with this small data size use a lot of RAM on broadcast references
         self.spark.conf.set("sedona.join.autoBroadcastJoinThreshold", -1)

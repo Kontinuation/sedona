@@ -11,8 +11,12 @@ import argparse
 
 if __name__ == "__main__":
     # Parse arguments
-    parser = argparse.ArgumentParser(description="Run a PySpark job with a custom Pandas UDF")
-    parser.add_argument('batch_size', type=int, help='The batch size to be used in the Pandas UDF')
+    parser = argparse.ArgumentParser(
+        description="Run a PySpark job with a custom Pandas UDF"
+    )
+    parser.add_argument(
+        "batch_size", type=int, help="The batch size to be used in the Pandas UDF"
+    )
     args = parser.parse_args()
 
     # Create a Spark session

@@ -19,4 +19,6 @@ from pyspark.sql import SparkSession
 
 
 def getorCreate():
-    return SparkSession.getActiveSession()._jvm.org.apache.sedona.stats.stats.monitoring.MetricsRegistrator.getOrCreate()
+    return (
+        SparkSession.getActiveSession()._jvm.org.apache.sedona.stats.stats.monitoring.MetricsRegistrator.getOrCreate()
+    )

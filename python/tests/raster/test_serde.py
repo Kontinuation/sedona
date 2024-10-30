@@ -25,47 +25,76 @@ from sedona.sql.types import RasterType
 
 from tests import world_map_raster_input_location
 
+
 class TestRasterSerde(TestBase):
     def test_empty_raster(self):
-        df = TestRasterSerde.spark.sql("SELECT RS_MakeEmptyRaster(2, 100, 200, 1000, 2000, 1) as raster")
+        df = TestRasterSerde.spark.sql(
+            "SELECT RS_MakeEmptyRaster(2, 100, 200, 1000, 2000, 1) as raster"
+        )
         raster = df.first()[0]
-        assert raster.width == 100 and raster.height == 200 and len(raster.bands_meta) == 2
+        assert (
+            raster.width == 100 and raster.height == 200 and len(raster.bands_meta) == 2
+        )
         assert raster.affine_trans.ip_x == 1000 and raster.affine_trans.ip_y == 2000
         assert raster.affine_trans.scale_x == 1 and raster.affine_trans.scale_y == -1
 
     def test_banded_sample_model(self):
-        df = TestRasterSerde.spark.sql("SELECT RS_MakeRasterForTesting(3, 'I', 'BandedSampleModel', 10, 8, 100, 100, 10, -10, 0, 0, 3857) as raster")
+        df = TestRasterSerde.spark.sql(
+            "SELECT RS_MakeRasterForTesting(3, 'I', 'BandedSampleModel', 10, 8, 100, 100, 10, -10, 0, 0, 3857) as raster"
+        )
         raster = df.first()[0]
         assert raster.width == 10 and raster.height == 8 and len(raster.bands_meta) == 3
         self.validate_test_raster(raster)
 
     def test_pixel_interleaved_sample_model(self):
-        df = TestRasterSerde.spark.sql("SELECT RS_MakeRasterForTesting(3, 'I', 'PixelInterleavedSampleModel', 10, 10, 100, 100, 10, -10, 0, 0, 3857) as raster")
+        df = TestRasterSerde.spark.sql(
+            "SELECT RS_MakeRasterForTesting(3, 'I', 'PixelInterleavedSampleModel', 10, 10, 100, 100, 10, -10, 0, 0, 3857) as raster"
+        )
         raster = df.first()[0]
-        assert raster.width == 10 and raster.height == 10 and len(raster.bands_meta) == 3
+        assert (
+            raster.width == 10 and raster.height == 10 and len(raster.bands_meta) == 3
+        )
         self.validate_test_raster(raster)
-        df = TestRasterSerde.spark.sql("SELECT RS_MakeRasterForTesting(4, 'I', 'PixelInterleavedSampleModelComplex', 8, 10, 100, 100, 10, -10, 0, 0, 3857) as raster")
+        df = TestRasterSerde.spark.sql(
+            "SELECT RS_MakeRasterForTesting(4, 'I', 'PixelInterleavedSampleModelComplex', 8, 10, 100, 100, 10, -10, 0, 0, 3857) as raster"
+        )
         raster = df.first()[0]
         assert raster.width == 8 and raster.height == 10 and len(raster.bands_meta) == 4
         self.validate_test_raster(raster)
 
     def test_component_sample_model(self):
-        for pixel_type in ['B', 'S', 'US', 'I', 'F', 'D']:
-            df = TestRasterSerde.spark.sql("SELECT RS_MakeRasterForTesting(4, '{}', 'ComponentSampleModel', 10, 10, 100, 100, 10, -10, 0, 0, 3857) as raster".format(pixel_type))
+        for pixel_type in ["B", "S", "US", "I", "F", "D"]:
+            df = TestRasterSerde.spark.sql(
+                "SELECT RS_MakeRasterForTesting(4, '{}', 'ComponentSampleModel', 10, 10, 100, 100, 10, -10, 0, 0, 3857) as raster".format(
+                    pixel_type
+                )
+            )
             raster = df.first()[0]
-            assert raster.width == 10 and raster.height == 10 and len(raster.bands_meta) == 4
+            assert (
+                raster.width == 10
+                and raster.height == 10
+                and len(raster.bands_meta) == 4
+            )
             self.validate_test_raster(raster)
 
     def test_multi_pixel_packed_sample_model(self):
-        df = TestRasterSerde.spark.sql("SELECT RS_MakeRasterForTesting(1, 'B', 'MultiPixelPackedSampleModel', 10, 10, 100, 100, 10, -10, 0, 0, 3857) as raster")
+        df = TestRasterSerde.spark.sql(
+            "SELECT RS_MakeRasterForTesting(1, 'B', 'MultiPixelPackedSampleModel', 10, 10, 100, 100, 10, -10, 0, 0, 3857) as raster"
+        )
         raster = df.first()[0]
-        assert raster.width == 10 and raster.height == 10 and len(raster.bands_meta) == 1
+        assert (
+            raster.width == 10 and raster.height == 10 and len(raster.bands_meta) == 1
+        )
         self.validate_test_raster(raster, packed=True)
 
     def test_single_pixel_packed_sample_model(self):
-        df = TestRasterSerde.spark.sql("SELECT RS_MakeRasterForTesting(4, 'I', 'SinglePixelPackedSampleModel', 10, 10, 100, 100, 10, -10, 0, 0, 3857) as raster")
+        df = TestRasterSerde.spark.sql(
+            "SELECT RS_MakeRasterForTesting(4, 'I', 'SinglePixelPackedSampleModel', 10, 10, 100, 100, 10, -10, 0, 0, 3857) as raster"
+        )
         raster = df.first()[0]
-        assert raster.width == 10 and raster.height == 10 and len(raster.bands_meta) == 4
+        assert (
+            raster.width == 10 and raster.height == 10 and len(raster.bands_meta) == 4
+        )
         self.validate_test_raster(raster, packed=True)
 
     def test_raster_read_from_geotiff(self):
@@ -73,7 +102,11 @@ class TestRasterSerde(TestBase):
         r_orig = rasterio.open(raster_path)
         band = r_orig.read(1)
         band_masked = np.where(band == 0, np.nan, band)
-        df = TestRasterSerde.spark.read.format("binaryFile").load(raster_path).selectExpr("RS_FromGeoTiff(content) as raster")
+        df = (
+            TestRasterSerde.spark.read.format("binaryFile")
+            .load(raster_path)
+            .selectExpr("RS_FromGeoTiff(content) as raster")
+        )
         raster = df.first()[0]
         assert raster.width == r_orig.width
         assert raster.height == r_orig.height
@@ -92,7 +125,9 @@ class TestRasterSerde(TestBase):
 
         # test as_numpy_masked
         arr = raster.as_numpy_masked()[0, :, :]
-        assert np.array_equal(arr, band_masked) or np.array_equal(np.isnan(arr), np.isnan(band_masked))
+        assert np.array_equal(arr, band_masked) or np.array_equal(
+            np.isnan(arr), np.isnan(band_masked)
+        )
 
         raster.close()
         r_orig.close()
@@ -102,8 +137,12 @@ class TestRasterSerde(TestBase):
         r_orig = rasterio.open(raster_path)
         band = r_orig.read(1)
         band_masked = np.where(band == 0, np.nan, band)
-        for eager_loading in ['true', 'false']:
-            df = TestRasterSerde.spark.sql("SELECT RS_FromPath('{}', '', {}) as raster".format(raster_path, eager_loading))
+        for eager_loading in ["true", "false"]:
+            df = TestRasterSerde.spark.sql(
+                "SELECT RS_FromPath('{}', '', {}) as raster".format(
+                    raster_path, eager_loading
+                )
+            )
             raster = df.first()[0]
             assert raster.width == r_orig.width
             assert raster.height == r_orig.height
@@ -121,35 +160,54 @@ class TestRasterSerde(TestBase):
 
             # test as_numpy_masked
             arr = raster.as_numpy_masked()[0, :, :]
-            assert np.array_equal(arr, band_masked) or np.array_equal(np.isnan(arr), np.isnan(band_masked))
+            assert np.array_equal(arr, band_masked) or np.array_equal(
+                np.isnan(arr), np.isnan(band_masked)
+            )
 
             raster.close()
         r_orig.close()
 
     def test_outdb_tiled_raster(self):
-        for raster_path in [world_map_raster_input_location,
-                            'file:' + world_map_raster_input_location,
-                            'file://' + world_map_raster_input_location]:
+        for raster_path in [
+            world_map_raster_input_location,
+            "file:" + world_map_raster_input_location,
+            "file://" + world_map_raster_input_location,
+        ]:
             r_orig = rasterio.open(raster_path)
             band = r_orig.read(1)
             r_orig.close()
-            df = TestRasterSerde.spark.sql("SELECT RS_TileExplode(RS_FromPath('{}'), 1, 256, 256) AS (x, y, rast)".format(raster_path))
+            df = TestRasterSerde.spark.sql(
+                "SELECT RS_TileExplode(RS_FromPath('{}'), 1, 256, 256) AS (x, y, rast)".format(
+                    raster_path
+                )
+            )
             df = df.withColumn("meta", expr("RS_Metadata(rast)"))
             rows = df.collect()
             for row in rows:
-                r_tile = row['rast']
-                meta = row['meta']
-                ip_x, ip_y, width, height, scale_x, scale_y, skew_x, skew_y, srid, num_bands = (
-                    meta['upperLeftX'],
-                    meta['upperLeftY'],
-                    meta['gridWidth'],
-                    meta['gridHeight'],
-                    meta['scaleX'],
-                    meta['scaleY'],
-                    meta['skewX'],
-                    meta['skewY'],
-                    meta['srid'],
-                    meta['numSampleDimensions']
+                r_tile = row["rast"]
+                meta = row["meta"]
+                (
+                    ip_x,
+                    ip_y,
+                    width,
+                    height,
+                    scale_x,
+                    scale_y,
+                    skew_x,
+                    skew_y,
+                    srid,
+                    num_bands,
+                ) = (
+                    meta["upperLeftX"],
+                    meta["upperLeftY"],
+                    meta["gridWidth"],
+                    meta["gridHeight"],
+                    meta["scaleX"],
+                    meta["scaleY"],
+                    meta["skewX"],
+                    meta["skewY"],
+                    meta["srid"],
+                    meta["numSampleDimensions"],
                 )
                 assert width == r_tile.width
                 assert height == r_tile.height
@@ -159,10 +217,10 @@ class TestRasterSerde(TestBase):
                 assert scale_y == r_tile.affine_trans.scale_y
                 assert skew_x == r_tile.affine_trans.skew_x
                 assert skew_y == r_tile.affine_trans.skew_y
-                start_x = row['x'] * 256
-                end_x = (row['x'] + 1) * 256
-                start_y = row['y'] * 256
-                end_y = (row['y'] + 1) * 256
+                start_x = row["x"] * 256
+                end_x = (row["x"] + 1) * 256
+                start_y = row["y"] * 256
+                end_y = (row["y"] + 1) * 256
 
                 # test as_numpy
                 assert (band[start_y:end_y, start_x:end_x] == r_tile.as_numpy()).all()
@@ -176,12 +234,14 @@ class TestRasterSerde(TestBase):
 
     def test_to_pandas(self):
         spark = TestRasterSerde.spark
-        df = spark.sql("SELECT RS_MakeRasterForTesting(3, 'I', 'BandedSampleModel', 10, 8, 100, 100, 10, -10, 0, 0, 3857) as raster")
+        df = spark.sql(
+            "SELECT RS_MakeRasterForTesting(3, 'I', 'BandedSampleModel', 10, 8, 100, 100, 10, -10, 0, 0, 3857) as raster"
+        )
         pandas_df = df.toPandas()
-        raster = pandas_df.iloc[0]['raster']
+        raster = pandas_df.iloc[0]["raster"]
         self.validate_test_raster(raster)
 
-    def validate_test_raster(self, raster, packed = False):
+    def validate_test_raster(self, raster, packed=False):
         arr = raster.as_numpy()
         ds = raster.as_rasterio()
         bands, height, width = arr.shape

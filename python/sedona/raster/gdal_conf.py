@@ -21,6 +21,7 @@ import os
 import re
 
 from rasterio.session import AWSSession  # type: ignore
+
 try:
     import boto3  # type: ignore
 except ImportError:
@@ -36,14 +37,14 @@ _base_gdal_conf: Optional[Dict[str, str]] = None
 _per_bucket_gdal_conf: Optional[Dict[str, Dict[str, str]]] = None
 
 
-BASE_GDAL_CONF_ENV_KEY = '__SEDONA_BASE_GDAL_CONF__'
-PER_BUCKET_GDAL_CONF_ENV_KEY = '__SEDONA_PER_BUCKET_GDAL_CONF__'
+BASE_GDAL_CONF_ENV_KEY = "__SEDONA_BASE_GDAL_CONF__"
+PER_BUCKET_GDAL_CONF_ENV_KEY = "__SEDONA_PER_BUCKET_GDAL_CONF__"
 
 
 S3A_CONFIG_TO_GDAL_CONFIG_MAP = {
-    'access.key': 'AWS_ACCESS_KEY_ID',
-    'secret.key': 'AWS_SECRET_ACCESS_KEY',
-    'session.token': 'AWS_SESSION_TOKEN',
+    "access.key": "AWS_ACCESS_KEY_ID",
+    "secret.key": "AWS_SECRET_ACCESS_KEY",
+    "session.token": "AWS_SESSION_TOKEN",
 }
 
 
@@ -59,12 +60,12 @@ def get_gdal_conf_for_s3_bucket(bucket_name: str) -> Dict[str, str]:
 
 def get_gdal_conf(path: str) -> Dict[str, str]:
     bucket_name = None
-    if path.startswith('s3a://'):
-        bucket_name = path.split('/')[2]
-    elif path.startswith('s3://'):
-        bucket_name = path.split('/')[2]
-    elif path.startswith('/vsis3/'):
-        bucket_name = path.split('/')[2]
+    if path.startswith("s3a://"):
+        bucket_name = path.split("/")[2]
+    elif path.startswith("s3://"):
+        bucket_name = path.split("/")[2]
+    elif path.startswith("/vsis3/"):
+        bucket_name = path.split("/")[2]
     if bucket_name is None:
         return {}
     return get_gdal_conf_for_s3_bucket(bucket_name)
@@ -93,16 +94,16 @@ def get_rasterio_aws_session(path: str) -> Optional[AWSSession]:
         # AWSSession requires boto3 to work properly
         return None
     args: Dict[str, Any] = {}
-    if 'AWS_ACCESS_KEY_ID' in conf:
-        args['aws_access_key_id'] = conf['AWS_ACCESS_KEY_ID']
-    if 'AWS_SECRET_ACCESS_KEY' in conf:
-        args['aws_secret_access_key'] = conf['AWS_SECRET_ACCESS_KEY']
-    if 'AWS_SESSION_TOKEN' in conf:
-        args['aws_session_token'] = conf['AWS_SESSION_TOKEN']
-    if 'AWS_NO_SIGN_REQUEST' in conf:
-        args['aws_unsigned'] = (conf['AWS_NO_SIGN_REQUEST'] == 'YES')
-    if 'AWS_REQUEST_PAYER' in conf:
-        args['requester_pays'] = (conf['AWS_REQUEST_PAYER'] == 'requester')
+    if "AWS_ACCESS_KEY_ID" in conf:
+        args["aws_access_key_id"] = conf["AWS_ACCESS_KEY_ID"]
+    if "AWS_SECRET_ACCESS_KEY" in conf:
+        args["aws_secret_access_key"] = conf["AWS_SECRET_ACCESS_KEY"]
+    if "AWS_SESSION_TOKEN" in conf:
+        args["aws_session_token"] = conf["AWS_SESSION_TOKEN"]
+    if "AWS_NO_SIGN_REQUEST" in conf:
+        args["aws_unsigned"] = conf["AWS_NO_SIGN_REQUEST"] == "YES"
+    if "AWS_REQUEST_PAYER" in conf:
+        args["requester_pays"] = conf["AWS_REQUEST_PAYER"] == "requester"
     return AWSSession(**args)
 
 
@@ -122,6 +123,7 @@ def _load_spark_conf() -> Optional[Dict[str, str]]:
     try:
         from pyspark import TaskContext
         from pyspark.sql import SparkSession
+
         task_context = TaskContext.get()
         if task_context is not None:
             # running on spark executor
@@ -138,8 +140,10 @@ def _load_spark_conf() -> Optional[Dict[str, str]]:
     return _spark_conf
 
 
-def _parse_s3a_conf(spark_conf: Dict[str, str]) -> Tuple[Dict[str, str], Dict[str, Dict[str, str]]]:
-    regex = re.compile(r'spark\.hadoop\.fs\.s3a(\.bucket\.([^.]+]*))?\.(.*)')
+def _parse_s3a_conf(
+    spark_conf: Dict[str, str]
+) -> Tuple[Dict[str, str], Dict[str, Dict[str, str]]]:
+    regex = re.compile(r"spark\.hadoop\.fs\.s3a(\.bucket\.([^.]+]*))?\.(.*)")
     global_s3_configs = {}
     per_bucket_s3_configs: Dict[str, Dict[str, str]] = {}
     for key, value in spark_conf.items():
@@ -162,16 +166,16 @@ def _convert_s3a_configs_to_gdal_configs(s3a_config: Dict[str, str]) -> Dict[str
     for key, value in s3a_config.items():
         if key in S3A_CONFIG_TO_GDAL_CONFIG_MAP:
             gdal_configs[S3A_CONFIG_TO_GDAL_CONFIG_MAP[key]] = value
-        elif key == 'aws.credentials.provider':
-            if 'AnonymousAWSCredentialsProvider' in value:
-                gdal_configs['AWS_NO_SIGN_REQUEST'] = 'YES'
+        elif key == "aws.credentials.provider":
+            if "AnonymousAWSCredentialsProvider" in value:
+                gdal_configs["AWS_NO_SIGN_REQUEST"] = "YES"
             else:
-                gdal_configs['AWS_NO_SIGN_REQUEST'] = 'NO'
-                if 'RequestPayer' in value:
-                    gdal_configs['AWS_REQUEST_PAYER'] = 'requester'
-        elif key == 'requester.pays.enabled':
-            if value == 'true':
-                gdal_configs['AWS_REQUEST_PAYER'] = 'requester'
+                gdal_configs["AWS_NO_SIGN_REQUEST"] = "NO"
+                if "RequestPayer" in value:
+                    gdal_configs["AWS_REQUEST_PAYER"] = "requester"
+        elif key == "requester.pays.enabled":
+            if value == "true":
+                gdal_configs["AWS_REQUEST_PAYER"] = "requester"
     return gdal_configs
 
 
@@ -181,14 +185,19 @@ def _load_gdal_conf():
         return
 
     # try loading gdal config from env
-    if BASE_GDAL_CONF_ENV_KEY in os.environ or PER_BUCKET_GDAL_CONF_ENV_KEY in os.environ:
+    if (
+        BASE_GDAL_CONF_ENV_KEY in os.environ
+        or PER_BUCKET_GDAL_CONF_ENV_KEY in os.environ
+    ):
         _base_gdal_conf = (
             json.loads(os.environ[BASE_GDAL_CONF_ENV_KEY])
-            if BASE_GDAL_CONF_ENV_KEY in os.environ else {}
+            if BASE_GDAL_CONF_ENV_KEY in os.environ
+            else {}
         )
         _per_bucket_gdal_conf = (
             json.loads(os.environ[PER_BUCKET_GDAL_CONF_ENV_KEY])
-            if PER_BUCKET_GDAL_CONF_ENV_KEY in os.environ else {}
+            if PER_BUCKET_GDAL_CONF_ENV_KEY in os.environ
+            else {}
         )
         return
 

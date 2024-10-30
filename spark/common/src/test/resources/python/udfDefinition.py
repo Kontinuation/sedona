@@ -10,7 +10,9 @@ def create_custom_pandas_udf(batch_size):
         # Example custom logic using batch_size
         # (Note: In a real scenario, the logic might be more complex)
         return s.apply(lambda x: x.upper() if len(x) <= batch_size else x.lower())
+
     return custom_pandas_udf
+
 
 def register_pandas_UDF(spark, batch_size):
     # Register a UDF imported from a Python module

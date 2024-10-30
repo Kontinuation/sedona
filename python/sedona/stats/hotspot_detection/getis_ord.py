@@ -25,6 +25,7 @@ from pyspark.sql import DataFrame, Column, SparkSession
 
 # todo change weights and x type to string
 
+
 def g_local(
     dataframe: DataFrame,
     x: str,

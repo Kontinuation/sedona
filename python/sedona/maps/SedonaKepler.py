@@ -55,7 +55,7 @@ class SedonaKepler:
         :param name: [Optional] Name to assign to the dataframe, default name assigned is 'unnamed'
         :return: Does not return anything, adds df directly to the given map object
         """
-        df = df.fillna('')  # Kepler does not support NaN values
+        df = df.fillna("")  # Kepler does not support NaN values
         schema = df.schema
         for field in schema.fields:
             if field.dataType == RasterType():

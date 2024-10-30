@@ -17,7 +17,18 @@ for path in sorted(src.rglob("*.py")):
     parts = tuple(module_path.parts)
 
     # Only gen docs for stats features
-    if len({"clustering", "sampling", "outlier_detection", "hotspot_detection", "weighting"}.intersection(set(parts))) == 0:
+    if (
+        len(
+            {
+                "clustering",
+                "sampling",
+                "outlier_detection",
+                "hotspot_detection",
+                "weighting",
+            }.intersection(set(parts))
+        )
+        == 0
+    ):
         continue
 
     if parts[-1] == "__init__":

@@ -38,7 +38,7 @@ class TestGetisOrd(TestBase):
             {"id": 7, "x": 1.0, "y": 2.0, "val": 0.2},
             {"id": 8, "x": 1.0, "y": 3.0, "val": 1.2},
             {"id": 9, "x": 0.0, "y": 2.0, "val": 1.0},
-            {"id": 10, "x": 4.0, "y": 2.0, "val": 1.2}
+            {"id": 10, "x": 4.0, "y": 2.0, "val": 1.2},
         ]
 
     def get_dataframe(self):
@@ -53,75 +53,105 @@ class TestGetisOrd(TestBase):
 
         # expected_results
         data = self.get_data()
-        points = [(datum['x'], datum['y']) for datum in data]
+        points = [(datum["x"], datum["y"]) for datum in data]
         w = DistanceBand(points, threshold=1.0)
-        y = [datum['val'] for datum in data]
-        expected_data = G_Local(y, w, transform='B')
+        y = [datum["val"] for datum in data]
+        expected_data = G_Local(y, w, transform="B")
 
         # assert
         actuals = actual_df.orderBy(f.col("id").asc()).collect()
         self.assert_almost_equal(expected_data.Gs.tolist(), [row.G for row in actuals])
-        self.assert_almost_equal(expected_data.EGs.tolist(), [row.EG for row in actuals])
-        self.assert_almost_equal(expected_data.VGs.tolist(), [row.VG for row in actuals])
+        self.assert_almost_equal(
+            expected_data.EGs.tolist(), [row.EG for row in actuals]
+        )
+        self.assert_almost_equal(
+            expected_data.VGs.tolist(), [row.VG for row in actuals]
+        )
         self.assert_almost_equal(expected_data.Zs.tolist(), [row.Z for row in actuals])
-        self.assert_almost_equal(expected_data.p_norm.tolist(), [row.P for row in actuals])
+        self.assert_almost_equal(
+            expected_data.p_norm.tolist(), [row.P for row in actuals]
+        )
 
     def test_gistar_results_match_pysal(self):
         # actual
-        input_dataframe = add_distance_band_column(self.get_dataframe(), 1.0, include_self=True)
+        input_dataframe = add_distance_band_column(
+            self.get_dataframe(), 1.0, include_self=True
+        )
         actual_df = g_local(input_dataframe, "val", "weights", star=True)
 
         # expected_results
         data = self.get_data()
-        points = [(datum['x'], datum['y']) for datum in data]
+        points = [(datum["x"], datum["y"]) for datum in data]
         w = DistanceBand(points, threshold=1.0)
-        y = [datum['val'] for datum in data]
-        expected_data = G_Local(y, w, transform='B', star=True)
+        y = [datum["val"] for datum in data]
+        expected_data = G_Local(y, w, transform="B", star=True)
 
         # assert
         actuals = actual_df.orderBy(f.col("id").asc()).collect()
         self.assert_almost_equal(expected_data.Gs.tolist(), [row.G for row in actuals])
-        self.assert_almost_equal(expected_data.EGs.tolist(), [row.EG for row in actuals])
-        self.assert_almost_equal(expected_data.VGs.tolist(), [row.VG for row in actuals])
+        self.assert_almost_equal(
+            expected_data.EGs.tolist(), [row.EG for row in actuals]
+        )
+        self.assert_almost_equal(
+            expected_data.VGs.tolist(), [row.VG for row in actuals]
+        )
         self.assert_almost_equal(expected_data.Zs.tolist(), [row.Z for row in actuals])
-        self.assert_almost_equal(expected_data.p_norm.tolist(), [row.P for row in actuals])
+        self.assert_almost_equal(
+            expected_data.p_norm.tolist(), [row.P for row in actuals]
+        )
 
     def test_gi_results_match_pysal_nb(self):
         # actual
-        input_dataframe = add_distance_band_column(self.get_dataframe(), 1.0, binary=False)
+        input_dataframe = add_distance_band_column(
+            self.get_dataframe(), 1.0, binary=False
+        )
         actual_df = g_local(input_dataframe, "val", "weights")
 
         # expected_results
         data = self.get_data()
-        points = [(datum['x'], datum['y']) for datum in data]
+        points = [(datum["x"], datum["y"]) for datum in data]
         w = DistanceBand(points, threshold=1.0, binary=False)
-        y = [datum['val'] for datum in data]
-        expected_data = G_Local(y, w, transform='B')
+        y = [datum["val"] for datum in data]
+        expected_data = G_Local(y, w, transform="B")
 
         # assert
         actuals = actual_df.orderBy(f.col("id").asc()).collect()
         self.assert_almost_equal(expected_data.Gs.tolist(), [row.G for row in actuals])
-        self.assert_almost_equal(expected_data.EGs.tolist(), [row.EG for row in actuals])
-        self.assert_almost_equal(expected_data.VGs.tolist(), [row.VG for row in actuals])
+        self.assert_almost_equal(
+            expected_data.EGs.tolist(), [row.EG for row in actuals]
+        )
+        self.assert_almost_equal(
+            expected_data.VGs.tolist(), [row.VG for row in actuals]
+        )
         self.assert_almost_equal(expected_data.Zs.tolist(), [row.Z for row in actuals])
-        self.assert_almost_equal(expected_data.p_norm.tolist(), [row.P for row in actuals])
+        self.assert_almost_equal(
+            expected_data.p_norm.tolist(), [row.P for row in actuals]
+        )
 
     def test_gistar_results_match_pysal_nb(self):
         # actual
-        input_dataframe = add_distance_band_column(self.get_dataframe(), 1.0, include_self=True, binary=False)
+        input_dataframe = add_distance_band_column(
+            self.get_dataframe(), 1.0, include_self=True, binary=False
+        )
         actual_df = g_local(input_dataframe, "val", "weights", star=True)
 
         # expected_results
         data = self.get_data()
-        points = [(datum['x'], datum['y']) for datum in data]
+        points = [(datum["x"], datum["y"]) for datum in data]
         w = DistanceBand(points, threshold=1.0, binary=False)
-        y = [datum['val'] for datum in data]
-        expected_data = G_Local(y, w, transform='B', star=True)
+        y = [datum["val"] for datum in data]
+        expected_data = G_Local(y, w, transform="B", star=True)
 
         # assert
         actuals = actual_df.orderBy(f.col("id").asc()).collect()
         self.assert_almost_equal(expected_data.Gs.tolist(), [row.G for row in actuals])
-        self.assert_almost_equal(expected_data.EGs.tolist(), [row.EG for row in actuals])
-        self.assert_almost_equal(expected_data.VGs.tolist(), [row.VG for row in actuals])
+        self.assert_almost_equal(
+            expected_data.EGs.tolist(), [row.EG for row in actuals]
+        )
+        self.assert_almost_equal(
+            expected_data.VGs.tolist(), [row.VG for row in actuals]
+        )
         self.assert_almost_equal(expected_data.Zs.tolist(), [row.Z for row in actuals])
-        self.assert_almost_equal(expected_data.p_norm.tolist(), [row.P for row in actuals])
+        self.assert_almost_equal(
+            expected_data.p_norm.tolist(), [row.P for row in actuals]
+        )

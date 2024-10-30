@@ -27,24 +27,37 @@ from tests.test_base import TestBase
 
 class TestGeoJSON(TestBase):
     def test_interoperability_with_geopandas(self, tmp_path):
-        df = self.spark.range(0, 10).toDF("id")\
-            .withColumn("geom", expr("ST_Point(id, id)"))\
+        df = (
+            self.spark.range(0, 10)
+            .toDF("id")
+            .withColumn("geom", expr("ST_Point(id, id)"))
             .withColumn("text", expr("concat('test', id)"))
+        )
         geojson_save_path = os.path.join(tmp_path, "test.geojson")
-        df.write.format("geojson").option("geometry.column", "geom").mode("overwrite").save(geojson_save_path)
+        df.write.format("geojson").option("geometry.column", "geom").mode(
+            "overwrite"
+        ).save(geojson_save_path)
 
         # Load GeoJSON file written by sedona using geopandas
-        geojson_file_paths = [os.path.join(geojson_save_path, fname) for fname in os.listdir(geojson_save_path) if fname.endswith('json')]
+        geojson_file_paths = [
+            os.path.join(geojson_save_path, fname)
+            for fname in os.listdir(geojson_save_path)
+            if fname.endswith("json")
+        ]
         for geojson_file_path in geojson_file_paths:
             gdf = geopandas.read_file(geojson_file_path)
-            assert gdf.dtypes['geometry'].name == 'geometry'
+            assert gdf.dtypes["geometry"].name == "geometry"
 
         # Load GeoJSON file written by geopandas using sedona
         geojson_save_path2 = os.path.join(tmp_path, "test_2.geojson")
         gdf.to_file(geojson_save_path2, driver="GeoJSON")
 
-        df = self.spark.read.format("geojson").option("multiLine", "true").load(geojson_save_path2)
+        df = (
+            self.spark.read.format("geojson")
+            .option("multiLine", "true")
+            .load(geojson_save_path2)
+        )
         df = df.selectExpr("explode(features) as feature").select("feature.*")
         row = df.first()
-        assert isinstance(row['geometry'], BaseGeometry)
-        assert row['properties']['text'].startswith('test')
+        assert isinstance(row["geometry"], BaseGeometry)
+        assert row["properties"]["text"].startswith("test")
