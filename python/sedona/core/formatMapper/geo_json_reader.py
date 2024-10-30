@@ -15,10 +15,9 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
-from pyspark import SparkContext, RDD
-
-from sedona.core.SpatialRDD.spatial_rdd import SpatialRDD
+from pyspark import RDD, SparkContext
 from sedona.core.formatMapper.geo_reader import GeoDataReader
+from sedona.core.SpatialRDD.spatial_rdd import SpatialRDD
 from sedona.utils.meta import MultipleMeta
 
 

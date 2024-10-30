@@ -18,10 +18,8 @@
 import os
 
 import pyspark
-
-from sedona.core.jvm.config import is_greater_or_equal_version, SedonaMeta
-
 from sedona.core.formatMapper.geo_json_reader import GeoJsonReader
+from sedona.core.jvm.config import SedonaMeta, is_greater_or_equal_version
 from tests.test_base import TestBase
 from tests.tools import tests_resource
 

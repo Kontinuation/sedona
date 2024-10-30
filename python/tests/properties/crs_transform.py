@@ -17,10 +17,9 @@
 
 import os
 
-from shapely.geometry import Point
-
 from sedona.core.enums import FileDataSplitter, IndexType
 from sedona.core.geom.envelope import Envelope
+from shapely.geometry import Point
 from tests.tools import tests_resource
 
 input_location = os.path.join(tests_resource, "crs-test-point.csv")

@@ -18,10 +18,9 @@
 import os
 
 import pytest
-
-from sedona.core.SpatialRDD import RectangleRDD
-from sedona.core.enums import IndexType, GridType, FileDataSplitter
+from sedona.core.enums import FileDataSplitter, GridType, IndexType
 from sedona.core.geom.envelope import Envelope
+from sedona.core.SpatialRDD import RectangleRDD
 from tests.test_base import TestBase
 from tests.tools import tests_resource
 

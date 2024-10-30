@@ -16,10 +16,10 @@
 #  under the License.
 
 import pytest
-
-from sedona.core.SpatialRDD import RectangleRDD, PolygonRDD, LineStringRDD, PointRDD
-from sedona.core.SpatialRDD.spatial_rdd import SpatialRDD
 from sedona.core.enums import GridType
+from sedona.core.SpatialRDD import (LineStringRDD, PointRDD, PolygonRDD,
+                                    RectangleRDD)
+from sedona.core.SpatialRDD.spatial_rdd import SpatialRDD
 from tests.test_base import TestBase
 
 

@@ -19,10 +19,9 @@ import os
 import shutil
 
 import pytest
-
-from sedona.core.SpatialRDD import PointRDD
 from sedona.core.enums import FileDataSplitter
 from sedona.core.geom.envelope import Envelope
+from sedona.core.SpatialRDD import PointRDD
 from tests.test_base import TestBase
 from tests.tools import tests_resource
 

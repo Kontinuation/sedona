@@ -1,13 +1,11 @@
+import argparse
 import sys
 
 import pyspark
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import udf
 from pyspark.sql.types import StringType
-
 from udfDefinition import register_pandas_UDF
-
-import argparse
 
 if __name__ == "__main__":
     # Parse arguments

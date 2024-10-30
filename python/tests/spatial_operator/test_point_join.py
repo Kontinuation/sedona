@@ -15,9 +15,9 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
-import pytest
 import os
 
+import pytest
 from sedona.core.enums import FileDataSplitter, GridType, IndexType
 from sedona.core.enums.join_build_side import JoinBuildSide
 from sedona.core.spatialOperator import JoinQuery

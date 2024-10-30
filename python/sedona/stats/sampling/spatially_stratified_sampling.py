@@ -18,8 +18,7 @@
 """Spatially stratified sampling partitions the data into a grid and randomly samples each partition independently."""
 from typing import Optional
 
-from pyspark.sql import DataFrame
-from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame, SparkSession
 
 
 def spatially_stratified_sample(

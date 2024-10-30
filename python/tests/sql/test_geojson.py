@@ -17,11 +17,9 @@
 
 import os
 
-from shapely.geometry.base import BaseGeometry
 import geopandas
-
 from pyspark.sql.functions import expr
-
+from shapely.geometry.base import BaseGeometry
 from tests.test_base import TestBase
 
 

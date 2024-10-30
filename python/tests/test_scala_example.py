@@ -17,13 +17,12 @@
 
 import os
 
-from shapely.geometry import Point
 from pyspark import StorageLevel
-
-from sedona.core.SpatialRDD import PointRDD, CircleRDD, PolygonRDD
-from sedona.core.enums import FileDataSplitter, IndexType, GridType
+from sedona.core.enums import FileDataSplitter, GridType, IndexType
 from sedona.core.geom.envelope import Envelope
-from sedona.core.spatialOperator import RangeQuery, JoinQuery, KNNQuery
+from sedona.core.spatialOperator import JoinQuery, KNNQuery, RangeQuery
+from sedona.core.SpatialRDD import CircleRDD, PointRDD, PolygonRDD
+from shapely.geometry import Point
 from tests.test_base import TestBase
 from tests.tools import tests_resource
 

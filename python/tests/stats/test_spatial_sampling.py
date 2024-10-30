@@ -18,10 +18,8 @@
 import pytest
 from pyspark.sql import DataFrame, SparkSession
 from sedona.sql.st_constructors import ST_GeomFromWKT
-from sedona.stats.sampling.spatially_stratified_sampling import (
-    spatially_stratified_sample,
-)
-
+from sedona.stats.sampling.spatially_stratified_sampling import \
+    spatially_stratified_sample
 from tests.test_base import TestBase
 
 

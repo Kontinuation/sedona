@@ -17,16 +17,8 @@
 
 from types import ModuleType
 
-from pyspark.sql.types import (
-    FloatType,
-    DoubleType,
-    IntegerType,
-    LongType,
-    DecimalType,
-    ShortType,
-    ByteType,
-)
-
+from pyspark.sql.types import (ByteType, DecimalType, DoubleType, FloatType,
+                               IntegerType, LongType, ShortType)
 from sedona.maps.SedonaMapUtils import SedonaMapUtils
 
 

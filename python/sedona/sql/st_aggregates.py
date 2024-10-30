@@ -16,16 +16,11 @@
 #  under the License.
 import inspect
 import sys
-
 from functools import partial
 
 from pyspark.sql import Column
-
-from sedona.sql.dataframe_api import (
-    ColumnOrName,
-    call_sedona_function,
-    validate_argument_types,
-)
+from sedona.sql.dataframe_api import (ColumnOrName, call_sedona_function,
+                                      validate_argument_types)
 
 _call_aggregate_function = partial(call_sedona_function, "st_aggregates")
 

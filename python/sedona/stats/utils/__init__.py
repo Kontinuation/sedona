@@ -15,7 +15,7 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
-from pyspark.sql import DataFrame, Column, SparkSession
+from pyspark.sql import Column, DataFrame, SparkSession
 from sedona.sql.types import GeometryType
 
 

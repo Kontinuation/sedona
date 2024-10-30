@@ -17,17 +17,10 @@
 
 from math import sqrt
 
-from shapely.geometry import (
-    Polygon,
-    Point,
-    LineString,
-    MultiPoint,
-    MultiPolygon,
-    MultiLineString,
-)
-from shapely.geometry.base import BaseGeometry
-
 from sedona.core.geom.envelope import Envelope
+from shapely.geometry import (LineString, MultiLineString, MultiPoint,
+                              MultiPolygon, Point, Polygon)
+from shapely.geometry.base import BaseGeometry
 
 
 class Circle(Polygon):

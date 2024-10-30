@@ -17,11 +17,10 @@
 
 import os
 
-from shapely.geometry import Point
-
-from sedona.core.SpatialRDD import LineStringRDD
-from sedona.core.enums import IndexType, FileDataSplitter
+from sedona.core.enums import FileDataSplitter, IndexType
 from sedona.core.spatialOperator import KNNQuery
+from sedona.core.SpatialRDD import LineStringRDD
+from shapely.geometry import Point
 from tests.test_base import TestBase
 from tests.tools import tests_resource
 

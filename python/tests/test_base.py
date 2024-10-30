@@ -16,11 +16,11 @@
 #  under the License.
 
 from tempfile import mkdtemp
+from typing import Iterable, Union
+
+from pyspark.sql import DataFrame
 from sedona.spark import *
 from sedona.utils.decorators import classproperty
-from typing import Union, Iterable
-from pyspark.sql import DataFrame
-
 from shapely import wkt
 from shapely.geometry.base import BaseGeometry
 

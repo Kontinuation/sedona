@@ -15,24 +15,22 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
-from typing import List, Dict, Optional, Tuple
 from abc import ABC, abstractmethod
+from typing import Dict, List, Optional, Tuple
 from xml.etree.ElementTree import Element, SubElement, tostring
 
 import numpy as np
 import rasterio  # type: ignore
 import rasterio.env  # type: ignore
-from rasterio.transform import Affine  # type: ignore
-from rasterio.io import MemoryFile  # type: ignore
 from rasterio.io import DatasetReader  # type: ignore
+from rasterio.io import MemoryFile  # type: ignore
+from rasterio.transform import Affine  # type: ignore
 from rasterio.windows import Window  # type: ignore
 
 from .awt_raster import AWTRaster
 from .data_buffer import DataBuffer
-from .meta import AffineTransform, PixelAnchor
-from .meta import SampleDimension
-from .meta import OutDbMeta
 from .gdal_conf import get_rasterio_aws_session
+from .meta import AffineTransform, OutDbMeta, PixelAnchor, SampleDimension
 
 
 def _rasterio_open(fp, driver=None):

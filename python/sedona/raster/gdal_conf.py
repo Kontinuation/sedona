@@ -15,10 +15,10 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
-from typing import List, Dict, Optional, Tuple, Any
 import json
 import os
 import re
+from typing import Any, Dict, List, Optional, Tuple
 
 from rasterio.session import AWSSession  # type: ignore
 

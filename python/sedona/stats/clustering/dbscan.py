@@ -26,7 +26,6 @@ import pyspark.sql.functions as f
 from kneed import KneeLocator
 from pyspark.sql import DataFrame, SparkSession
 from sedona.sql.st_functions import ST_Distance
-
 from sedona.stats.utils import get_geometry_column_name, reduce_dataset_size
 
 ID_COLUMN_NAME = "__id"
