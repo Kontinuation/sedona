@@ -43,7 +43,11 @@ class optVizOperatorTest extends VizTestBase {
 
       // Test aggregation within partitions
       val result =
-        AggregateWithinPartitions(newDf.withColumn("weight", lit(100.0)), "pixel", "weight", "avg")
+        AggregateWithinPartitions(
+          newDf.withColumn("weight", lit(100.0)),
+          "pixel",
+          "weight",
+          "avg")
       assert(result.rdd.getNumPartitions == secondaryPID)
 
       // Test the colorize operator
