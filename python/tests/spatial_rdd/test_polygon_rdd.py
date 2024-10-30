@@ -19,17 +19,22 @@ from sedona.core.enums import FileDataSplitter, GridType, IndexType
 from sedona.core.geom.envelope import Envelope
 from sedona.core.SpatialRDD import PolygonRDD
 from sedona.core.SpatialRDD.spatial_rdd import SpatialRDD
-from tests.properties.polygon_properties import (grid_type, input_boundary,
-                                                 input_count, input_location,
-                                                 input_location_geo_json,
-                                                 input_location_wkb,
-                                                 input_location_wkt,
-                                                 num_partitions,
-                                                 polygon_rdd_end_offset,
-                                                 polygon_rdd_input_location,
-                                                 polygon_rdd_splitter,
-                                                 polygon_rdd_start_offset,
-                                                 query_envelope, splitter)
+from tests.properties.polygon_properties import (
+    grid_type,
+    input_boundary,
+    input_count,
+    input_location,
+    input_location_geo_json,
+    input_location_wkb,
+    input_location_wkt,
+    num_partitions,
+    polygon_rdd_end_offset,
+    polygon_rdd_input_location,
+    polygon_rdd_splitter,
+    polygon_rdd_start_offset,
+    query_envelope,
+    splitter,
+)
 from tests.test_base import TestBase
 
 

@@ -19,12 +19,18 @@ from sedona.core.enums import GridType, IndexType
 from sedona.core.geom.envelope import Envelope
 from sedona.core.SpatialRDD import PointRDD
 from sedona.core.SpatialRDD.spatial_rdd import SpatialRDD
-from tests.properties.point_properties import (crs_envelope,
-                                               crs_envelope_transformed,
-                                               crs_point_test, input_boundary,
-                                               input_count, input_location,
-                                               num_partitions, offset,
-                                               splitter, transformed_envelope)
+from tests.properties.point_properties import (
+    crs_envelope,
+    crs_envelope_transformed,
+    crs_point_test,
+    input_boundary,
+    input_count,
+    input_location,
+    num_partitions,
+    offset,
+    splitter,
+    transformed_envelope,
+)
 from tests.test_base import TestBase
 
 

@@ -22,8 +22,7 @@ from pyspark.sql import DataFrame
 from pyspark.sql.types import DoubleType, IntegerType, StructField, StructType
 from sedona.sql.st_constructors import ST_MakePoint
 from sedona.sql.st_functions import ST_X, ST_Y
-from sedona.stats.outlier_detection.local_outlier_factor import \
-    local_outlier_factor
+from sedona.stats.outlier_detection.local_outlier_factor import local_outlier_factor
 from sklearn.neighbors import LocalOutlierFactor
 from tests.test_base import TestBase
 

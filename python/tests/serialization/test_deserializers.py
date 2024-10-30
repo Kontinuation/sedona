@@ -19,8 +19,15 @@ import os
 
 import geopandas as gpd
 import pandas as pd
-from shapely.geometry import (GeometryCollection, LineString, MultiLineString,
-                              MultiPoint, MultiPolygon, Point, Polygon)
+from shapely.geometry import (
+    GeometryCollection,
+    LineString,
+    MultiLineString,
+    MultiPoint,
+    MultiPolygon,
+    Point,
+    Polygon,
+)
 from tests import tests_resource
 from tests.test_base import TestBase
 

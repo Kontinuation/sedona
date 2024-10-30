@@ -16,8 +16,12 @@
 #  under the License.
 
 from sedona.core.SpatialRDD import CircleRDD, PointRDD
-from tests.properties.point_properties import (input_location, num_partitions,
-                                               offset, splitter)
+from tests.properties.point_properties import (
+    input_location,
+    num_partitions,
+    offset,
+    splitter,
+)
 from tests.test_base import TestBase
 
 

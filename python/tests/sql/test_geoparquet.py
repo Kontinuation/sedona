@@ -23,8 +23,11 @@ import pytest
 from shapely.geometry import LineString, Point
 from shapely.geometry.base import BaseGeometry
 from shapely.wkt import loads as wkt_loads
-from tests import (geoparquet_input_location, legacy_parquet_input_location,
-                   plain_parquet_input_location)
+from tests import (
+    geoparquet_input_location,
+    legacy_parquet_input_location,
+    plain_parquet_input_location,
+)
 from tests.test_base import TestBase
 
 

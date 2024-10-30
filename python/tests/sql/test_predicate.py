@@ -16,8 +16,11 @@
 #  under the License.
 
 from pyspark.sql.functions import expr
-from tests import (csv_point1_input_location, csv_point_input_location,
-                   csv_polygon1_input_location)
+from tests import (
+    csv_point1_input_location,
+    csv_point_input_location,
+    csv_polygon1_input_location,
+)
 from tests.test_base import TestBase
 
 

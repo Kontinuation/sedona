@@ -18,8 +18,7 @@
 import os
 
 from sedona.core.enums import FileDataSplitter, IndexType
-from sedona.core.SpatialRDD import (CircleRDD, LineStringRDD, PointRDD,
-                                    PolygonRDD)
+from sedona.core.SpatialRDD import CircleRDD, LineStringRDD, PointRDD, PolygonRDD
 from tests.test_base import TestBase
 from tests.tools import tests_resource
 

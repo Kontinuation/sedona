@@ -25,11 +25,13 @@ from sedona.sql.types import GeometryType
 from shapely import wkt
 from shapely.wkt import loads
 from tests import mixed_wkt_geometry_input_location
-from tests.sql.resource.sample_data import (create_sample_lines_df,
-                                            create_sample_points,
-                                            create_sample_points_df,
-                                            create_sample_polygons_df,
-                                            create_simple_polygons_df)
+from tests.sql.resource.sample_data import (
+    create_sample_lines_df,
+    create_sample_points,
+    create_sample_points_df,
+    create_sample_polygons_df,
+    create_simple_polygons_df,
+)
 from tests.test_base import TestBase
 
 

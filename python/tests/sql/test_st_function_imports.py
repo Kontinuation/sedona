@@ -22,8 +22,7 @@ from tests.test_base import TestBase
 
 class TestStFunctionImport(TestBase):
     def test_import(self):
-        from sedona.sql import (ST_Contains, ST_Distance, ST_Envelope_Aggr,
-                                ST_Point)
+        from sedona.sql import ST_Contains, ST_Distance, ST_Envelope_Aggr, ST_Point
 
         ST_Distance
         ST_Point

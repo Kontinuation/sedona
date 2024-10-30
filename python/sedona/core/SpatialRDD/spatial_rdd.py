@@ -26,8 +26,7 @@ from sedona.core.enums.grid_type import GridType, GridTypeJvm
 from sedona.core.enums.index_type import IndexType, IndexTypeJvm
 from sedona.core.enums.spatial import SpatialType
 from sedona.core.geom.envelope import Envelope
-from sedona.core.jvm.translate import (JvmSedonaPythonConverter,
-                                       SedonaPythonConverter)
+from sedona.core.jvm.translate import JvmSedonaPythonConverter, SedonaPythonConverter
 from sedona.core.SpatialRDD.spatial_rdd_factory import SpatialRDDFactory
 from sedona.utils.decorators import require
 from sedona.utils.jvm import JvmStorageLevel

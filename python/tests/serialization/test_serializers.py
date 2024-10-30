@@ -22,8 +22,14 @@ import pandas as pd
 from pyspark.sql import types as t
 from pyspark.sql.types import IntegerType
 from sedona.sql.types import GeometryType
-from shapely.geometry import (LineString, MultiLineString, MultiPoint,
-                              MultiPolygon, Point, Polygon)
+from shapely.geometry import (
+    LineString,
+    MultiLineString,
+    MultiPoint,
+    MultiPolygon,
+    Point,
+    Polygon,
+)
 from tests import tests_resource
 from tests.test_base import TestBase
 

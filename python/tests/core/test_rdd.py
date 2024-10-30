@@ -25,11 +25,13 @@ from sedona.core.spatialOperator import JoinQuery, KNNQuery, RangeQuery
 from sedona.core.spatialOperator.join_params import JoinParams
 from sedona.core.SpatialRDD import CircleRDD, PointRDD, PolygonRDD
 from shapely.geometry import Point
-from tests.properties.polygon_properties import (polygon_rdd_end_offset,
-                                                 polygon_rdd_index_type,
-                                                 polygon_rdd_input_location,
-                                                 polygon_rdd_splitter,
-                                                 polygon_rdd_start_offset)
+from tests.properties.polygon_properties import (
+    polygon_rdd_end_offset,
+    polygon_rdd_index_type,
+    polygon_rdd_input_location,
+    polygon_rdd_splitter,
+    polygon_rdd_start_offset,
+)
 from tests.test_base import TestBase
 from tests.tools import tests_resource
 

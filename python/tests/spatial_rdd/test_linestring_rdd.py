@@ -18,13 +18,17 @@
 from sedona.core.enums import GridType, IndexType
 from sedona.core.geom.envelope import Envelope
 from sedona.core.SpatialRDD import LineStringRDD
-from tests.properties.linestring_properties import (grid_type, input_boundary,
-                                                    input_boundary_2,
-                                                    input_count,
-                                                    input_location,
-                                                    num_partitions, splitter,
-                                                    transformed_envelope,
-                                                    transformed_envelope_2)
+from tests.properties.linestring_properties import (
+    grid_type,
+    input_boundary,
+    input_boundary_2,
+    input_count,
+    input_location,
+    num_partitions,
+    splitter,
+    transformed_envelope,
+    transformed_envelope_2,
+)
 from tests.test_base import TestBase
 
 

@@ -71,9 +71,16 @@ try:
         # handle of geos_c library from `shapely.geos._lgeos._handle`
         import shapely.geometry.base
         import shapely.geos
-        from shapely.geometry import (GeometryCollection, LinearRing,
-                                      LineString, MultiLineString, MultiPoint,
-                                      MultiPolygon, Point, Polygon)
+        from shapely.geometry import (
+            GeometryCollection,
+            LinearRing,
+            LineString,
+            MultiLineString,
+            MultiPoint,
+            MultiPolygon,
+            Point,
+            Polygon,
+        )
 
         lgeos_handle = shapely.geos._lgeos._handle
         geomserde_speedup.load_libgeos_c(lgeos_handle)
