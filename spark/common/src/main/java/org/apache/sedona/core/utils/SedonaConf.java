@@ -25,7 +25,7 @@ import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.enums.JoinBuildSide;
-import org.apache.sedona.core.enums.JoinSparitionDominantSide;
+import org.apache.sedona.core.enums.JoinSpartitionDominantSide;
 import org.apache.sedona.core.enums.JoinSubdivideMode;
 import org.apache.sedona.core.enums.SpatialJoinOptimizationMode;
 import org.apache.sedona.core.spatialOperator.Subdivide;
@@ -46,7 +46,7 @@ public class SedonaConf implements Serializable {
 
   // Parameters for JoinQuery including RangeJoin and DistanceJoin
 
-  private JoinSparitionDominantSide joinSparitionDominantSide;
+  private JoinSpartitionDominantSide joinSparitionDominantSide;
 
   private JoinBuildSide joinBuildSide;
 
@@ -132,7 +132,7 @@ public class SedonaConf implements Serializable {
     this.joinBuildSide =
         JoinBuildSide.getBuildSide(getConfigValue(runtimeConfig, "join.indexbuildside", "left"));
     this.joinSparitionDominantSide =
-        JoinSparitionDominantSide.getJoinSparitionDominantSide(
+        JoinSpartitionDominantSide.getJoinSparitionDominantSide(
             getConfigValue(runtimeConfig, "join.spatitionside", "left"));
     this.fallbackPartitionNum =
         Integer.parseInt(getConfigValue(runtimeConfig, "join.numpartition", "-1"));
@@ -367,7 +367,7 @@ public class SedonaConf implements Serializable {
     return joinGridType;
   }
 
-  public JoinSparitionDominantSide getJoinSparitionDominantSide() {
+  public JoinSpartitionDominantSide getJoinSparitionDominantSide() {
     return joinSparitionDominantSide;
   }
 
