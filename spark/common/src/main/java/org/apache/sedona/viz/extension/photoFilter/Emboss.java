@@ -23,10 +23,10 @@ import org.apache.sedona.viz.core.PhotoFilter;
 // TODO: Auto-generated Javadoc
 
 /** The Class Embose. */
-public class Embose extends PhotoFilter {
+public class Emboss extends PhotoFilter {
 
   /** Instantiates a new embose. */
-  public Embose() {
+  public Emboss() {
     super(1);
     this.convolutionMatrix[0][0] = -2.0;
     this.convolutionMatrix[1][0] = -1.0;
