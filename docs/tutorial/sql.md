@@ -86,11 +86,11 @@ You can add additional Spark runtime config to the config builder. For example, 
 
 	config = SedonaContext.builder() .\
 	    config('spark.jars.packages',
-	           'org.apache.sedona:sedona-spark-shaded-3.0_2.12:{{ sedona.current_version }},'
+	           'org.apache.sedona:sedona-spark-shaded-3.3_2.12:{{ sedona.current_version }},'
 	           'org.datasyslab:geotools-wrapper:{{ sedona.current_geotools }}'). \
 	    getOrCreate()
 	```
-    If you are using Spark versions >= 3.4, please replace the `3.0` in package name of sedona-spark-shaded with the corresponding major.minor version of Spark, such as `sedona-spark-shaded-3.4_2.12:{{ sedona.current_version }}`.
+    If you are using a different Spark version, please replace the `3.3` in package name of sedona-spark-shaded with the corresponding major.minor version of Spark, such as `sedona-spark-shaded-3.4_2.12:{{ sedona.current_version }}`.
 
 ==Sedona < 1.4.1==
 
@@ -139,7 +139,7 @@ The following method has been deprecated since Sedona 1.4.1. Please use the meth
 	    config("spark.serializer", KryoSerializer.getName()). \
 	    config("spark.kryo.registrator", SedonaKryoRegistrator.getName()). \
 	    config('spark.jars.packages',
-	           'org.apache.sedona:sedona-spark-shaded-3.0_2.12:{{ sedona.current_version }},'
+	           'org.apache.sedona:sedona-spark-shaded-3.3_2.12:{{ sedona.current_version }},'
 	           'org.datasyslab:geotools-wrapper:{{ sedona.current_geotools }}'). \
 	    getOrCreate()
 	```
@@ -291,45 +291,6 @@ root
 
 !!!note
 	SedonaSQL provides lots of functions to create a Geometry column, please read [SedonaSQL constructor API](../api/sql/Constructor.md).
-
-## Load GeoJSON using Spark JSON Data Source
-
-Spark SQL's built-in JSON data source supports reading GeoJSON data.
-To ensure proper parsing of the geometry property, we can define a schema with the geometry property set to type 'string'.
-This prevents Spark from interpreting the property and allows us to use the ST_GeomFromGeoJSON function for accurate geometry parsing.
-
-=== "Scala"
-
-	```scala
-	val schema = "type string, crs string, totalFeatures long, features array<struct<type string, geometry string, properties map<string, string>>>"
-	sedona.read.schema(schema).json(geojson_path)
-		.selectExpr("explode(features) as features") // Explode the envelope to get one feature per row.
-		.select("features.*") // Unpack the features struct.
-		.withColumn("geometry", expr("ST_GeomFromGeoJSON(geometry)")) // Convert the geometry string.
-		.printSchema()
-	```
-
-=== "Java"
-
-	```java
-	String schema = "type string, crs string, totalFeatures long, features array<struct<type string, geometry string, properties map<string, string>>>";
-	sedona.read.schema(schema).json(geojson_path)
-		.selectExpr("explode(features) as features") // Explode the envelope to get one feature per row.
-		.select("features.*") // Unpack the features struct.
-		.withColumn("geometry", expr("ST_GeomFromGeoJSON(geometry)")) // Convert the geometry string.
-		.printSchema();
-	```
-
-=== "Python"
-
-	```python
-	schema = "type string, crs string, totalFeatures long, features array<struct<type string, geometry string, properties map<string, string>>>";
-	(sedona.read.json(geojson_path, schema=schema)
-		.selectExpr("explode(features) as features") # Explode the envelope to get one feature per row.
-		.select("features.*") # Unpack the features struct.
-		.withColumn("geometry", f.expr("ST_GeomFromGeoJSON(geometry)")) # Convert the geometry string.
-		.printSchema())
-	```
 
 ## Load GeoJSON Data
 
@@ -870,6 +831,184 @@ The coordinates of polygons have been changed. The output will be like this:
 
 ```
 
+## Cluster with DBSCAN
+
+Sedona provides an implementation of the [DBSCAN](https://en.wikipedia.org/wiki/Dbscan) algorithm to cluster spatial data.
+
+The algorithm is available as a Scala and Python function called on a spatial dataframe. The returned dataframe has an additional column added containing the unique identifier of the cluster that record is a member of and a boolean column indicating if the record is a core point.
+
+The first parameter is the dataframe, the next two are the epsilon and min_points parameters of the DBSCAN algorithm.
+
+=== "Scala"
+
+	```scala
+	import org.apache.sedona.stats.clustering.DBSCAN.dbscan
+
+	dbscan(df, 0.1, 5).show()
+	```
+
+=== "Java"
+
+	```java
+	import org.apache.sedona.stats.clustering.DBSCAN;
+
+	DBSCAN.dbscan(df, 0.1, 5).show();
+	```
+
+=== "Python"
+
+	```python
+	from sedona.stats.clustering.dbscan import dbscan
+
+	dbscan(df, 0.1, 5).show()
+	```
+
+The output will look like this:
+
+```
++----------------+---+------+-------+
+|        geometry| id|isCore|cluster|
++----------------+---+------+-------+
+|   POINT (2.5 4)|  3| false|      1|
+|     POINT (3 4)|  2| false|      1|
+|     POINT (3 5)|  5| false|      1|
+|     POINT (1 3)|  9|  true|      0|
+| POINT (2.5 4.5)|  7|  true|      1|
+|     POINT (1 2)|  1|  true|      0|
+| POINT (1.5 2.5)|  4|  true|      0|
+| POINT (1.2 2.5)|  8|  true|      0|
+|   POINT (1 2.5)| 11|  true|      0|
+|     POINT (1 5)| 10| false|     -1|
+|     POINT (5 6)| 12| false|     -1|
+|POINT (12.8 4.5)|  6| false|     -1|
+|     POINT (4 3)| 13| false|     -1|
++----------------+---+------+-------+
+```
+
+## Calculate the Local Outlier Factor (LOF)
+
+Sedona provides an implementation of the [Local Outlier Factor](https://en.wikipedia.org/wiki/Local_outlier_factor) algorithm to identify anomalous data.
+
+The algorithm is available as a Scala and Python function called on a spatial dataframe. The returned dataframe has an additional column added containing the local outlier factor.
+
+The first parameter is the dataframe, the next is the number of nearest neighbors to consider use in calculating the score.
+
+=== "Scala"
+
+	```scala
+	import org.apache.sedona.stats.outlierDetection.LocalOutlierFactor.localOutlierFactor
+
+    localOutlierFactor(df, 20).show()
+	```
+
+=== "Java"
+
+	```java
+	import org.apache.sedona.stats.outlierDetection.LocalOutlierFactor;
+
+	LocalOutlierFactor.localOutlierFactor(df, 20).show();
+	```
+
+=== "Python"
+
+	```python
+	from sedona.stats.outlier_detection.local_outlier_factor import local_outlier_factor
+
+	local_outlier_factor(df, 20).show()
+	```
+
+The output will look like this:
+
+```
++--------------------+------------------+
+|            geometry|               lof|
++--------------------+------------------+
+|POINT (-2.0231305...| 0.952098153363662|
+|POINT (-2.0346944...|0.9975325496668104|
+|POINT (-2.2040074...|1.0825843906411081|
+|POINT (1.61573501...|1.7367129352162634|
+|POINT (-2.1176324...|1.5714144683150393|
+|POINT (-2.2349759...|0.9167275845938276|
+|POINT (1.65470192...| 1.046231536764447|
+|POINT (0.62624112...|1.1988700676990034|
+|POINT (2.01746261...|1.1060219481067417|
+|POINT (-2.0483857...|1.0775553430145446|
+|POINT (2.43969463...|1.1129132178576646|
+|POINT (-2.2425480...| 1.104108012697006|
+|POINT (-2.7859235...|  2.86371824574529|
+|POINT (-1.9738858...|1.0398822680356794|
+|POINT (2.00153403...| 0.927409656346015|
+|POINT (2.06422812...|0.9222203762264445|
+|POINT (-1.7533819...|1.0273650471626696|
+|POINT (-2.2030766...| 0.964744555830738|
+|POINT (-1.8509857...|1.0375927869698574|
+|POINT (2.10849080...|1.0753419197322656|
++--------------------+------------------+
+```
+
+## Perform Getis-Ord Gi(*) Hot Spot Analysis
+
+Sedona provides an implementation of the [Gi and Gi*](https://en.wikipedia.org/wiki/Getis%E2%80%93Ord_statistics) algorithms to identify local hotspots in spatial data
+
+The algorithm is available as a Scala and Python function called on a spatial dataframe. The returned dataframe has additional columns added containing G statistic, E[G], V[G], the Z score, and the p-value.
+
+Using Gi involves first generating the neighbors list for each record, then calling the g_local function.
+=== "Scala"
+
+	```scala
+	import org.apache.sedona.stats.Weighting.addBinaryDistanceBandColumn
+	import org.apache.sedona.stats.hotspotDetection.GetisOrd.gLocal
+
+	val distanceRadius = 1.0
+	val weightedDf = addBinaryDistanceBandColumn(df, distanceRadius)
+    gLocal(weightedDf, "val").show()
+	```
+
+=== "Java"
+
+	```java
+	import org.apache.sedona.stats.Weighting;
+	import org.apache.sedona.stats.hotspotDetection.GetisOrd;
+	import org.apache.spark.sql.DataFrame;
+
+	double distanceRadius = 1.0;
+	DataFrame weightedDf = Weighting.addBinaryDistanceBandColumn(df, distanceRadius);
+	GetisOrd.gLocal(weightedDf, "val").show();
+	```
+
+=== "Python"
+
+	```python
+	from sedona.stats.weighting import add_binary_distance_band_column
+	from sedona.stats.hotspot_detection.getis_ord import g_local
+
+	distance_radius = 1.0
+	weighted_df = addBinaryDistanceBandColumn(df, distance_radius)
+    g_local(weightedDf, "val").show()
+	```
+
+The output will look like this:
+
+<pre>
+<code>
++-----------+---+--------------------+-------------------+-------------------+--------------------+--------------------+--------------------+
+|   geometry|val|             weights|                  G|                 EG|                  VG|                   Z|                   P|
++-----------+---+--------------------+-------------------+-------------------+--------------------+--------------------+--------------------+
+|POINT (2 2)|0.9|[&#123;&#123;POINT (2 3), 1...| 0.4488188976377953|0.45454545454545453| 0.00356321373799772|-0.09593402008347063|  0.4617864875295957|
+|POINT (2 3)|1.2|[&#123;&#123;POINT (2 2), 0...|0.35433070866141736|0.36363636363636365|0.003325666155464539|-0.16136436037034918|  0.4359032175415549|
+|POINT (3 3)|1.2|[&#123;&#123;POINT (2 3), 1...|0.28346456692913385| 0.2727272727272727|0.002850570990398176| 0.20110780337013057| 0.42030714022155924|
+|POINT (3 2)|1.2|[&#123;&#123;POINT (2 2), 0...| 0.4488188976377953|0.45454545454545453| 0.00356321373799772|-0.09593402008347063|  0.4617864875295957|
+|POINT (3 1)|1.2|[&#123;&#123;POINT (3 2), 3...| 0.3622047244094489| 0.2727272727272727|0.002850570990398176|  1.6758983614177538| 0.04687905137429871|
+|POINT (2 1)|2.2|[&#123;&#123;POINT (2 2), 0...| 0.4330708661417323|0.36363636363636365|0.003325666155464539|  1.2040263812249166| 0.11428969105925013|
+|POINT (1 1)|1.2|[&#123;&#123;POINT (2 1), 5...| 0.2834645669291339| 0.2727272727272727|0.002850570990398176|  0.2011078033701316|  0.4203071402215588|
+|POINT (1 2)|0.2|[&#123;&#123;POINT (2 2), 0...|0.35433070866141736|0.45454545454545453| 0.00356321373799772|   -1.67884535146075|0.046591093685710794|
+|POINT (1 3)|1.2|[&#123;&#123;POINT (2 3), 1...| 0.2047244094488189| 0.2727272727272727|0.002850570990398176| -1.2736827546774914| 0.10138793530151635|
+|POINT (0 2)|1.0|[&#123;&#123;POINT (1 2), 7...|0.09448818897637795|0.18181818181818182|0.002137928242798632| -1.8887168824332323|0.029464887612748458|
+|POINT (4 2)|1.2|[&#123;&#123;POINT (3 2), 3...| 0.1889763779527559|0.18181818181818182|0.002137928242798632| 0.15481285921583854| 0.43848442662481324|
++-----------+---+--------------------+-------------------+-------------------+--------------------+--------------------+--------------------+
+</code>
+</pre>
+
 ## Run spatial queries
 
 After creating a Geometry type column, you are able to run spatial queries.
@@ -1309,8 +1448,21 @@ SELECT ST_AsText(countyshape)
 FROM polygondf
 ```
 
-!!!note
-	ST_AsGeoJSON is also available. We would like to invite you to contribute more functions
+## Save as GeoJSON
+
+Since `v1.6.1`, the GeoJSON data source in Sedona can be used to save a Spatial DataFrame to a single-line JSON file, with geometries written in GeoJSON format.
+
+```sparksql
+df.write.format("geojson").save("YOUR/PATH.json")
+```
+
+The structure of the generated file will be like this:
+
+```json
+{"type":"Feature","geometry":{"type":"Point","coordinates":[102.0,0.5]},"properties":{"prop0":"value0"}}
+{"type":"Feature","geometry":{"type":"LineString","coordinates":[[102.0,0.0],[103.0,1.0],[104.0,0.0],[105.0,1.0]]},"properties":{"prop0":"value1"}}
+{"type":"Feature","geometry":{"type":"Polygon","coordinates":[[[100.0,0.0],[101.0,0.0],[101.0,1.0],[100.0,1.0],[100.0,0.0]]]},"properties":{"prop0":"value2"}}
+```
 
 ## Save GeoParquet
 
