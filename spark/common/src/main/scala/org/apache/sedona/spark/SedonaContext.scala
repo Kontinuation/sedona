@@ -29,9 +29,10 @@ import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.deploy.PythonRunner
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.monitoring.ListenerRegistrator
-import org.apache.spark.sql.sedona_sql.optimization.{SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
+import org.apache.spark.sql.sedona_sql.optimization.{GetReverseGeocodeLayersFunction, ReverseGeocodingFunction, SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
 import org.apache.spark.sql.{SQLContext, SparkSession}
+
 import scala.collection.mutable.ListBuffer
 import scala.annotation.StaticAnnotation
 import scala.util.Try
@@ -73,6 +74,14 @@ object SedonaContext {
       sparkSession.experimental.extraOptimizations ++= Seq(
         new SpatialFilterPushDownForGeoParquet(sparkSession))
     }
+
+    // Support reverse geocoding functions
+    if (!sparkSession.experimental.extraOptimizations.contains(ReverseGeocodingFunction)) {
+      sparkSession.experimental.extraOptimizations ++= Seq(
+        ReverseGeocodingFunction,
+        GetReverseGeocodeLayersFunction)
+    }
+
     addGeoParquetToSupportNestedFilterSources(sparkSession)
     RasterRegistrator.registerAll(sparkSession)
     UdtRegistrator.registerAll()

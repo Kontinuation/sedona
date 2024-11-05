@@ -17,9 +17,10 @@
 import inspect
 import sys
 from functools import partial
-from typing import Optional, Union
+from typing import Optional, Union, List
 
 from pyspark.sql import Column
+from pyspark.sql.functions import lit, array
 from sedona.sql.dataframe_api import (
     ColumnOrName,
     ColumnOrNameOrNumber,
@@ -2390,6 +2391,38 @@ def ST_Rotate(
         args = (geometry, angle)
 
     return _call_st_function("ST_Rotate", args)
+
+
+@validate_argument_types
+def ST_ReverseGeocode(
+    geometry: ColumnOrName, layers: Union[ColumnOrName, List]
+) -> Column:
+    """Return an Array of reverse geocode results for the given geometry and layers.
+
+    Up to one result is given per layer.
+
+    @param geometry: Geometry column or name
+    :type geometry: ColumnOrName
+    @param layers: the layers from which to reverse geocode. Needs to match the layer names in the geocodes dataset
+    :type layers: ColumnOrName
+    @return: An array of reverse geocoding results, each of which contains the address/name, the geometry, and the layer name
+    """
+
+    if isinstance(layers, list):
+        # passing lists to lit does not work in spark <=3.3
+        layers = array(*(lit(layer) for layer in layers))
+
+    return _call_st_function("ST_ReverseGeocode", (geometry, layers))
+
+
+@validate_argument_types
+def ST_GetReverseGeocodingLayers() -> Column:
+    """Return the Array of available geocode layer values.
+
+    @return: the Array of available geocode layer values.
+    """
+
+    return _call_st_function("ST_GetReverseGeocodingLayers", ())
 
 
 # Automatically populate __all__

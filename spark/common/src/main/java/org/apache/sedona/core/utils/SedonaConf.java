@@ -21,6 +21,8 @@ package org.apache.sedona.core.utils;
 import java.io.Serializable;
 import java.lang.reflect.Field;
 import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
@@ -35,8 +37,10 @@ import org.apache.spark.sql.RuntimeConfig;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.Utils;
 import org.locationtech.jts.geom.Envelope;
+import scala.collection.JavaConverters;
 
 public class SedonaConf implements Serializable {
+  private final String REVERSE_GEOCODE_DISTANCE_PREFIX = "spark.sedona.reverse.geocode.distance.";
 
   // Global parameters of Sedona. All these parameters can be initialized through SparkConf.
 
@@ -106,6 +110,10 @@ public class SedonaConf implements Serializable {
   private int skewnessMaximumMBRDividesInKNNJoins = 100;
   private boolean enableParallelPartitioningInKNNJoins = true;
   private int maxRowsPerPartitionInKNNJoins = 524288;
+
+  // Parameters for geocoding
+  private String reverseGeocodingTableName;
+  private Map<String, Double> reverseGeocodingDistanceThresholds;
 
   // Parameters for testing
   private boolean allowPlanBroadcastJoin;
@@ -298,6 +306,37 @@ public class SedonaConf implements Serializable {
     this.allowPlanBroadcastJoin =
         Boolean.parseBoolean(
             runtimeConfig.get("spark.sedona.testonly.allowPlanBroadcastJoin", "true"));
+
+    this.reverseGeocodingTableName =
+        runtimeConfig.get(
+            "spark.sedona.reverse.geocode.table",
+            "wherobots_open_data.overture_2024_10_23_0.geocodes");
+
+    this.reverseGeocodingDistanceThresholds =
+        initializeReverseGeocodingDistanceThresholds(runtimeConfig);
+  }
+
+  private Map<String, Double> initializeReverseGeocodingDistanceThresholds(
+      RuntimeConfig runtimeConfig) {
+    Map<String, Double> reverseGeocodingDistanceThresholds =
+        JavaConverters.mapAsJavaMap(runtimeConfig.getAll()).entrySet().stream()
+            .filter(entry -> entry.getKey().startsWith(REVERSE_GEOCODE_DISTANCE_PREFIX))
+            .collect(
+                Collectors.toMap(
+                    entry -> entry.getKey().substring(REVERSE_GEOCODE_DISTANCE_PREFIX.length()),
+                    entry -> Double.parseDouble(entry.getValue())));
+
+    // These default values are designed for overture
+    if (!reverseGeocodingDistanceThresholds.containsKey("default")) {
+      reverseGeocodingDistanceThresholds.put("default", 0.0);
+    }
+
+    if (reverseGeocodingDistanceThresholds.size() == 1) {
+      reverseGeocodingDistanceThresholds.put("poi", 0.0006); // ~20 feet
+      reverseGeocodingDistanceThresholds.put("address", 0.0003);
+    }
+
+    return reverseGeocodingDistanceThresholds;
   }
 
   private SubdivideOptions readSubdivideOptions(RuntimeConfig runtimeConfig, String prefix) {
@@ -543,5 +582,13 @@ public class SedonaConf implements Serializable {
 
   public boolean allowPlanBroadcastJoin() {
     return allowPlanBroadcastJoin;
+  }
+
+  public String getReverseGeocodingTableName() {
+    return reverseGeocodingTableName;
+  }
+
+  public Map<String, Double> getReverseGeocodingDistanceThresholds() {
+    return reverseGeocodingDistanceThresholds;
   }
 }

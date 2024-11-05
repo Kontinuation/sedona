@@ -78,8 +78,6 @@ class TestDBScan(TestBase):
             input_data, epsilon, min_pts, geometry, include_outliers=include_outliers
         )
 
-        result.show()
-
         id = id or "id"
         clusters_members = [
             (x[id], x.cluster)

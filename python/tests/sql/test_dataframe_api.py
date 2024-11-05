@@ -31,6 +31,7 @@ from sedona.sql.st_predicates import *
 from shapely.geometry.base import BaseGeometry
 from tests.test_base import TestBase
 
+
 test_configurations = [
     # constructors
     (
@@ -1743,3 +1744,53 @@ class TestDataFrameAPI(TestBase):
             match=f"Incorrect argument type: [A-Za-z_0-9]+ for {func.__name__} should be [A-Za-z0-9\\[\\]_, ]+ but received [A-Za-z0-9_]+.",
         ):
             func(*args)
+
+    def create_geocoding_df(self):
+        (
+            self.spark.createDataFrame(
+                [
+                    {
+                        "layer": "address",
+                        "location": "1600 Amphitheatre Parkway, Mountain View, CA",
+                        "x": 37.422408,
+                        "y": -122.084068,
+                    },
+                    {
+                        "layer": "address",
+                        "location": "1620 Amphitheatre Parkway, Mountain View, CA",
+                        "x": 37.442408,
+                        "y": -122.080068,
+                    },
+                    {
+                        "layer": "poi",
+                        "location": "Google",
+                        "x": 37.422408,
+                        "y": -122.084068,
+                    },
+                ]
+            )
+            .withColumn("geometry", f.expr("ST_Point(x, y)"))
+            .drop("x", "y")
+            .createOrReplaceTempView("geocodeTest")
+        )
+
+        self.spark.conf.set("spark.sedona.reverse.geocode.table", "geocodeTest")
+
+    def test_reverse_geocode_function_allows_layer_literals(self):
+        self.create_geocoding_df()
+        self.spark.sql("SELECT ST_Point(0, 0) AS geometry").withColumn(
+            "geocodes", ST_ReverseGeocode(f.col("geometry"), ["poi"])
+        ).collect()
+        self.spark.catalog.dropTempView("geocodeTest")
+
+    def test_reverse_geocode_function(self):
+        self.create_geocoding_df()
+        df = self.spark.createDataFrame(
+            [{"id": 0, "x": 37.422408, "y": -122.084068, "layers": ["poi", "address"]}]
+        ).withColumn("geometry", f.expr("ST_Point(x, y)"))
+
+        results_df = df.withColumn(
+            "reverse_geocode", ST_ReverseGeocode(f.col("geometry"), f.col("layers"))
+        )
+        assert results_df.where(f.size("reverse_geocode") == 2).count() == 1
+        self.spark.catalog.dropTempView("geocodeTest")

@@ -28,7 +28,6 @@ import org.apache.spark.sql.sedona_sql.expressions.raster._
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.operation.buffer.BufferParameters
 
-import scala.collection.mutable.ListBuffer
 import scala.reflect.ClassTag
 
 object Catalog {
@@ -345,7 +344,10 @@ object Catalog {
     function[RS_NetCDFInfo](),
     function[RS_StackTileExplode](false, Double.NaN),
     // Expression for raster AI
-    function[RS_SEGMENT_TO_GEOMS]())
+    function[RS_SEGMENT_TO_GEOMS](),
+    // Expression for ReverseGeocode
+    function[ST_ReverseGeocode](),
+    function[ST_GetReverseGeocodingLayers]())
 
   val aggregateExpressions: Seq[Aggregator[Geometry, _, _]] =
     Seq(new ST_Union_Aggr, new ST_Envelope_Aggr, new ST_Intersection_Aggr, new ST_Analyze_Aggr)
