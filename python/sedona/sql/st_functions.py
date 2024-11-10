@@ -2403,14 +2403,10 @@ def ST_ReverseGeocode(
 
     @param geometry: Geometry column or name
     :type geometry: ColumnOrName
-    @param layers: the layers from which to reverse geocode. Needs to match the layer names in the geocodes dataset
+    @param layer: the layer from which to reverse geocode. Needs to match a layer name in the geocodes dataset
     :type layers: ColumnOrName
-    @return: An array of reverse geocoding results, each of which contains the address/name, the geometry, and the layer name
+    @return: A reverse geocoding result, a struct which contains the address/name, the geometry, and the layer name
     """
-
-    if isinstance(layers, list):
-        # passing lists to lit does not work in spark <=3.3
-        layers = array(*(lit(layer) for layer in layers))
 
     return _call_st_function("ST_ReverseGeocode", (geometry, layers))
 

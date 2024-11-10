@@ -18,10 +18,10 @@
  */
 package org.apache.spark.sql.sedona_sql.optimization
 
+import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.analysis.EliminateSubqueryAliases
-import org.apache.spark.sql.catalyst.analysis.SimpleAnalyzer.ResolveRelations
-import org.apache.spark.sql.catalyst.expressions.NamedExpression
+import org.apache.spark.sql.catalyst.expressions.{Alias, Expression, NamedExpression}
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.types.StringType
 
@@ -55,10 +55,8 @@ object RewriteUtils {
    */
   def assertGeocodeTableWellFormed(geocodeTableName: String): Unit = {
     val baseMessage = f"spark.sedona.reverse.geocode.table set to $geocodeTableName."
-    val spark: SparkSession = SparkSession.getActiveSession.get
-
-    val geocodePlan = ResolveRelations(
-      EliminateSubqueryAliases(spark.table(geocodeTableName).logicalPlan))
+    val geocodePlan =
+      SparkSession.getActiveSession.get.table(geocodeTableName).queryExecution.optimizedPlan
 
     val geocodePlanAttrs = geocodePlan.outputSet
 
@@ -85,6 +83,40 @@ object RewriteUtils {
     require(
       geocodeLocation.dataType.isInstanceOf[StringType],
       f"$baseMessage $geocodeTableName's location column is not type String")
-
   }
+
+  def aliasOf(expr: Expression, plan: Project): Alias = {
+    plan.projectList
+      .filter(x => x.isInstanceOf[Alias] && x.asInstanceOf[Alias].child == expr)
+      .head
+      .asInstanceOf[Alias]
+  }
+
+  /**
+   * Retrieve an optimized LogicalPlan for the geocode table or view.
+   *
+   * The geocode table retrieved is based on the reverse Geocoding table name set in the
+   * SedonaConf.
+   *
+   * @return
+   *   The optimized LogicalPlan for the geocode table
+   */
+  def retrieveOptimizedGeocodeTablePlan(): LogicalPlan = {
+    val geocodeTableName = SedonaConf.fromActiveSession().getReverseGeocodingTableName
+    val geocodePlan =
+      SparkSession.getActiveSession.get.table(geocodeTableName).queryExecution.optimizedPlan
+
+    assertGeocodeTableWellFormed(geocodeTableName)
+
+    val geocodePlanAttrs = geocodePlan.outputSet
+
+    // when there are multiple calls, we need these to be aliased to be disambiguated
+    Project(
+      Seq(
+        Alias(geocodePlanAttrs.filter(_.name == "location").head, "location")(),
+        Alias(geocodePlanAttrs.filter(_.name == "layer").head, "layer")(),
+        Alias(geocodePlanAttrs.filter(_.name == "geometry").head, "geometry")()),
+      geocodePlan)
+  }
+
 }

@@ -1779,18 +1779,18 @@ class TestDataFrameAPI(TestBase):
     def test_reverse_geocode_function_allows_layer_literals(self):
         self.create_geocoding_df()
         self.spark.sql("SELECT ST_Point(0, 0) AS geometry").withColumn(
-            "geocodes", ST_ReverseGeocode(f.col("geometry"), ["poi"])
+            "geocodes", ST_ReverseGeocode(f.col("geometry"), f.lit("poi"))
         ).collect()
         self.spark.catalog.dropTempView("geocodeTest")
 
     def test_reverse_geocode_function(self):
         self.create_geocoding_df()
         df = self.spark.createDataFrame(
-            [{"id": 0, "x": 37.422408, "y": -122.084068, "layers": ["poi", "address"]}]
+            [{"id": 0, "x": 37.422408, "y": -122.084068, "layer": "address"}]
         ).withColumn("geometry", f.expr("ST_Point(x, y)"))
 
         results_df = df.withColumn(
-            "reverse_geocode", ST_ReverseGeocode(f.col("geometry"), f.col("layers"))
+            "reverse_geocode", ST_ReverseGeocode(f.col("geometry"), f.col("layer"))
         )
-        assert results_df.where(f.size("reverse_geocode") == 2).count() == 1
+        assert results_df.where("reverse_geocode.location is not null").count() == 1
         self.spark.catalog.dropTempView("geocodeTest")

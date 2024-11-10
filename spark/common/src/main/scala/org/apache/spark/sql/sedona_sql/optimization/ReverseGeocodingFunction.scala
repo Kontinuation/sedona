@@ -19,16 +19,11 @@
 package org.apache.spark.sql.sedona_sql.optimization
 
 import org.apache.sedona.core.utils.SedonaConf
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.analysis.EliminateSubqueryAliases
-import org.apache.spark.sql.catalyst.analysis.SimpleAnalyzer.{HandleNullInputsForUDF, ResolveRelations}
-import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, CollectList, Complete}
 import org.apache.spark.sql.catalyst.expressions.{Expression, _}
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.sedona_sql.expressions.{ST_Distance, ST_ReverseGeocode}
-import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{assertGeocodeTableWellFormed, matchOrderToOriginalProjectList}
-import org.apache.spark.sql.types.{IntegerType, StringType}
+import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{aliasOf, matchOrderToOriginalProjectList, retrieveOptimizedGeocodeTablePlan}
 
 import scala.collection.convert.ImplicitConversions.`map AsScala`
 
@@ -46,67 +41,32 @@ object ReverseGeocodingFunction extends RewriteLogicalPlan[ST_ReverseGeocode] {
     CaseWhen(cases, Literal(thresholds("default")))
   }
 
-  /**
-   * Sorts the geocode results by the order of the layers array.
-   *
-   * Called as a UDF.
-   *
-   * @param results
-   *   The geocode results to sort
-   * @param order
-   *   The order of the layers
-   * @return
-   *   The sorted geocode results
-   */
-  private def sortGeocodeResultsByLayersOrder(
-      results: Seq[GenericRowWithSchema],
-      order: Seq[GenericRowWithSchema]): Seq[GenericRowWithSchema] = {
-    val sorted = order.sortBy(_.getInt(0)).map(_.getString(1))
-    results.sortBy(r => sorted.indexOf(r.getString(1)))
-  }
-
   override def rewriteLogicalPlan(funcCall: ST_ReverseGeocode, plan: Project): LogicalPlan = {
-    val spark: SparkSession = SparkSession.getActiveSession.get
-
     val funcGeometryArg = funcCall.children(0)
     val funcLayerArg = funcCall.children(1)
 
-    // Geocode table setup
-    val geocodeTableName = SedonaConf.fromActiveSession().getReverseGeocodingTableName
-    assertGeocodeTableWellFormed(geocodeTableName)
-
-    var geocodePlan = ResolveRelations(
-      EliminateSubqueryAliases(spark.table(geocodeTableName).logicalPlan))
-
-    // If we don't remove the View node, we will get an error that there is no Plan for the view.
-    geocodePlan = geocodePlan match {
-      case view: View if view.desc.properties.contains("view.storingAnalyzedPlan") =>
-        geocodePlan.children.head
-      case _ => geocodePlan
-    }
+    val geocodePlan = retrieveOptimizedGeocodeTablePlan()
 
     val geocodePlanAttrs = geocodePlan.outputSet
-    val geocodeLocation = geocodePlanAttrs.filter(_.name == "location").head
     val geocodeLayer = geocodePlanAttrs.filter(_.name == "layer").head
+    val geocodeLocation = geocodePlanAttrs.filter(_.name == "location").head
     val geocodeGeom = geocodePlanAttrs.filter(_.name == "geometry").head
 
-    // Find geocode candidates
-    val explodedLayerOutput = AttributeReference("layer", StringType)()
     val distanceExpression = ST_Distance(Seq(geocodeGeom, funcGeometryArg))
 
     val joinedPlan = Join(
-      Generate(Explode(funcLayerArg), Nil, false, None, Seq(explodedLayerOutput), plan.child),
+      plan.child,
       geocodePlan,
       JoinType("left"),
       Some(
         And(
-          LessThan(distanceExpression, getDistanceJoinDistanceThreshold(explodedLayerOutput)),
-          EqualTo(geocodeLayer, explodedLayerOutput))),
+          LessThan(distanceExpression, getDistanceJoinDistanceThreshold(funcLayerArg)),
+          EqualTo(geocodeLayer, funcLayerArg))),
       JoinHint.NONE)
 
     // Get the closest geocode for each specified layer
     val partitionSpec =
-      plan.inputSet.toSeq :+ explodedLayerOutput // Join + Aggregate pattern assumes input rows are unique
+      Seq(funcGeometryArg, funcLayerArg)
     val orderSpec = Seq(SortOrder(distanceExpression, Ascending))
 
     val rankExpr = Alias(
@@ -124,56 +84,16 @@ object ReverseGeocodingFunction extends RewriteLogicalPlan[ST_ReverseGeocode] {
       EqualTo(windowedPlan.output.filter(_.exprId == rankExpr.exprId).head, Literal(1)),
       windowedPlan)
 
-    // Aggregate by input row
-    // Explicit order in CreateStruct to match ST_ReverseGeocode class output schema
-    val collectListExpression = CollectList(
-      CreateStruct(Seq(geocodeLocation, explodedLayerOutput, geocodeGeom)))
+    val replacedExpr = aliasOf(funcCall, plan)
 
-    val unsortedExprId = NamedExpression.newExprId
-    val aggregatedPlan =
-      Aggregate(
-        plan.inputSet.toSeq, // Join + Aggregate pattern assumes input rows are unique
-        plan.inputSet.toSeq :+ Alias(
-          AggregateExpression(
-            collectListExpression,
-            Complete,
-            false,
-            None,
-            NamedExpression.newExprId),
-          "unsortedResult")(unsortedExprId),
-        closestGeocodePerLayerPlan)
+    val ret = Project(
+      matchOrderToOriginalProjectList(
+        plan.projectList.filter(x => x.exprId != replacedExpr.exprId) :+ Alias(
+          CreateStruct(Seq(geocodeLocation, funcLayerArg, geocodeGeom)),
+          replacedExpr.name)(replacedExpr.exprId),
+        plan.projectList),
+      closestGeocodePerLayerPlan)
 
-    // Sort results array to match the ordering of the layers array.
-    val layerLambdaVar = NamedLambdaVariable("layer", StringType, false)
-    val orderLambdaVar = NamedLambdaVariable("order", IntegerType, false)
-
-    val zipExpression = ZipWith(
-      Sequence(
-        Literal(0),
-        Subtract(Size(funcLayerArg), Literal(1)),
-        Some(Literal(1)),
-        Some(java.time.ZoneOffset.UTC.toString)),
-      funcLayerArg,
-      LambdaFunction(
-        CreateStruct(Seq(orderLambdaVar, layerLambdaVar)),
-        Seq(orderLambdaVar, layerLambdaVar)))
-
-    val sortUDF = ScalaUDF(
-      sortGeocodeResultsByLayersOrder _,
-      collectListExpression.dataType,
-      Seq(aggregatedPlan.output.filter(_.exprId == unsortedExprId).head, zipExpression))
-
-    val replacedExpr = plan.projectList
-      .filter(x => x.isInstanceOf[Alias] && x.asInstanceOf[Alias].child == funcCall)
-      .head
-
-    HandleNullInputsForUDF(
-      Project(
-        matchOrderToOriginalProjectList(
-          plan.projectList.filter(x => x.exprId != replacedExpr.exprId) :+ Alias(
-            sortUDF,
-            replacedExpr.name)(exprId = replacedExpr.exprId),
-          plan.projectList),
-        aggregatedPlan))
+    ret
   }
 }

@@ -35,14 +35,14 @@ case class ST_ReverseGeocode(children: Seq[Expression])
 
   override def nullable: Boolean = true
 
-  override def dataType: DataType = ArrayType(
+  override def dataType: DataType =
     StructType(
       Seq(
         StructField("location", StringType),
         StructField("layer", StringType),
-        StructField("geometry", GeometryUDT))))
+        StructField("geometry", GeometryUDT)))
 
-  override def inputTypes: Seq[AbstractDataType] = Seq(GeometryUDT, ArrayType(StringType))
+  override def inputTypes: Seq[AbstractDataType] = Seq(GeometryUDT, StringType)
 
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]): Expression =
     copy(children = newChildren)

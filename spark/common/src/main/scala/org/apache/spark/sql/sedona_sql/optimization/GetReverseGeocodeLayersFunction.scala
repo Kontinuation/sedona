@@ -18,40 +18,22 @@
  */
 package org.apache.spark.sql.sedona_sql.optimization
 
-import org.apache.sedona.core.utils.SedonaConf
-import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.analysis.EliminateSubqueryAliases
-import org.apache.spark.sql.catalyst.analysis.SimpleAnalyzer.ResolveRelations
-import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, CollectSet, Complete}
 import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, CollectSet, Complete}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.sedona_sql.expressions.ST_GetReverseGeocodingLayers
-import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{assertGeocodeTableWellFormed, matchOrderToOriginalProjectList}
+import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{aliasOf, matchOrderToOriginalProjectList, retrieveOptimizedGeocodeTablePlan}
 
 object GetReverseGeocodeLayersFunction extends RewriteLogicalPlan[ST_GetReverseGeocodingLayers] {
   override def rewriteLogicalPlan(
       funcCall: ST_GetReverseGeocodingLayers,
       plan: Project): LogicalPlan = {
-    val spark: SparkSession = SparkSession.getActiveSession.get
-    val geocodeTableName = SedonaConf.fromActiveSession().getReverseGeocodingTableName
 
-    assertGeocodeTableWellFormed(geocodeTableName)
-
-    var geocodePlan = ResolveRelations(
-      EliminateSubqueryAliases(spark.table(geocodeTableName).logicalPlan))
-
-    // If we don't remove the View node, we will get an error that there is no Plan for the view.
-    geocodePlan = geocodePlan match {
-      case view: View if view.desc.properties.contains("view.storingAnalyzedPlan") =>
-        geocodePlan.children.head
-      case _ => geocodePlan
-    }
+    val geocodePlan = retrieveOptimizedGeocodeTablePlan()
 
     val geocodeLayer = geocodePlan.outputSet.filter(_.name == "layer").head
 
-    val funcAlias = plan.projectList
-      .filter(x => x.isInstanceOf[Alias] && x.asInstanceOf[Alias].child == funcCall)
-      .head
+    val funcAlias = aliasOf(funcCall, plan)
 
     val tempLayersExprId = NamedExpression.newExprId
     val LayersListPlan = Aggregate(

@@ -20,14 +20,14 @@ package org.apache.sedona.sql
 
 import org.apache.spark.sql
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.rank
+import org.apache.spark.sql.functions.{lit, rank}
 import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_GetReverseGeocodingLayers, ST_ReverseGeocode}
 import org.apache.spark.sql.{DataFrame, functions => f}
 import org.scalatest.BeforeAndAfterAll
 
 case class Geocode(layer: String, location: String, x: Double, y: Double)
 
-case class Query(id: Int, x: Double, y: Double, layers: Array[String])
+case class Query(id: Int, x: Double, y: Double, layer: String)
 
 class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
 
@@ -69,76 +69,66 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
     spark
       .createDataFrame(
         Seq(
-          Query(0, -122.084068, 37.422408, Seq("poi", "address").toArray),
-          Query(1, -122.084078, 37.422418, Seq("address").toArray),
-          Query(2, -122.084063, 37.422398, Seq("poi").toArray),
-          Query(3, -123.0, 37.0, Seq("poi", "address").toArray),
-          Query(
-            4,
-            -122.084068 - 0.00031,
-            37.422408,
-            Seq("poi", "address").toArray
-          ) // should match only poi
+          Query(0, -122.084068, 37.422408, "poi"),
+          Query(1, -122.084078, 37.422418, "address"),
+          Query(2, -122.084063, 37.422398, "poi"),
+          Query(3, -123.0, 37.0, "address"), // should match nothing
+          Query(4, -122.084068 - 0.00031, 37.422408, "address") // should match only poi
         ))
       .withColumn("geometry", f.expr("ST_Point(x, y)"))
       .drop("x", "y")
   }
 
-  it("test reverse geocoding function with literal layers") {
+  it("test reverse geocoding function with literal layer") {
 
     val df = get_input_data()
+      .drop("layer") // avoid debugging confusion
 
-    val dfGeoCoded = df
-      .drop("layers") // avoid debugging confusion
-      .withColumn(
-        "reverse_geocoded",
-        f.expr("ST_ReverseGeocode(geometry, ARRAY('poi', 'address'))"))
+    val geocodedDf = df
+      .withColumn("reverse_geocoded", f.expr("ST_ReverseGeocode(geometry, 'poi')"))
 
     // return every row, every column
-    assert(dfGeoCoded.count() == df.count())
+    assert(geocodedDf.count() == df.count())
+    assert(geocodedDf.columns.length == df.columns.length + 1)
+
+    assert(geocodedDf.where("reverse_geocoded.location is not null").count() == df.count() - 1)
+    assert(geocodedDf.where("reverse_geocoded.location = 'Google'").count() == df.count() - 1)
     assert(
-      dfGeoCoded.columns.length == df.columns.length
-    ) // dropped layers column, added reverse_geocode
-
-    assert(dfGeoCoded.where(f.expr("2 = size(reverse_geocoded)")).count() == df.count())
-
-    // Test order
-    assert(dfGeoCoded.where("reverse_geocoded[0].layer == 'poi'").count() == 5)
-    assert(dfGeoCoded.where("reverse_geocoded[1].layer == 'address'").count() == 5)
-
-    val explodedDf =
-      dfGeoCoded.select(f.col("*"), f.explode(f.col("reverse_geocoded")).alias("gc"))
-    assert(explodedDf.where("gc.layer = 'poi' and gc.location is not null").count() === 4)
-    assert(explodedDf.where("gc.layer = 'address' and gc.location is not null").count() === 3)
-    assert(explodedDf.where("gc.layer is null").count() == 0)
+      geocodedDf
+        .where("reverse_geocoded.geometry = ST_Point(-122.084068, 37.422408)")
+        .count() == df.count() - 1)
+    assert(geocodedDf.where("reverse_geocoded.layer = 'poi'").count() == df.count())
 
   }
 
-  it("test reverse geocoding function with col layers") {
+  it("test reverse geocoding function with col layer") {
 
     val df = get_input_data()
 
-    val dfGeoCoded = df
-      .withColumn("reverse_geocoded", f.expr("ST_ReverseGeocode(geometry, layers)"))
+    val geocodedDf = df
+      .withColumn("reverse_geocoded", f.expr("ST_ReverseGeocode(geometry, layer)"))
 
     // return every row, every column
-    assert(dfGeoCoded.count() == df.count())
-    assert(dfGeoCoded.columns.length == df.columns.length + 1)
+    assert(geocodedDf.count() == df.count())
+    assert(geocodedDf.columns.length == df.columns.length + 1)
+
+    assert(geocodedDf.where("reverse_geocoded.location is not null").count() == 3)
+
+    // The poi and address layers share a geom
+    assert(
+      geocodedDf
+        .where("reverse_geocoded.geometry = ST_Point(-122.084068, 37.422408)")
+        .count() == 3)
+
+    assert(geocodedDf.where("reverse_geocoded.location = 'Google'").count() == 2)
+    assert(geocodedDf.where("reverse_geocoded.layer = 'poi'").count() == 2)
 
     assert(
-      dfGeoCoded.where(f.expr("size(layers) = size(reverse_geocoded)")).count() == df.count())
-
-    val explodedDf =
-      dfGeoCoded.select(f.col("*"), f.explode(f.col("reverse_geocoded")).alias("gc"))
-    assert(explodedDf.where("gc.layer = 'poi' and gc.location is not null").count() === 3)
-    assert(explodedDf.where("gc.layer = 'address' and gc.location is not null").count() === 2)
-    assert(explodedDf.where("gc.layer is null").count() == 0)
-
-    // Test Order
-    assert(dfGeoCoded
-      .withColumn("index", f.explode(f.sequence(f.lit(0), f.size(f.col("reverse_geocoded")) - 1)))
-      .where("layers[index] = reverse_geocoded[index].layer")
-      .count() == explodedDf.count())
+      geocodedDf
+        .where("reverse_geocoded.location = '1600 Amphitheatre Parkway, Mountain View, CA'")
+        .cache()
+        .count() == 1)
+    assert(geocodedDf.where("reverse_geocoded.layer = 'address'").count() == 3)
 
   }
 
@@ -146,46 +136,53 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
 
     val df = get_input_data()
 
-    val dfGeoCoded = df
-      .withColumn("reverse_geocoded", f.expr("ST_ReverseGeocode(geometry, layers)"))
+    val geocodedDf = df
+      .withColumn("reverse_geocoded", f.expr("ST_ReverseGeocode(geometry, layer)"))
       .withColumn("anotherColumn", f.rand())
 
     // if we didn't optimize away the ST_ReverseGeocode call, this will throw an exception
-    dfGeoCoded.collect()
+    // if we failed to preserve the anotherColumn, this will throw an exception
+    geocodedDf.collect()
   }
 
   it("test parallel reverse geocoding function calls") {
 
-    val df = get_input_data()
+    val df = get_input_data().drop("layer")
 
-    val dfGeoCoded = df.select(
+    val geocodedDf = df.select(
       f.col("*"),
-      f.expr("ST_ReverseGeocode(geometry, ARRAY('address'))").alias("reverse_geocoded"),
-      f.expr("ST_ReverseGeocode(geometry, ARRAY('poi'))").alias("reverse_geocoded2"))
+      f.expr("ST_ReverseGeocode(geometry, 'address')").alias("reverse_geocoded"),
+      f.expr("ST_ReverseGeocode(geometry, 'poi')").alias("reverse_geocoded2"))
 
-    dfGeoCoded.collect()
-  }
+    assert(
+      geocodedDf
+        .where("reverse_geocoded.layer = 'address' and reverse_geocoded2.layer = 'poi'")
+        .count() == 5)
 
-  it("test unaliased reverse geocoding function call") {
+    // Don't confuse the results
+    assert(geocodedDf.where("reverse_geocoded.location = 'Google'").count() == 0)
+    assert(
+      geocodedDf
+        .where("reverse_geocoded2.location = '1600 Amphitheatre Parkway, Mountain View, CA'")
+        .count() == 0)
 
-    val df = get_input_data()
+    assert(geocodedDf.where("reverse_geocoded2.location = 'Google'").count() == 4)
+    assert(
+      geocodedDf
+        .where("reverse_geocoded.location = '1600 Amphitheatre Parkway, Mountain View, CA'")
+        .count() == 3)
 
-    val dfGeoCoded =
-      df.select(f.col("*"), f.expr("ST_ReverseGeocode(geometry, ARRAY('address'))"))
-
-    dfGeoCoded.collect()
   }
 
   it("test nested reverse geocoding function calls") {
 
     val df = get_input_data()
 
-    val dfGeoCoded = df.withColumn(
+    val geocodedDf = df.withColumn(
       "reverse_geocoded",
-      f.expr(
-        "ST_ReverseGeocode(geometry, ARRAY(ST_ReverseGeocode(geometry, ARRAY('poi'))[0].layer))"))
+      f.expr("ST_ReverseGeocode(geometry, ST_ReverseGeocode(geometry, 'poi').layer)"))
     val exception = intercept[IllegalArgumentException] {
-      dfGeoCoded.collect()
+      geocodedDf.collect()
     }
 
     assert(exception.getMessage == "ST_ReverseGeocode calls cannot be nested")
@@ -195,34 +192,42 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
 
     val df = get_input_data()
 
-    val dfGeocoded = df.where("ST_ReverseGeocode(geometry, ARRAY('poi')) IS NOT NULL")
-    dfGeocoded.explain(true)
-    dfGeocoded.collect().length == df.count()
+    val geocodedDf = df.where("ST_ReverseGeocode(geometry, 'poi') IS NOT NULL")
+
+    geocodedDf.collect().length == df.count()
   }
 
   it("test reverse geocoding function calls in subquery") {
 
     val df = get_input_data()
 
-    val dfGeoCoded = df
-      .withColumn(
-        "reverse_geocoded",
-        f.expr("ST_ReverseGeocode(geometry, ARRAY('poi', 'address'))"))
+    val geocodedDf = df
+      .withColumn("reverse_geocoded", f.expr("ST_ReverseGeocode(geometry, 'address')"))
 
-    dfGeoCoded.createOrReplaceTempView("dfGeoCoded")
+    geocodedDf.createOrReplaceTempView("geocodedDf")
 
-    spark.sql("SELECT * FROM dfGeoCoded WHERE size(reverse_geocoded) > 0").collect()
+    spark.sql("SELECT * FROM geocodedDf WHERE reverse_geocoded.location is not null").collect()
   }
 
   it("test can call through df functions") {
 
     val df = get_input_data()
 
-    val dfGeoCoded = df.withColumn(
-      "reverse_geocoded",
-      ST_ReverseGeocode(f.col("geometry"), f.array(f.lit("poi"), f.lit("address"))))
+    val geocodedDf =
+      df.withColumn("reverse_geocoded", ST_ReverseGeocode(f.col("geometry"), f.lit("poi")))
 
-    dfGeoCoded.collect()
+    geocodedDf.collect()
+  }
+
+  it("test support dfs with map column") {
+    val df = get_input_data()
+
+    val geocodedDf = df
+      .withColumn("myMap", f.map(lit("key"), lit("value")))
+      .withColumn("reverse_geocoded", ST_ReverseGeocode(f.col("geometry"), f.lit("address")))
+
+    geocodedDf.collect()
+
   }
 
   it("test when table has wrong schema exception is thrown") {
@@ -247,9 +252,9 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
     try {
       val df = get_input_data()
 
-      val dfGeoCoded = df.withColumn("rgc", f.expr("ST_ReverseGeocode(geometry, ARRAY('poi'))"))
+      val geocodedDf = df.withColumn("rgc", f.expr("ST_ReverseGeocode(geometry, 'poi')"))
       val exception = intercept[IllegalArgumentException] {
-        dfGeoCoded.collect()
+        geocodedDf.collect()
       }
 
       assert(
@@ -268,12 +273,12 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
   }
 
   it("can use ST_GetReverseGeocodingLayers in ST_ReverseGeocode") {
-    val df = get_input_data().drop("layers")
+    val df = get_input_data().drop("layer")
 
-    val dfGeoCoded = df
+    val geocodedDf = df
       .withColumn("layers", ST_GetReverseGeocodingLayers())
-      .withColumn("reverse_geocoded", ST_ReverseGeocode(f.col("geometry"), f.col("layers")))
-    assert(dfGeoCoded.where("size(reverse_geocoded) = size(layers)").count() == df.count())
+      .withColumn("reverse_geocoded", ST_ReverseGeocode(f.col("geometry"), f.expr("layers[0]")))
+    assert(geocodedDf.where("reverse_geocoded.layer = layers[0]").count() == df.count())
 
   }
 
@@ -312,7 +317,7 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
     get_input_data()
       .select(
         f.col("*"),
-        rank().over(Window.partitionBy("layers").orderBy(ST_GetReverseGeocodingLayers())))
+        rank().over(Window.partitionBy("layer").orderBy(ST_GetReverseGeocodingLayers())))
       .collect()
   }
 
@@ -332,7 +337,7 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
   it("test RewriteLogicalPlan does not support aggregate in agg statement") {
     val exception = intercept[IllegalArgumentException] {
       get_input_data()
-        .groupBy(f.col("layers"))
+        .groupBy(f.col("layer"))
         .agg(ST_GetReverseGeocodingLayers())
         .collect()
     }
