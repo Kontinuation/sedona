@@ -2420,6 +2420,7 @@ def ST_GetReverseGeocodingLayers() -> Column:
 
     return _call_st_function("ST_GetReverseGeocodingLayers", ())
 
+
 @validate_argument_types
 def ST_InterpolatePoint(geom1: ColumnOrName, geom2: ColumnOrName) -> Column:
     """Returns the interpolated Measure value at the point on the given linestring M that is closest to the given point.
