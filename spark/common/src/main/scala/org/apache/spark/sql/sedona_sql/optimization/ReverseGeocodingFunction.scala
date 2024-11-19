@@ -19,11 +19,11 @@
 package org.apache.spark.sql.sedona_sql.optimization
 
 import org.apache.sedona.core.utils.SedonaConf
-import org.apache.spark.sql.catalyst.expressions.{Expression, _}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.sedona_sql.expressions.{ST_Distance, ST_ReverseGeocode}
-import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{aliasOf, matchOrderToOriginalProjectList, retrieveOptimizedGeocodeTablePlan}
+import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{aliasOf, matchOrderToOriginalProjectList, retrieveGeocodeTablePlan}
 
 import scala.collection.convert.ImplicitConversions.`map AsScala`
 
@@ -45,7 +45,7 @@ object ReverseGeocodingFunction extends RewriteLogicalPlan[ST_ReverseGeocode] {
     val funcGeometryArg = funcCall.children(0)
     val funcLayerArg = funcCall.children(1)
 
-    val geocodePlan = retrieveOptimizedGeocodeTablePlan()
+    val geocodePlan = retrieveGeocodeTablePlan()
 
     val geocodePlanAttrs = geocodePlan.outputSet
     val geocodeLayer = geocodePlanAttrs.filter(_.name == "layer").head
@@ -60,7 +60,7 @@ object ReverseGeocodingFunction extends RewriteLogicalPlan[ST_ReverseGeocode] {
       JoinType("left"),
       Some(
         And(
-          LessThan(distanceExpression, getDistanceJoinDistanceThreshold(funcLayerArg)),
+          LessThanOrEqual(distanceExpression, getDistanceJoinDistanceThreshold(funcLayerArg)),
           EqualTo(geocodeLayer, funcLayerArg))),
       JoinHint.NONE)
 

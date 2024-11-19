@@ -18,6 +18,7 @@
  */
 package org.apache.spark.sql.sedona_sql.optimization
 
+import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, Expression, ExpressionSet, NamedExpression, SortOrder}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -25,6 +26,10 @@ import org.apache.spark.sql.catalyst.rules.Rule
 import scala.collection.mutable.ListBuffer
 import scala.reflect.runtime.universe._
 
+// TODO consider a refactor where this is a the actual Rule added to extraOptimizations and various rewrites are
+// registered as children of this rule. This would allow for unnestFunctionCallsAndMigrateToProjects to handle all
+// un-nesting and migration to projects in a single pass and avoid edge cases with nested rewritten function calls.
+// For example if the rewrite of one function puts a child function call in a join, which is not supported.
 abstract class RewriteLogicalPlan[FunctionType <: Expression: TypeTag] extends Rule[LogicalPlan] {
 
   /**
@@ -42,21 +47,19 @@ abstract class RewriteLogicalPlan[FunctionType <: Expression: TypeTag] extends R
   def apply(plan: LogicalPlan): LogicalPlan = plan match {
     case s: Subquery if s.correlated => plan
     case _ =>
-      plan
+      val rewrittenPlan = plan
         .transformUp { case plan: LogicalPlan =>
           unnestFunctionCallsAndMigrateToProjects(plan)
         }
         .transformUp { case plan: LogicalPlan =>
           extract(plan)
         }
-  }
 
-  def expressionContainsFunction(expr: Expression): Boolean = {
-    expr.find { e =>
-      runtimeMirror(e.getClass.getClassLoader)
-        .classSymbol(e.getClass)
-        .toType =:= typeOf[FunctionType]
-    }.isDefined
+      if (plan != rewrittenPlan) {
+        SparkSession.getActiveSession.get.sessionState.optimizer.execute(rewrittenPlan)
+      } else {
+        plan
+      }
   }
 
   // this function is only written for child pattern
@@ -189,7 +192,7 @@ abstract class RewriteLogicalPlan[FunctionType <: Expression: TypeTag] extends R
         }
       case _: BinaryNode =>
         throw new IllegalArgumentException(
-          f"${typeOf[FunctionType].baseClasses.head.name} functions cannot be in a Join or other binary operator")
+          f"${typeOf[FunctionType].baseClasses.head.name} functions cannot be in a Join or other binary operator. If this is not the case, report a bug.")
       case _ =>
         throw new IllegalArgumentException(
           f"${typeOf[FunctionType].baseClasses.head.name} functions found in unsupported operator. Report a bug.")

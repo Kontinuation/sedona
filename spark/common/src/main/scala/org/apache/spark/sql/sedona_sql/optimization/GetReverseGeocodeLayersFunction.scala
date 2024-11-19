@@ -22,14 +22,14 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, CollectSet, Complete}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.sedona_sql.expressions.ST_GetReverseGeocodingLayers
-import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{aliasOf, matchOrderToOriginalProjectList, retrieveOptimizedGeocodeTablePlan}
+import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{aliasOf, matchOrderToOriginalProjectList, retrieveGeocodeTablePlan}
 
 object GetReverseGeocodeLayersFunction extends RewriteLogicalPlan[ST_GetReverseGeocodingLayers] {
   override def rewriteLogicalPlan(
       funcCall: ST_GetReverseGeocodingLayers,
       plan: Project): LogicalPlan = {
 
-    val geocodePlan = retrieveOptimizedGeocodeTablePlan()
+    val geocodePlan = retrieveGeocodeTablePlan()
 
     val geocodeLayer = geocodePlan.outputSet.filter(_.name == "layer").head
 

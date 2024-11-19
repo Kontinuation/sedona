@@ -36,6 +36,11 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
   override def beforeAll(): Unit = {
     super.beforeAll()
     create_geocode_table()
+
+    // defaults are set for overture so we set these for our custom test layer names
+    spark.conf.set("spark.sedona.reverse.geocode.distance.address", "0.0003")
+    spark.conf.set("spark.sedona.reverse.geocode.distance.poi", "0.0006")
+
   }
 
   override def afterAll(): Unit = {
@@ -345,6 +350,13 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
     assert(
       exception.getMessage == "Unsupported call to ST_GetReverseGeocodingLayers in aggregate expression. If this is not the case, report a bug.")
 
+  }
+
+  it("test nested calls of different functions") {
+    spark
+      .sql(
+        "select ST_ReverseGeocode(ST_GeomFromText('POINT (-80.176474 25.784764)'), ST_GetReverseGeocodingLayers()[0])")
+      .collect()
   }
 
 }

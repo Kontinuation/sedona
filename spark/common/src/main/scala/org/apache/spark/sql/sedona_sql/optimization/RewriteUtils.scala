@@ -101,10 +101,10 @@ object RewriteUtils {
    * @return
    *   The optimized LogicalPlan for the geocode table
    */
-  def retrieveOptimizedGeocodeTablePlan(): LogicalPlan = {
+  def retrieveGeocodeTablePlan(): LogicalPlan = {
     val geocodeTableName = SedonaConf.fromActiveSession().getReverseGeocodingTableName
     val geocodePlan =
-      SparkSession.getActiveSession.get.table(geocodeTableName).queryExecution.optimizedPlan
+      SparkSession.getActiveSession.get.table(geocodeTableName).logicalPlan
 
     assertGeocodeTableWellFormed(geocodeTableName)
 

@@ -78,8 +78,10 @@ object SedonaContext {
     // Support reverse geocoding functions
     if (!sparkSession.experimental.extraOptimizations.contains(ReverseGeocodingFunction)) {
       sparkSession.experimental.extraOptimizations ++= Seq(
-        ReverseGeocodingFunction,
-        GetReverseGeocodeLayersFunction)
+        // Processing GetReverseGeocodeLayers before ST_ReverseGeocode so that the GetReverseGeocodeLayers call does not
+        // wind up in the Join clause of ST_ReverseGeocode when nested.
+        GetReverseGeocodeLayersFunction,
+        ReverseGeocodingFunction)
     }
 
     addGeoParquetToSupportNestedFilterSources(sparkSession)

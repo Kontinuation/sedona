@@ -332,8 +332,8 @@ public class SedonaConf implements Serializable {
     }
 
     if (reverseGeocodingDistanceThresholds.size() == 1) {
-      reverseGeocodingDistanceThresholds.put("poi", 0.0006); // ~20 feet
-      reverseGeocodingDistanceThresholds.put("address", 0.0003);
+      reverseGeocodingDistanceThresholds.put("places", 0.0006); // ~20 feet
+      reverseGeocodingDistanceThresholds.put("addresses", 0.0003);
     }
 
     return reverseGeocodingDistanceThresholds;
