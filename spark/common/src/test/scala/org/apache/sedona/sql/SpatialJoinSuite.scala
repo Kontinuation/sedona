@@ -539,6 +539,35 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     }
   }
 
+  describe("Spatial outer join should handle empty datasets correctly") {
+    val joinClauses = Table(
+      "query",
+      "SELECT df1.id, dfEmpty.id FROM df1 LEFT JOIN dfEmpty ON ST_Distance(df1.geom, dfEmpty.geom) < 1",
+      "SELECT df1.id, dfEmptyWithPartitions.id FROM df1 LEFT JOIN dfEmptyWithPartitions ON ST_Distance(df1.geom, dfEmptyWithPartitions.geom) < 1",
+      "SELECT dfEmpty.id, df1.id FROM dfEmpty LEFT JOIN df1 ON ST_Distance(df1.geom, dfEmpty.geom) < 1",
+      "SELECT dfEmptyWithPartitions.id, df1.id FROM dfEmptyWithPartitions LEFT JOIN df1 ON ST_Distance(df1.geom, dfEmptyWithPartitions.geom) < 1",
+      "SELECT df1.id, dfEmpty.id FROM df1 RIGHT JOIN dfEmpty ON ST_Distance(df1.geom, dfEmpty.geom) < 1",
+      "SELECT df1.id, dfEmptyWithPartitions.id FROM df1 RIGHT JOIN dfEmptyWithPartitions ON ST_Distance(df1.geom  , dfEmptyWithPartitions.geom) < 1",
+      "SELECT dfEmpty.id, df1.id FROM dfEmpty RIGHT JOIN df1 ON ST_Distance(df1.geom, dfEmpty.geom) < 1",
+      "SELECT dfEmptyWithPartitions.id, df1.id FROM dfEmptyWithPartitions RIGHT JOIN df1 ON ST_Distance(df1.geom, dfEmptyWithPartitions.geom) < 1")
+
+    forAll(joinClauses) { case (query) =>
+      it(s"query: $query") {
+        val actual = withConf(Map(advancedSpatialJoinConfKey -> "true")) {
+          val df = sparkSession.sql(query)
+          assert(isUsingOptimizedSpatialJoin(df))
+          df
+        }
+        val expected = withOptimizationMode("none") {
+          sparkSession.sql(query)
+        }
+        val expectedResult = collectQueryResult(expected)
+        val actualResult = collectQueryResult(actual)
+        assert(actualResult === expectedResult)
+      }
+    }
+  }
+
   describe("Spatial join should produce results with correct geometry values") {
     def verifyGeometries(result: DataFrame): Unit = {
       val resultRows = result.collect()
@@ -717,7 +746,7 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       .repartition(4)
       .cache()
     val emptyRdd = sparkSession.sparkContext.emptyRDD[Row]
-    val emptyDf = sparkSession.createDataFrame(
+    val emptyDfWithNoPartitions = sparkSession.createDataFrame(
       emptyRdd,
       StructType(Seq(StructField("id", IntegerType), StructField("geom", GeometryUDT))))
     df1.createOrReplaceTempView("df1")
@@ -734,7 +763,9 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     sparkSession
       .sql("SELECT id, geom, explode(array_repeat(0,3)) dup FROM df1WithNull")
       .createOrReplaceTempView("df2WithNullAndDup")
-    emptyDf.createOrReplaceTempView("dfEmpty")
+    emptyDfWithNoPartitions.createOrReplaceTempView("dfEmpty")
+    val emptyDfWithPartitions = df1.where("id > 100000")
+    emptyDfWithPartitions.createOrReplaceTempView("dfEmptyWithPartitions")
     (df1, df2)
   }
 

@@ -57,6 +57,7 @@ import org.apache.spark.util.LongAccumulator;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Polygonal;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
 import org.locationtech.jts.index.SpatialIndex;
@@ -406,9 +407,26 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
   @Override
   public Iterator<Pair<U, T>> call(
       Integer index, Iterator<U> leftIterator, Iterator<T> rightIterator) {
-    if (joinType == JoinType.INNER && (!leftIterator.hasNext() || !rightIterator.hasNext())) {
-      return Collections.emptyIterator();
+    // Short circuit for empty partitions
+    switch (joinType) {
+      case INNER:
+        if (!leftIterator.hasNext() || !rightIterator.hasNext()) {
+          return Collections.emptyIterator();
+        }
+        break;
+      case LEFT_OUTER:
+        if (!leftIterator.hasNext()) {
+          return Collections.emptyIterator();
+        }
+        break;
+      case RIGHT_OUTER:
+        if (!rightIterator.hasNext()) {
+          return Collections.emptyIterator();
+        }
+        break;
     }
+
+    // Get the per-partition execution parameters
     List<LocalSpatialJoinExecParams> paramsList;
     if (localSpatialJoinExecParamsListBroadcast != null) {
       // This is the path taken by actual Spark job execution
@@ -892,10 +910,22 @@ public class AdaptiveIndexLookupJudgement<U extends Geometry, T extends Geometry
         streamCount++;
         T geometry = streamIterator.next();
         List<Object> candidates = new ArrayList<>();
+
+        // The stream side should be subdivided when stream subdividing option is configured and
+        // the number of points in the stream geometry is less than the number of indexed
+        // geometries.
+        // If there are just a few geometries on the build side, then the cost of subdividing the
+        // stream side is not worth it.
+        boolean shouldSubdivide = false;
         if (streamSubDivider != null) {
+          shouldSubdivide =
+              !(geometry instanceof Polygonal)
+                  || geometry.getNumPoints() < indexedGeometries.size();
+        }
+
+        if (shouldSubdivide) {
           // If the stream side should be subdivided, we need to first subdivide the geometry and
-          // then query
-          // the spatial index.
+          // then query the spatial index.
           Iterator<Geometry> subGeomIter = streamSubDivider.subdivide(geometry);
           while (subGeomIter.hasNext()) {
             Geometry subGeom = subGeomIter.next();

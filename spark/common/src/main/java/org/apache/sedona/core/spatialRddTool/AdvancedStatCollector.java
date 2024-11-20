@@ -215,7 +215,7 @@ public class AdvancedStatCollector implements Serializable {
       double maxX = input.readDouble();
       double minY = input.readDouble();
       double maxY = input.readDouble();
-      this.extent = new Envelope(minX, maxX, minY, maxY);
+      this.extent = minX <= maxX ? new Envelope(minX, maxX, minY, maxY) : new Envelope();
       this.numPoints = input.readInt();
       this.geometryType = geometryTypes[input.readByte()];
       this.width = this.extent.getWidth();

@@ -358,14 +358,14 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     // note that we'll still perform an inner join when global subdivide is enabled, since subdivided
     // outer joins are handled specially by joining back with original datasets.
     if (joinType != Inner && subdivideLeftRDDOptions.isEmpty && subdivideRightRDDOptions.isEmpty) {
-      val numOufOfBoundsPartitions = determineNumOutOfBoundsPartitions(
+      val numOutOfBoundsPartitions = determineNumOutOfBoundsPartitions(
         joinType,
         spatialPartitioner,
         spatialPartitioningMetrics)
       val outerSpatialPartitioner =
-        new OuterJoinSpatialPartitioner(spatialPartitioner, numOufOfBoundsPartitions, true)
+        new OuterJoinSpatialPartitioner(spatialPartitioner, numOutOfBoundsPartitions, true)
       val otherSpatialPartitioner =
-        new OuterJoinSpatialPartitioner(spatialPartitioner, numOufOfBoundsPartitions, false)
+        new OuterJoinSpatialPartitioner(spatialPartitioner, numOutOfBoundsPartitions, false)
       joinType match {
         case LeftOuter =>
           leftShapes.spatialPartitioning(outerSpatialPartitioner, sedonaConf)
