@@ -69,7 +69,7 @@ jobs:
         run: cd python && pipenv run mkdocs build && mkdir -p ../docs/api/pythondoc/wherobots-compute && cp -r site/* ../docs/api/pythondoc/wherobots-compute/
       - name: zip docs
         run: zip -r docs.zip docs
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: docs
           path: docs.zip
