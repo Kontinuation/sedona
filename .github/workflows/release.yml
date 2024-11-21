@@ -207,6 +207,6 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/jars/*
-            artifacts/wheels/*
+            artifacts/cibw-*
             artifacts/docs/*
             LICENSE
