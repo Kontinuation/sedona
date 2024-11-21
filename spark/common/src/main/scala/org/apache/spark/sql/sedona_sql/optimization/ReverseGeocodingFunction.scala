@@ -22,7 +22,7 @@ import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.sedona_sql.expressions.{ST_Distance, ST_ReverseGeocode}
+import org.apache.spark.sql.sedona_sql.expressions.{ST_Distance, ST_ReverseGeocode, ST_SRID}
 import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{aliasOf, matchOrderToOriginalProjectList, retrieveGeocodeTablePlan}
 
 import scala.collection.convert.ImplicitConversions.`map AsScala`
@@ -54,8 +54,16 @@ object ReverseGeocodingFunction extends RewriteLogicalPlan[ST_ReverseGeocode] {
 
     val distanceExpression = ST_Distance(Seq(geocodeGeom, funcGeometryArg))
 
+    val assertSRID = Filter(
+      IsNull(
+        AssertTrue(
+          ArrayContains(
+            CreateArray(Seq(Literal(0), Literal(4326))),
+            ST_SRID(Seq(funcGeometryArg))))),
+      plan.child)
+
     val joinedPlan = Join(
-      plan.child,
+      assertSRID,
       geocodePlan,
       JoinType("left"),
       Some(

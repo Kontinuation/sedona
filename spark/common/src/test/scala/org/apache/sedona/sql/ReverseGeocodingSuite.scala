@@ -18,7 +18,7 @@
  */
 package org.apache.sedona.sql
 
-import org.apache.spark.sql
+import org.apache.spark.{SparkException, sql}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{lit, rank}
 import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_GetReverseGeocodingLayers, ST_ReverseGeocode}
@@ -357,6 +357,21 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
       .sql(
         "select ST_ReverseGeocode(ST_GeomFromText('POINT (-80.176474 25.784764)'), ST_GetReverseGeocodingLayers()[0])")
       .collect()
+  }
+
+  it("test throws exception when SRID is not 4326") {
+    assertThrows[SparkException] {
+      spark
+        .sql("select ST_ReverseGeocode(ST_GeomFromText('POINT (-80.176474 25.784764)', 3857), ST_GetReverseGeocodingLayers()[0])")
+        .collect()
+    }
+
+    // This shouldn't throw
+    spark
+      .sql(
+        "select ST_ReverseGeocode(ST_GeomFromText('POINT (-80.176474 25.784764)', 4326), ST_GetReverseGeocodingLayers()[0])")
+      .collect()
+
   }
 
 }
