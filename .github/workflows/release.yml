@@ -195,6 +195,8 @@ jobs:
         run: |
           git tag $TAG
           git push origin $TAG
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
