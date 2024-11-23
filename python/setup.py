@@ -57,7 +57,7 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     python_requires=">=3.6",
-    install_requires=["attrs", "shapely>=1.7.0", "rasterio>=1.2.10"],
+    install_requires=["attrs", "shapely>=1.7.0"],
     extras_require={
         "spark": ["pyspark>=2.3.0"],
         "pydeck-map": ["geopandas", "pydeck==0.8.0"],
@@ -69,6 +69,7 @@ setup(
             "pydeck==0.8.0",
             "keplergl==0.3.2",
             "kneed<=0.8.5",
+            "rasterio>=1.2.10",
         ],
     },
     project_urls={
