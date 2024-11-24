@@ -22,7 +22,7 @@ import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical._
-import org.apache.spark.sql.sedona_sql.expressions.{ST_Distance, ST_ReverseGeocode, ST_SRID}
+import org.apache.spark.sql.sedona_sql.expressions.{ST_Distance, ST_GetReverseGeocodingLayers, ST_ReverseGeocode, ST_SRID}
 import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{aliasOf, matchOrderToOriginalProjectList, retrieveGeocodeTablePlan}
 
 import scala.collection.convert.ImplicitConversions.`map AsScala`
@@ -54,7 +54,7 @@ object ReverseGeocodingFunction extends RewriteLogicalPlan[ST_ReverseGeocode] {
 
     val distanceExpression = ST_Distance(Seq(geocodeGeom, funcGeometryArg))
 
-    val assertSRID = Filter(
+    val assertSRIDPlan = Filter(
       IsNull(
         AssertTrue(
           ArrayContains(
@@ -62,8 +62,13 @@ object ReverseGeocodingFunction extends RewriteLogicalPlan[ST_ReverseGeocode] {
             ST_SRID(Seq(funcGeometryArg))))),
       plan.child)
 
+    val assertLayerPlan = Filter(
+      IsNull(AssertTrue(ArrayContains(ST_GetReverseGeocodingLayers(Seq()), funcLayerArg))),
+      assertSRIDPlan)
+
     val joinedPlan = Join(
-      assertSRID,
+      if (SedonaConf.fromActiveSession.getReverseGeocodingAssertLayerExists) assertLayerPlan
+      else assertSRIDPlan,
       geocodePlan,
       JoinType("left"),
       Some(

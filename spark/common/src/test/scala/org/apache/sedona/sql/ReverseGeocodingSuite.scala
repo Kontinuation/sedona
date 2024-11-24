@@ -371,7 +371,14 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
       .sql(
         "select ST_ReverseGeocode(ST_GeomFromText('POINT (-80.176474 25.784764)', 4326), ST_GetReverseGeocodingLayers()[0])")
       .collect()
+  }
 
+  it("test throws when layer doesn't exist") {
+    assertThrows[SparkException] {
+      spark
+        .sql("select ST_ReverseGeocode(ST_GeomFromText('POINT (-80.176474 25.784764)'), 'iDontExist')")
+        .collect()
+    }
   }
 
 }

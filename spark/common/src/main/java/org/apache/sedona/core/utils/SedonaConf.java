@@ -114,6 +114,7 @@ public class SedonaConf implements Serializable {
   // Parameters for geocoding
   private String reverseGeocodingTableName;
   private Map<String, Double> reverseGeocodingDistanceThresholds;
+  private Boolean reverseGeocodingAssertLayerExists;
 
   // Parameters for testing
   private boolean allowPlanBroadcastJoin;
@@ -314,6 +315,10 @@ public class SedonaConf implements Serializable {
 
     this.reverseGeocodingDistanceThresholds =
         initializeReverseGeocodingDistanceThresholds(runtimeConfig);
+
+    this.reverseGeocodingAssertLayerExists =
+        Boolean.parseBoolean(
+            runtimeConfig.get("spark.sedona.reverse.geocode.assert.layers", "true"));
   }
 
   private Map<String, Double> initializeReverseGeocodingDistanceThresholds(
@@ -590,5 +595,9 @@ public class SedonaConf implements Serializable {
 
   public Map<String, Double> getReverseGeocodingDistanceThresholds() {
     return reverseGeocodingDistanceThresholds;
+  }
+
+  public Boolean getReverseGeocodingAssertLayerExists() {
+    return reverseGeocodingAssertLayerExists;
   }
 }
