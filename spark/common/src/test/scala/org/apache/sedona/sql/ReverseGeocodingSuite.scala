@@ -18,11 +18,11 @@
  */
 package org.apache.sedona.sql
 
-import org.apache.spark.{SparkException, sql}
 import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{lit, rank}
 import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_GetReverseGeocodingLayers, ST_ReverseGeocode}
 import org.apache.spark.sql.{DataFrame, functions => f}
+import org.apache.spark.{SparkException, sql}
 import org.scalatest.BeforeAndAfterAll
 
 case class Geocode(layer: String, location: String, x: Double, y: Double)
@@ -381,4 +381,14 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
     }
   }
 
+  it("test ST_GetReverseGeocodingLayers supports explodes") {
+    // No Project Parent
+    val result1 = spark.sql("SELECT explode(ST_GetReverseGeocodingLayers())").collect()
+    assert(result1.map(_.getString(0)).toSet == Set("address", "poi"))
+
+    // This will have a Project on top so worth having a distinct test case
+    val result2 =
+      spark.sql("SELECT 1 as anotherColumn, explode(ST_GetReverseGeocodingLayers())").collect()
+    assert(result2.map(_.getString(1)).toSet == Set("address", "poi"))
+  }
 }

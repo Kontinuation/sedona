@@ -19,7 +19,7 @@
 package org.apache.spark.sql.sedona_sql.optimization
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, Expression, ExpressionSet, NamedExpression, SortOrder}
+import org.apache.spark.sql.catalyst.expressions.{Alias, AttributeReference, Expression, ExpressionSet, Generator, NamedExpression, SortOrder}
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 
@@ -116,7 +116,7 @@ abstract class RewriteLogicalPlan[FunctionType <: Expression: TypeTag] extends R
       return plan
     }
 
-    val ret = plan match {
+    plan match {
       case p: Project => // child strategy
         val (newProjectList, nweChildExprs) = handleAliases(p.projectList)
         p.copy(projectList = newProjectList
@@ -190,6 +190,22 @@ abstract class RewriteLogicalPlan[FunctionType <: Expression: TypeTag] extends R
         } else {
           aAfterGrouping
         }
+      case g: Generate =>
+        val (generator, childFunctionCalls) = replaceFunctionCallWithAttributeReference(
+          g.generator)
+        val newChild = Project(g.child.outputSet.toSeq ++ childFunctionCalls, g.child)
+
+        g.copy(
+          generator = generator.asInstanceOf[Generator],
+          // The new Generate has an additional output from the new child. When there is a parent project this extra
+          // column would be handled automatically. Queries with only a Generate (eg "SELECT explode(...)") dont have a
+          // parent Project. To handle these cases we need to set unrequiredChildIndex with the new output's index.
+          unrequiredChildIndex = newChild.output
+            .map(g.output.contains)
+            .zipWithIndex
+            .filter { case (contains, _) => !contains }
+            .map(_._2),
+          child = newChild)
       case _: BinaryNode =>
         throw new IllegalArgumentException(
           f"${typeOf[FunctionType].baseClasses.head.name} functions cannot be in a Join or other binary operator. If this is not the case, report a bug.")
@@ -197,8 +213,6 @@ abstract class RewriteLogicalPlan[FunctionType <: Expression: TypeTag] extends R
         throw new IllegalArgumentException(
           f"${typeOf[FunctionType].baseClasses.head.name} functions found in unsupported operator. Report a bug.")
     }
-
-    ret
   }
 
   private def collectFunctionCallsFromExpressions(
