@@ -132,20 +132,10 @@ case class BroadcastQuerySideKNNJoinExec(
     val kValue: Int = this.k.eval().asInstanceOf[Int]
     require(kValue > 0, "The number of neighbors must be greater than 0.")
     objectsShapes.setNeighborSampleNumber(kValue)
-
-    val joinPartitions: Integer = numPartitions
-    broadcastJoin = false
-
-    // expand the boundary for partition to include both RDDs
-    objectsShapes.advancedAnalyze()
-    queryShapes.advancedAnalyze()
-    objectsShapes.getStatistics.getBoundary.expandToInclude(queryShapes.getStatistics.getBoundary)
-
-    objectsShapes.spatialPartitioning(GridType.QUADTREE_RTREE, joinPartitions)
-    queryShapes.spatialPartitioning(
-      objectsShapes.getPartitioner.asInstanceOf[QuadTreeRTPartitioner].nonOverlappedPartitioner())
-
-    objectsShapes.buildIndex(IndexType.RTREE, true)
+    // index the objects on regular partitions (not spatial partitions)
+    // this avoids the cost of spatial partitioning
+    objectsShapes.buildIndex(IndexType.RTREE, false)
+    broadcastJoin = true
   }
 
   /**

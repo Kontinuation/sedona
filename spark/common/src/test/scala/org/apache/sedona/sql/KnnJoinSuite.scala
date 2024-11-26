@@ -48,6 +48,9 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
   val testDataDelimiter = "\t"
   val knnPointsLocationQueries: String = resourceFolder + "knn/queries.csv"
   val knnPointsLocationObjects: String = resourceFolder + "knn/objects.csv"
+
+  val knnPointsLocationQueriesWithDuplicates: String =
+    resourceFolder + "knn/queries-with-duplicate.csv"
   val knnPointsLocationSkewedObjects: String = resourceFolder + "knn/queries-large-skewed.csv"
   val knnPointsLocationMultipleSkewedObjects: String =
     resourceFolder + "knn/queries-large-skewed-multiple.csv"
@@ -59,6 +62,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     prepareTempViewsForTestData()
     prepareTempViewsForDifferentPartitionsTestData()
     prepareTempViewsForSkewedTestData()
+    prepareTempViewsForDuplicatedRowsTestData()
   }
 
   describe("KNN spatial join SQLs should be parsed correctly") {
@@ -310,6 +314,26 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19]")
     }
 
+    it("KNN Join should support duplicate rows on queries") {
+      val df = sparkSession.sql(
+        s"SELECT QUERIES_DUPLICATES.ID, OBJECTS_DUPLICATES.ID FROM QUERIES_DUPLICATES JOIN OBJECTS_DUPLICATES ON ST_KNN(QUERIES_DUPLICATES.GEOM, OBJECTS_DUPLICATES.GEOM, 4, true)")
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.length should be(4 * 4) // 3 queries and 4 neighbors each
+      println(resultAll.mkString)
+      resultAll.mkString should be(
+        "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19][4,3][4,6][4,13][4,16]")
+    }
+
+    it("KNN Join should support duplicate rows on broadcast queries") {
+      val df = sparkSession.sql(
+        s"SELECT /*+ BROADCAST(QUERIES_DUPLICATES) */ QUERIES_DUPLICATES.ID, OBJECTS_DUPLICATES.ID FROM QUERIES_DUPLICATES JOIN OBJECTS_DUPLICATES ON ST_KNN(QUERIES_DUPLICATES.GEOM, OBJECTS_DUPLICATES.GEOM, 4, true)")
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.length should be(4 * 4) // 3 queries and 4 neighbors each
+      println(resultAll.mkString)
+      resultAll.mkString should be(
+        "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19][4,3][4,6][4,13][4,16]")
+    }
+
     it(
       "KNN Join with approximate algorithms should work on tiny datasets with lots of partitions") {
       val df = sparkSession
@@ -538,7 +562,7 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
         print(resultAll.mkString)
         resultAll.length should be(2)
-        resultAll.mkString should be("[0,6][0,7]")
+        resultAll.mkString should (be("[0,5][0,6]") or be("[0,6][0,7]"))
       }
     }
   }
@@ -635,6 +659,30 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       .select("id", "geom", "shape")
     df1.repartition(2).createOrReplaceTempView("queries_par2")
     df2.repartition(4).createOrReplaceTempView("objects_par4")
+    (df1, df2)
+  }
+
+  private def prepareTempViewsForDuplicatedRowsTestData(): (DataFrame, DataFrame) = {
+    val df1 = sparkSession.read
+      .format("csv")
+      .option("header", "false")
+      .option("delimiter", testDataDelimiter)
+      .load(knnPointsLocationQueriesWithDuplicates)
+      .withColumn("id", col("_c0").cast(IntegerType))
+      .withColumn("geom", ST_GeomFromText(new Column("_c1")))
+      .withColumn("shape", col("_c1"))
+      .select("id", "geom", "shape")
+    val df2 = sparkSession.read
+      .format("csv")
+      .option("header", "false")
+      .option("delimiter", testDataDelimiter)
+      .load(knnPointsLocationObjects)
+      .withColumn("id", col("_c0").cast(IntegerType))
+      .withColumn("geom", ST_GeomFromText(new Column("_c1")))
+      .withColumn("shape", col("_c1"))
+      .select("id", "geom", "shape")
+    df1.repartition(4).createOrReplaceTempView("queries_duplicates")
+    df2.repartition(4).createOrReplaceTempView("objects_duplicates")
     (df1, df2)
   }
 

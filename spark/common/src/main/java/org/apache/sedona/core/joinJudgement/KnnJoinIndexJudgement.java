@@ -25,6 +25,7 @@ import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.knnJudgement.EuclideanItemDistance;
 import org.apache.sedona.core.knnJudgement.HaversineItemDistance;
 import org.apache.sedona.core.knnJudgement.SpheroidDistance;
+import org.apache.sedona.core.wrapper.UniqueGeometry;
 import org.apache.spark.api.java.function.FlatMapFunction2;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.util.LongAccumulator;
@@ -48,7 +49,8 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
   private final int k;
   private final DistanceMetric distanceMetric;
   private final boolean includeTies;
-  private final Broadcast<STRtree> broadcastedTreeIndex;
+  private final Broadcast<List> broadcastQueryObjects;
+  private final Broadcast<STRtree> broadcastObjectsTreeIndex;
 
   /**
    * Constructor for the KnnJoinIndexJudgement class.
@@ -59,13 +61,15 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
    * @param streamCount accumulator for the number of geometries processed from the stream side
    * @param resultCount accumulator for the number of join results
    * @param candidateCount accumulator for the number of candidate matches
-   * @param broadcastedTreeIndex the broadcasted spatial index
+   * @param broadcastQueryObjects the broadcast geometries on queries
+   * @param broadcastObjectsTreeIndex the broadcast spatial index on objects
    */
   public KnnJoinIndexJudgement(
       int k,
       DistanceMetric distanceMetric,
       boolean includeTies,
-      Broadcast<STRtree> broadcastedTreeIndex,
+      Broadcast<List> broadcastQueryObjects,
+      Broadcast<STRtree> broadcastObjectsTreeIndex,
       LongAccumulator buildCount,
       LongAccumulator streamCount,
       LongAccumulator resultCount,
@@ -74,7 +78,8 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
     this.k = k;
     this.distanceMetric = distanceMetric;
     this.includeTies = includeTies;
-    this.broadcastedTreeIndex = broadcastedTreeIndex;
+    this.broadcastQueryObjects = broadcastQueryObjects;
+    this.broadcastObjectsTreeIndex = broadcastObjectsTreeIndex;
   }
 
   /**
@@ -90,7 +95,7 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
   @Override
   public Iterator<Pair<U, T>> call(Iterator<T> streamShapes, Iterator<SpatialIndex> treeIndexes)
       throws Exception {
-    if (!treeIndexes.hasNext() || !streamShapes.hasNext()) {
+    if (!treeIndexes.hasNext() || (streamShapes != null && !streamShapes.hasNext())) {
       buildCount.add(0);
       streamCount.add(0);
       resultCount.add(0);
@@ -99,10 +104,9 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
     }
 
     STRtree strTree;
-    if (broadcastedTreeIndex != null) {
-      // get the broadcasted spatial index if available
-      // this is to support the broadcast join
-      strTree = broadcastedTreeIndex.getValue();
+    if (broadcastObjectsTreeIndex != null) {
+      // get the broadcast spatial index on objects side if available
+      strTree = broadcastObjectsTreeIndex.getValue();
     } else {
       // get the spatial index from the iterator
       SpatialIndex treeIndex = treeIndexes.next();
@@ -113,44 +117,78 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
       strTree = (STRtree) treeIndex;
     }
 
+    // TODO: For future improvement, instead of using a list to store the results,
+    // we can use lazy evaluation to avoid storing all the results in memory.
     List<Pair<U, T>> result = new ArrayList<>();
-    ItemDistance itemDistance;
 
-    while (streamShapes.hasNext()) {
-      T streamShape = streamShapes.next();
-      streamCount.add(1);
+    List queryItems;
+    if (broadcastQueryObjects != null) {
+      // get the broadcast spatial index on queries side if available
+      queryItems = broadcastQueryObjects.getValue();
+      for (Object item : queryItems) {
+        T queryGeom;
+        if (item instanceof UniqueGeometry) {
+          queryGeom = (T) ((UniqueGeometry) item).getOriginalGeometry();
+        } else {
+          queryGeom = (T) item;
+        }
+        streamCount.add(1);
 
-      Object[] localK;
-      switch (distanceMetric) {
-        case EUCLIDEAN:
-          itemDistance = new EuclideanItemDistance();
-          break;
-        case HAVERSINE:
-          itemDistance = new HaversineItemDistance();
-          break;
-        case SPHEROID:
-          itemDistance = new SpheroidDistance();
-          break;
-        default:
-          itemDistance = new GeometryItemDistance();
-          break;
+        Object[] localK =
+            strTree.nearestNeighbour(
+                queryGeom.getEnvelopeInternal(), queryGeom, getItemDistance(), k);
+        if (includeTies) {
+          localK = getUpdatedLocalKWithTies(queryGeom, localK, strTree);
+        }
+
+        for (Object obj : localK) {
+          T candidate = (T) obj;
+          Pair<U, T> pair = Pair.of((U) item, candidate);
+          result.add(pair);
+          resultCount.add(1);
+        }
       }
+      return result.iterator();
+    } else {
+      while (streamShapes.hasNext()) {
+        T streamShape = streamShapes.next();
+        streamCount.add(1);
 
-      localK =
-          strTree.nearestNeighbour(streamShape.getEnvelopeInternal(), streamShape, itemDistance, k);
-      if (includeTies) {
-        localK = getUpdatedLocalKWithTies(streamShape, localK, strTree);
-      }
+        Object[] localK =
+            strTree.nearestNeighbour(
+                streamShape.getEnvelopeInternal(), streamShape, getItemDistance(), k);
+        if (includeTies) {
+          localK = getUpdatedLocalKWithTies(streamShape, localK, strTree);
+        }
 
-      for (Object obj : localK) {
-        T candidate = (T) obj;
-        Pair<U, T> pair = Pair.of((U) streamShape, candidate);
-        result.add(pair);
-        resultCount.add(1);
+        for (Object obj : localK) {
+          T candidate = (T) obj;
+          Pair<U, T> pair = Pair.of((U) streamShape, candidate);
+          result.add(pair);
+          resultCount.add(1);
+        }
       }
+      return result.iterator();
     }
+  }
 
-    return result.iterator();
+  private ItemDistance getItemDistance() {
+    ItemDistance itemDistance;
+    switch (distanceMetric) {
+      case EUCLIDEAN:
+        itemDistance = new EuclideanItemDistance();
+        break;
+      case HAVERSINE:
+        itemDistance = new HaversineItemDistance();
+        break;
+      case SPHEROID:
+        itemDistance = new SpheroidDistance();
+        break;
+      default:
+        itemDistance = new GeometryItemDistance();
+        break;
+    }
+    return itemDistance;
   }
 
   private Object[] getUpdatedLocalKWithTies(T streamShape, Object[] localK, STRtree strTree) {
@@ -183,5 +221,19 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
       localK = tiedResults.toArray();
     }
     return localK;
+  }
+
+  public static <U extends Geometry, T extends Geometry> double distance(
+      U key, T value, DistanceMetric distanceMetric) {
+    switch (distanceMetric) {
+      case EUCLIDEAN:
+        return new EuclideanItemDistance().distance(key, value);
+      case HAVERSINE:
+        return new HaversineItemDistance().distance(key, value);
+      case SPHEROID:
+        return new SpheroidDistance().distance(key, value);
+      default:
+        return new EuclideanItemDistance().distance(key, value);
+    }
   }
 }
