@@ -349,7 +349,10 @@ object Catalog {
     function[RS_SEGMENT_TO_GEOMS](),
     // Expression for ReverseGeocode
     function[ST_ReverseGeocode](),
-    function[ST_GetReverseGeocodingLayers]())
+    function[ST_GetReverseGeocodingLayers](),
+    // geostats functions
+    function[ST_DBSCAN](),
+    function[ST_LocalOutlierFactor]())
 
   val aggregateExpressions: Seq[Aggregator[Geometry, _, _]] =
     Seq(new ST_Union_Aggr, new ST_Envelope_Aggr, new ST_Intersection_Aggr, new ST_Analyze_Aggr)

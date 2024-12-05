@@ -949,4 +949,10 @@ object st_functions extends DataFrameAPI {
   def ST_InterpolatePoint(geom1: String, geom2: String): Column =
     wrapExpression[ST_InterpolatePoint](geom1, geom2)
 
+  def ST_DBSCAN(geom: Column, epsilon: Column, minPoints: Column, useSpheroid: Column): Column =
+    wrapExpression[ST_DBSCAN](geom, epsilon, minPoints, useSpheroid)
+
+  def ST_LocalOutlierFactor(geom: Column, k: Column, useSpheroid: Column): Column =
+    wrapExpression[ST_LocalOutlierFactor](geom, k, useSpheroid)
+
 }

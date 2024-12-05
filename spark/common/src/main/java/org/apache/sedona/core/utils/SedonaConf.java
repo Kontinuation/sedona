@@ -116,6 +116,10 @@ public class SedonaConf implements Serializable {
   private Map<String, Double> reverseGeocodingDistanceThresholds;
   private Boolean reverseGeocodingAssertLayerExists;
 
+  // Parameters for geostats
+  private Boolean DBSCANIncludeOutliers = true;
+  private Boolean LOFApproximateKNN = false;
+
   // Parameters for testing
   private boolean allowPlanBroadcastJoin;
 
@@ -319,6 +323,12 @@ public class SedonaConf implements Serializable {
     this.reverseGeocodingAssertLayerExists =
         Boolean.parseBoolean(
             runtimeConfig.get("spark.sedona.reverse.geocode.assert.layers", "true"));
+
+    this.DBSCANIncludeOutliers =
+        Boolean.parseBoolean(runtimeConfig.get("spark.sedona.dbscan.includeOutliers", "true"));
+
+    this.LOFApproximateKNN =
+        Boolean.parseBoolean(runtimeConfig.get("spark.sedona.lof.approximateKNN", "false"));
   }
 
   private Map<String, Double> initializeReverseGeocodingDistanceThresholds(
@@ -599,5 +609,13 @@ public class SedonaConf implements Serializable {
 
   public Boolean getReverseGeocodingAssertLayerExists() {
     return reverseGeocodingAssertLayerExists;
+  }
+
+  public Boolean getDBSCANIncludeOutliers() {
+    return DBSCANIncludeOutliers;
+  }
+
+  public Boolean getLOFApproximateKNN() {
+    return LOFApproximateKNN;
   }
 }

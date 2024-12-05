@@ -47,6 +47,8 @@ object LocalOutlierFactor {
    *   whether to handle ties in the k-distance calculation. Default is false
    * @param useSpheroid
    *   whether to use a cartesian or spheroidal distance calculation. Default is false
+   * @param resultColumnName
+   *   the name of the column containing the lof for each row. Default is "lof"
    *
    * @return
    *   A PySpark DataFrame containing the lof for each row
@@ -57,7 +59,8 @@ object LocalOutlierFactor {
       geometry: String = null,
       approximateKNN: Boolean = false,
       handleTies: Boolean = false,
-      useSpheroid: Boolean = false): DataFrame = {
+      useSpheroid: Boolean = false,
+      resultColumnName: String = "lof"): DataFrame = {
 
     MetricsRegistrator.getOrCreate.LOFPerform.inc()
 
@@ -142,8 +145,8 @@ object LocalOutlierFactor {
       .groupBy("a_id")
       .agg(
         f.first(CONTENTS_COLUMN_NAME).alias(CONTENTS_COLUMN_NAME),
-        (f.sum("b_lrd") / (f.count("b_lrd") * f.first("a_lrd"))).alias("lof"))
-      .select(f.col(f"$CONTENTS_COLUMN_NAME.*"), f.col("lof"))
+        (f.sum("b_lrd") / (f.count("b_lrd") * f.first("a_lrd"))).alias(resultColumnName))
+      .select(f.col(f"$CONTENTS_COLUMN_NAME.*"), f.col(resultColumnName))
 
     if (handleTies)
       SparkSession.getActiveSession.get.conf

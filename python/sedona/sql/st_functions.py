@@ -2421,9 +2421,7 @@ def ST_Rotate(
 def ST_ReverseGeocode(
     geometry: ColumnOrName, layers: Union[ColumnOrName, List]
 ) -> Column:
-    """Return an Array of reverse geocode results for the given geometry and layers.
-
-    Up to one result is given per layer.
+    """Return a reverse geocode result for the given geometry and layer.
 
     @param geometry: Geometry column or name
     :type geometry: ColumnOrName
@@ -2458,6 +2456,64 @@ def ST_InterpolatePoint(geom1: ColumnOrName, geom2: ColumnOrName) -> Column:
 
     args = (geom1, geom2)
     return _call_st_function("ST_InterpolatePoint", args)
+
+
+@validate_argument_types
+def ST_DBSCAN(
+    geometry: ColumnOrName,
+    epsilon: Union[ColumnOrName, float],
+    min_pts: Union[ColumnOrName, int],
+    use_spheroid: Optional[Union[ColumnOrName, bool]] = False,
+) -> Column:
+    """Perform DBSCAN clustering on the given geometry column.
+
+    @param geometry: Geometry column or name
+    :type geometry: ColumnOrName
+    @param epsilon: the distance between two points to be considered neighbors
+    :type epsilon: ColumnOrName
+    @param min_pts: the number of neighbors a point should have to form a cluster
+    :type min_pts: ColumnOrName
+    @param use_spheroid: whether to use spheroid for distance calculation
+    :type use_spheroid: ColumnOrName
+    @return: A struct indicating the cluster to which the point belongs and whether it is a core point
+    """
+
+    if isinstance(epsilon, float):
+        epsilon = lit(epsilon)
+
+    if isinstance(min_pts, int):
+        min_pts = lit(min_pts)
+
+    if isinstance(use_spheroid, bool):
+        use_spheroid = lit(use_spheroid)
+
+    return _call_st_function("ST_DBSCAN", (geometry, epsilon, min_pts, use_spheroid))
+
+
+@validate_argument_types
+def ST_LocalOutlierFactor(
+    geometry: ColumnOrName,
+    k: Union[ColumnOrName, int],
+    use_spheroid: Optional[Union[ColumnOrName, bool]] = False,
+) -> Column:
+    """Calculate the local outlier factor on the given geometry column.
+
+    @param geometry: Geometry column or name
+    :type geometry: ColumnOrName
+    @param k: the number of neighbors to use for LOF calculation
+    :type k: ColumnOrName
+    @param use_spheroid: whether to use spheroid for distance calculation
+    :type use_spheroid: ColumnOrName
+    @return: A Double indicating the local outlier factor of the point
+    """
+
+    if isinstance(k, int):
+        k = lit(k)
+
+    if isinstance(use_spheroid, bool):
+        use_spheroid = lit(use_spheroid)
+
+    return _call_st_function("ST_LocalOutlierFactor", (geometry, k, use_spheroid))
 
 
 # Automatically populate __all__

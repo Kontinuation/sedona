@@ -31,7 +31,6 @@ from sedona.sql.st_predicates import *
 from shapely.geometry.base import BaseGeometry
 from tests.test_base import TestBase
 
-
 test_configurations = [
     # constructors
     (
@@ -1811,3 +1810,19 @@ class TestDataFrameAPI(TestBase):
         )
         assert results_df.where("reverse_geocode.location is not null").count() == 1
         self.spark.catalog.dropTempView("geocodeTest")
+
+    def test_dbscan(self):
+        df = self.spark.createDataFrame([{"id": 1, "x": 2, "y": 3}]).withColumn(
+            "geometry", f.expr("ST_Point(x, y)")
+        )
+
+        df.withColumn("dbscan", ST_DBSCAN("geometry", 1.0, 2, False)).collect()
+
+    def test_lof(self):
+        df = self.spark.createDataFrame([{"id": 1, "x": 2, "y": 3}]).withColumn(
+            "geometry", f.expr("ST_Point(x, y)")
+        )
+
+        df.withColumn(
+            "localOutlierFactor", ST_LocalOutlierFactor("geometry", 2, False)
+        ).collect()

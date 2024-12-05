@@ -31,6 +31,7 @@ def local_outlier_factor(
     approximate_knn: bool = False,
     handle_ties: bool = False,
     use_spheroid=False,
+    result_column_name: str = "lof",
 ):
     """Annotates a dataframe with a column containing the local outlier factor for each data record.
 
@@ -45,6 +46,7 @@ def local_outlier_factor(
         approximate_knn: whether to use approximate KNN. When false will use exact KNN join. Default is False
         handle_ties: whether to handle ties in the k-distance calculation. Default is false
         use_spheroid: whether to use a cartesian or spheroidal distance calculation. Default is false
+        result_column_name: the name of the column containing the lof for each row. Default is "lof"
 
     Returns:
         A PySpark DataFrame containing the lof for each row
@@ -58,6 +60,7 @@ def local_outlier_factor(
         approximate_knn,
         handle_ties,
         use_spheroid,
+        result_column_name,
     )
 
     return DataFrame(result_df, sedona)

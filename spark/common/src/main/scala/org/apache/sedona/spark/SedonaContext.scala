@@ -21,15 +21,16 @@ package org.apache.sedona.spark
 import org.apache.log4j.Logger
 import org.apache.sedona.common.utils.TelemetryCollector
 import org.apache.sedona.core.serde.SedonaKryoRegistrator
-import org.apache.sedona.sql.{ParserRegistrator, RasterRegistrator}
 import org.apache.sedona.sql.UDF.UdfRegistrator
 import org.apache.sedona.sql.UDT.UdtRegistrator
+import org.apache.sedona.sql.{ParserRegistrator, RasterRegistrator}
 import org.apache.spark.SparkConf
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.deploy.PythonRunner
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.monitoring.ListenerRegistrator
-import org.apache.spark.sql.sedona_sql.optimization.{GetReverseGeocodeLayersFunction, ReverseGeocodingFunction, SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
+import org.apache.spark.sql.sedona_sql.optimization.{ExtractGeoStatsFunctions, GetReverseGeocodeLayersFunction, ReverseGeocodingFunction, SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
+import org.apache.spark.sql.sedona_sql.strategy.geostats.EvalGeoStatsFunctionStrategy
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
 import org.apache.spark.sql.{SQLContext, SparkSession}
 
@@ -82,6 +83,16 @@ object SedonaContext {
         // wind up in the Join clause of ST_ReverseGeocode when nested.
         GetReverseGeocodeLayersFunction,
         ReverseGeocodingFunction)
+    }
+
+    // Support geostats functions
+    if (!sparkSession.experimental.extraOptimizations.contains(ExtractGeoStatsFunctions)) {
+      sparkSession.experimental.extraOptimizations ++= Seq(ExtractGeoStatsFunctions)
+    }
+    if (!sparkSession.experimental.extraStrategies.exists(
+        _.isInstanceOf[EvalGeoStatsFunctionStrategy])) {
+      sparkSession.experimental.extraStrategies ++= Seq(
+        new EvalGeoStatsFunctionStrategy(sparkSession))
     }
 
     addGeoParquetToSupportNestedFilterSources(sparkSession)
