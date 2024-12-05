@@ -309,7 +309,8 @@ case class ST_DWithin(inputExpressions: Seq[Expression])
 case class ST_KNN(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction3(Predicates.knn),
-      inferrableFunction4(Predicates.knn)) {
+      inferrableFunction4(Predicates.knn),
+      inferrableFunction5(Predicates.knn)) {
 
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -325,7 +326,8 @@ case class ST_KNN(inputExpressions: Seq[Expression])
 case class ST_AKNN(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction3(Predicates.knn),
-      inferrableFunction4(Predicates.knn)) {
+      inferrableFunction4(Predicates.knn),
+      inferrableFunction5(Predicates.knn)) {
 
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)

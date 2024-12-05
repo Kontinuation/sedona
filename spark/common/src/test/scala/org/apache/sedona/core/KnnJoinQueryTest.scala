@@ -120,7 +120,7 @@ class KnnJoinQueryTest extends TestBaseScala {
         }
 
         val knnOutputs = JoinQuery
-          .KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, k, DistanceMetric.EUCLIDEAN)
+          .KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, k, null, DistanceMetric.EUCLIDEAN)
           .collect()
           .asScala
           .toList
@@ -194,7 +194,7 @@ class KnnJoinQueryTest extends TestBaseScala {
         }
 
         val knnOutputs = JoinQuery
-          .KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, k, DistanceMetric.EUCLIDEAN)
+          .KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, k, null, DistanceMetric.EUCLIDEAN)
           .collect()
           .asScala
           .toList

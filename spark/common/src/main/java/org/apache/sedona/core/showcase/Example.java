@@ -345,7 +345,8 @@ public class Example implements Serializable {
     queryRDD.spatialPartitionedRDD.persist(StorageLevel.MEMORY_ONLY());
 
     List<Tuple2<Point, List<Point>>> knnOutputs =
-        JoinQuery.KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, 10, DistanceMetric.EUCLIDEAN)
+        JoinQuery.KNNJoinQuery(
+                objectRDD, queryRDD, IndexType.RTREE, 10, null, DistanceMetric.EUCLIDEAN)
             .collect();
     StringBuilder output = getListContent(knnOutputs);
     assert !output.toString().isEmpty();

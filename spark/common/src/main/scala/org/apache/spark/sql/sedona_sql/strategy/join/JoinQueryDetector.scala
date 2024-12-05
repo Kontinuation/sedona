@@ -21,7 +21,7 @@ package org.apache.spark.sql.sedona_sql.strategy.join
 import org.apache.sedona.core.enums.{IndexType, SpatialJoinOptimizationMode}
 import org.apache.sedona.core.spatialOperator.SpatialPredicate
 import org.apache.sedona.core.utils.SedonaConf
-import org.apache.spark.sql.catalyst.expressions.{And, Attribute, EqualNullSafe, EqualTo, Expression, LessThan, LessThanOrEqual}
+import org.apache.spark.sql.catalyst.expressions.{And, Attribute, EqualNullSafe, EqualTo, Expression, LessThan, LessThanOrEqual, Literal}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.datasources.LogicalRelation
@@ -31,6 +31,7 @@ import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
 import org.apache.spark.sql.sedona_sql.expressions._
 import org.apache.spark.sql.sedona_sql.expressions.raster._
 import org.apache.spark.sql.sedona_sql.optimization.ExpressionUtils.{matchDistanceExpressionToJoinSide, matchExpressionsToPlans, matches, splitConjunctivePredicates}
+import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.{SparkSession, Strategy}
 
 case class JoinQueryDetection(
@@ -42,7 +43,8 @@ case class JoinQueryDetection(
     isGeography: Boolean,
     condition: Expression,
     extraCondition: Option[Expression] = None,
-    distance: Option[Expression] = None)
+    distance: Option[Expression] = None,
+    bound: Option[Expression] = None)
 
 /**
  * Plans `RangeJoinExec` for inner joins on spatial relationships ST_Contains(a, b) and
@@ -488,6 +490,20 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
                 condition.get,
                 condition,
                 Some(k)))
+          case ST_KNN(Seq(leftShape, rightShape, k, useSpheroid, radius)) =>
+            val useSpheroidUnwrapped = useSpheroid.eval().asInstanceOf[Boolean]
+            Some(
+              JoinQueryDetection(
+                left,
+                right,
+                leftShape,
+                rightShape,
+                spatialPredicate = SpatialPredicate.KNN,
+                isGeography = useSpheroidUnwrapped,
+                condition.get,
+                condition,
+                Some(k),
+                Some(radius)))
 
           // ST_AKNN
           case ST_AKNN(Seq(leftShape, rightShape, k)) =>
@@ -515,7 +531,20 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
                 condition.get,
                 condition,
                 Some(k)))
-
+          case ST_AKNN(Seq(leftShape, rightShape, k, useSpheroid, radius)) =>
+            val useSpheroidUnwrapped = useSpheroid.eval().asInstanceOf[Boolean]
+            Some(
+              JoinQueryDetection(
+                left,
+                right,
+                leftShape,
+                rightShape,
+                spatialPredicate = SpatialPredicate.AKNN,
+                isGeography = useSpheroidUnwrapped,
+                condition.get,
+                condition,
+                Some(k),
+                Some(radius)))
           case _ => None
         }
       case _ => None
@@ -535,7 +564,8 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
                 isGeography,
                 condition,
                 extraCondition,
-                distance)) =>
+                distance,
+                None)) =>
           planBroadcastJoin(
             left,
             right,
@@ -548,6 +578,34 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
             isGeography,
             extraCondition,
             distance,
+            None,
+            unneededLeftAttributes,
+            unneededRightAttributes)
+        case Some(
+              JoinQueryDetection(
+                left,
+                right,
+                leftShape,
+                rightShape,
+                spatialPredicate,
+                isGeography,
+                condition,
+                extraCondition,
+                distance,
+                searchRadius)) =>
+          planBroadcastJoin(
+            left,
+            right,
+            Seq(leftShape, rightShape),
+            joinType,
+            spatialPredicate,
+            sedonaConf.getIndexType,
+            broadcastLeft,
+            broadcastRight,
+            isGeography,
+            extraCondition,
+            distance,
+            searchRadius,
             unneededLeftAttributes,
             unneededRightAttributes)
         case _ =>
@@ -565,6 +623,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
                 isGeography,
                 condition,
                 extraCondition,
+                None,
                 None)) =>
           planRangeJoin(
             left,
@@ -586,7 +645,8 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
                 isGeography,
                 condition,
                 extraCondition,
-                Some(distance))) =>
+                Some(k),
+                None)) =>
           Option(spatialPredicate) match {
             case Some(SpatialPredicate.KNN) =>
               planKNNJoin(
@@ -595,7 +655,8 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
                 Seq(leftShape, rightShape),
                 joinType,
                 useApproximate = false,
-                distance,
+                k,
+                Literal.create(null, DoubleType),
                 isGeography,
                 condition,
                 extraCondition)
@@ -606,7 +667,8 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
                 Seq(leftShape, rightShape),
                 joinType,
                 useApproximate = true,
-                distance,
+                k,
+                Literal.create(null, DoubleType),
                 isGeography,
                 condition,
                 extraCondition)
@@ -616,7 +678,58 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
                 right,
                 Seq(leftShape, rightShape),
                 joinType,
-                distance,
+                k,
+                predicate,
+                isGeography,
+                condition,
+                extraCondition)
+            case None =>
+              Nil
+          }
+        case Some(
+              JoinQueryDetection(
+                left,
+                right,
+                leftShape,
+                rightShape,
+                spatialPredicate,
+                isGeography,
+                condition,
+                extraCondition,
+                Some(k),
+                Some(searchRadius))) =>
+          Option(spatialPredicate) match {
+            case Some(SpatialPredicate.KNN) =>
+              planKNNJoin(
+                left,
+                right,
+                Seq(leftShape, rightShape),
+                joinType,
+                useApproximate = false,
+                k,
+                searchRadius,
+                isGeography,
+                condition,
+                extraCondition)
+            case Some(SpatialPredicate.AKNN) =>
+              planKNNJoin(
+                left,
+                right,
+                Seq(leftShape, rightShape),
+                joinType,
+                useApproximate = true,
+                k,
+                searchRadius,
+                isGeography,
+                condition,
+                extraCondition)
+            case Some(predicate) =>
+              planDistanceJoin(
+                left,
+                right,
+                Seq(leftShape, rightShape),
+                joinType,
+                k,
                 predicate,
                 isGeography,
                 condition,
@@ -774,7 +887,8 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       children: Seq[Expression],
       joinType: JoinType,
       useApproximate: Boolean,
-      distance: Expression,
+      k: Expression,
+      searchRadius: Expression,
       isGeography: Boolean,
       condition: Expression,
       extraCondition: Option[Expression] = None): Seq[SparkPlan] = {
@@ -805,7 +919,8 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       leftShape,
       rightShape,
       joinType,
-      distance,
+      k,
+      searchRadius,
       useApproximate = useApproximate,
       spatialPredicate = null,
       isGeography,
@@ -845,6 +960,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       isGeography: Boolean,
       extraCondition: Option[Expression],
       distance: Option[Expression],
+      searchRadius: Option[Expression],
       unneededLeftAttributes: Seq[Attribute],
       unneededRightAttributes: Seq[Attribute]): Seq[SparkPlan] = {
 
@@ -889,6 +1005,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
             broadcastSide.get,
             joinType,
             k = distance.get,
+            searchRadius = searchRadius.getOrElse(Literal.create(null, DoubleType)),
             useApproximate = false,
             spatialPredicate,
             isGeography = false,
@@ -904,6 +1021,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
             broadcastSide.get,
             joinType,
             k = distance.get,
+            searchRadius = searchRadius.getOrElse(Literal.create(null, DoubleType)),
             useApproximate = false,
             spatialPredicate,
             isGeography = false,

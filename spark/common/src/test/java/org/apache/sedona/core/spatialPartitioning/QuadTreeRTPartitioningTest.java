@@ -53,7 +53,7 @@ public class QuadTreeRTPartitioningTest extends TestCase {
     QuadTreeRTPartitioning rtreePartitioning = new QuadTreeRTPartitioning(samples, extent, 10);
 
     int k = 2; // Number of neighbors
-    STRtree strTree = rtreePartitioning.buildSTRTree(samples, k);
+    STRtree strTree = rtreePartitioning.buildSTRTree(samples, k, -1);
 
     // Check the resulting STR tree
     // Here you can add assertions to validate the behavior

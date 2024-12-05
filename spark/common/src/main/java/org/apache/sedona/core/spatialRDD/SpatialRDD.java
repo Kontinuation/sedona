@@ -109,6 +109,9 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
   /** The neighbor sample number. */
   private int neighborSampleNumber = -1;
 
+  /** The search radius - positive value means using search radius. */
+  private double searchRadius = -1;
+
   /**
    * Comprehensive statistics of the spatial RDD with random samples collected for creating the
    * spatial partitioning grid.
@@ -135,6 +138,15 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
    */
   public void setNeighborSampleNumber(int neighborSampleNumber) {
     this.neighborSampleNumber = neighborSampleNumber;
+  }
+
+  /**
+   * Sets the search radius. Positive value means using search radius.
+   *
+   * @param searchRadius
+   */
+  public void setSearchRadius(double searchRadius) {
+    this.searchRadius = searchRadius;
   }
 
   /**
@@ -216,6 +228,7 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
     builder.addSamples(samples);
     builder.setNeighborSampleNumber(neighborSampleNumber);
     builder.setSamplingProbability((double) samples.size() / (double) this.approximateTotalCount);
+    builder.setSearchRadius(searchRadius);
     partitioner = builder.build();
   }
 

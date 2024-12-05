@@ -67,6 +67,7 @@ case class KNNJoinExec(
     rightShape: Expression,
     joinType: JoinType,
     k: Expression,
+    searchRadius: Expression,
     useApproximate: Boolean,
     spatialPredicate: SpatialPredicate,
     isGeography: Boolean,
@@ -168,7 +169,9 @@ case class KNNJoinExec(
     val kValue: Int = this.k.eval().asInstanceOf[Int]
     require(kValue > 0, "The number of neighbors must be greater than 0.")
     objectsShapes.setNeighborSampleNumber(kValue)
-
+    val searchRadius: Double =
+      Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(-1)
+    if (searchRadius > 0) { objectsShapes.setSearchRadius(searchRadius) }
     if (useApproximate) {
       approximateSpatialPartitioning(objectsShapes, queryShapes, numPartitions)
     } else {
@@ -237,9 +240,11 @@ case class KNNJoinExec(
     // Please update this function when new join strategies are added
     // Number of neighbors to find
     val kValue: Int = this.k.eval().asInstanceOf[Int]
+    val searchRadius: Double =
+      Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(Double.MaxValue)
     // Metric to use in the join to calculate the distance, only Euclidean and Spheroid are supported
     val distanceMetric = if (isGeography) DistanceMetric.SPHEROID else DistanceMetric.EUCLIDEAN
-    val joinParams = new JoinParams(IndexType.RTREE, kValue, distanceMetric)
+    val joinParams = new JoinParams(IndexType.RTREE, kValue, distanceMetric, searchRadius)
     joinParams
   }
 }

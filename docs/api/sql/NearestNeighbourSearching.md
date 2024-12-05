@@ -5,9 +5,13 @@ Sedona supports nearest-neighbour searching on geospatial data by providing a ge
 
 Introduction: join operation to find the k-nearest neighbors of a point or region in a spatial dataset.
 
-Format: `ST_KNN(R: Table, S: Table, k: Integer, use_spheroid: Boolean)`
+Format: `ST_KNN(R: Table, S: Table, k: Integer, use_spheroid: Boolean, search_radius: Double)`
 
-Where R is the queries side table and S is the object side table, K is the number of neighbors. use_spheroid is a boolean value that determines whether to use the spheroid distance or not.
+* `R` represents the queries side table.
+* `S` represents the objects side table.
+* `K` denotes the number of nearest neighbors to retrieve.
+* `use_spheroid` is a boolean value that specifies whether to calculate distances using the spheroid model.
+* `search_radius` is an optional parameter that defines the maximum distance within which neighbors will be searched, without imposing any constraints on its value.
 
 Queries side table contains geometries that are used to find the k-nearest neighbors in the object side table.
 
@@ -82,6 +86,8 @@ ID  GEOMETRY            NAME
 20	POINT(-7 3)         bank20
 ```
 
+Example 1: Query Without search_radius Parameter
+
 ```sql
 SELECT
     QUERIES.ID AS QUERY_ID,
@@ -89,6 +95,14 @@ SELECT
     OBJECTS.GEOMETRY AS OBJECTS_GEOM
 FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOMETRY, OBJECTS.GEOMETRY, 4, FALSE)
 ```
+
+Explanation:
+
+This query performs a k-Nearest Neighbor (kNN) join between the QUERIES table and the OBJECTS table. For each geometry in the QUERIES table, the function ST_KNN identifies the 4 nearest geometries (based on spatial distance) from the OBJECTS table.
+
+`FALSE` indicates that the spheroid distance model is not being used. Instead a planar distance model is being applied.
+
+Since the `search_radius` parameter is not provided, there are no constraints on the maximum distance between the query and the objects.
 
 Output:
 
@@ -111,11 +125,54 @@ Output:
 +--------+-----------------+-------------+
 ```
 
+Example 2: Query With `search_radius` Parameter
+
+```sql
+SELECT
+    QUERIES.ID AS QUERY_ID,
+    QUERIES.GEOMETRY AS QUERIES_GEOM,
+    OBJECTS.GEOMETRY AS OBJECTS_GEOM
+FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOMETRY, OBJECTS.GEOMETRY, 4, FALSE, 3.0)
+```
+
+Explanation:
+
+This query is similar to  Example 1 but this example includes an additional parameter, `search_radius = 3.0`. With this parameter, only neighbors within 3.0 units of each query geometry are considered.
+
+The `search_radius` acts as a filter, removing any object geometries that are farther than the specified radius.
+
+When `search_radius` is applied, the query may return fewer than `K` neighbors if there aren’t enough points within the radius.
+
+Output:
+
+```
++--------+-----------------+-------------+
+|QUERY_ID|QUERIES_GEOM     |OBJECTS_GEOM |
++--------+-----------------+-------------+
+|2       |POINT (10 10)    |POINT (9 8)  |
+|2       |POINT (10 10)    |POINT (9 8)  |
+|3       |POINT (-0.5 -0.5)|POINT (-1 -1)|
+|3       |POINT (-0.5 -0.5)|POINT (-1 -1)|
+|3       |POINT (-0.5 -0.5)|POINT (-3 1) |
+|3       |POINT (-0.5 -0.5)|POINT (-3 1) |
+|1       |POINT (1 1)      |POINT (-1 -1)|
+|1       |POINT (1 1)      |POINT (-1 -1)|
++--------+-----------------+-------------+
+```
+
+In this output:
+
+Some object points from the previous result set are missing because they fall outside the 3.0-unit search radius.
+
+For some queries (e.g., `QUERY_ID = 2`), fewer than 4 neighbors are returned since not enough points are within the specified radius.
+
+The `search_radius` ensures more focused results by excluding distant neighbors, which can be useful for scenarios requiring spatial proximity.
+
 ## ST_AKNN
 
 Introduction: join operation to find the k-nearest neighbors of a point or region in a spatial dataset.
 
-Format: `ST_AKNN(R: Table, S: Table, k: Integer, use_spheroid: Boolean)`
+Format: `ST_AKNN(R: Table, S: Table, k: Integer, use_spheroid: Boolean, search_radius: Double)`
 
 The `ST_AKNN` function is similar to `ST_KNN`, but it uses approximate algorithms to find the k-nearest neighbors. This can be useful for large datasets where exact kNN search is computationally expensive. The trade-off is that approximate algorithms may not always return the exact k-nearest neighbors, but they provide a good approximation in a reasonable amount of time.
 

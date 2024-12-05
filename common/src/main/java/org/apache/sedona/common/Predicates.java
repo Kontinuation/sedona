@@ -103,4 +103,9 @@ public class Predicates {
       Geometry leftGeometry, Geometry rightGeometry, int k, boolean useSpheroid) {
     throw new UnsupportedOperationException("KNN predicate is not supported");
   }
+
+  public static boolean knn(
+      Geometry leftGeometry, Geometry rightGeometry, int k, boolean useSpheroid, double radius) {
+    throw new UnsupportedOperationException("KNN predicate is not supported");
+  }
 }

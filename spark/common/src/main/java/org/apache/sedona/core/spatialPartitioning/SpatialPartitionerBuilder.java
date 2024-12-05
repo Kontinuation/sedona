@@ -34,6 +34,7 @@ public class SpatialPartitionerBuilder {
   private final Envelope boundary;
   private int neighborSampleNumber = -1;
   private double samplingProbability = 0.01f;
+  private double searchRadius = -1;
 
   /**
    * Construct a spatial partitioner builder.
@@ -182,7 +183,7 @@ public class SpatialPartitionerBuilder {
 
       case QUADTREE_RTREE:
         ExtendedQuadTree<Integer> extendedQuadTree = (ExtendedQuadTree<Integer>) tree;
-        extendedQuadTree.build(neighborSampleNumber, samplingProbability);
+        extendedQuadTree.build(neighborSampleNumber, samplingProbability, searchRadius);
         return new QuadTreeRTPartitioner(extendedQuadTree);
 
       default:
@@ -310,5 +311,9 @@ public class SpatialPartitionerBuilder {
 
   public void setSamplingProbability(double samplingProbability) {
     this.samplingProbability = samplingProbability;
+  }
+
+  public void setSearchRadius(double radius) {
+    this.searchRadius = radius;
   }
 }

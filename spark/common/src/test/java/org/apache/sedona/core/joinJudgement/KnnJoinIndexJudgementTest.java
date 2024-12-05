@@ -52,6 +52,7 @@ public class KnnJoinIndexJudgementTest {
     judgement =
         new KnnJoinIndexJudgement<>(
             5,
+            null,
             DistanceMetric.EUCLIDEAN,
             false,
             null,
@@ -164,6 +165,7 @@ public class KnnJoinIndexJudgementTest {
     KnnJoinIndexJudgement thisJudgement =
         new KnnJoinIndexJudgement<>(
             4,
+            null,
             DistanceMetric.EUCLIDEAN,
             false,
             null,
@@ -188,7 +190,56 @@ public class KnnJoinIndexJudgementTest {
     Iterator<Pair<Geometry, Geometry>> resultIterator =
         thisJudgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
 
-    // Assert that there are results
-    assertTrue(resultIterator.hasNext());
+    // Assert that the results are correct
+    int count = 0;
+    while (resultIterator.hasNext()) {
+      resultIterator.next();
+      count++;
+    }
+    // without search radius, the result should be 4
+    assertEquals(4, count);
+  }
+
+  @Test
+  public void testCase2() throws Exception {
+    // Create an STRtree spatial index
+    STRtree strTree = new STRtree();
+
+    KnnJoinIndexJudgement thisJudgement =
+        new KnnJoinIndexJudgement<>(
+            4,
+            1.4,
+            DistanceMetric.EUCLIDEAN,
+            false,
+            null,
+            null,
+            buildCount,
+            streamCount,
+            resultCount,
+            candidateCount);
+    // Points forming a grid
+    for (int i = 0; i <= 7; i++) {
+      for (int j = 0; j <= 4; j++) {
+        strTree.insert(
+            factory.createPoint(new Coordinate(i, j)).getEnvelopeInternal(),
+            factory.createPoint(new Coordinate(i, j)));
+      }
+    }
+
+    // Create a test point
+    Geometry testPoint = factory.createPoint(new Coordinate(3.3, 4.4));
+
+    // Perform a KNN search using the test point
+    Iterator<Pair<Geometry, Geometry>> resultIterator =
+        thisJudgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
+
+    // Assert that the results are correct
+    int count = 0;
+    while (resultIterator.hasNext()) {
+      resultIterator.next();
+      count++;
+    }
+    // with search radius 1.4, the result should be 3
+    assertEquals(3, count);
   }
 }

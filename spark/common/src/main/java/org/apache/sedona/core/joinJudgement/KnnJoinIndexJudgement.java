@@ -47,6 +47,7 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
     extends JudgementBase<T, U>
     implements FlatMapFunction2<Iterator<T>, Iterator<SpatialIndex>, Pair<U, T>>, Serializable {
   private final int k;
+  private final Double searchRadius;
   private final DistanceMetric distanceMetric;
   private final boolean includeTies;
   private final Broadcast<List> broadcastQueryObjects;
@@ -56,16 +57,18 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
    * Constructor for the KnnJoinIndexJudgement class.
    *
    * @param k the number of nearest neighbors to find
+   * @param searchRadius
    * @param distanceMetric the distance metric to use
+   * @param broadcastQueryObjects the broadcast geometries on queries
+   * @param broadcastObjectsTreeIndex the broadcast spatial index on objects
    * @param buildCount accumulator for the number of geometries processed from the build side
    * @param streamCount accumulator for the number of geometries processed from the stream side
    * @param resultCount accumulator for the number of join results
    * @param candidateCount accumulator for the number of candidate matches
-   * @param broadcastQueryObjects the broadcast geometries on queries
-   * @param broadcastObjectsTreeIndex the broadcast spatial index on objects
    */
   public KnnJoinIndexJudgement(
       int k,
+      Double searchRadius,
       DistanceMetric distanceMetric,
       boolean includeTies,
       Broadcast<List> broadcastQueryObjects,
@@ -76,6 +79,7 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
       LongAccumulator candidateCount) {
     super(null, buildCount, streamCount, resultCount, candidateCount, false);
     this.k = k;
+    this.searchRadius = searchRadius;
     this.distanceMetric = distanceMetric;
     this.includeTies = includeTies;
     this.broadcastQueryObjects = broadcastQueryObjects;
@@ -140,6 +144,9 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
         if (includeTies) {
           localK = getUpdatedLocalKWithTies(queryGeom, localK, strTree);
         }
+        if (searchRadius != null) {
+          localK = getInSearchRadius(localK, queryGeom);
+        }
 
         for (Object obj : localK) {
           T candidate = (T) obj;
@@ -160,6 +167,9 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
         if (includeTies) {
           localK = getUpdatedLocalKWithTies(streamShape, localK, strTree);
         }
+        if (searchRadius != null) {
+          localK = getInSearchRadius(localK, streamShape);
+        }
 
         for (Object obj : localK) {
           T candidate = (T) obj;
@@ -170,6 +180,18 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
       }
       return result.iterator();
     }
+  }
+
+  private Object[] getInSearchRadius(Object[] localK, T queryGeom) {
+    localK =
+        Arrays.stream(localK)
+            .filter(
+                candidate -> {
+                  T candidateGeom = (T) candidate;
+                  return queryGeom.distance(candidateGeom) <= searchRadius;
+                })
+            .toArray();
+    return localK;
   }
 
   private ItemDistance getItemDistance() {

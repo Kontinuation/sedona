@@ -82,9 +82,10 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
    *
    * @param samples the samples
    * @param k the number of neighbor samples
+   * @param searchRadius
    * @return
    */
-  public STRtree buildSTRTree(List<Envelope> samples, int k) {
+  public STRtree buildSTRTree(List<Envelope> samples, int k, double searchRadius) {
     // The partitioned MBRs
     mbrs = new HashMap<>();
 
@@ -120,6 +121,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
           partitionMBRs,
           mbrs,
           k,
+          searchRadius,
           sampleTree,
           geometryFactory,
           minimalGridWidth,
@@ -130,6 +132,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
           partitionMBRs,
           mbrs,
           k,
+          searchRadius,
           sampleTree,
           geometryFactory,
           minimalGridWidth,
@@ -153,6 +156,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       List<QuadRectangle> partitionMBRs,
       Map<Integer, List<Envelope>> mbrs,
       int k,
+      double searchRadius,
       STRtree sampleTree,
       GeometryFactory geometryFactory,
       double minimalGridWidth,
@@ -164,6 +168,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
           partitionMBRs,
           mbrs,
           k,
+          searchRadius,
           sampleTree,
           geometryFactory,
           minimalGridWidth,
@@ -173,6 +178,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
           partitionMBRs,
           mbrs,
           k,
+          searchRadius,
           sampleTree,
           geometryFactory,
           minimalGridWidth,
@@ -184,6 +190,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       List<QuadRectangle> partitionMBRs,
       Map<Integer, List<Envelope>> mbrs,
       int k,
+      double searchRadius,
       STRtree sampleTree,
       GeometryFactory geometryFactory,
       double minimalGridWidth,
@@ -203,6 +210,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
                     quadRect,
                     mbrs,
                     k,
+                    searchRadius,
                     sampleTree,
                     geometryFactory,
                     minimalGridWidth,
@@ -227,6 +235,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       List<QuadRectangle> partitionMBRs,
       Map<Integer, List<Envelope>> mbrs,
       int k,
+      double searchRadius,
       STRtree sampleTree,
       GeometryFactory geometryFactory,
       double minimalGridWidth,
@@ -237,6 +246,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
           quadRect,
           mbrs,
           k,
+          searchRadius,
           sampleTree,
           geometryFactory,
           minimalGridWidth,
@@ -249,6 +259,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       QuadRectangle quadRect,
       Map<Integer, List<Envelope>> mbrs,
       int k,
+      double searchRadius,
       STRtree sampleTree,
       GeometryFactory geometryFactory,
       double minimalGridWidth,
@@ -267,6 +278,10 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
 
     // Calculate the maximum distance from the centroid to the k-nearest neighbors in the samples
     double maxDistance = getMaxDistanceFromSamples(k, sampleTree, centroid);
+    // If search radius is set and valid, use it as the maximum distance
+    if (searchRadius > 0 && maxDistance > searchRadius) {
+      maxDistance = searchRadius;
+    }
     List<Envelope> intersectingMBRs =
         getMBRIntersectEnvelopes(ui, maxDistance, centroidX, centroidY);
 

@@ -219,8 +219,10 @@ public class ExtendedQuadTree<T> extends PartitioningUtils implements Serializab
    * @param neighborSampleNumber the number of neighbor samples to consider for building the STR
    *     tree.
    * @param samplingProbability the probability used for sampling when building the STR tree.
+   * @param searchRadius the search radius used for building the STR tree. Only positive values are
+   *     valid.
    */
-  public void build(int neighborSampleNumber, double samplingProbability) {
+  public void build(int neighborSampleNumber, double samplingProbability, double searchRadius) {
     // Force the quad-tree to grow up to a certain level
     // So the actual num of partitions might be slightly different
     int minLevel = (int) Math.max(Math.log(numPartitions) / Math.log(4), 0);
@@ -229,7 +231,7 @@ public class ExtendedQuadTree<T> extends PartitioningUtils implements Serializab
     partitionTree = quadTreeRTPartitioning.getPartitionTree();
 
     // Create the expanded boundaries
-    quadTreeRTPartitioning.buildSTRTree(samples, neighborSampleNumber);
+    quadTreeRTPartitioning.buildSTRTree(samples, neighborSampleNumber, searchRadius);
     expandedBoundaries = quadTreeRTPartitioning.getMbrs();
     spatialExpandedBoundaryIndex = quadTreeRTPartitioning.getMbrSpatialIndex();
 

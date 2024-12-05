@@ -59,7 +59,7 @@ public class QuadTreeRTPartitionerTest extends TestCase {
     }
 
     int k = 4; // Number of neighbors
-    extendedQuadTree.build(k, 0.0);
+    extendedQuadTree.build(k, 0.0, -1);
 
     // create the partitioner
     partitioner = new QuadTreeRTPartitioner(extendedQuadTree);

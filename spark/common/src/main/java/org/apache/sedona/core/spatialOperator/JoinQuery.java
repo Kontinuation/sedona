@@ -429,9 +429,10 @@ public class JoinQuery {
       SpatialRDD<U> queryRDD,
       IndexType indexType,
       int k,
+      Double searchRadius,
       DistanceMetric distanceMetric)
       throws Exception {
-    final JoinParams joinParams = new JoinParams(indexType, k, distanceMetric);
+    final JoinParams joinParams = new JoinParams(indexType, k, distanceMetric, searchRadius);
     final JavaPairRDD<U, T> joinResults = knnJoin(queryRDD, objectRDD, joinParams, false, false);
     return collectGeometriesByKey(joinResults);
   }
@@ -892,6 +893,7 @@ public class JoinQuery {
       final KnnJoinIndexJudgement judgement =
           new KnnJoinIndexJudgement(
               joinParams.k,
+              joinParams.searchRadius,
               joinParams.distanceMetric,
               includeTies,
               null,
@@ -906,6 +908,7 @@ public class JoinQuery {
       final KnnJoinIndexJudgement judgement =
           new KnnJoinIndexJudgement(
               joinParams.k,
+              joinParams.searchRadius,
               joinParams.distanceMetric,
               includeTies,
               null,
@@ -921,6 +924,7 @@ public class JoinQuery {
       final KnnJoinIndexJudgement judgement =
           new KnnJoinIndexJudgement(
               joinParams.k,
+              joinParams.searchRadius,
               joinParams.distanceMetric,
               includeTies,
               broadcastQueryObjects,
@@ -1160,7 +1164,8 @@ public class JoinQuery {
     }
 
     // Overloaded constructor for non-KNN joins
-    public JoinParams(IndexType indexType, int k, DistanceMetric distanceMetric) {
+    public JoinParams(
+        IndexType indexType, int k, DistanceMetric distanceMetric, Double searchRadius) {
       this(
           true,
           null,
@@ -1170,7 +1175,7 @@ public class JoinQuery {
           null,
           k,
           distanceMetric,
-          null,
+          searchRadius,
           null,
           null,
           null,
