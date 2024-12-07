@@ -716,6 +716,46 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         assert(resultRows.isEmpty)
       }
     }
+
+    it("should alias complex expressions in SortOrder") {
+      sparkSession.sqlContext.udf.register("customFunction", (x: Int) => x * x)
+
+      val df = sparkSession.range(0, 10).toDF("id")
+      df.createOrReplaceTempView("test_table")
+
+      // Query with multiple ORDER BY clauses using a CTE
+      val query =
+        """
+          WITH cte AS (
+            SELECT id, customFunction(id) AS squared_value
+            FROM test_table
+            ORDER BY customFunction(id) DESC
+          )
+          SELECT id, squared_value, id + squared_value AS sum_value
+          FROM cte
+          ORDER BY (id + squared_value) ASC
+        """
+
+      val queryDf = sparkSession.sql(query)
+
+      val analyzedPlan = queryDf.queryExecution.analyzed
+      val optimizedPlan = queryDf.queryExecution.optimizedPlan
+
+      // Ensure the final schema matches the analyzed schema
+      val analyzedSchema = analyzedPlan.output.map(_.name)
+      val optimizedSchema = optimizedPlan.output.map(_.name)
+      assert(
+        analyzedSchema == optimizedSchema,
+        "Schema mismatch between analyzed and optimized plans")
+
+      // Collect and validate results
+      val results = queryDf.collect()
+      val expectedResults = (0 until 10)
+        .map(i => (i, i * i, i + i * i))
+        .sortBy(_._3)
+      assert(results.map(r =>
+        (r.getLong(0).toInt, r.getInt(1), r.getLong(2).toInt)) === expectedResults)
+    }
   }
 
   private def withOptimizationMode[T](mode: String)(body: => T): T = {
