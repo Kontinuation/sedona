@@ -21,9 +21,9 @@ package org.apache.sedona.spark
 import org.apache.log4j.Logger
 import org.apache.sedona.common.utils.TelemetryCollector
 import org.apache.sedona.core.serde.SedonaKryoRegistrator
+import org.apache.sedona.sql.RasterRegistrator
 import org.apache.sedona.sql.UDF.UdfRegistrator
 import org.apache.sedona.sql.UDT.UdtRegistrator
-import org.apache.sedona.sql.{ParserRegistrator, RasterRegistrator}
 import org.apache.spark.SparkConf
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.deploy.PythonRunner
@@ -100,9 +100,6 @@ object SedonaContext {
     UdtRegistrator.registerAll()
     UdfRegistrator.registerAll(sparkSession)
     ListenerRegistrator.registerAll(sparkSession)
-    if (sparkSession.conf.get("spark.sedona.enableParserExtensions", "false").toBoolean) {
-      ParserRegistrator.register(sparkSession)
-    }
     jsc = new JavaSparkContext(sparkSession.sparkContext)
     jconf = jsc.getConf
     try {
