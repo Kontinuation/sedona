@@ -31,7 +31,6 @@ import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.monitoring.ListenerRegistrator
 import org.apache.spark.sql.sedona_sql.optimization.{ExtractGeoStatsFunctions, GetReverseGeocodeLayersFunction, ReverseGeocodingFunction, SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
 import org.apache.spark.sql.sedona_sql.strategy.geostats.EvalGeoStatsFunctionStrategy
-import org.apache.spark.sql.sedona_sql.optimization.{GetReverseGeocodeLayersFunction, OrderByOptimization, ReverseGeocodingFunction, SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
 import org.apache.spark.sql.{SQLContext, SparkSession}
 
@@ -94,11 +93,6 @@ object SedonaContext {
         _.isInstanceOf[EvalGeoStatsFunctionStrategy])) {
       sparkSession.experimental.extraStrategies ++= Seq(
         new EvalGeoStatsFunctionStrategy(sparkSession))
-    }
-
-    // Support order by optimization
-    if (!sparkSession.experimental.extraOptimizations.contains(OrderByOptimization)) {
-      sparkSession.experimental.extraOptimizations ++= Seq(OrderByOptimization)
     }
 
     addGeoParquetToSupportNestedFilterSources(sparkSession)
