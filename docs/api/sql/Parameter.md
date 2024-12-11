@@ -77,7 +77,8 @@ The advanced spatial join algorithm is enabled by default, users can disable adv
 	* Default: kdbtree
 	* Possible values: quadtree, kdbtree
 * spark.sedona.join.knn.includeTieBreakers
-	* KNN join will include all ties in the result, possibly returning more than k results
+	* When enabled (true), the KNN join will include all ties in the result, potentially returning more than k results.
+	* When disabled (false), the algorithm will randomly pick among the ties, resulting in exactly k results. Note that ties are chosen non-deterministically, meaning the same query or API call may not consistently return the same ties across multiple executions.
 	* Default: false
 	* Possible values: true, false
 * sedona.join.indexbuildside **(Advanced users only!)**
