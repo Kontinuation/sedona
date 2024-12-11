@@ -114,6 +114,9 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       sampleTree.insert(sample, point);
     }
 
+    // Build the STR tree to avoid concurrent queries from multiple threads
+    sampleTree.build();
+
     double minimalGridWidth = getMinimalEnvelopeWidth(partitionMBRs);
 
     if (isEnableParallelPartitioning()) {
