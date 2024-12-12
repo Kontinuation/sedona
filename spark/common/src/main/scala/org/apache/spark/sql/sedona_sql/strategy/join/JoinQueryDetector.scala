@@ -1008,7 +1008,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
             searchRadius = searchRadius.getOrElse(Literal.create(null, DoubleType)),
             useApproximate = false,
             spatialPredicate,
-            isGeography = false,
+            isGeography,
             condition = null,
             extraCondition = None) :: Nil
         } else {
@@ -1024,7 +1024,7 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
             searchRadius = searchRadius.getOrElse(Literal.create(null, DoubleType)),
             useApproximate = false,
             spatialPredicate,
-            isGeography = false,
+            isGeography,
             condition = null,
             extraCondition = None) :: Nil
         }

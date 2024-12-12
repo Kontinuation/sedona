@@ -406,6 +406,20 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
       resultAll.mkString should be("[2,5][2,15][3,3][3,13]")
     }
+
+    it("KNN Join (objects side broadcast) with exact algorithms with ranged distance filter") {
+      val df = sparkSession.sql(
+        s"SELECT /*+ BROADCAST(OBJECTS) */ QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, true, 250000)")
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.mkString should be("[2,5][2,15][3,3][3,13]")
+    }
+
+    it("KNN Join (queries side broadcast) with exact algorithms with ranged distance filter") {
+      val df = sparkSession.sql(
+        s"SELECT /*+ BROADCAST(QUERIES) */ QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, true, 250000)")
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.mkString should be("[2,5][2,15][3,3][3,13]")
+    }
   }
 
   describe("KNN spatial join SQLs should be executed correctly with complex join conditions") {
