@@ -26,10 +26,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
-import org.apache.sedona.core.knnJudgement.EuclideanItemDistance;
+import org.apache.sedona.core.enums.DistanceMetric;
+import org.apache.sedona.core.joinJudgement.KnnJoinIndexJudgement;
 import org.apache.sedona.core.spatialPartitioning.quadtree.QuadRectangle;
 import org.apache.sedona.core.utils.SedonaConf;
 import org.locationtech.jts.geom.*;
+import org.locationtech.jts.index.strtree.ItemDistance;
 import org.locationtech.jts.index.strtree.STRtree;
 
 /**
@@ -85,7 +87,8 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
    * @param searchRadius
    * @return
    */
-  public STRtree buildSTRTree(List<Envelope> samples, int k, double searchRadius) {
+  public STRtree buildSTRTree(
+      List<Envelope> samples, int k, DistanceMetric distanceMetric, double searchRadius) {
     // The partitioned MBRs
     mbrs = new HashMap<>();
 
@@ -124,6 +127,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
           partitionMBRs,
           mbrs,
           k,
+          distanceMetric,
           searchRadius,
           sampleTree,
           geometryFactory,
@@ -135,6 +139,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
           partitionMBRs,
           mbrs,
           k,
+          distanceMetric,
           searchRadius,
           sampleTree,
           geometryFactory,
@@ -159,6 +164,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       List<QuadRectangle> partitionMBRs,
       Map<Integer, List<Envelope>> mbrs,
       int k,
+      DistanceMetric distanceMetric,
       double searchRadius,
       STRtree sampleTree,
       GeometryFactory geometryFactory,
@@ -171,6 +177,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
           partitionMBRs,
           mbrs,
           k,
+          distanceMetric,
           searchRadius,
           sampleTree,
           geometryFactory,
@@ -181,6 +188,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
           partitionMBRs,
           mbrs,
           k,
+          distanceMetric,
           searchRadius,
           sampleTree,
           geometryFactory,
@@ -193,6 +201,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       List<QuadRectangle> partitionMBRs,
       Map<Integer, List<Envelope>> mbrs,
       int k,
+      DistanceMetric distanceMetric,
       double searchRadius,
       STRtree sampleTree,
       GeometryFactory geometryFactory,
@@ -213,6 +222,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
                     quadRect,
                     mbrs,
                     k,
+                    distanceMetric,
                     searchRadius,
                     sampleTree,
                     geometryFactory,
@@ -238,6 +248,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       List<QuadRectangle> partitionMBRs,
       Map<Integer, List<Envelope>> mbrs,
       int k,
+      DistanceMetric distanceMetric,
       double searchRadius,
       STRtree sampleTree,
       GeometryFactory geometryFactory,
@@ -249,6 +260,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
           quadRect,
           mbrs,
           k,
+          distanceMetric,
           searchRadius,
           sampleTree,
           geometryFactory,
@@ -262,6 +274,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       QuadRectangle quadRect,
       Map<Integer, List<Envelope>> mbrs,
       int k,
+      DistanceMetric distanceMetric,
       double searchRadius,
       STRtree sampleTree,
       GeometryFactory geometryFactory,
@@ -277,16 +290,21 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
     Point centroid = geometryFactory.createPoint(centroidCoord);
 
     // Compute the maximum distance ui from the centroid to any point inside the partition
-    double ui = getUi(centroid, partitionMBR);
+    double ui = getUi(centroid, partitionMBR, distanceMetric);
 
     // Calculate the maximum distance from the centroid to the k-nearest neighbors in the samples
-    double maxDistance = getMaxDistanceFromSamples(k, sampleTree, centroid);
-    // If search radius is set and valid, use it as the maximum distance
-    if (searchRadius > 0 && maxDistance > searchRadius) {
-      maxDistance = searchRadius;
+    double maxDistance = getMaxDistanceFromSamples(k, sampleTree, centroid, distanceMetric);
+
+    // calculate the maximum search radius
+    double maxSearchRadius = (searchRadius < 0) ? maxDistance : Math.min(maxDistance, searchRadius);
+    if (distanceMetric == DistanceMetric.SPHEROID) {
+      maxSearchRadius = convertSpheroidToEuclidean(centroid, maxSearchRadius);
+    } else if (distanceMetric != DistanceMetric.EUCLIDEAN) {
+      throw new IllegalArgumentException("Invalid distance metric.");
     }
+
     List<Envelope> intersectingMBRs =
-        getMBRIntersectEnvelopes(ui, maxDistance, centroidX, centroidY);
+        getMBRIntersectEnvelopes(ui, maxSearchRadius, centroidX, centroidY);
 
     // Calculate the MBRs (Minimum Bounding Rectangles) that intersect with the circle.
     if (isSkewed(intersectingMBRs, partitionMBRs)) {
@@ -305,7 +323,8 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
                 + skewnessMaximumMBRDivides);
         divide = skewnessMaximumMBRDivides;
       }
-      intersectingMBRs = getEnvelopesForSubDividedGrids(k, partitionMBR, sampleTree, divide);
+      intersectingMBRs =
+          getEnvelopesForSubDividedGrids(k, partitionMBR, sampleTree, divide, distanceMetric);
     }
 
     synchronized (mbrs) {
@@ -384,23 +403,32 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
    * @param partitionMBR
    * @return
    */
-  private static double getUi(Point centroid, Envelope partitionMBR) {
+  private static double getUi(
+      Point centroid, Envelope partitionMBR, DistanceMetric distanceMetric) {
     double ui =
         Math.max(
-            centroid.distance(
+            KnnJoinIndexJudgement.distanceByMetric(
+                centroid,
                 geometryFactory.createPoint(
-                    new Coordinate(partitionMBR.getMinX(), partitionMBR.getMinY()))),
+                    new Coordinate(partitionMBR.getMinX(), partitionMBR.getMinY())),
+                distanceMetric),
             Math.max(
-                centroid.distance(
+                KnnJoinIndexJudgement.distanceByMetric(
+                    centroid,
                     geometryFactory.createPoint(
-                        new Coordinate(partitionMBR.getMinX(), partitionMBR.getMaxY()))),
+                        new Coordinate(partitionMBR.getMinX(), partitionMBR.getMaxY())),
+                    distanceMetric),
                 Math.max(
-                    centroid.distance(
+                    KnnJoinIndexJudgement.distanceByMetric(
+                        centroid,
                         geometryFactory.createPoint(
-                            new Coordinate(partitionMBR.getMaxX(), partitionMBR.getMinY()))),
-                    centroid.distance(
+                            new Coordinate(partitionMBR.getMaxX(), partitionMBR.getMinY())),
+                        distanceMetric),
+                    KnnJoinIndexJudgement.distanceByMetric(
+                        centroid,
                         geometryFactory.createPoint(
-                            new Coordinate(partitionMBR.getMaxX(), partitionMBR.getMaxY()))))));
+                            new Coordinate(partitionMBR.getMaxX(), partitionMBR.getMaxY())),
+                        distanceMetric))));
     return ui;
   }
 
@@ -416,7 +444,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
    * @return
    */
   private List<Envelope> getEnvelopesForSubDividedGrids(
-      int k, Envelope partitionMBR, STRtree sampleTree, int divide) {
+      int k, Envelope partitionMBR, STRtree sampleTree, int divide, DistanceMetric distanceMetric) {
     Set<Envelope> optimizedIntersectingMBRs = new HashSet<>();
     double minX = partitionMBR.getMinX();
     double minY = partitionMBR.getMinY();
@@ -431,13 +459,14 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
 
       // Top edge (minY)
       Point pointTop = geometryFactory.createPoint(new Coordinate(x, minY));
-      double maxKNNDistanceTop = getMaxDistanceFromSamples(k, sampleTree, pointTop);
+      double maxKNNDistanceTop = getMaxDistanceFromSamples(k, sampleTree, pointTop, distanceMetric);
       optimizedIntersectingMBRs.addAll(
           getMBRIntersectEnvelopes(0.0, maxKNNDistanceTop, pointTop.getX(), pointTop.getY()));
 
       // Bottom edge (maxY)
       Point pointBottom = geometryFactory.createPoint(new Coordinate(x, maxY));
-      double maxKNNDistanceBottom = getMaxDistanceFromSamples(k, sampleTree, pointBottom);
+      double maxKNNDistanceBottom =
+          getMaxDistanceFromSamples(k, sampleTree, pointBottom, distanceMetric);
       optimizedIntersectingMBRs.addAll(
           getMBRIntersectEnvelopes(
               0.0, maxKNNDistanceBottom, pointBottom.getX(), pointBottom.getY()));
@@ -448,13 +477,15 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
 
       // Left edge (minX)
       Point pointLeft = geometryFactory.createPoint(new Coordinate(minX, y));
-      double maxKNNDistanceLeft = getMaxDistanceFromSamples(k, sampleTree, pointLeft);
+      double maxKNNDistanceLeft =
+          getMaxDistanceFromSamples(k, sampleTree, pointLeft, distanceMetric);
       optimizedIntersectingMBRs.addAll(
           getMBRIntersectEnvelopes(0.0, maxKNNDistanceLeft, pointLeft.getX(), pointLeft.getY()));
 
       // Right edge (maxX)
       Point pointRight = geometryFactory.createPoint(new Coordinate(maxX, y));
-      double maxKNNDistanceRight = getMaxDistanceFromSamples(k, sampleTree, pointRight);
+      double maxKNNDistanceRight =
+          getMaxDistanceFromSamples(k, sampleTree, pointRight, distanceMetric);
       optimizedIntersectingMBRs.addAll(
           getMBRIntersectEnvelopes(0.0, maxKNNDistanceRight, pointRight.getX(), pointRight.getY()));
     }
@@ -471,11 +502,14 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
    * @param centroid
    * @return
    */
-  private static double getMaxDistanceFromSamples(int k, STRtree sampleTree, Point centroid) {
-    // 3 - Find the k-nearest neighbors in the samples of the centroid in the STR tree
+  private static double getMaxDistanceFromSamples(
+      int k, STRtree sampleTree, Point centroid, DistanceMetric distanceMetric) {
+    // Find the k-nearest neighbors in the samples of the centroid in the STR tree
+    ItemDistance itemDistanceByMetric =
+        KnnJoinIndexJudgement.getItemDistanceByMetric(distanceMetric);
     Object[] kNearestNeighbors =
         sampleTree.nearestNeighbour(
-            centroid.getEnvelopeInternal(), centroid, new EuclideanItemDistance(), k);
+            centroid.getEnvelopeInternal(), centroid, itemDistanceByMetric, k);
 
     // 4 - Calculate the distance to the farthest neighbor
     double maxDistance = 0;
@@ -485,7 +519,8 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
         Coordinate neighborCoord =
             new Coordinate(neighborEnvelope.centre().getX(), neighborEnvelope.centre().getY());
         Point neighborPoint = geometryFactory.createPoint(neighborCoord);
-        double distance = centroid.distance(neighborPoint);
+        double distance =
+            KnnJoinIndexJudgement.distanceByMetric(centroid, neighborPoint, distanceMetric);
         if (distance > maxDistance) {
           maxDistance = distance;
         }
@@ -533,5 +568,23 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
       }
     }
     return intersectingMBRs;
+  }
+
+  public static double convertSpheroidToEuclidean(Point centroid, double spheroidDistance) {
+    if (centroid == null || spheroidDistance < 0) {
+      throw new IllegalArgumentException("Invalid centroid or spheroid distance.");
+    }
+
+    // Convert spheroid distance to angular distance in degrees
+    double angularDistance = Math.toDegrees(spheroidDistance / 6371008.0);
+
+    // Calculate the latitude and longitude differences based on the centroid's coordinates
+    double latDiff = angularDistance;
+    double lonDiff = angularDistance / Math.cos(Math.toRadians(centroid.getY()));
+
+    // Calculate the Euclidean distance using the chord length formula
+    double euclideanDistance = Math.sqrt(Math.pow(latDiff, 2) + Math.pow(lonDiff, 2));
+
+    return euclideanDistance;
   }
 }

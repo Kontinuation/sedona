@@ -286,7 +286,6 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       val df = sparkSession.sql(
         s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_AKNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false, 5.0)")
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
-      print(resultAll.mkString)
       resultAll.mkString should be("[1,3][1,6][1,13][1,16][2,5][2,15][3,3][3,9][3,13][3,19]")
     }
   }
@@ -351,7 +350,6 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         s"SELECT QUERIES_DUPLICATES.ID, OBJECTS_DUPLICATES.ID FROM QUERIES_DUPLICATES JOIN OBJECTS_DUPLICATES ON ST_KNN(QUERIES_DUPLICATES.GEOM, OBJECTS_DUPLICATES.GEOM, 4, true)")
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
       resultAll.length should be(4 * 4) // 3 queries and 4 neighbors each
-      println(resultAll.mkString)
       resultAll.mkString should be(
         "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19][4,3][4,6][4,13][4,16]")
     }
@@ -361,7 +359,6 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         s"SELECT /*+ BROADCAST(QUERIES_DUPLICATES) */ QUERIES_DUPLICATES.ID, OBJECTS_DUPLICATES.ID FROM QUERIES_DUPLICATES JOIN OBJECTS_DUPLICATES ON ST_KNN(QUERIES_DUPLICATES.GEOM, OBJECTS_DUPLICATES.GEOM, 4, true)")
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
       resultAll.length should be(4 * 4) // 3 queries and 4 neighbors each
-      println(resultAll.mkString)
       resultAll.mkString should be(
         "[1,3][1,6][1,13][1,16][2,1][2,5][2,11][2,15][3,3][3,9][3,13][3,19][4,3][4,6][4,13][4,16]")
     }
@@ -399,8 +396,15 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
       val df = sparkSession.sql(
         s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false, 5.0)")
       val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
-      print(resultAll.mkString)
       resultAll.mkString should be("[1,3][1,6][1,13][1,16][2,5][2,15][3,3][3,9][3,13][3,19]")
+    }
+
+    it("KNN Join with exact algorithms based on HAVERSINE distance with ranged distance filter") {
+      val df = sparkSession.sql(
+        s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, true, 250000)")
+      df.show()
+      val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
+      resultAll.mkString should be("[2,5][2,15][3,3][3,13]")
     }
   }
 
@@ -485,7 +489,6 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
 
       var dfResult = sparkSession.sql(
         "SELECT df1.id1, df2.id2 FROM df1 JOIN df2 ON ST_KNN(df1.geometry, df2.geometry, 1)")
-      println("ST_KNN(df1.geometry, df2.geometry, 1)")
       var resultAll = dfResult.orderBy("id1").take(1)
       resultAll.mkString should be("[0,str0]")
 
@@ -587,7 +590,6 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           df.groupBy("qid").agg(collect_list("oid").as("collected_points")).orderBy("qid")
 
         val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
-        print(resultAll.mkString)
         resultAll.length should be(3)
         resultAll.mkString should be("[0,5][0,6][0,7]")
       }
@@ -600,7 +602,6 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           df.groupBy("qid").agg(collect_list("oid").as("collected_points")).orderBy("qid")
 
         val resultAll = df.collect().sortBy(row => (row.getInt(0), row.getInt(1)))
-        print(resultAll.mkString)
         resultAll.length should be(2)
         resultAll.mkString should (be("[0,5][0,6]") or be("[0,6][0,7]"))
       }

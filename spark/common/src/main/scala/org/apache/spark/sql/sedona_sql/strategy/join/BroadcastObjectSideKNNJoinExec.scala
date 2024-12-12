@@ -134,6 +134,8 @@ case class BroadcastObjectSideKNNJoinExec(
     val kValue: Int = this.k.eval().asInstanceOf[Int]
     require(kValue > 0, "The number of neighbors must be greater than 0.")
     objectsShapes.setNeighborSampleNumber(kValue)
+    objectsShapes.setDistanceMetric(
+      if (isGeography) DistanceMetric.SPHEROID else DistanceMetric.EUCLIDEAN)
     val searchRadius: Double =
       Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(-1)
     if (searchRadius > 0) { objectsShapes.setSearchRadius(searchRadius) }

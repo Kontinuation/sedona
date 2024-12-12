@@ -187,14 +187,51 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
         Arrays.stream(localK)
             .filter(
                 candidate -> {
-                  T candidateGeom = (T) candidate;
-                  return queryGeom.distance(candidateGeom) <= searchRadius;
+                  Geometry candidateGeom = (Geometry) candidate;
+                  return distanceByMetric(queryGeom, candidateGeom, distanceMetric) <= searchRadius;
                 })
             .toArray();
     return localK;
   }
 
+  /**
+   * This method calculates the distance between two geometries using the specified distance metric.
+   *
+   * @param queryGeom the query geometry
+   * @param candidateGeom the candidate geometry
+   * @param distanceMetric the distance metric to use
+   * @return the distance between the two geometries
+   */
+  public static double distanceByMetric(
+      Geometry queryGeom, Geometry candidateGeom, DistanceMetric distanceMetric) {
+    switch (distanceMetric) {
+      case EUCLIDEAN:
+        EuclideanItemDistance euclideanItemDistance = new EuclideanItemDistance();
+        return euclideanItemDistance.distance(queryGeom, candidateGeom);
+      case HAVERSINE:
+        HaversineItemDistance haversineItemDistance = new HaversineItemDistance();
+        return haversineItemDistance.distance(queryGeom, candidateGeom);
+      case SPHEROID:
+        SpheroidDistance spheroidDistance = new SpheroidDistance();
+        return spheroidDistance.distance(queryGeom, candidateGeom);
+      default:
+        return queryGeom.distance(candidateGeom);
+    }
+  }
+
   private ItemDistance getItemDistance() {
+    ItemDistance itemDistance;
+    itemDistance = getItemDistanceByMetric(distanceMetric);
+    return itemDistance;
+  }
+
+  /**
+   * This method returns the ItemDistance object based on the specified distance metric.
+   *
+   * @param distanceMetric the distance metric to use
+   * @return the ItemDistance object
+   */
+  public static ItemDistance getItemDistanceByMetric(DistanceMetric distanceMetric) {
     ItemDistance itemDistance;
     switch (distanceMetric) {
       case EUCLIDEAN:

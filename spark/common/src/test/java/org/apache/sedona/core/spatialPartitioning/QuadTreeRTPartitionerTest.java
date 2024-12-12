@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import junit.framework.TestCase;
+import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.spatialPartitioning.quadtree.ExtendedQuadTree;
 import org.junit.Assert;
 import org.junit.Before;
@@ -59,7 +60,7 @@ public class QuadTreeRTPartitionerTest extends TestCase {
     }
 
     int k = 4; // Number of neighbors
-    extendedQuadTree.build(k, 0.0, -1);
+    extendedQuadTree.build(k, DistanceMetric.EUCLIDEAN, -1);
 
     // create the partitioner
     partitioner = new QuadTreeRTPartitioner(extendedQuadTree);

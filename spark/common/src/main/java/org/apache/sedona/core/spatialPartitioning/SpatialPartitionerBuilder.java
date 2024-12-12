@@ -21,6 +21,7 @@ package org.apache.sedona.core.spatialPartitioning;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.spatialPartitioning.quadtree.ExtendedQuadTree;
 import org.apache.sedona.core.spatialPartitioning.quadtree.QuadRectangle;
@@ -34,6 +35,7 @@ public class SpatialPartitionerBuilder {
   private final Envelope boundary;
   private int neighborSampleNumber = -1;
   private double samplingProbability = 0.01f;
+  private DistanceMetric distanceMetric = DistanceMetric.EUCLIDEAN;
   private double searchRadius = -1;
 
   /**
@@ -183,7 +185,7 @@ public class SpatialPartitionerBuilder {
 
       case QUADTREE_RTREE:
         ExtendedQuadTree<Integer> extendedQuadTree = (ExtendedQuadTree<Integer>) tree;
-        extendedQuadTree.build(neighborSampleNumber, samplingProbability, searchRadius);
+        extendedQuadTree.build(neighborSampleNumber, distanceMetric, searchRadius);
         return new QuadTreeRTPartitioner(extendedQuadTree);
 
       default:
@@ -311,6 +313,10 @@ public class SpatialPartitionerBuilder {
 
   public void setSamplingProbability(double samplingProbability) {
     this.samplingProbability = samplingProbability;
+  }
+
+  public void setDistanceMetric(DistanceMetric distanceMetric) {
+    this.distanceMetric = distanceMetric;
   }
 
   public void setSearchRadius(double radius) {

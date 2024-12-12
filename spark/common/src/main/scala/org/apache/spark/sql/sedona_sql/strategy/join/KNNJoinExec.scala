@@ -171,6 +171,8 @@ case class KNNJoinExec(
     objectsShapes.setNeighborSampleNumber(kValue)
     val searchRadius: Double =
       Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(-1)
+    objectsShapes.setDistanceMetric(
+      if (isGeography) DistanceMetric.SPHEROID else DistanceMetric.EUCLIDEAN)
     if (searchRadius > 0) { objectsShapes.setSearchRadius(searchRadius) }
     if (useApproximate) {
       approximateSpatialPartitioning(objectsShapes, queryShapes, numPartitions)

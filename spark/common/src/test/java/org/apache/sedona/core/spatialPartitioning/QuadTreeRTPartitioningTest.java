@@ -21,6 +21,7 @@ package org.apache.sedona.core.spatialPartitioning;
 import java.util.ArrayList;
 import java.util.List;
 import junit.framework.TestCase;
+import org.apache.sedona.core.enums.DistanceMetric;
 import org.junit.Assert;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
@@ -53,7 +54,7 @@ public class QuadTreeRTPartitioningTest extends TestCase {
     QuadTreeRTPartitioning rtreePartitioning = new QuadTreeRTPartitioning(samples, extent, 10);
 
     int k = 2; // Number of neighbors
-    STRtree strTree = rtreePartitioning.buildSTRTree(samples, k, -1);
+    STRtree strTree = rtreePartitioning.buildSTRTree(samples, k, DistanceMetric.EUCLIDEAN, -1);
 
     // Check the resulting STR tree
     // Here you can add assertions to validate the behavior

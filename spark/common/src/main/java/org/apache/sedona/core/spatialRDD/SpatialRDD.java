@@ -32,6 +32,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.FunctionsGeoTools;
 import org.apache.sedona.common.utils.GeomUtils;
+import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.monitoring.JavaMetrics;
@@ -109,6 +110,9 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
   /** The neighbor sample number. */
   private int neighborSampleNumber = -1;
 
+  /** The distance type. */
+  private DistanceMetric distanceMetric = DistanceMetric.EUCLIDEAN;
+
   /** The search radius - positive value means using search radius. */
   private double searchRadius = -1;
 
@@ -138,6 +142,16 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
    */
   public void setNeighborSampleNumber(int neighborSampleNumber) {
     this.neighborSampleNumber = neighborSampleNumber;
+  }
+
+  /**
+   * Gets the raw spatial RDD.
+   *
+   * @return the raw spatial RDD
+   */
+  public DistanceMetric setDistanceMetric(DistanceMetric distanceMetric) {
+    this.distanceMetric = distanceMetric;
+    return distanceMetric;
   }
 
   /**
@@ -228,6 +242,7 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
     builder.addSamples(samples);
     builder.setNeighborSampleNumber(neighborSampleNumber);
     builder.setSamplingProbability((double) samples.size() / (double) this.approximateTotalCount);
+    builder.setDistanceMetric(distanceMetric);
     builder.setSearchRadius(searchRadius);
     partitioner = builder.build();
   }
