@@ -155,7 +155,7 @@ class TestDBScan(TestBase):
             epsilon,
             min_pts,
             "geometryFieldName",
-            use_spheroid=True,
+            use_sphere=True,
         )
 
     def test_dbscan_invalid_epsilon(self, sample_dataframe):

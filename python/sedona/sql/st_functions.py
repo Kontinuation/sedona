@@ -2463,7 +2463,7 @@ def ST_DBSCAN(
     geometry: ColumnOrName,
     epsilon: Union[ColumnOrName, float],
     min_pts: Union[ColumnOrName, int],
-    use_spheroid: Optional[Union[ColumnOrName, bool]] = False,
+    use_sphere: Optional[Union[ColumnOrName, bool]] = False,
 ) -> Column:
     """Perform DBSCAN clustering on the given geometry column.
 
@@ -2473,8 +2473,8 @@ def ST_DBSCAN(
     :type epsilon: ColumnOrName
     @param min_pts: the number of neighbors a point should have to form a cluster
     :type min_pts: ColumnOrName
-    @param use_spheroid: whether to use spheroid for distance calculation
-    :type use_spheroid: ColumnOrName
+    @param use_sphere: whether to use sphere for distance calculation
+    :type use_sphere: ColumnOrName
     @return: A struct indicating the cluster to which the point belongs and whether it is a core point
     """
 
@@ -2484,17 +2484,17 @@ def ST_DBSCAN(
     if isinstance(min_pts, int):
         min_pts = lit(min_pts)
 
-    if isinstance(use_spheroid, bool):
-        use_spheroid = lit(use_spheroid)
+    if isinstance(use_sphere, bool):
+        use_sphere = lit(use_sphere)
 
-    return _call_st_function("ST_DBSCAN", (geometry, epsilon, min_pts, use_spheroid))
+    return _call_st_function("ST_DBSCAN", (geometry, epsilon, min_pts, use_sphere))
 
 
 @validate_argument_types
 def ST_LocalOutlierFactor(
     geometry: ColumnOrName,
     k: Union[ColumnOrName, int],
-    use_spheroid: Optional[Union[ColumnOrName, bool]] = False,
+    use_sphere: Optional[Union[ColumnOrName, bool]] = False,
 ) -> Column:
     """Calculate the local outlier factor on the given geometry column.
 
@@ -2502,18 +2502,18 @@ def ST_LocalOutlierFactor(
     :type geometry: ColumnOrName
     @param k: the number of neighbors to use for LOF calculation
     :type k: ColumnOrName
-    @param use_spheroid: whether to use spheroid for distance calculation
-    :type use_spheroid: ColumnOrName
+    @param use_sphere: whether to use sphere for distance calculation
+    :type use_sphere: ColumnOrName
     @return: A Double indicating the local outlier factor of the point
     """
 
     if isinstance(k, int):
         k = lit(k)
 
-    if isinstance(use_spheroid, bool):
-        use_spheroid = lit(use_spheroid)
+    if isinstance(use_sphere, bool):
+        use_sphere = lit(use_sphere)
 
-    return _call_st_function("ST_LocalOutlierFactor", (geometry, k, use_spheroid))
+    return _call_st_function("ST_LocalOutlierFactor", (geometry, k, use_sphere))
 
 
 # Automatically populate __all__

@@ -5,12 +5,12 @@ Sedona supports nearest-neighbour searching on geospatial data by providing a ge
 
 Introduction: join operation to find the k-nearest neighbors of a point or region in a spatial dataset.
 
-Format: `ST_KNN(R: Table, S: Table, k: Integer, use_spheroid: Boolean, search_radius: Double)`
+Format: `ST_KNN(R: Table, S: Table, k: Integer, use_sphere: Boolean, search_radius: Double)`
 
 * `R` represents the queries side table.
 * `S` represents the objects side table.
 * `K` denotes the number of nearest neighbors to retrieve.
-* `use_spheroid` is a boolean value that specifies whether to calculate distances using the spheroid model.
+* `use_sphere` is a boolean value that specifies whether to calculate distances using the sphere model.
 * `search_radius` is an optional parameter that defines the maximum distance within which neighbors will be searched, without imposing any constraints on its value.
 
 Queries side table contains geometries that are used to find the k-nearest neighbors in the object side table.
@@ -172,7 +172,7 @@ The `search_radius` ensures more focused results by excluding distant neighbors,
 
 Introduction: join operation to find the k-nearest neighbors of a point or region in a spatial dataset.
 
-Format: `ST_AKNN(R: Table, S: Table, k: Integer, use_spheroid: Boolean, search_radius: Double)`
+Format: `ST_AKNN(R: Table, S: Table, k: Integer, use_sphere: Boolean, search_radius: Double)`
 
 The `ST_AKNN` function is similar to `ST_KNN`, but it uses approximate algorithms to find the k-nearest neighbors. This can be useful for large datasets where exact kNN search is computationally expensive. The trade-off is that approximate algorithms may not always return the exact k-nearest neighbors, but they provide a good approximation in a reasonable amount of time.
 

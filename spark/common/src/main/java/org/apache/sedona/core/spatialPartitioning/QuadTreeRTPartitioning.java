@@ -297,8 +297,8 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
 
     // calculate the maximum search radius
     double maxSearchRadius = (searchRadius < 0) ? maxDistance : Math.min(maxDistance, searchRadius);
-    if (distanceMetric == DistanceMetric.SPHEROID) {
-      maxSearchRadius = convertSpheroidToEuclidean(centroid, maxSearchRadius);
+    if (distanceMetric == DistanceMetric.HAVERSINE) {
+      maxSearchRadius = convertSphereToEuclidean(centroid, maxSearchRadius);
     } else if (distanceMetric != DistanceMetric.EUCLIDEAN) {
       throw new IllegalArgumentException("Invalid distance metric.");
     }
@@ -570,7 +570,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
     return intersectingMBRs;
   }
 
-  public static double convertSpheroidToEuclidean(Point centroid, double spheroidDistance) {
+  public static double convertSphereToEuclidean(Point centroid, double spheroidDistance) {
     if (centroid == null || spheroidDistance < 0) {
       throw new IllegalArgumentException("Invalid centroid or spheroid distance.");
     }

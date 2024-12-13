@@ -135,7 +135,7 @@ case class BroadcastObjectSideKNNJoinExec(
     require(kValue > 0, "The number of neighbors must be greater than 0.")
     objectsShapes.setNeighborSampleNumber(kValue)
     objectsShapes.setDistanceMetric(
-      if (isGeography) DistanceMetric.SPHEROID else DistanceMetric.EUCLIDEAN)
+      if (isGeography) DistanceMetric.HAVERSINE else DistanceMetric.EUCLIDEAN)
     val searchRadius: Double =
       Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(-1)
     if (searchRadius > 0) { objectsShapes.setSearchRadius(searchRadius) }
@@ -156,8 +156,8 @@ case class BroadcastObjectSideKNNJoinExec(
     val kValue: Int = this.k.eval().asInstanceOf[Int]
     val searchRadius: Double =
       Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(Double.MaxValue)
-    // Metric to use in the join to calculate the distance, only Euclidean and Spheroid are supported
-    val distanceMetric = if (isGeography) DistanceMetric.SPHEROID else DistanceMetric.EUCLIDEAN
+    // Metric to use in the join to calculate the distance, only Euclidean and Haversine are supported
+    val distanceMetric = if (isGeography) DistanceMetric.HAVERSINE else DistanceMetric.EUCLIDEAN
     val joinParams = new JoinParams(IndexType.RTREE, kValue, distanceMetric, searchRadius)
     joinParams
   }

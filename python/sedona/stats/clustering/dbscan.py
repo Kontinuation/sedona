@@ -38,7 +38,7 @@ def dbscan(
     min_pts: int,
     geometry: Optional[str] = None,
     include_outliers: bool = True,
-    use_spheroid=False,
+    use_sphere=False,
     is_core_column_name="isCore",
     cluster_column_name="cluster",
 ):
@@ -55,7 +55,7 @@ def dbscan(
         geometry: name of the geometry column
         include_outliers: whether to return outlier points. If True, outliers are returned with a cluster value of -1.
             Default is False
-        use_spheroid: whether to use a cartesian or spheroidal distance calculation. Default is false
+        use_sphere: whether to use a cartesian or sphere distance calculation. Default is false
         is_core_column_name: what the name of the column indicating if this is a core point should be. Default is "isCore"
         cluster_column_name: what the name of the column indicating the cluster id should be. Default is "cluster"
 
@@ -70,7 +70,7 @@ def dbscan(
         min_pts,
         geometry,
         include_outliers,
-        use_spheroid,
+        use_sphere,
         is_core_column_name,
         cluster_column_name,
     )
@@ -83,7 +83,7 @@ def get_knee_locator(
     min_points: int,
     geometry: Optional[str] = None,
     approximate_knn: bool = False,
-    use_spheroid: bool = False,
+    use_sphere: bool = False,
     max_sample_size: Optional[int] = DEFAULT_MAX_SAMPLE_SIZE,
     **kwargs,
 ) -> KneeLocator:
@@ -106,7 +106,7 @@ def get_knee_locator(
             value that is calculated.
         geometry: name of the geometry column
         approximate_knn: whether to use approximate KNN. When false will use exact KNN join. Default is False
-        use_spheroid: whether to use a cartesian or spheroidal distance calculation. False will use Cartesian. Default
+        use_sphere: whether to use a cartesian or sphere distance calculation. False will use Cartesian. Default
             is false
         max_sample_size:  the maximum number of records from dataframe to use when calculating the knee. If the
             dataframe has more records than this, it will be downsampled to approximately this size. Default is 1
@@ -135,7 +135,7 @@ def get_knee_locator(
         l_dataframe = dataframe
 
     knn_function = "ST_AKNN" if approximate_knn else "ST_KNN"
-    use_spheroid_string = "TRUE" if use_spheroid else "FALSE"
+    use_sphere_string = "TRUE" if use_sphere else "FALSE"
 
     # min_points +1 because we are not counting the row matching to itself
     kth_distance_df = (
@@ -143,7 +143,7 @@ def get_knee_locator(
         .join(
             dataframe.alias("r"),
             f.expr(
-                f"{knn_function}(l.{geometry}, r.{geometry}, {min_points} + 1, {use_spheroid_string})"
+                f"{knn_function}(l.{geometry}, r.{geometry}, {min_points} + 1, {use_sphere_string})"
             ),
         )
         .groupBy(f"l.{ID_COLUMN_NAME}")

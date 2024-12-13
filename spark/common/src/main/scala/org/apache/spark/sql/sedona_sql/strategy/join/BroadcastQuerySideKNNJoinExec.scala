@@ -136,7 +136,7 @@ case class BroadcastQuerySideKNNJoinExec(
     val searchRadius: Double =
       Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(-1)
     objectsShapes.setDistanceMetric(
-      if (isGeography) DistanceMetric.SPHEROID else DistanceMetric.EUCLIDEAN)
+      if (isGeography) DistanceMetric.HAVERSINE else DistanceMetric.EUCLIDEAN)
     if (searchRadius > 0) { objectsShapes.setSearchRadius(searchRadius) }
     // index the objects on regular partitions (not spatial partitions)
     // this avoids the cost of spatial partitioning
@@ -159,7 +159,7 @@ case class BroadcastQuerySideKNNJoinExec(
     val searchRadius: Double =
       Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(Double.MaxValue)
     // Metric to use in the join to calculate the distance, only Euclidean and Spheroid are supported
-    val distanceMetric = if (isGeography) DistanceMetric.SPHEROID else DistanceMetric.EUCLIDEAN
+    val distanceMetric = if (isGeography) DistanceMetric.HAVERSINE else DistanceMetric.EUCLIDEAN
     val joinParams = new JoinParams(IndexType.RTREE, kValue, distanceMetric, searchRadius)
     joinParams
   }
