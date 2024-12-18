@@ -81,6 +81,12 @@ public class SedonaConf implements Serializable {
   private SpatialPartitionBuildingStrategy spatialPartitionBuildingStrategy;
   private int maxSamplesForAdaptiveBroadcastJoinExecutionMode;
 
+  // Parameters for setting external (spill-able) spatial index
+  private boolean useExternalSpatialIndex;
+  private int externalSpatialIndexLeafPageCapacity;
+  private int externalSpatialIndexInternalNodeCapacity;
+  private boolean forceSpillExternalSpatialIndex;
+
   // Parameters for enabling auto-subdividing when running spatial joins
   private JoinSubdivideMode spatialJoinSubdivideLeft;
   private JoinSubdivideMode spatialJoinSubdivideRight;
@@ -221,6 +227,20 @@ public class SedonaConf implements Serializable {
         Integer.parseInt(
             runtimeConfig.get(
                 "spark.sedona.join.maxSamplesForAdaptiveBroadcastJoinExecutionMode", "10"));
+
+    // Parameters for setting external (spill-able) spatial index
+    this.useExternalSpatialIndex =
+        Boolean.parseBoolean(
+            runtimeConfig.get("spark.sedona.join.useExternalSpatialIndex", "false"));
+    this.externalSpatialIndexLeafPageCapacity =
+        Integer.parseInt(
+            runtimeConfig.get("spark.sedona.join.externalSpatialIndexLeafPageCapacity", "100"));
+    this.externalSpatialIndexInternalNodeCapacity =
+        Integer.parseInt(
+            runtimeConfig.get("spark.sedona.join.externalSpatialIndexInternalNodeCapacity", "10"));
+    this.forceSpillExternalSpatialIndex =
+        Boolean.parseBoolean(
+            runtimeConfig.get("spark.sedona.join.forceSpillExternalSpatialIndex", "false"));
 
     // Parameters for enabling auto-subdividing when running spatial joins
     this.spatialJoinSubdivideLeft =
@@ -617,5 +637,21 @@ public class SedonaConf implements Serializable {
 
   public Boolean getLOFApproximateKNN() {
     return LOFApproximateKNN;
+  }
+
+  public boolean useExternalSpatialIndex() {
+    return useExternalSpatialIndex;
+  }
+
+  public int getExternalSpatialIndexLeafPageCapacity() {
+    return externalSpatialIndexLeafPageCapacity;
+  }
+
+  public int getExternalSpatialIndexInternalNodeCapacity() {
+    return externalSpatialIndexInternalNodeCapacity;
+  }
+
+  public boolean forceSpillExternalSpatialIndex() {
+    return forceSpillExternalSpatialIndex;
   }
 }

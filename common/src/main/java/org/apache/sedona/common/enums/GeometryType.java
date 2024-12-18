@@ -49,4 +49,31 @@ public enum GeometryType implements Serializable {
     throw new IllegalArgumentException(
         "[" + GeometryType.class + "] Unsupported geometry type:" + str);
   }
+
+  /**
+   * From wkb type.
+   *
+   * @param wkbType the wkb type
+   * @return the geometry type
+   */
+  public static GeometryType fromWkbType(int wkbType) {
+    switch (wkbType) {
+      case 1:
+        return POINT;
+      case 2:
+        return LINESTRING;
+      case 3:
+        return POLYGON;
+      case 4:
+        return MULTIPOINT;
+      case 5:
+        return MULTILINESTRING;
+      case 6:
+        return MULTIPOLYGON;
+      case 7:
+        return GEOMETRYCOLLECTION;
+      default:
+        throw new IllegalArgumentException("Unsupported WKB type: " + wkbType);
+    }
+  }
 }

@@ -18,7 +18,7 @@
  */
 package org.apache.sedona.common.geometrySerde;
 
-enum CoordinateType {
+public enum CoordinateType {
   XY(1, 2, false, false),
   XYZ(2, 3, true, false),
   XYM(3, 3, false, true),

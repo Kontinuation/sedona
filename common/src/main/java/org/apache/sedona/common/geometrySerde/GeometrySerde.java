@@ -131,6 +131,18 @@ public class GeometrySerde extends Serializer implements Serializable {
     }
   }
 
+  public GeometryBuffer readGeometryBuffer(Input input) {
+    byte typeId = input.readByte();
+    Type geometryType = Type.fromId(typeId);
+    if (geometryType != Type.SHAPE) {
+      throw new IllegalArgumentException("Expected SHAPE type, got " + geometryType);
+    }
+    int length = input.readInt();
+    byte[] bytes = new byte[length];
+    input.readBytes(bytes);
+    return GeometryBufferFactory.wrap(bytes);
+  }
+
   private Object readUserData(Kryo kryo, Input input) {
     Object userData = null;
     if (input.readBoolean()) {
@@ -161,12 +173,20 @@ public class GeometrySerde extends Serializer implements Serializable {
     }
 
     public static Type fromId(int id) {
-      for (Type type : values()) {
-        if (type.id == id) {
-          return type;
-        }
+      // Here we don't iterate over values() to save one object array clone incurred by values().
+      // Directly switch over the possible values is more efficient.
+      switch (id) {
+        case 0:
+          return SHAPE;
+        case 1:
+          return CIRCLE;
+        case 2:
+          return ENVELOPE;
+        case 3:
+          return NULL_GEOMETRY;
+        default:
+          throw new IllegalArgumentException("Unknown type id: " + id);
       }
-      throw new IllegalArgumentException("Unknown type id: " + id);
     }
   }
 }

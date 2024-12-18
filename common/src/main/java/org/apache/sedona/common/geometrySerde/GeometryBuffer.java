@@ -21,7 +21,7 @@ package org.apache.sedona.common.geometrySerde;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateSequence;
 
-interface GeometryBuffer {
+public interface GeometryBuffer {
   CoordinateType getCoordinateType();
 
   void setCoordinateType(CoordinateType coordinateType);
@@ -51,6 +51,8 @@ interface GeometryBuffer {
   void putCoordinates(int offset, CoordinateSequence coordinates);
 
   CoordinateSequence getCoordinates(int offset, int numCoordinates);
+
+  void filterCoordinates(int offset, int numCoordinates, SerializedCoordinateFilter filter);
 
   GeometryBuffer slice(int offset);
 

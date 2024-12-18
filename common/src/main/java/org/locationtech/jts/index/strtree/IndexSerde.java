@@ -49,8 +49,8 @@ public class IndexSerde {
         return index;
       } else {
         // if not built, just read itemBoundables
-        ArrayList itemBoundables = new ArrayList();
         int itemSize = input.readInt();
+        ArrayList itemBoundables = new ArrayList(itemSize);
         for (int i = 0; i < itemSize; ++i) {
           itemBoundables.add(readItemBoundable(kryo, input));
         }
@@ -125,7 +125,7 @@ public class IndexSerde {
     STRtree.STRtreeNode node = new STRtree.STRtreeNode(level);
     int childrenSize = input.readInt();
     boolean isLeaf = (input.readByte() & 0x01) == 1;
-    ArrayList children = new ArrayList();
+    ArrayList children = new ArrayList(childrenSize);
     if (isLeaf) {
       for (int i = 0; i < childrenSize; ++i) {
         children.add(readItemBoundable(kryo, input));

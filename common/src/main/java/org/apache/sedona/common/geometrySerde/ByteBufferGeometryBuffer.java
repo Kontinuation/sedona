@@ -244,6 +244,50 @@ class ByteBufferGeometryBuffer implements GeometryBuffer {
   }
 
   @Override
+  public void filterCoordinates(int offset, int numCoordinates, SerializedCoordinateFilter filter) {
+    switch (coordinateType) {
+      case XY:
+        for (int k = 0; k < numCoordinates; k++) {
+          double x = byteBuffer.getDouble(offset);
+          double y = byteBuffer.getDouble(offset + 8);
+          filter.coordinate(x, y, Double.NaN, Double.NaN);
+          offset += 16;
+        }
+        break;
+      case XYZ:
+        for (int k = 0; k < numCoordinates; k++) {
+          double x = byteBuffer.getDouble(offset);
+          double y = byteBuffer.getDouble(offset + 8);
+          double z = byteBuffer.getDouble(offset + 16);
+          filter.coordinate(x, y, z, Double.NaN);
+          offset += 24;
+        }
+        break;
+      case XYM:
+        for (int k = 0; k < numCoordinates; k++) {
+          double x = byteBuffer.getDouble(offset);
+          double y = byteBuffer.getDouble(offset + 8);
+          double m = byteBuffer.getDouble(offset + 16);
+          filter.coordinate(x, y, Double.NaN, m);
+          offset += 24;
+        }
+        break;
+      case XYZM:
+        for (int k = 0; k < numCoordinates; k++) {
+          double x = byteBuffer.getDouble(offset);
+          double y = byteBuffer.getDouble(offset + 8);
+          double z = byteBuffer.getDouble(offset + 16);
+          double m = byteBuffer.getDouble(offset + 24);
+          filter.coordinate(x, y, z, m);
+          offset += 32;
+        }
+        break;
+      default:
+        throw new IllegalStateException("coordinateType was not configured properly");
+    }
+  }
+
+  @Override
   public GeometryBuffer slice(int offset) {
     byteBuffer.position(offset);
     return new ByteBufferGeometryBuffer(byteBuffer.slice());

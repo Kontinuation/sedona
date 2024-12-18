@@ -107,6 +107,10 @@ public class SubdividedPolygonUsingBoxes implements Iterator<Geometry> {
     }
   }
 
+  public Iterator<Envelope> toEnvelopesIterator() {
+    return iterator;
+  }
+
   @Override
   public boolean hasNext() {
     return iterator.hasNext();

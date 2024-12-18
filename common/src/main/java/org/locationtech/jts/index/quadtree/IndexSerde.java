@@ -45,7 +45,7 @@ public class IndexSerde {
       return index;
     }
     int itemSize = input.readInt();
-    List items = new ArrayList();
+    List items = new ArrayList(itemSize);
     for (int i = 0; i < itemSize; ++i) {
       items.add(geometrySerde.read(kryo, input, Geometry.class));
     }
@@ -105,7 +105,7 @@ public class IndexSerde {
     int level = input.readInt();
     Node node = new Node(envelope, level);
     int itemSize = input.readInt();
-    List items = new ArrayList();
+    List items = new ArrayList(itemSize);
     for (int i = 0; i < itemSize; ++i) {
       items.add(geometrySerde.read(kryo, input, Geometry.class));
     }

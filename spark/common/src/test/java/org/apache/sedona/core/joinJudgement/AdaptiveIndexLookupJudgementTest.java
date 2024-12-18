@@ -19,8 +19,13 @@
 package org.apache.sedona.core.joinJudgement;
 
 import static org.junit.Assert.*;
+import static org.mockito.Answers.RETURNS_SMART_NULLS;
+import static org.mockito.Mockito.when;
 
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -33,22 +38,82 @@ import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.enums.ExecutionMode;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.enums.JoinType;
+import org.apache.sedona.core.index.ExternalIndexTestBase;
 import org.apache.sedona.core.joinJudgement.AdaptiveIndexLookupJudgement.IndexBuildSide;
 import org.apache.sedona.core.joinJudgement.AdaptiveIndexLookupJudgement.LocalSpatialJoinExecParams;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators;
 import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner.OuterJoinUserData;
+import org.apache.sedona.core.utils.SedonaConf;
+import org.apache.spark.SparkEnv;
+import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
+import org.mockito.Mock;
 
-public class AdaptiveIndexLookupJudgementTest {
+@RunWith(Parameterized.class)
+public class AdaptiveIndexLookupJudgementTest extends ExternalIndexTestBase {
 
   private static final GeometryFactory factory = new GeometryFactory();
-  private static final List<Geometry> datasetA = generateRandomGeometries(1);
-  private static final List<Geometry> datasetB = generateRandomGeometries(2);
+  private static final List<Geometry> datasetA = generateRandomGeometries(1, 1000);
+  private static final List<Geometry> datasetB = generateRandomGeometries(2, 1000);
+
+  @Parameterized.Parameters(name = "use external spatial index: {0}")
+  public static Collection<Boolean> testParams() {
+    return Arrays.asList(false, true);
+  }
+
+  private final boolean useExternalSpatialIndex;
+
+  public AdaptiveIndexLookupJudgementTest(boolean useExternalSpatialIndex) {
+    this.useExternalSpatialIndex = useExternalSpatialIndex;
+  }
+
+  @Mock(answer = RETURNS_SMART_NULLS)
+  SedonaConf sedonaConf;
+
+  @Mock(answer = RETURNS_SMART_NULLS)
+  SparkEnv sparkEnv;
+
+  @Before
+  public void setUpMock() {
+    when(sparkEnv.blockManager()).thenReturn(blockManager);
+    when(sedonaConf.useExternalSpatialIndex()).thenReturn(true);
+    when(sedonaConf.getExternalSpatialIndexLeafPageCapacity()).thenReturn(10);
+    when(sedonaConf.getExternalSpatialIndexInternalNodeCapacity()).thenReturn(10);
+    when(sedonaConf.forceSpillExternalSpatialIndex()).thenReturn(false);
+  }
+
+  private AdaptiveIndexLookupJudgement<Geometry, Geometry> createJudgement(
+      SpatialPredicate spatialPredicate,
+      JoinType joinType,
+      List<LocalSpatialJoinExecParams> localSpatialJoinExecParamsList) {
+    if (useExternalSpatialIndex) {
+      AdaptiveIndexLookupJudgement<Geometry, Geometry> judgement =
+          new AdaptiveIndexLookupJudgement<>(
+              spatialPredicate, joinType, localSpatialJoinExecParamsList, sedonaConf);
+      judgement.setSparkEnv(sparkEnv);
+      judgement.setTaskContext(taskContext);
+      return judgement;
+    } else {
+      return new AdaptiveIndexLookupJudgement<>(
+          spatialPredicate, joinType, localSpatialJoinExecParamsList, null);
+    }
+  }
+
+  private void cleanUpTaskResource() {
+    if (useExternalSpatialIndex) {
+      // The external spatial index should be closed when the iterator was drained.
+      long consumption = memoryManager.executionMemoryUsed();
+      assertEquals(0, consumption);
+      taskContext.runTaskCompletionListeners();
+    }
+  }
 
   @SuppressWarnings("unchecked")
   @Test
@@ -57,7 +122,7 @@ public class AdaptiveIndexLookupJudgementTest {
         new LocalSpatialJoinExecParams(
             IndexType.RTREE, IndexBuildSide.LEFT, ExecutionMode.PREPARE_STREAM, null);
     AdaptiveIndexLookupJudgement<Geometry, Geometry> judgement =
-        new AdaptiveIndexLookupJudgement<>(
+        createJudgement(
             SpatialPredicate.INTERSECTS, JoinType.INNER, Collections.singletonList(param));
 
     // Both sides are empty
@@ -72,6 +137,7 @@ public class AdaptiveIndexLookupJudgementTest {
             Collections.emptyIterator(),
             new SingletonIterator(factory.createPoint(new Coordinate(0, 0))));
     assertFalse(resultIterator.hasNext());
+    cleanUpTaskResource();
 
     // Right side is empty
     resultIterator =
@@ -80,6 +146,7 @@ public class AdaptiveIndexLookupJudgementTest {
             new SingletonIterator(factory.createPoint(new Coordinate(0, 0))),
             Collections.emptyIterator());
     assertFalse(resultIterator.hasNext());
+    cleanUpTaskResource();
   }
 
   @Test
@@ -135,6 +202,103 @@ public class AdaptiveIndexLookupJudgementTest {
     }
   }
 
+  @Test
+  public void testSpilling() throws IOException {
+    if (!useExternalSpatialIndex) {
+      return;
+    }
+
+    LocalSpatialJoinExecParams param =
+        new LocalSpatialJoinExecParams(
+            IndexType.RTREE, IndexBuildSide.LEFT, ExecutionMode.PREPARE_STREAM, null, null, null);
+
+    SpatialPredicate predicate = SpatialPredicate.INTERSECTS;
+    JoinType joinType = JoinType.RIGHT_OUTER;
+    AdaptiveIndexLookupJudgement<Geometry, Geometry> judgement =
+        createJudgement(predicate, joinType, Collections.singletonList(param));
+    Iterator<Pair<Geometry, Geometry>> resultIterator =
+        judgement.call(0, datasetA.iterator(), datasetB.iterator());
+
+    List<Pair<Geometry, Geometry>> results = new ArrayList<>();
+    for (int k = 0; resultIterator.hasNext(); k++) {
+      results.add(resultIterator.next());
+      if (k == 100) {
+        ((ExternalSpatialJoinIterator<Geometry, Geometry>) resultIterator).forceSpill();
+      }
+    }
+    // At least 100 results were generated after spilling
+    assertTrue(results.size() > 200);
+    verifyResult(results.iterator(), datasetA, datasetB, predicate, joinType);
+  }
+
+  @Test
+  public void testSpillingWithLimitedMemory() throws IOException {
+    if (!useExternalSpatialIndex) {
+      return;
+    }
+
+    LocalSpatialJoinExecParams param =
+        new LocalSpatialJoinExecParams(
+            IndexType.RTREE, IndexBuildSide.LEFT, ExecutionMode.PREPARE_STREAM, null, null, null);
+    SpatialPredicate predicate = SpatialPredicate.INTERSECTS;
+    JoinType joinType = JoinType.RIGHT_OUTER;
+    AdaptiveIndexLookupJudgement<Geometry, Geometry> judgement =
+        createJudgement(predicate, joinType, Collections.singletonList(param));
+
+    List<Geometry> datasetBLarge = generateRandomGeometries(2, 200000);
+    Iterator<Pair<Geometry, Geometry>> resultIterator =
+        judgement.call(0, datasetA.iterator(), datasetBLarge.iterator());
+
+    List<Pair<Geometry, Geometry>> results = new ArrayList<>();
+    for (int k = 0; resultIterator.hasNext(); k++) {
+      results.add(resultIterator.next());
+      if (k == 100) {
+        ExternalSpatialJoinIterator<Geometry, Geometry> iter =
+            ((ExternalSpatialJoinIterator<Geometry, Geometry>) resultIterator);
+        iter.forceSpill();
+        iter.setEqualityValidation(true);
+        memoryManager.limit(8 * 1024 * 1024);
+      }
+    }
+    // At least 100 results were generated after spilling
+    assertTrue(results.size() > 200);
+    verifyResult(results.iterator(), datasetA, datasetBLarge, predicate, joinType);
+  }
+
+  @Test
+  public void testSpillingWithoutEqualityValidation() throws IOException {
+    if (!useExternalSpatialIndex) {
+      return;
+    }
+
+    LocalSpatialJoinExecParams param =
+        new LocalSpatialJoinExecParams(
+            IndexType.RTREE, IndexBuildSide.LEFT, ExecutionMode.PREPARE_STREAM, null, null, null);
+    SpatialPredicate predicate = SpatialPredicate.INTERSECTS;
+    JoinType joinType = JoinType.RIGHT_OUTER;
+    AdaptiveIndexLookupJudgement<Geometry, Geometry> judgement =
+        createJudgement(predicate, joinType, Collections.singletonList(param));
+
+    List<Geometry> datasetBLarge = generateRandomGeometries(2, 200000);
+    Iterator<Pair<Geometry, Geometry>> resultIterator =
+        judgement.call(0, datasetA.iterator(), datasetBLarge.iterator());
+
+    List<Pair<Geometry, Geometry>> results = new ArrayList<>();
+    for (int k = 0; resultIterator.hasNext(); k++) {
+      results.add(resultIterator.next());
+      if (k == 100) {
+        ExternalSpatialJoinIterator<Geometry, Geometry> iter =
+            ((ExternalSpatialJoinIterator<Geometry, Geometry>) resultIterator);
+        iter.forceSpill();
+        iter.setEqualityValidation(false);
+        memoryManager.limit(8 * 1024 * 1024);
+      }
+    }
+    // At least 100 results were generated after spilling
+    assertTrue(results.size() > 200);
+    verifyResult(results.iterator(), datasetA, datasetBLarge, predicate, joinType);
+  }
+
   private void testExecutionMode(ExecutionMode executionMode) {
     JoinType[] joinTypes = {JoinType.INNER, JoinType.LEFT_OUTER, JoinType.RIGHT_OUTER};
     SpatialPredicate[] predicates =
@@ -186,22 +350,24 @@ public class AdaptiveIndexLookupJudgementTest {
             subdivideBuildOptions,
             subdivideStreamOptions);
     AdaptiveIndexLookupJudgement<Geometry, Geometry> judgement =
-        new AdaptiveIndexLookupJudgement<>(predicate, joinType, Collections.singletonList(param));
+        createJudgement(predicate, joinType, Collections.singletonList(param));
     Iterator<Pair<Geometry, Geometry>> resultIterator =
         judgement.call(0, datasetA.iterator(), datasetB.iterator());
     verifyResult(resultIterator, datasetA, datasetB, predicate, joinType);
+    cleanUpTaskResource();
     resultIterator = judgement.call(0, datasetB.iterator(), datasetA.iterator());
     verifyResult(resultIterator, datasetB, datasetA, predicate, joinType);
+    cleanUpTaskResource();
   }
 
-  private static List<Geometry> generateRandomGeometries(int seed) {
+  private static List<Geometry> generateRandomGeometries(int seed, int count) {
     List<Geometry> geoms = new ArrayList<>();
     Random random = new Random(seed);
-    for (int k = 0; k < 1000; k++) {
+    for (int k = 0; k < count; k++) {
       double minX = random.nextDouble() * 10;
       double minY = random.nextDouble() * 10;
-      double width = random.nextDouble();
-      double height = random.nextDouble();
+      double width = random.nextDouble() * 0.2;
+      double height = random.nextDouble() * 0.2;
       Geometry geom;
       if (random.nextBoolean()) {
         Envelope env = new Envelope(minX, minX + width, minY, minY + height);

@@ -68,6 +68,7 @@
         <jts.version>1.20.0</jts.version>
         <jts2geojson.version>0.16.1</jts2geojson.version>
         <spatial4j.version>0.8</spatial4j.version>
+        <fastutil.version>8.5.15</fastutil.version>
 
         <jt-jiffle.version>1.1.24</jt-jiffle.version>
         <antlr-runtime.version>4.9.3</antlr-runtime.version>
@@ -164,6 +165,11 @@
                 <groupId>org.locationtech.spatial4j</groupId>
                 <artifactId>spatial4j</artifactId>
                 <version>${spatial4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>it.unimi.dsi</groupId>
+                <artifactId>fastutil-core</artifactId>
+                <version>${fastutil.version}</version>
             </dependency>
             <dependency>
                 <groupId>edu.ucar</groupId>
@@ -320,6 +326,11 @@
                 <groupId>commons-lang</groupId>
                 <artifactId>commons-lang</artifactId>
                 <version>2.6</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-collections4</artifactId>
+                <version>4.4</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>
@@ -767,7 +778,7 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
             <properties>
-                <scala.version>2.12.15</scala.version>
+                <scala.version>2.12.18</scala.version>
                 <scala.compat.version>2.12</scala.compat.version>
                 <scaladoc.arg>-no-java-comments</scaladoc.arg>
             </properties>

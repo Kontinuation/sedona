@@ -21,8 +21,8 @@ package org.apache.sedona.common.subDivide;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import org.apache.commons.collections.IteratorUtils;
-import org.apache.commons.collections.iterators.SingletonIterator;
+import org.apache.commons.collections4.IteratorUtils;
+import org.apache.commons.collections4.iterators.SingletonIterator;
 import org.apache.sedona.common.subDivide.iterator.SubdividedLineStringCutSegments;
 import org.apache.sedona.common.subDivide.iterator.SubdividedLineStringPreserveSegments;
 import org.apache.sedona.common.subDivide.iterator.SubdividedMultiPoint;
@@ -32,6 +32,7 @@ import org.apache.sedona.common.subDivide.iterator.SubdividedPolygonUsingOverlay
 import org.apache.sedona.common.subDivide.iterator.SubdividedPolygonUsingOverlayNG;
 import org.apache.sedona.common.subDivide.iterator.SubdividedPolygonUsingOverlayNG2;
 import org.apache.sedona.common.subDivide.iterator.SubdividedPolygonUsingTriangulation;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.LineString;
 import org.locationtech.jts.geom.MultiPoint;
@@ -61,10 +62,9 @@ public class ExtentBasedGeometrySubDivider {
    * @param geometry The geometry to subdivide.
    * @return An iterator of the smaller geometries.
    */
-  @SuppressWarnings("unchecked")
   public Iterator<Geometry> subdivide(Geometry geometry) {
     if (geometry.isEmpty() || geometry instanceof Point) {
-      return (Iterator<Geometry>) new SingletonIterator(geometry.copy());
+      return new SingletonIterator<>(geometry.copy());
     } else if (geometry instanceof MultiPoint) {
       return subdivideMultiPoint((MultiPoint) geometry);
     } else if (geometry instanceof LineString) {
@@ -72,9 +72,39 @@ public class ExtentBasedGeometrySubDivider {
     } else if (geometry instanceof Polygon) {
       return subdividePolygon((Polygon) geometry);
     } else {
-      List<Iterator<Geometry>> iterators = new ArrayList<>();
+      List<Iterator<? extends Geometry>> iterators = new ArrayList<>();
       for (int i = 0; i < geometry.getNumGeometries(); i++) {
         iterators.add(subdivide(geometry.getGeometryN(i)));
+      }
+      return IteratorUtils.chainedIterator(iterators);
+    }
+  }
+
+  /**
+   * Subdivide a geometry into envelopes that fully covers the geometry based on the maximum number
+   * of vertices, width, height, and area.
+   *
+   * @param geometry The geometry to subdivide.
+   * @return An iterator of the envelopes of the smaller geometries.
+   */
+  public Iterator<Envelope> subdivideToEnvelopes(Geometry geometry) {
+    if (geometry.isEmpty() || geometry instanceof Point) {
+      return new SingletonIterator<>(geometry.getEnvelopeInternal());
+    } else if (geometry instanceof MultiPoint) {
+      return IteratorUtils.transformedIterator(
+          subdivideMultiPoint((MultiPoint) geometry), Geometry::getEnvelopeInternal);
+    } else if (geometry instanceof LineString) {
+      return IteratorUtils.transformedIterator(
+          subdivideLineString((LineString) geometry), Geometry::getEnvelopeInternal);
+    } else if (geometry instanceof Polygon) {
+      // Some of the polygon sub-dividers generate envelopes directly, so we can retrieve the
+      // envelopes iterator and avoid the overhead of transforming each envelope to geometry and
+      // back to envelope
+      return subdividePolygonToEnvelopes((Polygon) geometry);
+    } else {
+      List<Iterator<? extends Envelope>> iterators = new ArrayList<>();
+      for (int i = 0; i < geometry.getNumGeometries(); i++) {
+        iterators.add(subdivideToEnvelopes(geometry.getGeometryN(i)));
       }
       return IteratorUtils.chainedIterator(iterators);
     }
@@ -119,6 +149,19 @@ public class ExtentBasedGeometrySubDivider {
       default:
         throw new IllegalArgumentException(
             "Unsupported polygon sub-divider: " + options.polygonSubDivider);
+    }
+  }
+
+  private Iterator<Envelope> subdividePolygonToEnvelopes(Polygon geometry) {
+    if (options.polygonSubDivider == SubdivideOptions.PolygonSubDivider.BOX_APPROX) {
+      // BOX_APPROX subdivider generates envelopes directly, so we can retrieve the envelopes
+      // iterator and avoid the overhead of transforming each envelope to geometry and back to
+      // envelope
+      SubdividedPolygonUsingBoxes subdivided = new SubdividedPolygonUsingBoxes(geometry, options);
+      return subdivided.toEnvelopesIterator();
+    } else {
+      return IteratorUtils.transformedIterator(
+          subdividePolygon(geometry), Geometry::getEnvelopeInternal);
     }
   }
 }
