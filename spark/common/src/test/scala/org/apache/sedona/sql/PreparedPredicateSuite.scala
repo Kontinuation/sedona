@@ -62,6 +62,14 @@ class PreparedPredicateSuite extends TestBaseScala with TableDrivenPropertyCheck
         runSpatialQuery(df, predicate, queryWindow, queryWindowSide)
       }
     }
+
+    forAll(predicates) { case (predicate, queryWindow, queryWindowSide) =>
+      it(
+        s"should correctly evaluate $predicate when scalar subquery window is on the ${queryWindowSide.side} side") {
+        val df = loadTestDataFrame()
+        runSpatialQueryWithSubquery(df, predicate, queryWindow, queryWindowSide)
+      }
+    }
   }
 
   private def loadTestDataFrame(): DataFrame = {
@@ -75,16 +83,16 @@ class PreparedPredicateSuite extends TestBaseScala with TableDrivenPropertyCheck
       .select("id", "geom")
   }
 
-  private def runSpatialQuery(
+  private def createRunSpatialQuery(leftQuery: String, rightQuery: String)(
       df: DataFrame,
       predicate: String,
       queryWindow: String,
       queryWindowSide: QueryWindowSide) = {
     val (condition, joinCondition) = queryWindowSide match {
       case LeftSide =>
-        (s"$predicate(ST_GeomFromText('$queryWindow'), geom)", s"$predicate(q, geom)")
+        (leftQuery, s"$predicate(q, geom)")
       case RightSide =>
-        (s"$predicate(geom, ST_GeomFromText('$queryWindow'))", s"$predicate(geom, q)")
+        (rightQuery, s"$predicate(geom, q)")
     }
     val queryDf = df.where(condition).select(col("id"))
     val oneRowDf =
@@ -97,6 +105,31 @@ class PreparedPredicateSuite extends TestBaseScala with TableDrivenPropertyCheck
     assert(queryResult.nonEmpty)
     assert(queryResult == joinResult)
   }
+
+  private def runSpatialQuery(
+      df: DataFrame,
+      predicate: String,
+      queryWindow: String,
+      queryWindowSide: QueryWindowSide) = createRunSpatialQuery(
+    s"$predicate(ST_GeomFromText('$queryWindow'), geom)",
+    s"$predicate(geom, ST_GeomFromText('$queryWindow'))")(
+    df,
+    predicate,
+    queryWindow,
+    queryWindowSide)
+
+  private def runSpatialQueryWithSubquery(
+      df: DataFrame,
+      predicate: String,
+      queryWindow: String,
+      queryWindowSide: QueryWindowSide) = createRunSpatialQuery(
+    // these are getting optimized away, need a not one line subquery
+    s"$predicate((SELECT ST_GeomFromText(FIRST(geom)) FROM VALUES ('$queryWindow'), ('POINT(0 0)') AS (geom)), geom)",
+    s"$predicate(geom, (SELECT ST_GeomFromText(FIRST(geom)) FROM VALUES ('$queryWindow'), ('POINT(0 0)') AS (geom)))")(
+    df,
+    predicate,
+    queryWindow,
+    queryWindowSide)
 
   private def collectPreparedPredicates(df: DataFrame): Seq[ST_PreparedPredicate] = {
     df.queryExecution.optimizedPlan.collect { case Filter(condition, _) =>

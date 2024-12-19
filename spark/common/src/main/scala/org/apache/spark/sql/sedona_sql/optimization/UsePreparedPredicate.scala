@@ -18,7 +18,7 @@
  */
 package org.apache.spark.sql.sedona_sql.optimization
 
-import org.apache.spark.sql.catalyst.expressions.{Expression, Literal}
+import org.apache.spark.sql.catalyst.expressions.{Expression, Literal, ScalarSubquery}
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.sedona_sql.expressions._
@@ -33,6 +33,8 @@ class UsePreparedPredicate extends Rule[LogicalPlan] {
       val newCondition = condition transform { case predicate: ST_Predicate =>
         val operands = predicate.inputExpressions match {
           case Seq(left, right: Literal) => Some(left, right, false)
+          case Seq(left, right: ScalarSubquery) => Some(left, right, false)
+          case Seq(left: ScalarSubquery, right) => Some(right, left, true)
           case Seq(left: Literal, right) => Some(right, left, true)
           case _ => None
         }
@@ -52,24 +54,27 @@ class UsePreparedPredicate extends Rule[LogicalPlan] {
   private def transformSpatialPredicate(
       predicate: ST_Predicate,
       expr: Expression,
-      literal: Literal,
+      scalar: Expression,
       swapped: Boolean): ST_PreparedPredicate = {
+    require(
+      scalar.isInstanceOf[Literal] || scalar.isInstanceOf[ScalarSubquery],
+      "Right side of the expression must be a literal or scalar subquery")
     predicate match {
       case ST_Contains(_) =>
-        if (swapped) ST_PreparedWithin(expr, literal) else ST_PreparedContains(expr, literal)
+        if (swapped) ST_PreparedWithin(expr, scalar) else ST_PreparedContains(expr, scalar)
       case ST_Within(_) =>
-        if (swapped) ST_PreparedContains(expr, literal) else ST_PreparedWithin(expr, literal)
+        if (swapped) ST_PreparedContains(expr, scalar) else ST_PreparedWithin(expr, scalar)
       case ST_Covers(_) =>
-        if (swapped) ST_PreparedCoveredBy(expr, literal) else ST_PreparedCovers(expr, literal)
+        if (swapped) ST_PreparedCoveredBy(expr, scalar) else ST_PreparedCovers(expr, scalar)
       case ST_CoveredBy(_) =>
-        if (swapped) ST_PreparedCovers(expr, literal) else ST_PreparedCoveredBy(expr, literal)
-      case ST_Intersects(_) => ST_PreparedIntersects(expr, literal)
-      case ST_Touches(_) => ST_PreparedTouches(expr, literal)
-      case ST_Crosses(_) => ST_PreparedCrosses(expr, literal)
-      case ST_Overlaps(_) => ST_PreparedOverlaps(expr, literal)
-      case ST_Equals(_) => ST_PreparedEquals(expr, literal)
-      case ST_OrderingEquals(_) => ST_PreparedOrderingEquals(expr, literal)
-      case ST_Disjoint(_) => ST_PreparedDisjoint(expr, literal)
+        if (swapped) ST_PreparedCovers(expr, scalar) else ST_PreparedCoveredBy(expr, scalar)
+      case ST_Intersects(_) => ST_PreparedIntersects(expr, scalar)
+      case ST_Touches(_) => ST_PreparedTouches(expr, scalar)
+      case ST_Crosses(_) => ST_PreparedCrosses(expr, scalar)
+      case ST_Overlaps(_) => ST_PreparedOverlaps(expr, scalar)
+      case ST_Equals(_) => ST_PreparedEquals(expr, scalar)
+      case ST_OrderingEquals(_) => ST_PreparedOrderingEquals(expr, scalar)
+      case ST_Disjoint(_) => ST_PreparedDisjoint(expr, scalar)
     }
   }
 }

@@ -21,7 +21,8 @@ package org.apache.spark.sql.sedona_sql.expressions
 import org.apache.sedona.sql.utils.GeometrySerializer
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, Literal, NullIntolerant}
+import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, Literal, NullIntolerant, ScalarSubquery}
+import org.apache.spark.sql.execution.{ScalarSubquery => ExecutionScalarSubquery}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.types.{AbstractDataType, BooleanType, DataType}
 import org.locationtech.jts.geom.Geometry
@@ -43,7 +44,12 @@ abstract class ST_PreparedPredicate
     with ExpectsInputTypes
     with NullIntolerant {
   def left: Expression
-  def right: Literal
+  def right: Expression
+
+  require(
+    right == null || right.isInstanceOf[Literal] || right.isInstanceOf[ScalarSubquery] || right
+      .isInstanceOf[ExecutionScalarSubquery],
+    "Right side of the expression must be a literal or scalar subquery")
 
   override def toString: String = s" **${this.getClass.getName}**  "
   override def nullable: Boolean = children.exists(_.nullable)
@@ -52,7 +58,7 @@ abstract class ST_PreparedPredicate
   override def children: Seq[Expression] = left :: right :: Nil
 
   lazy val rightGeom: Geometry = {
-    val serializedGeom = right.value.asInstanceOf[Array[Byte]]
+    val serializedGeom = right.eval().asInstanceOf[Array[Byte]]
     if (serializedGeom == null) {
       null
     } else {
@@ -87,73 +93,73 @@ abstract class ST_PreparedPredicate
 
   protected def withNewChildrenInternal(
       newChildren: IndexedSeq[Expression]): ST_PreparedPredicate = {
-    withNewChildrenInternal(newChildren(0), newChildren(1).asInstanceOf[Literal])
+    withNewChildrenInternal(newChildren(0), newChildren(1))
   }
 
-  protected def withNewChildrenInternal(left: Expression, right: Literal): ST_PreparedPredicate
+  protected def withNewChildrenInternal(left: Expression, right: Expression): ST_PreparedPredicate
 }
 
-case class ST_PreparedContains(left: Expression, right: Literal)
+case class ST_PreparedContains(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.within(left)
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
 
-case class ST_PreparedIntersects(left: Expression, right: Literal)
+case class ST_PreparedIntersects(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.intersects(left)
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
 
-case class ST_PreparedWithin(left: Expression, right: Literal)
+case class ST_PreparedWithin(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.contains(left)
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
 
-case class ST_PreparedCovers(left: Expression, right: Literal)
+case class ST_PreparedCovers(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.coveredBy(left)
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
 
-case class ST_PreparedCoveredBy(left: Expression, right: Literal)
+case class ST_PreparedCoveredBy(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
   override def evalGeom(left: Geometry, preparedRight: PreparedGeometry): Boolean = {
     preparedRight.covers(left)
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
 
-case class ST_PreparedCrosses(left: Expression, right: Literal)
+case class ST_PreparedCrosses(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
 
@@ -161,12 +167,12 @@ case class ST_PreparedCrosses(left: Expression, right: Literal)
     preparedRight.crosses(left)
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
 
-case class ST_PreparedOverlaps(left: Expression, right: Literal)
+case class ST_PreparedOverlaps(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
 
@@ -174,12 +180,12 @@ case class ST_PreparedOverlaps(left: Expression, right: Literal)
     preparedRight.overlaps(left)
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
 
-case class ST_PreparedTouches(left: Expression, right: Literal)
+case class ST_PreparedTouches(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
 
@@ -187,12 +193,12 @@ case class ST_PreparedTouches(left: Expression, right: Literal)
     preparedRight.touches(left)
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
 
-case class ST_PreparedEquals(left: Expression, right: Literal)
+case class ST_PreparedEquals(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
 
@@ -203,12 +209,12 @@ case class ST_PreparedEquals(left: Expression, right: Literal)
     symDifference.isEmpty
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
 
-case class ST_PreparedDisjoint(left: Expression, right: Literal)
+case class ST_PreparedDisjoint(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
 
@@ -216,12 +222,12 @@ case class ST_PreparedDisjoint(left: Expression, right: Literal)
     preparedRight.disjoint(left)
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
 
-case class ST_PreparedOrderingEquals(left: Expression, right: Literal)
+case class ST_PreparedOrderingEquals(left: Expression, right: Expression)
     extends ST_PreparedPredicate
     with CodegenFallback {
 
@@ -229,7 +235,7 @@ case class ST_PreparedOrderingEquals(left: Expression, right: Literal)
     left.equalsExact(rightGeom)
   }
 
-  override protected def withNewChildrenInternal(left: Expression, right: Literal) = {
+  override protected def withNewChildrenInternal(left: Expression, right: Expression) = {
     copy(left = left, right = right)
   }
 }
