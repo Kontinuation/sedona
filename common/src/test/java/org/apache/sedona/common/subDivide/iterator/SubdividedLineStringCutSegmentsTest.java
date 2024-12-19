@@ -112,6 +112,32 @@ public class SubdividedLineStringCutSegmentsTest {
     verifySubdivided(iter, lineString);
   }
 
+  @Test
+  public void testNotExceedingMaxResultCount() {
+    LineString lineString =
+        factory.createLineString(
+            new Coordinate[] {
+              new Coordinate(1, 3),
+              new Coordinate(1.01, 3.01),
+              new Coordinate(1.02, 3.02),
+              new Coordinate(1.1, 3.03),
+              new Coordinate(1.11, 3.04),
+              new Coordinate(1.12, 2.98),
+              new Coordinate(1.13, 2.97),
+              new Coordinate(1.24, 2.96),
+            });
+    SubdivideOptions options = new SubdivideOptions(1e-10, 1e-10);
+    SubdividedLineStringCutSegments iter = new SubdividedLineStringCutSegments(lineString, options);
+    verifySubdivided(iter, lineString);
+    iter = new SubdividedLineStringCutSegments(lineString, options);
+    int count = 0;
+    while (iter.hasNext()) {
+      iter.next();
+      count += 1;
+    }
+    assertTrue(count < 2000);
+  }
+
   private void verifySubdivided(Iterator<Geometry> iter, LineString lineString) {
     LineMerger merger = new LineMerger();
     while (iter.hasNext()) {

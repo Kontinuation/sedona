@@ -617,10 +617,8 @@ public class Subdivide {
     if (dominantGeometryType == GeometryType.POINT
         || dominantGeometryType == GeometryType.LINESTRING) {
       // We apply a more aggressive subdivision strategy for multipoint and linestring geometries,
-      // since they
-      // occupy no space but have large envelope size, so they are more likely to produce
-      // false-postive
-      // join result candidates.
+      // since they occupy no space but have large envelope size, so they are more likely to produce
+      // false-positive join result candidates.
       collisionFactorThreshold =
           Math.min(collisionFactorThreshold, nonPolygonalCollisionFactorThreshold);
     }
@@ -630,17 +628,14 @@ public class Subdivide {
         double polygonRatio = (double) stat.getPolygonalCount() / stat.getCount();
         if (polygonRatio >= 0.1) {
           // Apply a more conservative subdivision strategy for dataset containing a large number of
-          // polygons,
-          // since polygons are very costy to subdivide, and they are less likely to produce
-          // false-positive
-          // join result candidates.
+          // polygons, since polygons are very costly to subdivide, and they are less likely to
+          // produce false-positive join result candidates.
           double factor = 1.0 / meanCollisionFactor;
           double localSubdivideWidth = stat.getMeanEnvelopeWidth() * factor;
           double localSubdivideHeight = stat.getMeanEnvelopeHeight() * factor;
           // Extent of subdivided geometries should not be too small, otherwise the polygon
-          // subdividing will
-          // be very slow. Extent size small enough compared to the spatial partitioning grid should
-          // be good.
+          // subdividing will be very slow. Extent size small enough compared to the spatial
+          // partitioning grid should be good.
           localSubdivideWidth =
               Math.max(localSubdivideWidth, boundary.getWidth() / Math.sqrt(numPartitions) * 0.03);
           localSubdivideHeight =
@@ -649,8 +644,7 @@ public class Subdivide {
           localOptions = new SubdivideOptions(localSubdivideWidth, localSubdivideHeight);
         } else {
           // Apply a more aggressive subdivision strategy for non-polygonal geometries, since they
-          // are
-          // easier to subdivide, and they are more likely to produce false-positive join result
+          // are easier to subdivide, and they are more likely to produce false-positive join result
           // candidates.
           double factor = 0.1;
           double localSubdivideWidth = stat.getMeanEnvelopeWidth() * factor;

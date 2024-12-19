@@ -41,9 +41,15 @@ public class SubdividedLineStringCutSegments implements Iterator<Geometry> {
   private double lastY = 0;
   private int index = 1;
 
+  // Avoid generating too many tiny line strings
+  private static final int MAX_RESULT_COUNT = 1000;
+
   public SubdividedLineStringCutSegments(LineString lineString, SubdivideOptions options) {
     factory = lineString.getFactory();
-    maxLength = (options.maxWidth * 0.5 + options.maxHeight * 0.5);
+    maxLength =
+        Math.max(
+            (options.maxWidth * 0.5 + options.maxHeight * 0.5),
+            lineString.getLength() / MAX_RESULT_COUNT);
     coordinates = lineString.getCoordinates();
     if (coordinates.length > 0) {
       lastX = coordinates[0].getX();
