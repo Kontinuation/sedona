@@ -31,15 +31,12 @@ import scala.collection.mutable
  * functions can be evaluated alone in its own physical executors.
  */
 object ExtractGeoStatsFunctions extends Rule[LogicalPlan] {
+  var geoStatsResultCount = 0
 
   private def collectGeoStatsFunctionsFromExpressions(
       expressions: Seq[Expression]): Seq[ST_GeoStatsFunction] = {
     def collectGeoStatsFunctions(expr: Expression): Seq[ST_GeoStatsFunction] = expr match {
-      case expr: ST_GeoStatsFunction =>
-        if (collectGeoStatsFunctionsFromExpressions(expr.children).nonEmpty) {
-          throw new IllegalArgumentException("GeoStats functions cannot be nested")
-        }
-        Seq(expr)
+      case expr: ST_GeoStatsFunction => Seq(expr)
       case e => e.children.flatMap(collectGeoStatsFunctions)
     }
     expressions.flatMap(collectGeoStatsFunctions)
@@ -69,12 +66,19 @@ object ExtractGeoStatsFunctions extends Rule[LogicalPlan] {
    * operator.
    */
   private def extract(plan: LogicalPlan): LogicalPlan = {
-    val geoStatsFuncs = ExpressionSet(collectGeoStatsFunctionsFromExpressions(plan.expressions))
-      // ignore the ST_GeoStatsFunction that come from second/third aggregate, which is not used
-      .filter(func => func.references.subsetOf(plan.inputSet))
-      .filter(func => plan.children.exists(child => func.references.subsetOf(child.outputSet)))
-      .toSeq
-      .asInstanceOf[Seq[ST_GeoStatsFunction]]
+    val geoStatsFuncs = plan match {
+      case e: EvalGeoStatsFunction =>
+        collectGeoStatsFunctionsFromExpressions(e.function.children)
+      case _ =>
+        ExpressionSet(collectGeoStatsFunctionsFromExpressions(plan.expressions))
+          // ignore the ST_GeoStatsFunction that come from second/third aggregate, which is not used
+          .filter(func => func.references.subsetOf(plan.inputSet))
+          .filter(func =>
+            plan.children.exists(child => func.references.subsetOf(child.outputSet)))
+          .toSeq
+          .asInstanceOf[Seq[ST_GeoStatsFunction]]
+    }
+
     if (geoStatsFuncs.isEmpty) {
       // If there aren't any, we are done.
       plan
@@ -87,10 +91,12 @@ object ExtractGeoStatsFunctions extends Rule[LogicalPlan] {
       // Rewrite the child that has the input required for the UDF
       val newChildren = plan.children.map { child =>
         if (geoStatsFunc.references.subsetOf(child.outputSet)) {
-          val resultAttr = AttributeReference("geoStatsResult", geoStatsFunc.dataType)()
+          geoStatsResultCount += 1
+          val resultAttr =
+            AttributeReference(f"geoStatsResult$geoStatsResultCount", geoStatsFunc.dataType)()
           val evaluation = EvalGeoStatsFunction(geoStatsFunc, Seq(resultAttr), child)
           attributeMap += (canonicalizeDeterministic(geoStatsFunc) -> resultAttr)
-          evaluation
+          extract(evaluation) // handle nested geo-stats functions
         } else {
           child
         }

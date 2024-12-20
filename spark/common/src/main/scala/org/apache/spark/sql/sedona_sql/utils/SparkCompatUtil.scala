@@ -18,8 +18,8 @@
  */
 package org.apache.spark.sql.sedona_sql.utils
 
-import org.apache.spark.sql.{Encoder, Row}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{Encoder, Row}
 
 /**
  * Work with internal data types of Spark SQL in a way compatible with multiple Spark versions.

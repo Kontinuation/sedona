@@ -353,7 +353,10 @@ object Catalog {
     function[ST_GetReverseGeocodingLayers](),
     // geostats functions
     function[ST_DBSCAN](),
-    function[ST_LocalOutlierFactor]())
+    function[ST_LocalOutlierFactor](),
+    function[ST_GLocal](),
+    function[ST_BinaryDistanceBandColumn](),
+    function[ST_WeightedDistanceBandColumn]())
 
   val aggregateExpressions: Seq[Aggregator[Geometry, _, _]] =
     Seq(new ST_Union_Aggr, new ST_Envelope_Aggr, new ST_Intersection_Aggr, new ST_Analyze_Aggr)

@@ -20,7 +20,7 @@ package org.apache.sedona.stats.outlierDetection
 
 import org.apache.sedona.stats.MetricsRegistrator
 import org.apache.sedona.stats.Util.getGeometryColumnName
-import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_Distance, ST_DistanceSpheroid}
+import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_Distance, ST_DistanceSphere}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession, functions => f}
 
 object LocalOutlierFactor {
@@ -45,7 +45,7 @@ object LocalOutlierFactor {
    *   whether to use approximate KNN. When false will use exact KNN join. Default is false
    * @param handleTies
    *   whether to handle ties in the k-distance calculation. Default is false
-   * @param useSpheroid
+   * @param useSphere
    *   whether to use a cartesian or spheroidal distance calculation. Default is false
    * @param resultColumnName
    *   the name of the column containing the lof for each row. Default is "lof"
@@ -59,7 +59,7 @@ object LocalOutlierFactor {
       geometry: String = null,
       approximateKNN: Boolean = false,
       handleTies: Boolean = false,
-      useSpheroid: Boolean = false,
+      useSphere: Boolean = false,
       resultColumnName: String = "lof"): DataFrame = {
 
     MetricsRegistrator.getOrCreate.LOFPerform.inc()
@@ -76,8 +76,8 @@ object LocalOutlierFactor {
     } else "false" // else case to make compiler happy
 
     val distanceFunction: (Column, Column) => Column =
-      if (useSpheroid) ST_DistanceSpheroid else ST_Distance
-    val useSpheroidString = if (useSpheroid) "True" else "False" // for the SQL expression
+      if (useSphere) ST_DistanceSphere else ST_Distance
+    val useSpheroidString = if (useSphere) "True" else "False" // for the SQL expression
 
     val geometryColumn = if (geometry == null) getGeometryColumnName(dataframe) else geometry
 

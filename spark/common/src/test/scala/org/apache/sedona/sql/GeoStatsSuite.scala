@@ -18,7 +18,9 @@
  */
 package org.apache.sedona.sql
 
+import org.apache.sedona.stats.Weighting.{addBinaryDistanceBandColumn, addWeightedDistanceBandColumn}
 import org.apache.sedona.stats.clustering.DBSCAN.dbscan
+import org.apache.sedona.stats.hotspotDetection.GetisOrd.gLocal
 import org.apache.sedona.stats.outlierDetection.LocalOutlierFactor.localOutlierFactor
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions.{col, expr, lit}
@@ -88,7 +90,7 @@ class GeoStatsSuite extends TestBaseScala {
     assert(
       error
         .asInstanceOf[IllegalArgumentException]
-        .getMessage == "geometry argument must be a column reference")
+        .getMessage == "geometry argument must be a named reference to an existing column")
   }
 
   it("test dbscan with minPts variable") {
@@ -129,7 +131,7 @@ class GeoStatsSuite extends TestBaseScala {
       .collect()
   }
 
-  it("test geostats function with a column named __isCore in input df") {
+  it("test DBSCAN with a column named __isCore in input df") {
     val exception = intercept[IllegalArgumentException] {
       getData
         .withColumn("__isCore", lit(1))
@@ -138,5 +140,76 @@ class GeoStatsSuite extends TestBaseScala {
     }
     assert(
       exception.getMessage == "requirement failed: __isCore is a  reserved name by the dbscan algorithm. Please rename the columns before calling the ST_DBSCAN function.")
+  }
+
+  it("test ST_BinaryDistanceBandColumn") {
+    val weightedDf = getData
+      .withColumn(
+        "someWeights",
+        expr(
+          "array_sort(ST_BinaryDistanceBandColumn(geometry, 1.0, true, true, false, struct(id, geometry)))"))
+
+    val resultsDf = addBinaryDistanceBandColumn(
+      weightedDf,
+      1.0,
+      true,
+      true,
+      savedAttributes = Seq("id", "geometry"))
+      .withColumn("weights", expr("array_sort(weights)"))
+      .where("someWeights = weights")
+
+    assert(resultsDf.count == weightedDf.count())
+  }
+
+  it("test ST_WeightedDistanceBandColumn") {
+    val weightedDf = getData
+      .withColumn(
+        "someWeights",
+        expr(
+          "array_sort(ST_WeightedDistanceBandColumn(geometry, 1.0, -1.0, true, true, 1.0, false, struct(id, geometry)))"))
+
+    val resultsDf = addWeightedDistanceBandColumn(
+      weightedDf,
+      1.0,
+      -1.0,
+      true,
+      true,
+      savedAttributes = Seq("id", "geometry"),
+      selfWeight = 1.0)
+      .withColumn("weights", expr("array_sort(weights)"))
+      .where("someWeights = weights")
+
+    assert(resultsDf.count == weightedDf.count())
+  }
+
+  it("test GI with ST_BinaryDistanceBandColumn") {
+    val weightedDf = getData
+      .withColumn(
+        "someWeights",
+        expr(
+          "ST_BinaryDistanceBandColumn(geometry, 1.0, true, true, false, struct(id, geometry))"))
+
+    val giDf = weightedDf
+      .withColumn("gi", expr("ST_GLocal(id, someWeights, true)"))
+    assert(
+      gLocal(giDf, "id", weights = "someWeights", star = true)
+        .where("G = gi.G")
+        .count() == weightedDf.count())
+  }
+
+  it("test nested ST_Geostats calls with getis ord") {
+    getData
+      .withColumn(
+        "GI",
+        expr(
+          "ST_GLocal(id, ST_BinaryDistanceBandColumn(geometry, 1.0, true, true, false, struct(id, geometry)), true)"))
+      .collect()
+  }
+
+  it("test ST_Geostats with string column") {
+    getData
+      .withColumn("someString", lit("test"))
+      .withColumn("sql_results", expr("ST_DBSCAN(geometry, 1.0, 4, false)"))
+      .collect()
   }
 }
