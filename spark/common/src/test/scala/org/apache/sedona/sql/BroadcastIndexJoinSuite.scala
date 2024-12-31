@@ -2514,6 +2514,26 @@ class BroadcastIndexJoinSuite extends TestBaseScala {
         p
       }.size === 0)
     }
+
+    it("Broadcast the inner side when running outer joins") {
+      val polygonDf = buildPolygonDf.repartition(3).alias("polygon")
+      val pointDf = buildPointDf.repartition(5).alias("point")
+      withConf(
+        Map(
+          "sedona.global.index" -> "true",
+          "sedona.join.autoBroadcastJoinThreshold" -> "100mb")) {
+        Seq("inner", "left", "right", "left_anti", "left_semi").foreach { joinType =>
+          val df =
+            polygonDf.join(
+              pointDf,
+              expr("ST_Contains(polygon.polygonshape, point.pointshape)"),
+              joinType)
+          assert(df.queryExecution.sparkPlan.collect { case p: BroadcastIndexJoinExec =>
+            p
+          }.size === 1)
+        }
+      }
+    }
   }
 
   describe("Sedona-SQL Broadcast join with null geometries") {

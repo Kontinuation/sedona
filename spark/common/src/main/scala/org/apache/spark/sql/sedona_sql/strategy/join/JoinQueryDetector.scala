@@ -258,9 +258,15 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       val canAutoBroadCastLeft = canAutoBroadcastBySize(left)
       val canAutoBroadCastRight = canAutoBroadcastBySize(right)
       if (canAutoBroadCastLeft && canAutoBroadCastRight) {
-        // Both sides can be broadcast. Choose the smallest side.
-        broadcastLeft = left.stats.sizeInBytes <= right.stats.sizeInBytes
-        broadcastRight = !broadcastLeft
+        // Both sides can be broadcast. Choose which one to broadcast according to the join type
+        joinType match {
+          case Inner =>
+            // Both sides are eligible for broadcast, choose the smaller side.
+            broadcastLeft = left.stats.sizeInBytes <= right.stats.sizeInBytes
+            broadcastRight = !broadcastLeft
+          case LeftOuter | LeftSemi | LeftAnti => broadcastRight = true
+          case RightOuter => broadcastLeft = true
+        }
       } else {
         broadcastLeft = canAutoBroadCastLeft
         broadcastRight = canAutoBroadCastRight
