@@ -22,6 +22,7 @@ import org.apache.spark.sql.execution.joins.BroadcastNestedLoopJoinExec
 import org.apache.spark.sql.sedona_sql.strategy.join.BroadcastIndexJoinExec
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.sedona_sql.strategy.join.RangeJoinExec
 
 class BroadcastIndexJoinSuite extends TestBaseScala {
 
@@ -2518,12 +2519,16 @@ class BroadcastIndexJoinSuite extends TestBaseScala {
     it("Broadcast the inner side when running outer joins") {
       val polygonDf = buildPolygonDf.repartition(3).alias("polygon")
       val pointDf = buildPointDf.repartition(5).alias("point")
+      val polygonDfNoStatistics =
+        sparkSession.createDataFrame(buildPolygonDf.rdd, buildPolygonDf.schema).alias("polygon")
+      val pointDfNoStatistics =
+        sparkSession.createDataFrame(buildPointDf.rdd, buildPointDf.schema).alias("point")
       withConf(
         Map(
           "sedona.global.index" -> "true",
           "sedona.join.autoBroadcastJoinThreshold" -> "100mb")) {
         Seq("inner", "left", "right", "left_anti", "left_semi").foreach { joinType =>
-          val df =
+          var df =
             polygonDf.join(
               pointDf,
               expr("ST_Contains(polygon.polygonshape, point.pointshape)"),
@@ -2531,6 +2536,44 @@ class BroadcastIndexJoinSuite extends TestBaseScala {
           assert(df.queryExecution.sparkPlan.collect { case p: BroadcastIndexJoinExec =>
             p
           }.size === 1)
+
+          df = polygonDfNoStatistics.join(
+            pointDf,
+            expr("ST_Contains(polygon.polygonshape, point.pointshape)"),
+            joinType)
+          assert(df.queryExecution.sparkPlan.collect {
+            case p: BroadcastIndexJoinExec => p
+            case p: RangeJoinExec => p
+          }.size === 1)
+          assert(df.queryExecution.sparkPlan.collect { case p: BroadcastNestedLoopJoinExec =>
+            p
+          }.isEmpty)
+          if (!joinType.contains("right")) {
+            assert(df.queryExecution.sparkPlan.collect { case p: BroadcastIndexJoinExec =>
+              p
+            }.size === 1)
+          }
+
+          // TODO (EWT-1912): Non-broadcast left-semi and left-anti joins are not supported yet.
+          //  We can remove this check once we support them.
+          if (joinType != "left_semi" && joinType != "left_anti") {
+            df = polygonDf.join(
+              pointDfNoStatistics,
+              expr("ST_Contains(polygon.polygonshape, point.pointshape)"),
+              joinType)
+            assert(df.queryExecution.sparkPlan.collect {
+              case p: BroadcastIndexJoinExec => p
+              case p: RangeJoinExec => p
+            }.size === 1)
+            assert(df.queryExecution.sparkPlan.collect { case p: BroadcastNestedLoopJoinExec =>
+              p
+            }.isEmpty)
+            if (!joinType.contains("left")) {
+              assert(df.queryExecution.sparkPlan.collect { case p: BroadcastIndexJoinExec =>
+                p
+              }.size === 1)
+            }
+          }
         }
       }
     }
