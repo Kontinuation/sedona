@@ -908,6 +908,10 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
       return Nil
     }
 
+    // validate the k value
+    val kValue: Int = k.eval().asInstanceOf[Int]
+    require(kValue >= 1, "The number of neighbors (k) must be equal or greater than 1.")
+
     val leftShape = children.head
     val rightShape = children.tail.head
 
@@ -990,55 +994,57 @@ class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
     }
 
     if (spatialPredicate == SpatialPredicate.KNN || spatialPredicate == SpatialPredicate.AKNN) {
-      {
-        val leftShape = children.head
-        val rightShape = children.tail.head
+      // validate the k value for KNN join
+      val kValue: Int = distance.get.eval().asInstanceOf[Int]
+      require(kValue >= 1, "The number of neighbors (k) must be equal or greater than 1.")
 
-        val querySide = matchExpressionsToPlans(leftShape, rightShape, left, right) match {
-          case Some((_, _, false)) =>
-            LeftSide
-          case Some((_, _, true)) =>
-            RightSide
-          case None =>
-            Nil
-        }
-        val objectSidePlan = if (querySide == LeftSide) right else left
+      val leftShape = children.head
+      val rightShape = children.tail.head
 
-        checkObjectPlanFilterPushdown(objectSidePlan)
+      val querySide = matchExpressionsToPlans(leftShape, rightShape, left, right) match {
+        case Some((_, _, false)) =>
+          LeftSide
+        case Some((_, _, true)) =>
+          RightSide
+        case None =>
+          Nil
+      }
+      val objectSidePlan = if (querySide == LeftSide) right else left
 
-        if (querySide == broadcastSide.get) {
-          // broadcast is on query side
-          return BroadcastQuerySideKNNJoinExec(
-            planLater(left),
-            planLater(right),
-            leftShape,
-            rightShape,
-            broadcastSide.get,
-            joinType,
-            k = distance.get,
-            searchRadius = searchRadius.getOrElse(Literal.create(null, DoubleType)),
-            useApproximate = false,
-            spatialPredicate,
-            isGeography,
-            condition = null,
-            extraCondition = None) :: Nil
-        } else {
-          // broadcast is on object side
-          return BroadcastObjectSideKNNJoinExec(
-            planLater(left),
-            planLater(right),
-            leftShape,
-            rightShape,
-            broadcastSide.get,
-            joinType,
-            k = distance.get,
-            searchRadius = searchRadius.getOrElse(Literal.create(null, DoubleType)),
-            useApproximate = false,
-            spatialPredicate,
-            isGeography,
-            condition = null,
-            extraCondition = None) :: Nil
-        }
+      checkObjectPlanFilterPushdown(objectSidePlan)
+
+      if (querySide == broadcastSide.get) {
+        // broadcast is on query side
+        return BroadcastQuerySideKNNJoinExec(
+          planLater(left),
+          planLater(right),
+          leftShape,
+          rightShape,
+          broadcastSide.get,
+          joinType,
+          k = distance.get,
+          searchRadius = searchRadius.getOrElse(Literal.create(null, DoubleType)),
+          useApproximate = false,
+          spatialPredicate,
+          isGeography,
+          condition = null,
+          extraCondition = None) :: Nil
+      } else {
+        // broadcast is on object side
+        return BroadcastObjectSideKNNJoinExec(
+          planLater(left),
+          planLater(right),
+          leftShape,
+          rightShape,
+          broadcastSide.get,
+          joinType,
+          k = distance.get,
+          searchRadius = searchRadius.getOrElse(Literal.create(null, DoubleType)),
+          useApproximate = false,
+          spatialPredicate,
+          isGeography,
+          condition = null,
+          extraCondition = None) :: Nil
       }
     }
 

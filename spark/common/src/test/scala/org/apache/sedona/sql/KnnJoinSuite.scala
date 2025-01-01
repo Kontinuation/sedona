@@ -378,6 +378,22 @@ class KnnJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         "[0,0][0,1][0,2][0,3][1,0][1,1][1,2][1,3][2,0][2,1][2,2][2,3][3,0][3,1][3,2][3,3]")
     }
 
+    it("KNN Join should verify the correct parameter k is passed to the join function") {
+      val df = sparkSession
+        .range(0, 1)
+        .toDF("id")
+        .withColumn("geom", expr("ST_Point(id, id)"))
+        .repartition(1)
+      df.createOrReplaceTempView("df1")
+      val exception = intercept[IllegalArgumentException] {
+        sparkSession
+          .sql(s"SELECT A.ID, B.ID FROM df1 A JOIN df1 B ON ST_KNN(A.GEOM, B.GEOM, 0, false)")
+          .collect()
+      }
+      exception.getMessage should include(
+        "The number of neighbors (k) must be equal or greater than 1.")
+    }
+
     it("KNN Join with exact algorithms with additional join conditions on id") {
       val df = sparkSession.sql(
         s"SELECT QUERIES.ID, OBJECTS.ID FROM QUERIES JOIN OBJECTS ON ST_KNN(QUERIES.GEOM, OBJECTS.GEOM, 4, false) AND QUERIES.ID > 1")
