@@ -118,6 +118,29 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
         val expected = buildExpectedResult(joinCondition)
         verifyResult(expected, result)
       }
+
+      it(s"should join two dataframes with $joinCondition with auto-broadcasting enabled") {
+        withConf(Map("sedona.join.autoBroadcastJoinThreshold" -> "100mb")) {
+          var result =
+            sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
+          assert(isUsingBroadcastIndexJoin(result))
+          var expected = buildExpectedResult(joinCondition)
+          verifyResult(expected, result)
+
+          result = sparkSession.sql(
+            s"SELECT df1.id, df2.id FROM df1 LEFT OUTER JOIN df2 ON $joinCondition")
+          assert(isUsingBroadcastIndexJoin(result))
+          expected = buildExpectedResult(joinCondition, LeftOuter)
+          verifyResult(expected, result)
+
+          result = sparkSession.sql(
+            s"SELECT df1.id, df2.id FROM df1 RIGHT OUTER JOIN df2 ON $joinCondition")
+          assert(isUsingBroadcastIndexJoin(result))
+          expected = buildExpectedResult(joinCondition, RightOuter)
+          verifyResult(expected, result)
+        }
+      }
+
       it(s"should join two dataframes with $joinCondition, using advanced spatial join") {
         withConf(Map(advancedSpatialJoinConfKey -> "true")) {
           val result =
@@ -519,7 +542,8 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           val result = sparkSession.sql(
             s"SELECT /*+ BROADCAST(df1) */ df1.id, df2.id FROM df1WithNullAndDup df1 $joinClause df2WithNullAndDup df2 ON $condition")
           val expected = buildExpectedResultWithNulls(condition, joinClause)
-          verifyResult(expected, result)
+          val shouldOptimized = joinClause == "RIGHT JOIN"
+          verifyResult(expected, result, shouldOptimized)
           val count = result.count()
           assert(count == expected.size)
         }
@@ -531,7 +555,8 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           val result = sparkSession.sql(
             s"SELECT /*+ BROADCAST(df2) */ df1.id, df2.id FROM df1WithNullAndDup df1 $joinClause df2WithNullAndDup df2 ON $condition")
           val expected = buildExpectedResultWithNulls(condition, joinClause)
-          verifyResult(expected, result)
+          val shouldOptimized = joinClause == "LEFT JOIN"
+          verifyResult(expected, result, shouldOptimized)
           val count = result.count()
           assert(count == expected.size)
         }
@@ -887,8 +912,13 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     }
   }
 
-  def verifyResult(expected: Seq[(Option[Int], Option[Int])], result: DataFrame): Unit = {
-    isUsingOptimizedSpatialJoin(result)
+  def verifyResult(
+      expected: Seq[(Option[Int], Option[Int])],
+      result: DataFrame,
+      shouldBeOptimized: Boolean = true): Unit = {
+    if (shouldBeOptimized) {
+      assert(isUsingOptimizedSpatialJoin(result))
+    }
     val actual = collectQueryResult(result)
     assert(actual.nonEmpty)
     assert(actual === expected)
@@ -911,6 +941,16 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
     }
     actualPlan.collect {
       case _: BroadcastIndexJoinExec | _: DistanceJoinExec | _: RangeJoinExec => true
+    }.nonEmpty
+  }
+
+  def isUsingBroadcastIndexJoin(df: DataFrame): Boolean = {
+    val actualPlan = df.queryExecution.executedPlan match {
+      case adaptive: AdaptiveSparkPlanExec => adaptive.executedPlan
+      case plan: SparkPlan => plan
+    }
+    actualPlan.collect { case _: BroadcastIndexJoinExec =>
+      true
     }.nonEmpty
   }
 }

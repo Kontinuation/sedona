@@ -18,7 +18,7 @@
  */
 package org.apache.spark.sql.sedona_sql.strategy.join
 
-import org.apache.spark.sql.catalyst.expressions.{And, Expression, LessThan, LessThanOrEqual, Literal}
+import org.apache.spark.sql.catalyst.expressions.{And, Expression, LessThan, LessThanOrEqual, GreaterThan, GreaterThanOrEqual, Literal}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.sedona_sql.expressions._
 import org.apache.spark.sql.sedona_sql.expressions.raster.RS_Predicate
@@ -50,46 +50,87 @@ case class OptimizableJoinCondition(left: LogicalPlan, right: LogicalPlan) {
     expressions match {
       case Nil => (None, Nil)
       case head :: tail =>
-        if (isOptimizablePredicate(head)) {
-          (Some(head), tail)
-        } else {
-          val (spatialPredicate, otherPredicates) = extractFirstOptimizablePredicate(tail)
-          (spatialPredicate, head +: otherPredicates)
+        extractOptimizablePredicate(head) match {
+          case Some(predicate) => (Some(predicate), tail)
+          case None =>
+            val (spatialPredicate, otherPredicates) = extractFirstOptimizablePredicate(tail)
+            (spatialPredicate, head +: otherPredicates)
         }
     }
   }
 
-  private def isOptimizablePredicate(expression: Expression): Boolean = {
+  private def extractOptimizablePredicate(expression: Expression): Option[Expression] = {
     expression match {
       case _: ST_Intersects | _: ST_Contains | _: ST_Covers | _: ST_Within | _: ST_CoveredBy |
           _: ST_Overlaps | _: ST_Touches | _: ST_Equals | _: ST_Crosses | _: ST_KNN | _: ST_AKNN |
           _: RS_Predicate =>
         val leftShape = expression.children.head
         val rightShape = expression.children(1)
-        ExpressionUtils.matchExpressionsToPlans(leftShape, rightShape, left, right).isDefined
+        if (ExpressionUtils
+            .matchExpressionsToPlans(leftShape, rightShape, left, right)
+            .isDefined) {
+          Some(expression)
+        } else {
+          None
+        }
 
       case ST_DWithin(Seq(leftShape, rightShape, distance)) =>
-        isDistanceJoinOptimizable(leftShape, rightShape, distance)
+        if (isDistanceJoinOptimizable(leftShape, rightShape, distance)) {
+          Some(expression)
+        } else {
+          None
+        }
       case ST_DWithin(Seq(leftShape, rightShape, distance, useSpheroid)) =>
-        useSpheroid
-          .isInstanceOf[Literal] && isDistanceJoinOptimizable(leftShape, rightShape, distance)
+        if (useSpheroid
+            .isInstanceOf[Literal] && isDistanceJoinOptimizable(
+            leftShape,
+            rightShape,
+            distance)) {
+          Some(expression)
+        } else {
+          None
+        }
 
       case _: LessThan | _: LessThanOrEqual =>
         val (smaller, larger) = (expression.children.head, expression.children(1))
-        smaller match {
-          case _: ST_Distance | _: ST_DistanceSphere | _: ST_DistanceSpheroid |
-              _: ST_FrechetDistance =>
-            val leftShape = smaller.children.head
-            val rightShape = smaller.children(1)
-            isDistanceJoinOptimizable(leftShape, rightShape, larger)
-
-          case ST_HausdorffDistance(Seq(leftShape, rightShape)) =>
-            isDistanceJoinOptimizable(leftShape, rightShape, larger)
-          case ST_HausdorffDistance(Seq(leftShape, rightShape, densityFrac)) =>
-            isDistanceJoinOptimizable(leftShape, rightShape, larger)
-
-          case _ => false
+        if (isBinaryExpressionOptimizable(smaller, larger)) {
+          Some(expression)
+        } else {
+          None
         }
+
+      case _: GreaterThan =>
+        val (larger, smaller) = (expression.children.head, expression.children(1))
+        if (isBinaryExpressionOptimizable(smaller, larger)) {
+          Some(LessThan(smaller, larger))
+        } else {
+          None
+        }
+
+      case _: GreaterThanOrEqual =>
+        val (larger, smaller) = (expression.children.head, expression.children(1))
+        if (isBinaryExpressionOptimizable(smaller, larger)) {
+          Some(LessThanOrEqual(smaller, larger))
+        } else {
+          None
+        }
+
+      case _ => None
+    }
+  }
+
+  private def isBinaryExpressionOptimizable(smaller: Expression, larger: Expression): Boolean = {
+    smaller match {
+      case _: ST_Distance | _: ST_DistanceSphere | _: ST_DistanceSpheroid |
+          _: ST_FrechetDistance =>
+        val leftShape = smaller.children.head
+        val rightShape = smaller.children(1)
+        isDistanceJoinOptimizable(leftShape, rightShape, larger)
+
+      case ST_HausdorffDistance(Seq(leftShape, rightShape)) =>
+        isDistanceJoinOptimizable(leftShape, rightShape, larger)
+      case ST_HausdorffDistance(Seq(leftShape, rightShape, densityFrac)) =>
+        isDistanceJoinOptimizable(leftShape, rightShape, larger)
 
       case _ => false
     }
