@@ -132,14 +132,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_PKG_GITHUB_TOKEN }}
         run: |
           mkdir -p artifacts/jars
-          mvn --batch-mode clean deploy -DskipTests -Dscala=2.12 -Dspark=3.3
-          cp spark-shaded/target/sedona-*.jar artifacts/jars
-          cp flink-shaded/target/sedona-*.jar artifacts/jars
-          cp snowflake/target/sedona-*.jar artifacts/jars
-          mvn --batch-mode clean deploy -DskipTests -Dscala=2.12 -Dspark=3.4
-          cp spark-shaded/target/sedona-*.jar artifacts/jars
-          cp flink-shaded/target/sedona-*.jar artifacts/jars
-          cp snowflake/target/sedona-*.jar artifacts/jars
           mvn --batch-mode clean deploy -DskipTests -Dscala=2.12 -Dspark=3.5
           cp spark-shaded/target/sedona-*.jar artifacts/jars
           cp flink-shaded/target/sedona-*.jar artifacts/jars
