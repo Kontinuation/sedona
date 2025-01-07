@@ -112,9 +112,6 @@ public class JoinQuery {
         queryRDD.spatialPartitionedRDD,
         "[JoinQuery] queryRDD SpatialPartitionedRDD is null. Please use the spatialRDD's grids to do spatial partitioning.");
 
-    final SpatialPartitioner spatialPartitioner = spatialRDD.getPartitioner();
-    final SpatialPartitioner queryPartitioner = queryRDD.getPartitioner();
-
     final int spatialNumPart = spatialRDD.spatialPartitionedRDD.getNumPartitions();
     final int queryNumPart = queryRDD.spatialPartitionedRDD.getNumPartitions();
     if (spatialNumPart != queryNumPart) {

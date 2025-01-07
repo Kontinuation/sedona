@@ -27,9 +27,13 @@ public class UniqueGeometry<T> extends Geometry {
   private final String uniqueId;
 
   public UniqueGeometry(T originalGeometry) {
+    this(UUID.randomUUID().toString(), originalGeometry);
+  }
+
+  public UniqueGeometry(String uniqueId, T originalGeometry) {
     super(new GeometryFactory());
+    this.uniqueId = uniqueId;
     this.originalGeometry = originalGeometry;
-    this.uniqueId = UUID.randomUUID().toString();
   }
 
   public T getOriginalGeometry() {

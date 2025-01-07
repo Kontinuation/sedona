@@ -78,6 +78,10 @@ public class Subdivide {
       this.origGeomWithoutUserData = origGeomWithoutUserData;
     }
 
+    public SubdividedPart() {
+      this(0, null, null);
+    }
+
     @Override
     public void write(Kryo kryo, Output output) {
       output.writeLong(id);

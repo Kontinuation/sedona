@@ -24,82 +24,116 @@ import com.esotericsoftware.kryo.io.UnsafeOutput;
 import org.apache.sedona.common.geometryObjects.Circle;
 import org.apache.sedona.common.geometryObjects.NullGeometry;
 import org.apache.sedona.common.geometrySerde.GeometryBuffer;
-import org.apache.sedona.common.geometrySerde.GeometrySerde;
+import org.apache.sedona.common.geometrySerde.GeometryBufferFactory;
+import org.apache.sedona.common.geometrySerde.GeometrySerializer;
 import org.apache.sedona.common.geometrySerde.SerializedCoordinateFilters.StatisticsCollector;
-import org.apache.sedona.core.spatialOperator.Subdivide;
-import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner.OuterJoinUserData;
 import org.apache.sedona.core.wrapper.UniqueGeometry;
 import org.apache.spark.sedona.core.index.DataItemFormat;
-import org.apache.spark.sql.catalyst.expressions.UnsafeRow;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.GeometryCollection;
-import org.locationtech.jts.geom.LineString;
-import org.locationtech.jts.geom.MultiLineString;
-import org.locationtech.jts.geom.MultiPoint;
-import org.locationtech.jts.geom.MultiPolygon;
-import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 
 /**
  * The data item format for accessing geometry data. This is an adapter for externalizing in-memory
- * STR-tree based spatial indexes. A better approach to support Spark SQL spatial join queries is to
- * use {@code UnsafeRowDataItemFormat}.
+ * STR-tree based spatial indexes. It also serves as a better serializer for geometry objects
+ * containing user data, since the most commonly used user data types have special treatments to get
+ * rid of unnecessary overhead.
  */
 public class GeometryDataItemFormat implements DataItemFormat<GeometryDataItem> {
 
   private final Kryo kryo = new Kryo();
   private final UnsafeOutput out = new UnsafeOutput(1024, -1);
   private final UnsafeInput in = new UnsafeInput(0);
-  private final GeometrySerde geometrySerde = new GeometrySerde();
   private final StatisticsCollector statsCollector = new StatisticsCollector();
 
   public GeometryDataItemFormat() {
     kryo.setInstantiatorStrategy(new org.objenesis.strategy.StdInstantiatorStrategy());
     kryo.setClassLoader(Thread.currentThread().getContextClassLoader());
-    kryo.setReferences(false);
-
-    kryo.register(Point.class, geometrySerde);
-    kryo.register(LineString.class, geometrySerde);
-    kryo.register(Polygon.class, geometrySerde);
-    kryo.register(MultiPoint.class, geometrySerde);
-    kryo.register(MultiLineString.class, geometrySerde);
-    kryo.register(MultiPolygon.class, geometrySerde);
-    kryo.register(GeometryCollection.class, geometrySerde);
-    kryo.register(Circle.class, geometrySerde);
-    kryo.register(Envelope.class, geometrySerde);
-    kryo.register(NullGeometry.class, geometrySerde);
-    kryo.register(UniqueGeometry.class, geometrySerde);
-    kryo.register(Subdivide.SubdividedPart.class);
-    kryo.register(OuterJoinUserData.class);
-    kryo.register(UnsafeRow.class);
-    kryo.register(GeometryDataItem.class);
+    UserDataSerializer.registerClasses(kryo);
   }
 
   @Override
   public byte[] serialize(GeometryDataItem dataItem) {
-    out.clear();
-    geometrySerde.write(kryo, out, dataItem.geometry);
-    return out.toBytes();
+    Geometry geometry = dataItem.geometry;
+    return serialize(geometry);
   }
 
   public byte[] serialize(Geometry geometry) {
     out.clear();
-    geometrySerde.write(kryo, out, geometry);
+    Object userData = geometry.getUserData();
+    if (geometry instanceof NullGeometry) {
+      out.writeByte((byte) Type.NULL_GEOMETRY.id);
+    } else if (geometry instanceof UniqueGeometry) {
+      out.writeByte((byte) Type.UNIQUE_GEOMETRY.id);
+      UniqueGeometry<?> uniqueGeometry = (UniqueGeometry<?>) geometry;
+      out.writeString(((UniqueGeometry<?>) geometry).getUniqueId());
+      byte[] data = GeometrySerializer.serialize((Geometry) uniqueGeometry.getOriginalGeometry());
+      out.writeInt(data.length);
+      out.write(data, 0, data.length);
+    } else if (geometry instanceof Circle) {
+      out.writeByte((byte) Type.CIRCLE.id);
+      Circle circle = (Circle) geometry;
+      out.writeDouble(circle.getRadius());
+      Geometry innerGeometry = circle.getCenterGeometry();
+      byte[] data = GeometrySerializer.serialize(innerGeometry);
+      out.writeInt(data.length);
+      out.write(data, 0, data.length);
+      UserDataSerializer.write(kryo, out, innerGeometry.getUserData());
+    } else {
+      out.writeByte((byte) Type.GEOMETRY.id);
+      byte[] data = GeometrySerializer.serialize(geometry);
+      out.writeInt(data.length);
+      out.write(data, 0, data.length);
+    }
+    UserDataSerializer.write(kryo, out, userData);
     return out.toBytes();
   }
 
   @Override
   public GeometryDataItem deserialize(byte[] bytes) {
-    in.setBuffer(bytes);
-    Geometry geom = (Geometry) geometrySerde.read(kryo, in, Geometry.class);
-    return new GeometryDataItem(geom);
+    Geometry geometry = deserializeToGeometry(bytes);
+    return new GeometryDataItem(geometry);
   }
 
   public Geometry deserializeToGeometry(byte[] bytes) {
     in.setBuffer(bytes);
-    return (Geometry) geometrySerde.read(kryo, in, Geometry.class);
+
+    Geometry geometry;
+    Type type = Type.fromId(in.readByte());
+    byte[] data;
+    switch (type) {
+      case NULL_GEOMETRY:
+        geometry = new NullGeometry();
+        geometry.setUserData(UserDataSerializer.read(kryo, in));
+        break;
+      case UNIQUE_GEOMETRY:
+        String uniqueId = in.readString();
+        data = new byte[in.readInt()];
+        in.readBytes(data);
+        geometry = new UniqueGeometry<>(uniqueId, GeometrySerializer.deserialize(data));
+        geometry.setUserData(UserDataSerializer.read(kryo, in));
+        break;
+      case GEOMETRY:
+        data = new byte[in.readInt()];
+        in.readBytes(data);
+        geometry = GeometrySerializer.deserialize(data);
+        geometry.setUserData(UserDataSerializer.read(kryo, in));
+        break;
+      case CIRCLE:
+        double radius = in.readDouble();
+        data = new byte[in.readInt()];
+        in.readBytes(data);
+        Geometry centerGeometry = GeometrySerializer.deserialize(data);
+        centerGeometry.setUserData(UserDataSerializer.read(kryo, in));
+        Circle circle = new Circle(centerGeometry, radius);
+        circle.setUserData(UserDataSerializer.read(kryo, in));
+        geometry = circle;
+        break;
+      default:
+        throw new IllegalArgumentException("Unknown type id: " + type.id);
+    }
+
+    return geometry;
   }
 
   @Override
@@ -109,7 +143,28 @@ public class GeometryDataItemFormat implements DataItemFormat<GeometryDataItem> 
 
   public Envelope extractEnvelope(byte[] serialized) {
     in.setBuffer(serialized);
-    GeometryBuffer geometryBuffer = geometrySerde.readGeometryBuffer(new UnsafeInput(serialized));
+
+    Type type = Type.fromId(in.readByte());
+    byte[] data;
+    switch (type) {
+      case NULL_GEOMETRY:
+        return new Envelope();
+      case UNIQUE_GEOMETRY:
+        in.readString();
+        data = new byte[in.readInt()];
+        in.readBytes(data);
+        break;
+      case GEOMETRY:
+        data = new byte[in.readInt()];
+        in.readBytes(data);
+        break;
+      case CIRCLE:
+        return deserializeToGeometry(serialized).getEnvelopeInternal();
+      default:
+        throw new IllegalArgumentException("Unknown type id: " + type.id);
+    }
+
+    GeometryBuffer geometryBuffer = GeometryBufferFactory.wrap(data);
     statsCollector.reset();
     statsCollector.apply(geometryBuffer);
     return statsCollector.getEnvelope();
@@ -125,48 +180,30 @@ public class GeometryDataItemFormat implements DataItemFormat<GeometryDataItem> 
     return dataItem.getPreparedGeometry();
   }
 
-  /**
-   * Handling serialization/deserialization of user data attached to the geometry specially for
-   * commonly used data types. This will be faster than using the generic Kryo object reader and
-   * writer.
-   */
-  private enum UserDataType {
-    /** No user data */
-    NULL(0),
-    /**
-     * User data is UnsafeRow. This is the most common case when running inner spatial joins using
-     * DataFrame/SQL API.
-     */
-    UNSAFE_ROW(1),
-    /** User data when running an outer spatial join. */
-    OUTER_JOIN_USER_DATA(2),
-    /** User data when running a spatial join with global subdividing. */
-    SUBDIVIDED_PART(3),
-    /**
-     * Any other user data. This won't happen when running spatial joins using DataFrame/SQL API.
-     */
-    OTHER(4);
+  private enum Type {
+    GEOMETRY(0),
+    CIRCLE(1),
+    NULL_GEOMETRY(2),
+    UNIQUE_GEOMETRY(3);
 
     private final int id;
 
-    UserDataType(int id) {
+    Type(int id) {
       this.id = id;
     }
 
-    public static UserDataType fromId(int id) {
+    public static Type fromId(int id) {
       switch (id) {
         case 0:
-          return NULL;
+          return GEOMETRY;
         case 1:
-          return UNSAFE_ROW;
+          return CIRCLE;
         case 2:
-          return OUTER_JOIN_USER_DATA;
+          return NULL_GEOMETRY;
         case 3:
-          return SUBDIVIDED_PART;
-        case 4:
-          return OTHER;
+          return UNIQUE_GEOMETRY;
         default:
-          throw new IllegalArgumentException("Unknown user data type id: " + id);
+          throw new IllegalArgumentException("Unknown type id: " + id);
       }
     }
   }

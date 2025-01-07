@@ -26,7 +26,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.commons.collections.iterators.SingletonIterator;
+import org.apache.commons.collections4.iterators.SingletonIterator;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
@@ -36,6 +36,7 @@ import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.monitoring.JavaMetrics;
+import org.apache.sedona.core.serde.ShuffledGeometrySerializer;
 import org.apache.sedona.core.spatialPartitioning.*;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitionerBuilder.SpatialPartitionBuildingStrategy;
 import org.apache.sedona.core.spatialPartitioning.quadtree.StandardQuadTree;
@@ -52,6 +53,8 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.function.FlatMapFunction;
 import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.Function2;
+import org.apache.spark.rdd.ShuffledRDD;
+import org.apache.spark.serializer.Serializer;
 import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.util.LongAccumulator;
 import org.apache.spark.util.random.SamplingUtils;
@@ -555,7 +558,7 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
     return partition(partitioner, null);
   }
 
-  private JavaRDD<T> partition(final SpatialPartitioner partitioner, SedonaConf conf) {
+  protected JavaRDD<T> partition(final SpatialPartitioner partitioner, SedonaConf conf) {
     JavaPairRDD<Integer, T> geometryWithPartId;
     if (conf != null && conf.metricsForSpatialPartitioningEnabled()) {
       // Update metrics when iterating over partitioned geometries
@@ -571,32 +574,38 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
     } else {
       geometryWithPartId = this.rawSpatialRDD.flatMapToPair(partitioner::placeObject);
     }
-    return geometryWithPartId
-        .partitionBy(partitioner)
-        .mapPartitions(
-            new FlatMapFunction<Iterator<Tuple2<Integer, T>>, T>() {
+
+    JavaPairRDD<Integer, T> partitionedRdd = geometryWithPartId.partitionBy(partitioner);
+
+    // Use a more efficient serializer for shuffle write and read of spatial partitioned
+    // <int, geometry> pairs.
+    Serializer serializer = new ShuffledGeometrySerializer();
+    ((ShuffledRDD<Integer, T, T>) partitionedRdd.rdd()).setSerializer(serializer);
+
+    return partitionedRdd.mapPartitions(
+        new FlatMapFunction<Iterator<Tuple2<Integer, T>>, T>() {
+          @Override
+          public Iterator<T> call(final Iterator<Tuple2<Integer, T>> tuple2Iterator)
+              throws Exception {
+            return new Iterator<T>() {
               @Override
-              public Iterator<T> call(final Iterator<Tuple2<Integer, T>> tuple2Iterator)
-                  throws Exception {
-                return new Iterator<T>() {
-                  @Override
-                  public boolean hasNext() {
-                    return tuple2Iterator.hasNext();
-                  }
-
-                  @Override
-                  public T next() {
-                    return tuple2Iterator.next()._2();
-                  }
-
-                  @Override
-                  public void remove() {
-                    throw new UnsupportedOperationException();
-                  }
-                };
+              public boolean hasNext() {
+                return tuple2Iterator.hasNext();
               }
-            },
-            true);
+
+              @Override
+              public T next() {
+                return tuple2Iterator.next()._2();
+              }
+
+              @Override
+              public void remove() {
+                throw new UnsupportedOperationException();
+              }
+            };
+          }
+        },
+        true);
   }
 
   /**
@@ -741,7 +750,6 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
    *
    * @return true, if successful
    */
-  @SuppressWarnings("unchecked")
   public boolean advancedAnalyze() {
     // Resolve parameters for collecting the statistics of the raw spatial RDD
     int numPartitions = this.rawSpatialRDD.getNumPartitions();
@@ -756,29 +764,16 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
     int topKLargest = conf.getSubdivideConsiderTopKLargestGeometries();
     long seed = System.nanoTime();
 
-    // Collect statistics of the raw spatial RDD
-    final Function2<Integer, Iterator<T>, Iterator<AdvancedStatCollector>>
-        aggregatePerPartitionStats =
-            (partitionId, iterator) -> {
-              AdvancedStatCollector statCalculator =
-                  new AdvancedStatCollector(
-                      minSamples,
-                      maxSamples,
-                      minSamplingRate,
-                      sizeEstimationSampleGrowthRate,
-                      topKLargest,
-                      seed + partitionId);
-              while (iterator.hasNext()) {
-                Geometry geom = iterator.next();
-                statCalculator.update(geom);
-              }
-              return (Iterator<AdvancedStatCollector>) new SingletonIterator(statCalculator);
-            };
     AdvancedStatCollector agg;
     if (numPartitions > 0) {
-      JavaRDD<AdvancedStatCollector> perPartitionStatsRdd =
-          this.rawSpatialRDD.mapPartitionsWithIndex(aggregatePerPartitionStats, true);
-      agg = perPartitionStatsRdd.reduce(AdvancedStatCollector::combine);
+      agg =
+          doAdvancedAnalyze(
+              minSamples,
+              maxSamples,
+              minSamplingRate,
+              sizeEstimationSampleGrowthRate,
+              topKLargest,
+              seed);
     } else {
       agg =
           new AdvancedStatCollector(
@@ -795,6 +790,36 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
     this.boundaryEnvelope = agg.getBoundary();
     this.approximateTotalCount = agg.getCount();
     return true;
+  }
+
+  protected AdvancedStatCollector doAdvancedAnalyze(
+      long minSamples,
+      long maxSamples,
+      double minSamplingRate,
+      double sizeEstimationSampleGrowthRate,
+      int topKLargest,
+      long seed) {
+    // Collect statistics of the raw spatial RDD
+    final Function2<Integer, Iterator<T>, Iterator<AdvancedStatCollector>>
+        aggregatePerPartitionStats =
+            (partitionId, iterator) -> {
+              AdvancedStatCollector statCalculator =
+                  new AdvancedStatCollector(
+                      minSamples,
+                      maxSamples,
+                      minSamplingRate,
+                      sizeEstimationSampleGrowthRate,
+                      topKLargest,
+                      seed + partitionId);
+              while (iterator.hasNext()) {
+                Geometry geom = iterator.next();
+                statCalculator.update(geom);
+              }
+              return new SingletonIterator<>(statCalculator);
+            };
+    JavaRDD<AdvancedStatCollector> perPartitionStatsRdd =
+        this.rawSpatialRDD.mapPartitionsWithIndex(aggregatePerPartitionStats, true);
+    return perPartitionStatsRdd.reduce(AdvancedStatCollector::combine);
   }
 
   /**

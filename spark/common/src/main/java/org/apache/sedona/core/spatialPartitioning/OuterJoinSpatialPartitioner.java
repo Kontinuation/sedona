@@ -125,6 +125,10 @@ public class OuterJoinSpatialPartitioner extends SpatialPartitioner {
       this.isPrimary = isPrimary;
     }
 
+    public OuterJoinUserData() {
+      this(null, false);
+    }
+
     @Override
     public void write(Kryo kryo, Output output) {
       if (userData instanceof UnsafeRow) {

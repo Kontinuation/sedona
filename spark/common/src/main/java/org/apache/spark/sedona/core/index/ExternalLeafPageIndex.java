@@ -279,7 +279,19 @@ public class ExternalLeafPageIndex implements AutoCloseable {
     return result;
   }
 
-  public long spill(DiskBlockManager diskBlockManager) throws IOException {
+  public long spill(DiskBlockManager diskBlockManager) {
+    try {
+      return doSpill(diskBlockManager);
+    } catch (IOException e) {
+      // trySpillAndAcquire will catch IOException and rethrow it as a SparkOutOfMemoryError
+      // exception, this does not always make the task fail.
+      // The leaf page index will run into an inconsistent state if the spill fails. We should
+      // throw a RuntimeException to fail the task.
+      throw new RuntimeException("Failed to spill leaf pages to disk", e);
+    }
+  }
+
+  private long doSpill(DiskBlockManager diskBlockManager) throws IOException {
     LongArray envelopesToFree;
     long freedSize;
     int numEnvelopes = 0;

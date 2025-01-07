@@ -228,6 +228,16 @@ public class ExternalLeafPageIndexBuilder extends SpillableBuilderBase implement
         capacity = 0;
         size = 0;
       }
+    } catch (Exception e) {
+      // trySpillAndAcquire will catch IOException and rethrow it as a SparkOutOfMemoryError
+      // exception, this does not always make the task fail.
+      // The leaf page index builder will run into an inconsistent state if the spill fails. We
+      // should throw a RuntimeException to fail the task.
+      if (e instanceof IOException) {
+        throw new RuntimeException("I/O error while spilling envelopes to disk", e);
+      } else {
+        throw e;
+      }
     } finally {
       if (envelopeArrayToFree != null) {
         consumer.freeArray(envelopeArrayToFree);

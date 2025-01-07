@@ -231,7 +231,7 @@ public class SedonaConf implements Serializable {
     // Parameters for setting external (spill-able) spatial index
     this.useExternalSpatialIndex =
         Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.join.useExternalSpatialIndex", "false"));
+            runtimeConfig.get("spark.sedona.join.useExternalSpatialIndex", "true"));
     this.externalSpatialIndexLeafPageCapacity =
         Integer.parseInt(
             runtimeConfig.get("spark.sedona.join.externalSpatialIndexLeafPageCapacity", "100"));
