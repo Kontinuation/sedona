@@ -29,14 +29,13 @@ import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.deploy.PythonRunner
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.monitoring.ListenerRegistrator
-import org.apache.spark.sql.sedona_sql.optimization.{ExtractGeoStatsFunctions, GetReverseGeocodeLayersFunction, ReverseGeocodingFunction, SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
+import org.apache.spark.sql.sedona_sql.optimization._
 import org.apache.spark.sql.sedona_sql.strategy.geostats.EvalGeoStatsFunctionStrategy
-import org.apache.spark.sql.sedona_sql.optimization.{GetReverseGeocodeLayersFunction, OrderByOptimization, ReverseGeocodingFunction, SpatialFilterPushDownForGeoParquet, UsePreparedPredicate}
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
 import org.apache.spark.sql.{SQLContext, SparkSession}
 
-import scala.collection.mutable.ListBuffer
 import scala.annotation.StaticAnnotation
+import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
 class InternalApi(
@@ -67,6 +66,17 @@ object SedonaContext {
     if (!sparkSession.experimental.extraStrategies.exists(_.isInstanceOf[JoinQueryDetector])) {
       sparkSession.experimental.extraStrategies ++= Seq(new JoinQueryDetector(sparkSession))
     }
+    // Do these before UsePreparedPredicate so Use PreparedPredicate can be used against the revised plan
+    if (!sparkSession.experimental.extraOptimizations.contains(
+        ReplaceSingleRowJoinsWithScalarSubqueries)) {
+      sparkSession.experimental.extraOptimizations ++= Seq(
+        ReplaceSingleRowJoinsWithScalarSubqueries)
+    }
+    // Do this before UsePreparedPredicate so Use PreparedPredicate can be used against the revised plan
+    if (!sparkSession.experimental.extraOptimizations.contains(OneRowRelationJoin)) {
+      sparkSession.experimental.extraOptimizations ++= Seq(OneRowRelationJoin)
+    }
+
     if (!sparkSession.experimental.extraOptimizations.exists(
         _.isInstanceOf[UsePreparedPredicate])) {
       sparkSession.experimental.extraOptimizations ++= Seq(new UsePreparedPredicate)

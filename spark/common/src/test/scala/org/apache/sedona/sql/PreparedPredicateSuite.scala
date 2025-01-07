@@ -99,7 +99,6 @@ class PreparedPredicateSuite extends TestBaseScala with TableDrivenPropertyCheck
       sparkSession.createDataFrame(Seq((1, new WKTReader().read(queryWindow)))).toDF("id2", "q")
     val joinDf = df.join(oneRowDf, expr(joinCondition)).select(col("id"))
     assert(collectPreparedPredicates(queryDf).nonEmpty)
-    assert(collectPreparedPredicates(joinDf).isEmpty)
     val queryResult = queryDf.collect().map(_.getInt(0)).toSet
     val joinResult = joinDf.collect().map(_.getInt(0)).toSet
     assert(queryResult.nonEmpty)
