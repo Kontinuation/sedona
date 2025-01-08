@@ -33,6 +33,7 @@ import java.util.Random;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.enums.ExecutionMode;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
+import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.executor.ShuffleWriteMetrics;
 import org.apache.spark.sedona.core.index.ExternalSpatialIndex;
@@ -94,17 +95,14 @@ public class ExternalSpatialIndexWithRefinementTest extends ExternalIndexTestBas
   @Test
   public void testEmpty() throws IOException {
     ExternalSpatialIndexWithRefinement<GeometryDataItem> index =
-        create(
-            SpatialPredicate.INTERSECTS,
-            extraFilter,
-            executionMode,
-            subdivideBuildOptions,
-            subdivideStreamOptions);
+        create(executionMode, subdivideBuildOptions, subdivideStreamOptions);
     index.build();
 
     // Querying an empty index should return an empty iterator
     Geometry queryGeom = FACTORY.createPoint(new Coordinate(0, 0));
-    Iterator<DataObjectWithId<GeometryDataItem>> iter = index.query(queryGeom);
+    Iterator<DataObjectWithId<GeometryDataItem>> iter =
+        index.query(
+            queryGeom, SpatialPredicateEvaluators.create(SpatialPredicate.INTERSECTS), extraFilter);
     assertFalse(iter.hasNext());
 
     index.close();
@@ -113,12 +111,7 @@ public class ExternalSpatialIndexWithRefinementTest extends ExternalIndexTestBas
   @Test
   public void testBuildAndQueryIndex() throws IOException {
     ExternalSpatialIndexWithRefinement<GeometryDataItem> index =
-        create(
-            SpatialPredicate.INTERSECTS,
-            extraFilter,
-            executionMode,
-            subdivideBuildOptions,
-            subdivideStreamOptions);
+        create(executionMode, subdivideBuildOptions, subdivideStreamOptions);
     STRtree refIndex = new STRtree();
     for (Geometry geom : DATASET_BUILD) {
       index.insert(new GeometryDataItem(geom));
@@ -129,7 +122,9 @@ public class ExternalSpatialIndexWithRefinementTest extends ExternalIndexTestBas
 
     for (int trial = 0; trial < 2; trial++) {
       for (Geometry geom : DATASET_STREAM) {
-        Iterator<DataObjectWithId<GeometryDataItem>> actualIter = index.query(geom);
+        Iterator<DataObjectWithId<GeometryDataItem>> actualIter =
+            index.query(
+                geom, SpatialPredicateEvaluators.create(SpatialPredicate.INTERSECTS), extraFilter);
         List<Geometry> actual = new ArrayList<>();
         while (actualIter.hasNext()) {
           actual.add(actualIter.next().dataObject.geometry);
@@ -149,12 +144,7 @@ public class ExternalSpatialIndexWithRefinementTest extends ExternalIndexTestBas
   @Test
   public void testFetchDataObjects() throws IOException {
     ExternalSpatialIndexWithRefinement<GeometryDataItem> index =
-        create(
-            SpatialPredicate.INTERSECTS,
-            extraFilter,
-            executionMode,
-            subdivideBuildOptions,
-            subdivideStreamOptions);
+        create(executionMode, subdivideBuildOptions, subdivideStreamOptions);
     for (Geometry geom : DATASET_BUILD) {
       index.insert(new GeometryDataItem(geom));
     }
@@ -241,8 +231,6 @@ public class ExternalSpatialIndexWithRefinementTest extends ExternalIndexTestBas
   }
 
   private ExternalSpatialIndexWithRefinement<GeometryDataItem> create(
-      SpatialPredicate spatialPredicate,
-      Function2<Geometry, Geometry, Boolean> extraFilter,
       ExecutionMode executionMode,
       SubdivideOptions subdivideBuildOptions,
       SubdivideOptions subdivideStreamOptions) {
@@ -253,8 +241,6 @@ public class ExternalSpatialIndexWithRefinementTest extends ExternalIndexTestBas
     return new ExternalSpatialIndexWithRefinement<>(
         innerIndex,
         new GeometryDataItemFormat(),
-        spatialPredicate,
-        extraFilter,
         executionMode,
         subdivideBuildOptions,
         subdivideStreamOptions);

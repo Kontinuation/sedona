@@ -108,16 +108,12 @@ public class ExternalSpatialIndex extends SedonaMemoryConsumer implements AutoCl
   }
 
   public ExternalLeafPageIndex getLeafPageIndex() {
-    if (!built) {
-      throw new IllegalStateException("The spatial index is not built yet");
-    }
+    checkIndexIsBuilt();
     return leafPageIndex;
   }
 
   public ExternalDataItemIndex getDataItemIndex() {
-    if (!built) {
-      throw new IllegalStateException("The spatial index is not built yet");
-    }
+    checkIndexIsBuilt();
     return dataItemIndex;
   }
 
@@ -188,9 +184,7 @@ public class ExternalSpatialIndex extends SedonaMemoryConsumer implements AutoCl
   }
 
   public boolean hasSpilled() {
-    if (!built) {
-      throw new IllegalStateException("The spatial index is not built yet");
-    }
+    checkIndexIsBuilt();
     return dataItemIndex.isSpilled() || leafPageIndex.isSpilled();
   }
 
@@ -202,9 +196,7 @@ public class ExternalSpatialIndex extends SedonaMemoryConsumer implements AutoCl
    * @throws IOException If an I/O error occurs.
    */
   public IntList queryItemIds(Envelope searchEnv) throws IOException {
-    if (!built) {
-      throw new IllegalStateException("The spatial index is not built yet");
-    }
+    checkIndexIsBuilt();
 
     // Query the non-leaf tree to get the leaf ids
     IntList leafIds = queryNonLeafTree(searchEnv);
@@ -226,9 +218,7 @@ public class ExternalSpatialIndex extends SedonaMemoryConsumer implements AutoCl
    * @throws IOException if an I/O error occurs
    */
   public IntList queryItemIds(Iterator<Envelope> searchEnvs) throws IOException {
-    if (!built) {
-      throw new IllegalStateException("The spatial index is not built yet");
-    }
+    checkIndexIsBuilt();
 
     STRtree filterTree = new STRtree();
     List<Envelope> searchEnvsCopy = new ArrayList<>();
@@ -436,9 +426,13 @@ public class ExternalSpatialIndex extends SedonaMemoryConsumer implements AutoCl
   }
 
   public STRtree getNonLeafTree() {
+    checkIndexIsBuilt();
+    return nonLeafTree;
+  }
+
+  private void checkIndexIsBuilt() {
     if (!built) {
       throw new IllegalStateException("The spatial index is not built yet");
     }
-    return nonLeafTree;
   }
 }

@@ -35,6 +35,8 @@ import org.apache.sedona.common.utils.HalfOpenRectangle;
 import org.apache.sedona.core.enums.ExecutionMode;
 import org.apache.sedona.core.enums.LocalJoinType;
 import org.apache.sedona.core.spatialOperator.SpatialPredicate;
+import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators;
+import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators.SpatialPredicateEvaluator;
 import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner.OuterJoinUserData;
 import org.apache.sedona.core.utils.SedonaConf;
 import org.apache.spark.SparkEnv;
@@ -70,6 +72,8 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
 
   private final LocalJoinType localJoinType;
   private Iterator<T> streamIterator;
+  private final SpatialPredicateEvaluator spatialPredicateEvaluator;
+  private final Function2<Geometry, Geometry, Boolean> extraFilterWithDedup;
   private final ExternalSpatialIndexWithRefinement<GeometryDataItem> externalSpatialIndex;
   private BitSet indexedGeometryHasNoMatches;
   private Iterator<DataObjectWithId<GeometryDataItem>> queryResultIterator;
@@ -108,6 +112,8 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
       TaskContext taskContext) {
     this.localJoinType = localJoinType;
     this.streamIterator = streamIterator;
+    this.spatialPredicateEvaluator = SpatialPredicateEvaluators.create(predicate);
+    this.extraFilterWithDedup = getExtraFilterWithDedup(extraFilter, extent);
     this.queryResultIterator = EmptyIterator.emptyIterator();
     this.metricStreamCount = streamCount;
     this.metricResultCount = resultCount;
@@ -138,10 +144,7 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
     this.externalSpatialIndex =
         buildExternalSpatialIndex(
             buildIterator,
-            predicate,
-            extraFilter,
             executionMode,
-            extent,
             subdivideBuildOptions,
             subdivideStreamOptions,
             buildCount,
@@ -158,10 +161,7 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
 
   private ExternalSpatialIndexWithRefinement<GeometryDataItem> buildExternalSpatialIndex(
       Iterator<U> buildIterator,
-      SpatialPredicate predicate,
-      Function2<Geometry, Geometry, Boolean> extraFilter,
       ExecutionMode executionMode,
-      HalfOpenRectangle extent,
       SubdivideOptions subdivideBuildOptions,
       SubdivideOptions subdivideStreamOptions,
       SpatialJoinMetric buildCount,
@@ -182,15 +182,10 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
             internalNodeCapacity,
             spillMetrics);
 
-    Function2<Geometry, Geometry, Boolean> extraFilterWithDedup =
-        getExtraFilterWithDedup(extraFilter, extent);
-
     ExternalSpatialIndexWithRefinement<GeometryDataItem> externalSpatialIndex =
         new ExternalSpatialIndexWithRefinement<>(
             inner,
             new GeometryDataItemFormat(),
-            predicate,
-            extraFilterWithDedup,
             executionMode,
             subdivideBuildOptions,
             subdivideStreamOptions);
@@ -293,7 +288,11 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
         metricStreamCount.add(1);
         try {
           queryResultIterator =
-              externalSpatialIndex.query(currentStreamGeometry, metricCandidateCount);
+              externalSpatialIndex.query(
+                  currentStreamGeometry,
+                  spatialPredicateEvaluator,
+                  extraFilterWithDedup,
+                  metricCandidateCount);
         } catch (IOException e) {
           throw new RuntimeException(e);
         }

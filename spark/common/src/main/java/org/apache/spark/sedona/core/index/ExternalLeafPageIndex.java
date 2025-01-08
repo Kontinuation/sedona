@@ -104,6 +104,14 @@ public class ExternalLeafPageIndex implements AutoCloseable {
     public LeafPageMetadata(int id, int position, int size, double[] bounds) {
       this(id, position, size, bounds[0], bounds[1], bounds[2], bounds[3]);
     }
+
+    public Envelope getEnvelope() {
+      if (minX <= maxX) {
+        return new Envelope(minX, maxX, minY, maxY);
+      } else {
+        return new Envelope();
+      }
+    }
   }
 
   private final TaskContext taskContext;
@@ -365,14 +373,7 @@ public class ExternalLeafPageIndex implements AutoCloseable {
     STRtree nonLeafTree = new STRtree(internalNodeCapacity);
     for (int leafId = 0; leafId < this.metadata.size(); leafId++) {
       LeafPageMetadata leafMetadata = this.metadata.get(leafId);
-      Envelope leafEnvelope;
-      if (leafMetadata.minX <= leafMetadata.maxX) {
-        leafEnvelope =
-            new Envelope(
-                leafMetadata.minX, leafMetadata.maxX, leafMetadata.minY, leafMetadata.maxY);
-      } else {
-        leafEnvelope = new Envelope();
-      }
+      Envelope leafEnvelope = leafMetadata.getEnvelope();
       nonLeafTree.insert(leafEnvelope, leafId);
     }
     nonLeafTree.build();

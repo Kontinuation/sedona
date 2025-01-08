@@ -32,15 +32,17 @@ import org.apache.sedona.common.subDivide.ExtentBasedGeometrySubDivider;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.enums.ExecutionMode;
 import org.apache.sedona.core.joinJudgement.SpatialJoinMetric;
-import org.apache.sedona.core.spatialOperator.SpatialPredicate;
 import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators;
+import org.apache.sedona.core.spatialOperator.SpatialPredicateEvaluators.SpatialPredicateEvaluator;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.sedona.core.index.ExternalDataItemIndex.DataItemWithId;
+import org.apache.spark.sedona.core.index.nearestneighbor.NearestNeighborSearch;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Polygonal;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
+import org.locationtech.jts.index.strtree.ItemDistance;
 import org.locationtech.jts.index.strtree.STRtree;
 
 /** An external spatial index with candidate refinement using the original geometry. */
@@ -51,8 +53,6 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
   private final ExternalSpatialIndex spatialIndex;
   private final DataItemFormat<T> dataItemFormat;
 
-  private final SpatialPredicateEvaluators.SpatialPredicateEvaluator spatialPredicateEvaluator;
-  private final Function2<Geometry, Geometry, Boolean> extraFilter;
   private final ExecutionMode executionMode;
 
   private final ExtentBasedGeometrySubDivider buildSubDivider;
@@ -63,15 +63,11 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
   public ExternalSpatialIndexWithRefinement(
       ExternalSpatialIndex spatialIndex,
       DataItemFormat<T> dataItemFormat,
-      SpatialPredicate spatialPredicate,
-      Function2<Geometry, Geometry, Boolean> extraFilter,
       ExecutionMode executionMode,
       SubdivideOptions subdivideBuildOptions,
       SubdivideOptions subdivideStreamOptions) {
     this.spatialIndex = spatialIndex;
     this.dataItemFormat = dataItemFormat;
-    this.spatialPredicateEvaluator = SpatialPredicateEvaluators.create(spatialPredicate);
-    this.extraFilter = extraFilter;
     this.executionMode = executionMode;
 
     this.buildSubDivider =
@@ -88,6 +84,10 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
 
   public ExternalSpatialIndex getSpatialIndex() {
     return spatialIndex;
+  }
+
+  public DataItemFormat<T> getDataItemFormat() {
+    return dataItemFormat;
   }
 
   @Override
@@ -200,23 +200,35 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
    * Query the spatial index for the data objects that match the search geometry.
    *
    * @param searchGeom the search geometry
+   * @param spatialPredicateEvaluator the spatial predicate evaluator
+   * @param extraFilter the extra filter
    * @return an iterator of data objects that match the search geometry
    * @throws IOException if an error occurs while querying the spatial index
    */
-  public Iterator<DataObjectWithId<T>> query(Geometry searchGeom) throws IOException {
-    return query(searchGeom, null);
+  public Iterator<DataObjectWithId<T>> query(
+      Geometry searchGeom,
+      SpatialPredicateEvaluator spatialPredicateEvaluator,
+      Function2<Geometry, Geometry, Boolean> extraFilter)
+      throws IOException {
+    return query(searchGeom, spatialPredicateEvaluator, extraFilter, null);
   }
 
   /**
    * Query the spatial index for the data objects that match the search geometry.
    *
    * @param searchGeom the search geometry
+   * @param spatialPredicateEvaluator the spatial predicate evaluator
+   * @param extraFilter the extra filter
    * @param metricCandidateCount the metric candidate count
    * @return an iterator of data objects that match the search geometry
    * @throws IOException if an error occurs while querying the spatial index
    */
   public Iterator<DataObjectWithId<T>> query(
-      Geometry searchGeom, SpatialJoinMetric metricCandidateCount) throws IOException {
+      Geometry searchGeom,
+      SpatialPredicateEvaluator spatialPredicateEvaluator,
+      Function2<Geometry, Geometry, Boolean> extraFilter,
+      SpatialJoinMetric metricCandidateCount)
+      throws IOException {
     // Query the spatial index for the item ids
     IntList itemIds;
 
@@ -255,7 +267,8 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
         itemIdsToFetch.add(itemId);
         continue;
       }
-      if (refine(cachedDataItem, searchGeom, preparedSearchGeom)) {
+      if (refine(
+          cachedDataItem, searchGeom, preparedSearchGeom, spatialPredicateEvaluator, extraFilter)) {
         resultsFromCache.add(new DataObjectWithId<>(itemId, cachedDataItem));
       }
     }
@@ -267,29 +280,16 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
     // Step 3: filter the data items based on the spatial predicate. We need to add the data item to
     // the cache, and evaluate the spatial predicate and extra filter.
     Iterator<DataObjectWithId<T>> resultsFromIndex =
-        new RefinedDataItemIterator<>(this, fetchedDataItems, searchGeom, preparedSearchGeom);
+        new RefinedDataItemIterator<>(
+            this,
+            fetchedDataItems,
+            searchGeom,
+            preparedSearchGeom,
+            spatialPredicateEvaluator,
+            extraFilter);
 
     // Finally, merge the cached results and the uncached results
     return new IteratorChain<>(resultsFromCache.iterator(), resultsFromIndex);
-  }
-
-  /**
-   * Query the spatial index for the data objects that match the search geometry. The query results
-   * are returned as a list.
-   *
-   * @param searchGeom the search geometry
-   * @param metricCandidateCount the metric candidate count
-   * @return a list of data objects that match the search geometry
-   * @throws IOException if an error occurs while querying the spatial index
-   */
-  public List<DataObjectWithId<T>> queryAsList(
-      Geometry searchGeom, SpatialJoinMetric metricCandidateCount) throws IOException {
-    Iterator<DataObjectWithId<T>> iterator = query(searchGeom, metricCandidateCount);
-    List<DataObjectWithId<T>> result = new ArrayList<>();
-    while (iterator.hasNext()) {
-      result.add(iterator.next());
-    }
-    return result;
   }
 
   /**
@@ -298,9 +298,16 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
    * @param dataItem the data item to test
    * @param searchGeom the search geometry
    * @param preparedSearchGeom the prepared search geometry
+   * @param spatialPredicateEvaluator the spatial predicate evaluator
+   * @param extraFilter the extra filter
    * @return true if the data item matches the search geometry, false otherwise
    */
-  private boolean refine(T dataItem, Geometry searchGeom, PreparedGeometry preparedSearchGeom) {
+  private boolean refine(
+      T dataItem,
+      Geometry searchGeom,
+      PreparedGeometry preparedSearchGeom,
+      SpatialPredicateEvaluators.SpatialPredicateEvaluator spatialPredicateEvaluator,
+      Function2<Geometry, Geometry, Boolean> extraFilter) {
     Geometry geom;
     boolean matchSpatialPredicate;
     if (executionMode == ExecutionMode.PREPARE_BUILD) {
@@ -336,6 +343,8 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
     private final Iterator<DataItemWithId> fetchedDataItems;
     private final Geometry searchGeom;
     private final PreparedGeometry preparedSearchGeom;
+    private final SpatialPredicateEvaluators.SpatialPredicateEvaluator spatialPredicateEvaluator;
+    private final Function2<Geometry, Geometry, Boolean> extraFilter;
     private final ExternalSpatialIndexWithRefinement<T> parent;
 
     private T nextDataItem;
@@ -345,11 +354,15 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
         ExternalSpatialIndexWithRefinement<T> parent,
         Iterator<DataItemWithId> fetchedDataItems,
         Geometry searchGeom,
-        PreparedGeometry preparedSearchGeom) {
+        PreparedGeometry preparedSearchGeom,
+        SpatialPredicateEvaluators.SpatialPredicateEvaluator spatialPredicateEvaluator,
+        Function2<Geometry, Geometry, Boolean> extraFilter) {
       this.parent = parent;
       this.fetchedDataItems = fetchedDataItems;
       this.searchGeom = searchGeom;
       this.preparedSearchGeom = preparedSearchGeom;
+      this.spatialPredicateEvaluator = spatialPredicateEvaluator;
+      this.extraFilter = extraFilter;
       this.nextDataItem = null;
       this.nextId = -1;
     }
@@ -390,7 +403,8 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
       parent.cachedGeometries.put(itemId, dataItem);
 
       // Check if the data item matches the spatial predicate and extra filter
-      if (parent.refine(dataItem, searchGeom, preparedSearchGeom)) {
+      if (parent.refine(
+          dataItem, searchGeom, preparedSearchGeom, spatialPredicateEvaluator, extraFilter)) {
         nextId = itemId;
         nextDataItem = dataItem;
       } else {
@@ -415,5 +429,32 @@ public class ExternalSpatialIndexWithRefinement<T> implements AutoCloseable {
   public void invalidateCache() {
     cachedGeometries.invalidateAll();
     spatialIndex.getLeafPageIndex().invalidateCache();
+  }
+
+  /**
+   * Finds up to k items in this tree which are the nearest neighbors to the given item, using
+   * {@code itemDist} as the distance metric. This is ported from the STRtree implementation of JTS.
+   *
+   * <p>If the tree size is smaller than k fewer items will be returned.
+   *
+   * <p>If the tree is empty an array of size 0 is returned.
+   *
+   * @param env the envelope of the query item
+   * @param item the item to find the nearest neighbours of
+   * @param itemDist a distance metric applicable to the items in this tree and the query item
+   * @param k the maximum number of nearest items to search for
+   * @return a list of the nearest items found (with length between 0 and K)
+   */
+  public List<DataObjectWithId<T>> nearestNeighbours(
+      Envelope env, Object item, ItemDistance itemDist, int k) throws IOException {
+    if (k <= 0) {
+      throw new IllegalArgumentException("k must be greater than 0");
+    }
+    if (buildSubDivider != null || streamSubDivider != null) {
+      throw new UnsupportedOperationException(
+          "Cannot perform nearest neighbor search with subdivider enabled");
+    }
+
+    return NearestNeighborSearch.nearestNeighbours(this, env, item, itemDist, k);
   }
 }
