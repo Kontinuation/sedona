@@ -57,6 +57,7 @@ case class BroadcastIndexJoinExec(
     isGeography: Boolean,
     distance: Option[Expression] = None,
     unneededStreamAttributes: Seq[Attribute] = Seq.empty,
+    streamPartitions: Option[Int] = None,
     numOutputRowsMetrics: Option[SQLMetric] = None,
     executionMode: Option[ExecutionMode] = None)
     extends SedonaBinaryExecNode
@@ -268,7 +269,13 @@ case class BroadcastIndexJoinExec(
     val boundStreamShape = BindReferences.bindReference(streamShape, streamed.output)
     val streamResultsRaw = streamed.execute().asInstanceOf[RDD[UnsafeRow]]
     val broadcastIndex = broadcast.executeBroadcast[SpatialIndex]()
-    val streamShapes = createStreamShapes(streamResultsRaw, boundStreamShape)
+    var streamShapes = createStreamShapes(streamResultsRaw, boundStreamShape)
+
+    streamPartitions match {
+      case Some(numPartitions) =>
+        streamShapes = streamShapes.repartition(numPartitions)
+      case None =>
+    }
 
     streamShapes.mapPartitions { streamedIter =>
       val joinedIter = joinType match {

@@ -783,6 +783,7 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
               sizeEstimationSampleGrowthRate,
               topKLargest,
               seed);
+      agg.finish();
     }
 
     // Set the boundary and count
@@ -805,6 +806,7 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
             (partitionId, iterator) -> {
               AdvancedStatCollector statCalculator =
                   new AdvancedStatCollector(
+                      partitionId,
                       minSamples,
                       maxSamples,
                       minSamplingRate,
@@ -815,6 +817,7 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
                 Geometry geom = iterator.next();
                 statCalculator.update(geom);
               }
+              statCalculator.finish();
               return new SingletonIterator<>(statCalculator);
             };
     JavaRDD<AdvancedStatCollector> perPartitionStatsRdd =

@@ -66,33 +66,34 @@ class TestToPythonSerialization extends TestBaseScala {
     Source.fromInputStream(stream).getLines.toList
   }
 
-  val pointSpatialRDD = sc.parallelize(samplePoints).toJavaRDD()
+  lazy val pointSpatialRDD = sc.parallelize(samplePoints).toJavaRDD()
 
-  val circleSpatialRDD = sc.parallelize(sampleCircles).toJavaRDD()
+  lazy val circleSpatialRDD = sc.parallelize(sampleCircles).toJavaRDD()
 
-  val spatialPairRDD = sc.parallelize(
+  lazy val spatialPairRDD = sc.parallelize(
     samplePoints.zip(samplePolygons).map(geometries => (geometries._1, geometries._2)))
 
-  val spatialPairRDDWithList =
+  lazy val spatialPairRDDWithList =
     sc.parallelize(samplePolygons.map(polygon => (polygon, samplePoints.slice(0, 2).asJava)))
 
-  val expectedPointArray: List[List[Byte]] = samplePoints.map(point =>
+  lazy val expectedPointArray: List[List[Byte]] = samplePoints.map(point =>
     0.toByteArray().toList ++ pythonGeometrySerializer.serialize(point).toList ++ 0
       .toByteArray()
       .toList)
 
-  val expectedPairRDDPythonArray: List[List[Byte]] = samplePoints
+  lazy val expectedPairRDDPythonArray: List[List[Byte]] = samplePoints
     .zip(samplePolygons)
     .map(geometries =>
       2.toByteArray().toList ++ pythonGeometrySerializer.serialize(geometries._1).toList
         ++ 1.toByteArray().toList ++ pythonGeometrySerializer.serialize(geometries._2).toList)
 
-  val expectedPairRDDWithListPythonArray: List[List[Byte]] = samplePolygons.map(samplePolygon =>
-    1.toByteArray().toList ++ pythonGeometrySerializer.serialize(samplePolygon).toList ++ 2
-      .toByteArray() ++
-      samplePoints
-        .slice(0, 2)
-        .flatMap(samplePoint => pythonGeometrySerializer.serialize(samplePoint)))
+  lazy val expectedPairRDDWithListPythonArray: List[List[Byte]] =
+    samplePolygons.map(samplePolygon =>
+      1.toByteArray().toList ++ pythonGeometrySerializer.serialize(samplePolygon).toList ++ 2
+        .toByteArray() ++
+        samplePoints
+          .slice(0, 2)
+          .flatMap(samplePoint => pythonGeometrySerializer.serialize(samplePoint)))
 
   describe("Sedona Python Wrapper Test") {
     it("Test Serialize To Python JavaRDD[Geometry]") {

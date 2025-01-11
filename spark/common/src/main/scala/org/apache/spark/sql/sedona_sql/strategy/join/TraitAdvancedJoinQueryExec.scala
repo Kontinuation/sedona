@@ -31,6 +31,7 @@ import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitioningMetrics
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector
+import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector.PerPartitionStats
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
@@ -62,9 +63,7 @@ import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.UnsafeRowWithId
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.UnsafeRowWithKeyIdAndOtherId
 
-import scala.concurrent.duration.{Duration, MILLISECONDS}
-import scala.concurrent.{Await, ExecutionContext, Future, TimeoutException}
-import scala.util.Try
+import scala.collection.JavaConverters._
 
 /**
  * TraitJoinQueryExec using advanced self-driving spatial join. This implementation of spatial
@@ -521,6 +520,12 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     }
     val executionMode =
       ExecutionMode.getOptimalExecutionMode(spatialPredicate, broadcastStat, streamStat)
+
+    // Determine do we need to repartition the stream side according to streamStat
+    val streamPartitions = if (sedonaConf.autoReBalanceStreamSide) {
+      determineStreamSidePartitions(streamStat)
+    } else None
+
     val broadcastIndexJoinExec = BroadcastIndexJoinExec(
       leftPlan,
       rightPlan,
@@ -533,6 +538,7 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       isGeographyDistanceJoin,
       distanceOnStreamSide,
       streamUnneededAttributes,
+      streamPartitions,
       Some(numOutputRows),
       Some(executionMode))
 
@@ -1063,6 +1069,39 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       case _ => throw new UnsupportedOperationException(s"Unsupported join type: $joinType")
     }
     Math.min(Math.max(1, numPartitions.toInt), sedonaConf.getMaxGuessedPartitionNumber)
+  }
+
+  private def determineStreamSidePartitions(stats: AdvancedStatCollector): Option[Int] = {
+    if (stats.getCount < 10000) {
+      // Don't bother to repartition if the number of geometries is small. The cost of
+      // repartitioning may outweigh the benefit.
+      return None
+    }
+
+    // Compute the skew score of the largest partition.
+    val partitionSizes =
+      stats.getPerPartitionStats.asScala.values.map(_.getPartitionSizeInBytes()).toArray
+    val mean = partitionSizes.sum.toDouble / partitionSizes.length
+    val score = if (partitionSizes.nonEmpty && mean > 0) {
+      // We only look at the largest partition to determine the skew score, since the straggler
+      // is the reason why we need to repartition.
+      partitionSizes.max / mean
+    } else {
+      0.0
+    }
+
+    // If the skew score is smaller than a threshold, we should not repartition
+    val threshold = sedonaConf.getStreamSideSkewScoreThreshold
+    if (score < threshold) {
+      return None
+    }
+
+    // Otherwise, we should repartition. The number of partitions cannot be larger than twice the
+    // number of partitions of the original spatial RDD.
+    val parallelism = sparkContext.defaultParallelism
+    val numPartitions =
+      Math.max(partitionSizes.length, Math.min(parallelism, partitionSizes.length * 2))
+    Some(numPartitions)
   }
 }
 

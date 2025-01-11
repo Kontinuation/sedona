@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import org.junit.Test;
 import org.locationtech.jts.geom.Coordinate;
@@ -90,6 +91,13 @@ public class AdvancedStatCollectorTest {
     assertEquals(2, stat.getTopAreaInfos().size());
     assertEquals(2, stat.getTopWidthInfos().size());
     assertEquals(2, stat.getTopHeightInfos().size());
+
+    stat.finish();
+    Map<Integer, AdvancedStatCollector.PerPartitionStats> perPartitionStats =
+        stat.getPerPartitionStats();
+    assertEquals(1, perPartitionStats.size());
+    assertEquals(2, perPartitionStats.get(0).count);
+    assertTrue(perPartitionStats.get(0).getPartitionSizeInBytes() > 64);
   }
 
   @Test
@@ -109,6 +117,7 @@ public class AdvancedStatCollectorTest {
         stat.update(geom);
       }
     }
+    stat.finish();
 
     // Check collected statistics
     assertEquals(10000, stat.getCount());
@@ -170,6 +179,7 @@ public class AdvancedStatCollectorTest {
     for (; count < 40000; count++) {
       stat.update(factory.createPoint(new Coordinate(-random.nextDouble(), random.nextDouble())));
     }
+    stat.finish();
     assertEquals(200, stat.getSampledEnvelopes().size());
 
     // Should sample evenly
@@ -201,6 +211,7 @@ public class AdvancedStatCollectorTest {
     for (Geometry geom : geometries) {
       stat.update(geom);
     }
+    stat.finish();
 
     AdvancedStatCollector.LargeGeometryInfo[] topAreaInfos =
         stat.getTopAreaInfos().toArray(new AdvancedStatCollector.LargeGeometryInfo[0]);
@@ -258,6 +269,7 @@ public class AdvancedStatCollectorTest {
               new Coordinate(1e-6 + random.nextDouble(), 1e-6 + random.nextDouble()));
       stat.update(geom);
     }
+    stat.finish();
 
     // Collect statistics for points on the 2nd quadrant
     AdvancedStatCollector statQ2 = new AdvancedStatCollector(100, 200, 0.01, 1.2, 10, 1);
@@ -267,6 +279,7 @@ public class AdvancedStatCollectorTest {
               new Coordinate(-1e-6 - random.nextDouble(), 1e-6 + random.nextDouble()));
       statQ2.update(geom);
     }
+    statQ2.finish();
 
     stat.combineWith(statQ2);
     assertEquals(20000, stat.getCount());
@@ -298,6 +311,7 @@ public class AdvancedStatCollectorTest {
               new Coordinate(1e-6 + random.nextDouble(), 1e-6 + random.nextDouble()));
       nonEmptyStat.update(geom);
     }
+    nonEmptyStat.finish();
 
     AdvancedStatCollector stat;
     if (combineNonEmptyIntoEmpty) {
@@ -339,6 +353,7 @@ public class AdvancedStatCollectorTest {
               new Coordinate(1e-6 + random.nextDouble(), 1e-6 + random.nextDouble()));
       stat.update(geom);
     }
+    stat.finish();
 
     // Collect statistics for points on the 2nd quadrant
     AdvancedStatCollector statQ2 = new AdvancedStatCollector(100, 200, 0.01, 1.2, 10, 1);
@@ -348,6 +363,7 @@ public class AdvancedStatCollectorTest {
               new Coordinate(-1e-6 - random.nextDouble(), 1e-6 + random.nextDouble()));
       statQ2.update(geom);
     }
+    statQ2.finish();
 
     if (combineQ2IntoQ1) {
       stat.combineWith(statQ2);
@@ -378,6 +394,7 @@ public class AdvancedStatCollectorTest {
               new Coordinate(1e-6 + random.nextDouble(), 1e-6 + random.nextDouble()));
       stat.update(geom);
     }
+    stat.finish();
 
     // Collect statistics for points on the 2nd quadrant
     AdvancedStatCollector statQ2 = new AdvancedStatCollector(100, 120, 0.01, 1.2, 10, 1);
@@ -387,6 +404,7 @@ public class AdvancedStatCollectorTest {
               new Coordinate(-1e-6 - random.nextDouble(), 1e-6 + random.nextDouble()));
       statQ2.update(geom);
     }
+    statQ2.finish();
 
     stat.combineWith(statQ2);
     assertEquals(15000, stat.getCount());
@@ -428,6 +446,8 @@ public class AdvancedStatCollectorTest {
         stat2.update(geometries.get(k));
       }
     }
+    stat.finish();
+    stat2.finish();
     stat.combineWith(stat2);
 
     AdvancedStatCollector.LargeGeometryInfo[] topAreaInfos =
@@ -453,5 +473,44 @@ public class AdvancedStatCollectorTest {
     assertEquals(196, topHeightInfos[0].height, 1e-10);
     assertEquals(198, topHeightInfos[1].height, 1e-10);
     assertEquals(200, topHeightInfos[2].height, 1e-10);
+  }
+
+  @Test
+  public void testPerPartitionStats() {
+    AdvancedStatCollector stat0 = new AdvancedStatCollector(0, 100, 200, 0.01, 1.2, 10, 1);
+    for (int k = 0; k < 100; k++) {
+      stat0.update(factory.createPoint(new Coordinate(1, 1)));
+      stat0.finish();
+    }
+
+    AdvancedStatCollector stat1 = new AdvancedStatCollector(1, 100, 200, 0.01, 1.2, 10, 1);
+    for (int k = 0; k < 200; k++) {
+      stat1.update(factory.createPoint(new Coordinate(1, 1)));
+      stat1.finish();
+    }
+
+    AdvancedStatCollector stat2 = new AdvancedStatCollector(2, 100, 200, 0.01, 1.2, 10, 1);
+    for (int k = 0; k < 300; k++) {
+      stat2.update(factory.createPoint(new Coordinate(1, 1)));
+      stat2.finish();
+    }
+
+    stat1.combineWith(stat2);
+    stat0.combineWith(stat1);
+    assertEquals(600, stat0.getCount());
+
+    Map<Integer, AdvancedStatCollector.PerPartitionStats> perPartitionStats =
+        stat0.getPerPartitionStats();
+    assertEquals(3, perPartitionStats.size());
+    assertEquals(100, perPartitionStats.get(0).count);
+    assertEquals(200, perPartitionStats.get(1).count);
+    assertEquals(300, perPartitionStats.get(2).count);
+    assertTrue(perPartitionStats.get(0).getPartitionSizeInBytes() > 64);
+    assertTrue(
+        perPartitionStats.get(1).getPartitionSizeInBytes()
+            > perPartitionStats.get(0).getPartitionSizeInBytes());
+    assertTrue(
+        perPartitionStats.get(2).getPartitionSizeInBytes()
+            > perPartitionStats.get(1).getPartitionSizeInBytes());
   }
 }

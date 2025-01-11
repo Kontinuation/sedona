@@ -272,7 +272,7 @@ class SpatialJoinSuite extends TestBaseScala with TableDrivenPropertyChecks {
           Map(
             advancedSpatialJoinConfKey -> "true",
             "sedona.join.autoBroadcastJoinThreshold" -> "100m",
-            "spark.sedona.testonly.allowPlanBroadcastJoin" -> "false")) {
+            "spark.sedona.join.allowPlanBroadcastJoin" -> "false")) {
           var result =
             sparkSession.sql(s"SELECT df1.id, df2.id FROM df1 JOIN df2 ON $joinCondition")
           var expected = buildExpectedResult(joinCondition)

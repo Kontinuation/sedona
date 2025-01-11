@@ -27,7 +27,7 @@ import org.apache.spark.sql.functions.{col, expr, lit}
 import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_DBSCAN, ST_LocalOutlierFactor}
 
 class GeoStatsSuite extends TestBaseScala {
-  private val spark = sparkSession
+  private lazy val spark = sparkSession
 
   case class Record(id: Int, x: Double, y: Double)
 

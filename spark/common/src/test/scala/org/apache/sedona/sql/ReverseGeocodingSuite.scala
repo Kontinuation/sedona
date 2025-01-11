@@ -31,7 +31,7 @@ case class Query(id: Int, x: Double, y: Double, layer: String)
 
 class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
 
-  private val spark = sparkSession
+  private lazy val spark = sparkSession
 
   override def beforeAll(): Unit = {
     super.beforeAll()
@@ -44,8 +44,8 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
   }
 
   override def afterAll(): Unit = {
-    super.afterAll()
     spark.catalog.dropTempView("geocodeTest")
+    super.afterAll()
   }
 
   private def create_geocode_table(): Unit = {

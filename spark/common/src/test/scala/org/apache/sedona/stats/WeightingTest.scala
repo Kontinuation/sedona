@@ -37,8 +37,8 @@ class WeightingTest extends TestBaseScala {
   }
 
   override def afterAll: Unit = {
-    super.beforeAll()
     sparkSession.conf.set("spark.sql.adaptive.enabled", originalAQEValue)
+    super.afterAll()
   }
 
   def getData(): DataFrame = {

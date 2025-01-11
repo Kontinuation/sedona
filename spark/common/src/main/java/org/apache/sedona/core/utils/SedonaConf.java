@@ -126,8 +126,10 @@ public class SedonaConf implements Serializable {
   private Boolean DBSCANIncludeOutliers = true;
   private Boolean LOFApproximateKNN = false;
 
-  // Parameters for testing
+  // Parameter for adaptive broadcast join
   private boolean allowPlanBroadcastJoin;
+  private boolean autoReBalanceStreamSide;
+  private double streamSideSkewScoreThreshold;
 
   public static SedonaConf fromActiveSession() {
     return new SedonaConf(SparkSession.active().conf());
@@ -327,10 +329,31 @@ public class SedonaConf implements Serializable {
     this.maxRowsPerPartitionInKNNJoins =
         Integer.parseInt(runtimeConfig.get("spark.sedona.join.knn.maxRowsPerPartition", "524288"));
 
-    // Parameters for testing
+    // If this is disabled, we will never generate broadcast index join plan for spatial join.
+    // This does not completely disable broadcast index join. If the statistics retrieved in the
+    // analyze phase show that one of the relation is smaller than
+    // spark.sedona.join.adaptiveAutoBroadcastJoinThreshold, we will switch to broadcast index join
+    // at query running time. This also allow us to automatically repartition the stream relation
+    // if skew is detected by the analyze phase.
     this.allowPlanBroadcastJoin =
+        Boolean.parseBoolean(runtimeConfig.get("spark.sedona.join.allowPlanBroadcastJoin", "true"));
+
+    // When the spatial join physical executor determines to use broadcast index join at query
+    // running time after analyzing joined datasets, we can choose to re-balance the stream side
+    // if it is skewed. This is useful when joining very unbalanced data with a small dataset.
+    // This configuration is disabled by default since it may introduce performance regression
+    // to existing workload when enabled.
+    this.autoReBalanceStreamSide =
         Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.testonly.allowPlanBroadcastJoin", "true"));
+            runtimeConfig.get("spark.sedona.join.autoReBalanceStreamSide", "false"));
+
+    // When the spatial join physical executor determines to use broadcast index join at query
+    // running time after analyzing joined datasets, we can choose to re-balance the stream side
+    // if it is skewed. This threshold determines how skewed the data needs to be to trigger
+    // automatic repartitioning.
+    this.streamSideSkewScoreThreshold =
+        Double.parseDouble(
+            runtimeConfig.get("spark.sedona.join.streamSideSkewScoreThreshold", "2.0"));
 
     this.reverseGeocodingTableName =
         runtimeConfig.get(
@@ -619,6 +642,10 @@ public class SedonaConf implements Serializable {
     return allowPlanBroadcastJoin;
   }
 
+  public boolean autoReBalanceStreamSide() {
+    return autoReBalanceStreamSide;
+  }
+
   public String getReverseGeocodingTableName() {
     return reverseGeocodingTableName;
   }
@@ -653,5 +680,9 @@ public class SedonaConf implements Serializable {
 
   public boolean forceSpillExternalSpatialIndex() {
     return forceSpillExternalSpatialIndex;
+  }
+
+  public double getStreamSideSkewScoreThreshold() {
+    return streamSideSkewScoreThreshold;
   }
 }

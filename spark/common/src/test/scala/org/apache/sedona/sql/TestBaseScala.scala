@@ -28,7 +28,6 @@ import org.apache.sedona.common.sphere.{Haversine, Spheroid}
 import org.apache.sedona.spark.SedonaContext
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.{DataFrame, SparkSession}
-import org.junit.Assert.fail
 import org.locationtech.jts.geom._
 import org.locationtech.jts.io.WKTReader
 import org.scalatest.{BeforeAndAfterAll, FunSpec}
@@ -104,12 +103,10 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
     super.beforeAll()
     SedonaContext.create(sparkSession)
     sc.setCheckpointDir(Files.createTempDirectory("checkpoints").toString)
-
   }
 
   override def afterAll(): Unit = {
-    // SedonaSQLRegistrator.dropAll(spark)
-//    sparkSession.stop
+    sparkSession.stop
   }
 
   def loadCsv(path: String): DataFrame = {

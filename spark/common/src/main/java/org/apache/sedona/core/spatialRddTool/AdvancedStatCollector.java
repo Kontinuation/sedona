@@ -25,7 +25,9 @@ import com.esotericsoftware.kryo.io.Output;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Random;
 import org.apache.sedona.common.enums.GeometryType;
@@ -175,6 +177,12 @@ public class AdvancedStatCollector implements Serializable {
     }
   }
 
+  /** The id of the partition this stat collector is collecting statistics for. */
+  private final int partitionId;
+
+  /** The per-partition stats. */
+  private final Map<Integer, PerPartitionStats> perPartitionStats = new HashMap<>();
+
   /**
    * A class for storing the information of a geometry with large extent. We don't store the
    * geometry itself since it could be very large, we only store the extent and some statistics of
@@ -224,13 +232,49 @@ public class AdvancedStatCollector implements Serializable {
     }
   }
 
+  /** Statistics for a partition. */
+  public static class PerPartitionStats implements KryoSerializable, Serializable {
+    public long count;
+    public long numEstimatedGeometries;
+    public long totalEstimatedSizeInBytes;
+
+    PerPartitionStats(long count, long numEstimatedGeometries, long totalEstimatedSizeInBytes) {
+      this.count = count;
+      this.numEstimatedGeometries = numEstimatedGeometries;
+      this.totalEstimatedSizeInBytes = totalEstimatedSizeInBytes;
+    }
+
+    public long getPartitionSizeInBytes() {
+      if (numEstimatedGeometries == 0) {
+        return 0;
+      }
+      return totalEstimatedSizeInBytes / numEstimatedGeometries * count;
+    }
+
+    @Override
+    public void write(Kryo kryo, Output output) {
+      output.writeLong(count);
+      output.writeLong(numEstimatedGeometries);
+      output.writeLong(totalEstimatedSizeInBytes);
+    }
+
+    @Override
+    public void read(Kryo kryo, Input input) {
+      count = input.readLong();
+      numEstimatedGeometries = input.readLong();
+      totalEstimatedSizeInBytes = input.readLong();
+    }
+  }
+
   public AdvancedStatCollector(
+      int partitionId,
       long minNumSamples,
       long maxNumSamples,
       double minSamplingRate,
       double sizeEstimationSampleGrowthRate,
       int topKLargestGeometries,
       long seed) {
+    this.partitionId = partitionId;
     this.minNumSamples = minNumSamples;
     this.maxNumSamples = maxNumSamples;
     this.minSamplingRate = minSamplingRate;
@@ -240,8 +284,26 @@ public class AdvancedStatCollector implements Serializable {
     this.reservoirSamplingMaxCount = (long) (minNumSamples / minSamplingRate);
   }
 
+  public AdvancedStatCollector(
+      long minNumSamples,
+      long maxNumSamples,
+      double minSamplingRate,
+      double sizeEstimationSampleGrowthRate,
+      int topKLargestGeometries,
+      long seed) {
+    this(
+        0,
+        minNumSamples,
+        maxNumSamples,
+        minSamplingRate,
+        sizeEstimationSampleGrowthRate,
+        topKLargestGeometries,
+        seed);
+  }
+
   public AdvancedStatCollector(long seed) {
     this(
+        0,
         DEFAULT_MIN_SAMPLES,
         DEFAULT_MAX_SAMPLES,
         DEFAULT_MIN_SAMPLING_RATE,
@@ -340,6 +402,13 @@ public class AdvancedStatCollector implements Serializable {
     }
   }
 
+  public void finish() {
+    // Update the partition stats of itself
+    perPartitionStats.put(
+        partitionId,
+        new PerPartitionStats(count, numEstimatedGeometries, totalEstimatedSizeInBytes));
+  }
+
   /**
    * Merge the statistics of another StatCalculator object into this object.
    *
@@ -348,6 +417,15 @@ public class AdvancedStatCollector implements Serializable {
   public void combineWith(AdvancedStatCollector other) {
     if (other == null || other.count == 0) {
       return;
+    }
+
+    // Merge the per-partition stats of the other stat collector into our stats
+    for (Map.Entry<Integer, PerPartitionStats> entry : other.perPartitionStats.entrySet()) {
+      int partitionId = entry.getKey();
+      PerPartitionStats otherStats = entry.getValue();
+      // We can simply replace the stats of the same partition id, since each partition is only
+      // handled by one stats collector. There should be no conflict.
+      perPartitionStats.put(partitionId, otherStats);
     }
 
     // Merge samples.
@@ -571,5 +649,9 @@ public class AdvancedStatCollector implements Serializable {
     } else {
       return GeometryType.POLYGON;
     }
+  }
+
+  public Map<Integer, PerPartitionStats> getPerPartitionStats() {
+    return perPartitionStats;
   }
 }

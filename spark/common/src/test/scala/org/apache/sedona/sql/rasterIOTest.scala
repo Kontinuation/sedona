@@ -235,5 +235,8 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
     }
   }
 
-  override def afterAll(): Unit = FileUtils.deleteDirectory(new File(tempDir))
+  override def afterAll(): Unit = {
+    FileUtils.deleteDirectory(new File(tempDir))
+    super.afterAll()
+  }
 }

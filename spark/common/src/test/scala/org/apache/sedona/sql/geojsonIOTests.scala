@@ -34,7 +34,10 @@ class geojsonIOTests extends TestBaseScala with BeforeAndAfterAll {
   val geojsondatalocation4: String = resourceFolder + "geojson/test2.json"
   val geojsonoutputlocation: String = resourceFolder + "geojson/geojson_output/"
 
-  override def afterAll(): Unit = FileUtils.deleteDirectory(new File(geojsonoutputlocation))
+  override def afterAll(): Unit = {
+    FileUtils.deleteDirectory(new File(geojsonoutputlocation))
+    super.afterAll()
+  }
 
   describe("GeoJSON IO tests") {
     it("GeoJSON Test - Simple DataFrame writing and reading") {
