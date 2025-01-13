@@ -126,10 +126,10 @@ jobs:
           package_type: maven
           packages: ${{ steps.find-packages.outputs.packages }}
           versions: ${{ needs.prepare.outputs.version }}
-          github_token: ${{ secrets.GH_PKG_GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_PKG_WRITE_TOKEN }}
       - name: Build and publish to Maven repository
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_PKG_GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_PKG_WRITE_TOKEN }}
         run: |
           mkdir -p artifacts/jars
           mvn --batch-mode clean deploy -DskipTests -Dscala=2.12 -Dspark=3.5
