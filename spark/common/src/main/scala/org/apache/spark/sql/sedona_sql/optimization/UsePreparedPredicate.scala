@@ -27,7 +27,7 @@ import org.apache.spark.sql.sedona_sql.expressions._
  * Rewrites spatial predicates involving literals into prepared predicates. Prepared predicates
  * have better performance and enables spatial filter pushdown optimizations.
  */
-class UsePreparedPredicate extends Rule[LogicalPlan] {
+object UsePreparedPredicate extends Rule[LogicalPlan] {
   override def apply(plan: LogicalPlan): LogicalPlan = plan transform {
     case filter @ Filter(condition, _) =>
       val newCondition = condition transform { case predicate: ST_Predicate =>

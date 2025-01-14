@@ -46,6 +46,17 @@ object SedonaContext {
   val logger: Logger = Logger.getLogger("SedonaContext")
   var jsc: JavaSparkContext = _
   var jconf: SparkConf = _
+
+  private val customOptimizations = Seq(
+    // Do these 2 before UsePreparedPredicate so Use PreparedPredicate is used against the revised plan
+    ReplaceSingleRowJoinsWithScalarSubqueries,
+    OneRowRelationJoin,
+    UsePreparedPredicate,
+    GetReverseGeocodeLayersFunction,
+    ReverseGeocodingFunction,
+    ExtractGeoStatsFunctions,
+    OrderByOptimization)
+
   def create(sqlContext: SQLContext): SQLContext = {
     create(sqlContext.sparkSession)
     sqlContext
@@ -63,52 +74,27 @@ object SedonaContext {
   @InternalApi
   def create(sparkSession: SparkSession, language: String): SparkSession = {
     TelemetryCollector.send("spark", language)
+
     if (!sparkSession.experimental.extraStrategies.exists(_.isInstanceOf[JoinQueryDetector])) {
       sparkSession.experimental.extraStrategies ++= Seq(new JoinQueryDetector(sparkSession))
     }
-    // Do these before UsePreparedPredicate so Use PreparedPredicate can be used against the revised plan
-    if (!sparkSession.experimental.extraOptimizations.contains(
-        ReplaceSingleRowJoinsWithScalarSubqueries)) {
-      sparkSession.experimental.extraOptimizations ++= Seq(
-        ReplaceSingleRowJoinsWithScalarSubqueries)
-    }
-    // Do this before UsePreparedPredicate so Use PreparedPredicate can be used against the revised plan
-    if (!sparkSession.experimental.extraOptimizations.contains(OneRowRelationJoin)) {
-      sparkSession.experimental.extraOptimizations ++= Seq(OneRowRelationJoin)
-    }
 
-    if (!sparkSession.experimental.extraOptimizations.exists(
-        _.isInstanceOf[UsePreparedPredicate])) {
-      sparkSession.experimental.extraOptimizations ++= Seq(new UsePreparedPredicate)
-    }
-    if (!sparkSession.experimental.extraOptimizations.exists(
-        _.isInstanceOf[SpatialFilterPushDownForGeoParquet])) {
-      sparkSession.experimental.extraOptimizations ++= Seq(
-        new SpatialFilterPushDownForGeoParquet(sparkSession))
-    }
-
-    // Support reverse geocoding functions
-    if (!sparkSession.experimental.extraOptimizations.contains(ReverseGeocodingFunction)) {
-      sparkSession.experimental.extraOptimizations ++= Seq(
-        // Processing GetReverseGeocodeLayers before ST_ReverseGeocode so that the GetReverseGeocodeLayers call does not
-        // wind up in the Join clause of ST_ReverseGeocode when nested.
-        GetReverseGeocodeLayersFunction,
-        ReverseGeocodingFunction)
-    }
-
-    // Support geostats functions
-    if (!sparkSession.experimental.extraOptimizations.contains(ExtractGeoStatsFunctions)) {
-      sparkSession.experimental.extraOptimizations ++= Seq(ExtractGeoStatsFunctions)
-    }
     if (!sparkSession.experimental.extraStrategies.exists(
         _.isInstanceOf[EvalGeoStatsFunctionStrategy])) {
       sparkSession.experimental.extraStrategies ++= Seq(
         new EvalGeoStatsFunctionStrategy(sparkSession))
     }
 
-    // Support order by optimization
-    if (!sparkSession.experimental.extraOptimizations.contains(OrderByOptimization)) {
-      sparkSession.experimental.extraOptimizations ++= Seq(OrderByOptimization)
+    if (!sparkSession.experimental.extraOptimizations.exists(
+        _.isInstanceOf[SpatialFilterPushDownForGeoParquet])) {
+      sparkSession.experimental.extraOptimizations ++= Seq(
+        new SpatialFilterPushDownForGeoParquet(sparkSession))
+    }
+
+    customOptimizations.foreach { opt =>
+      if (!sparkSession.experimental.extraOptimizations.contains(opt)) {
+        sparkSession.experimental.extraOptimizations ++= Seq(opt)
+      }
     }
 
     addGeoParquetToSupportNestedFilterSources(sparkSession)

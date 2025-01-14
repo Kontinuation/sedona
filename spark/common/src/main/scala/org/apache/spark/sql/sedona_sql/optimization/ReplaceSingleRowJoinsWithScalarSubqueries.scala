@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.matchOrderToOriginalProjectList
 
-// TODO: Support left, right, and outer joins
+// TODO: Support outer and anti joins
 object ReplaceSingleRowJoinsWithScalarSubqueries extends Rule[LogicalPlan] {
 
   private def isScalarPlan(plan: LogicalPlan): Boolean = {
@@ -74,12 +74,13 @@ object ReplaceSingleRowJoinsWithScalarSubqueries extends Rule[LogicalPlan] {
 }
 
 // When a OneRowRelation does not have a parent Project, the output of the plan will not contain the members of the
-// OneRowRelation. Since the OneRowRelation outputs no columns and has a exactly 1 row, a cross join's output is
-// equivalent to the other branch of the join. There is some optimization where an Inner Join of a OneRowRelation and
-// another plan which doesn't output the OneRowRelation's fields becomes a cross join with the condition move to be a
-// filter in the other plan.
-// TODO Integrate this logic into the one optimizing the Inner join into a cross join for OneRowRelations.
-// TODO handle cases where there is a Condition in the join. Unclear if this is already always handled in the other rule
+// OneRowRelation. Since the OneRowRelation outputs no columns and has xactly 1 row, a cross join's output is
+// equivalent to the output of the other branch of the join. There is some optimization in spark where an Inner Join of
+// a OneRowRelation and another plan which doesn't output the OneRowRelation's fields becomes a cross join where the
+// condition is pushed into a new filter node in the non-OneRowRelation plan.
+
+// TODO Integrate this rule into the Spark rule which optimizes the Inner join into a cross join for OneRowRelations.
+// TODO handle cases where there is a Condition in the join. Unclear if this ever occurs due to spark's optimization.
 object OneRowRelationJoin extends Rule[LogicalPlan] {
 
   private def rewritePlan(join: Join): LogicalPlan =
