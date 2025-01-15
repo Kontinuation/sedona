@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.sedona.core.wrapper;
+package org.apache.sedona.common.geometryObjects;
 
 import java.util.UUID;
 import org.apache.commons.lang3.NotImplementedException;

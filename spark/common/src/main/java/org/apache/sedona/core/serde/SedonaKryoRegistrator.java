@@ -22,6 +22,7 @@ import com.esotericsoftware.kryo.Kryo;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.geometryObjects.Circle;
 import org.apache.sedona.common.geometryObjects.NullGeometry;
+import org.apache.sedona.common.geometryObjects.UniqueGeometry;
 import org.apache.sedona.common.geometrySerde.GeometrySerde;
 import org.apache.sedona.common.geometrySerde.SpatialIndexSerde;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
@@ -62,6 +63,7 @@ public class SedonaKryoRegistrator implements KryoRegistrator {
     kryo.register(Circle.class, serializer);
     kryo.register(Envelope.class, serializer);
     kryo.register(NullGeometry.class, serializer);
+    kryo.register(UniqueGeometry.class, serializer);
     // TODO: Replace the default serializer with default spatial index serializer
     kryo.register(Quadtree.class, indexSerializer);
     kryo.register(STRtree.class, indexSerializer);

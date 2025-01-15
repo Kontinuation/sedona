@@ -23,6 +23,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.LogManager;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.geometryObjects.Circle;
+import org.apache.sedona.common.geometryObjects.UniqueGeometry;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.core.enums.DistanceMetric;
@@ -35,7 +36,6 @@ import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner;
 import org.apache.sedona.core.spatialRDD.CircleRDD;
 import org.apache.sedona.core.spatialRDD.SpatialRDD;
 import org.apache.sedona.core.utils.SedonaConf;
-import org.apache.sedona.core.wrapper.UniqueGeometry;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
@@ -50,7 +50,6 @@ import org.apache.spark.sql.execution.metric.SQLMetric;
 import org.apache.spark.util.DoubleAccumulator;
 import org.apache.spark.util.LongAccumulator;
 import org.locationtech.jts.geom.*;
-import org.locationtech.jts.index.SpatialIndex;
 import org.locationtech.jts.index.strtree.STRtree;
 import scala.Tuple2;
 
@@ -877,7 +876,7 @@ public class JoinQuery {
           JavaSparkContext.fromSparkContext(sparkContext).broadcast(strTree);
       broadcastQueryObjects = null;
     } else {
-      // Regular join does not need to set broadcast inderx
+      // Regular join does not need to set broadcast index
       broadcastQueryObjects = null;
       broadcastObjectsTreeIndex = null;
     }
@@ -966,18 +965,7 @@ public class JoinQuery {
           boolean includeTies) {
     final JavaRDD<Pair<U, T>> joinResult;
     JavaRDD<Pair<U, T>> joinResultMapped =
-        objectRDD.indexedRawRDD.mapPartitions(
-            iterator -> {
-              List<Pair<U, T>> results = new ArrayList<>();
-              if (iterator.hasNext()) {
-                SpatialIndex spatialIndex = iterator.next();
-                // the broadcast join won't need inputs from the query's shape stream
-                Iterator<Pair<U, T>> callResult =
-                    judgement.call(null, Collections.singletonList(spatialIndex).iterator());
-                callResult.forEachRemaining(results::add);
-              }
-              return results.iterator();
-            });
+        objectRDD.indexedRawRDD.mapPartitions(iterator -> judgement.call(null, iterator));
     // this is to avoid serializable issues with the broadcast variable
     int k = joinParams.k;
     DistanceMetric distanceMetric = joinParams.distanceMetric;

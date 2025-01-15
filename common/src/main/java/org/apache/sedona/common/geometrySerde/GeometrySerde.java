@@ -25,6 +25,7 @@ import com.esotericsoftware.kryo.io.Output;
 import java.io.Serializable;
 import org.apache.sedona.common.geometryObjects.Circle;
 import org.apache.sedona.common.geometryObjects.NullGeometry;
+import org.apache.sedona.common.geometryObjects.UniqueGeometry;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryCollection;
@@ -66,6 +67,11 @@ public class GeometrySerde extends Serializer implements Serializable {
     } else if (object instanceof NullGeometry) {
       writeType(out, Type.NULL_GEOMETRY);
       writeUserData(kryo, out, (NullGeometry) object);
+    } else if (object instanceof UniqueGeometry) {
+      writeType(out, Type.UNIQUE_GEOMETRY);
+      UniqueGeometry<?> uniqueGeometry = (UniqueGeometry<?>) object;
+      out.writeString(uniqueGeometry.getUniqueId());
+      writeGeometry(kryo, out, (Geometry) uniqueGeometry.getOriginalGeometry());
     } else {
       throw new UnsupportedOperationException(
           "Cannot serialize object of type " + object.getClass().getName());
@@ -125,22 +131,14 @@ public class GeometrySerde extends Serializer implements Serializable {
         NullGeometry nullGeom = new NullGeometry();
         nullGeom.setUserData(readUserData(kryo, input));
         return nullGeom;
+      case UNIQUE_GEOMETRY:
+        String uniqueId = input.readString();
+        Geometry geometry = readGeometry(kryo, input);
+        return new UniqueGeometry<>(uniqueId, geometry);
       default:
         throw new UnsupportedOperationException(
             "Cannot deserialize object of type " + geometryType);
     }
-  }
-
-  public GeometryBuffer readGeometryBuffer(Input input) {
-    byte typeId = input.readByte();
-    Type geometryType = Type.fromId(typeId);
-    if (geometryType != Type.SHAPE) {
-      throw new IllegalArgumentException("Expected SHAPE type, got " + geometryType);
-    }
-    int length = input.readInt();
-    byte[] bytes = new byte[length];
-    input.readBytes(bytes);
-    return GeometryBufferFactory.wrap(bytes);
   }
 
   private Object readUserData(Kryo kryo, Input input) {
@@ -164,7 +162,8 @@ public class GeometrySerde extends Serializer implements Serializable {
     SHAPE(0),
     CIRCLE(1),
     ENVELOPE(2),
-    NULL_GEOMETRY(3);
+    NULL_GEOMETRY(3),
+    UNIQUE_GEOMETRY(4);
 
     private final int id;
 
@@ -184,6 +183,8 @@ public class GeometrySerde extends Serializer implements Serializable {
           return ENVELOPE;
         case 3:
           return NULL_GEOMETRY;
+        case 4:
+          return UNIQUE_GEOMETRY;
         default:
           throw new IllegalArgumentException("Unknown type id: " + id);
       }

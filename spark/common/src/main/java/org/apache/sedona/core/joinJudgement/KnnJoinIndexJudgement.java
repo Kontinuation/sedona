@@ -19,17 +19,17 @@
 package org.apache.sedona.core.joinJudgement;
 
 import java.io.Serializable;
-import java.util.*;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.knnJudgement.EuclideanItemDistance;
 import org.apache.sedona.core.knnJudgement.HaversineItemDistance;
 import org.apache.sedona.core.knnJudgement.SpheroidDistance;
-import org.apache.sedona.core.wrapper.UniqueGeometry;
 import org.apache.spark.api.java.function.FlatMapFunction2;
 import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.util.LongAccumulator;
-import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.index.SpatialIndex;
 import org.locationtech.jts.index.strtree.GeometryItemDistance;
@@ -45,7 +45,7 @@ import org.locationtech.jts.index.strtree.STRtree;
  */
 public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
     extends JudgementBase<T, U>
-    implements FlatMapFunction2<Iterator<T>, Iterator<SpatialIndex>, Pair<U, T>>, Serializable {
+    implements FlatMapFunction2<Iterator<T>, Iterator<SpatialIndex>, Pair<T, U>>, Serializable {
   private final int k;
   private final Double searchRadius;
   private final DistanceMetric distanceMetric;
@@ -97,7 +97,7 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
    * @throws Exception if the spatial index is not of type STRtree
    */
   @Override
-  public Iterator<Pair<U, T>> call(Iterator<T> streamShapes, Iterator<SpatialIndex> treeIndexes)
+  public Iterator<Pair<T, U>> call(Iterator<T> streamShapes, Iterator<SpatialIndex> treeIndexes)
       throws Exception {
     if (!treeIndexes.hasNext() || (streamShapes != null && !streamShapes.hasNext())) {
       buildCount.add(0);
@@ -121,77 +121,29 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
       strTree = (STRtree) treeIndex;
     }
 
-    // TODO: For future improvement, instead of using a list to store the results,
-    // we can use lazy evaluation to avoid storing all the results in memory.
-    List<Pair<U, T>> result = new ArrayList<>();
-
-    List queryItems;
     if (broadcastQueryObjects != null) {
       // get the broadcast spatial index on queries side if available
-      queryItems = broadcastQueryObjects.getValue();
-      for (Object item : queryItems) {
-        T queryGeom;
-        if (item instanceof UniqueGeometry) {
-          queryGeom = (T) ((UniqueGeometry) item).getOriginalGeometry();
-        } else {
-          queryGeom = (T) item;
-        }
-        streamCount.add(1);
-
-        Object[] localK =
-            strTree.nearestNeighbour(
-                queryGeom.getEnvelopeInternal(), queryGeom, getItemDistance(), k);
-        if (includeTies) {
-          localK = getUpdatedLocalKWithTies(queryGeom, localK, strTree);
-        }
-        if (searchRadius != null) {
-          localK = getInSearchRadius(localK, queryGeom);
-        }
-
-        for (Object obj : localK) {
-          T candidate = (T) obj;
-          Pair<U, T> pair = Pair.of((U) item, candidate);
-          result.add(pair);
-          resultCount.add(1);
-        }
-      }
-      return result.iterator();
+      List queryItems = broadcastQueryObjects.getValue();
+      return new InMemoryKNNJoinIterator<T, U>(
+          queryItems.iterator(),
+          strTree,
+          k,
+          searchRadius,
+          distanceMetric,
+          includeTies,
+          streamCount,
+          resultCount);
     } else {
-      while (streamShapes.hasNext()) {
-        T streamShape = streamShapes.next();
-        streamCount.add(1);
-
-        Object[] localK =
-            strTree.nearestNeighbour(
-                streamShape.getEnvelopeInternal(), streamShape, getItemDistance(), k);
-        if (includeTies) {
-          localK = getUpdatedLocalKWithTies(streamShape, localK, strTree);
-        }
-        if (searchRadius != null) {
-          localK = getInSearchRadius(localK, streamShape);
-        }
-
-        for (Object obj : localK) {
-          T candidate = (T) obj;
-          Pair<U, T> pair = Pair.of((U) streamShape, candidate);
-          result.add(pair);
-          resultCount.add(1);
-        }
-      }
-      return result.iterator();
+      return new InMemoryKNNJoinIterator<>(
+          streamShapes,
+          strTree,
+          k,
+          searchRadius,
+          distanceMetric,
+          includeTies,
+          streamCount,
+          resultCount);
     }
-  }
-
-  private Object[] getInSearchRadius(Object[] localK, T queryGeom) {
-    localK =
-        Arrays.stream(localK)
-            .filter(
-                candidate -> {
-                  Geometry candidateGeom = (Geometry) candidate;
-                  return distanceByMetric(queryGeom, candidateGeom, distanceMetric) <= searchRadius;
-                })
-            .toArray();
-    return localK;
   }
 
   /**
@@ -219,12 +171,6 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
     }
   }
 
-  private ItemDistance getItemDistance() {
-    ItemDistance itemDistance;
-    itemDistance = getItemDistanceByMetric(distanceMetric);
-    return itemDistance;
-  }
-
   /**
    * This method returns the ItemDistance object based on the specified distance metric.
    *
@@ -248,38 +194,6 @@ public class KnnJoinIndexJudgement<T extends Geometry, U extends Geometry>
         break;
     }
     return itemDistance;
-  }
-
-  private Object[] getUpdatedLocalKWithTies(T streamShape, Object[] localK, STRtree strTree) {
-    Envelope searchEnvelope = streamShape.getEnvelopeInternal();
-    // get the maximum distance from the k nearest neighbors
-    double maxDistance = 0.0;
-    LinkedHashSet<T> uniqueCandidates = new LinkedHashSet<>();
-    for (Object obj : localK) {
-      T candidate = (T) obj;
-      uniqueCandidates.add(candidate);
-      double distance = streamShape.distance(candidate);
-      if (distance > maxDistance) {
-        maxDistance = distance;
-      }
-    }
-    searchEnvelope.expandBy(maxDistance);
-    List<T> candidates = strTree.query(searchEnvelope);
-    if (!candidates.isEmpty()) {
-      // update localK with all candidates that are within the maxDistance
-      List<Object> tiedResults = new ArrayList<>();
-      // add all localK
-      Collections.addAll(tiedResults, localK);
-
-      for (T candidate : candidates) {
-        double distance = streamShape.distance(candidate);
-        if (distance == maxDistance && !uniqueCandidates.contains(candidate)) {
-          tiedResults.add(candidate);
-        }
-      }
-      localK = tiedResults.toArray();
-    }
-    return localK;
   }
 
   public static <U extends Geometry, T extends Geometry> double distance(

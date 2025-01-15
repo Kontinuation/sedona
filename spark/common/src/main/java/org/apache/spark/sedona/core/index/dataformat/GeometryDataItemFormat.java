@@ -23,11 +23,11 @@ import com.esotericsoftware.kryo.io.UnsafeInput;
 import com.esotericsoftware.kryo.io.UnsafeOutput;
 import org.apache.sedona.common.geometryObjects.Circle;
 import org.apache.sedona.common.geometryObjects.NullGeometry;
+import org.apache.sedona.common.geometryObjects.UniqueGeometry;
 import org.apache.sedona.common.geometrySerde.GeometryBuffer;
 import org.apache.sedona.common.geometrySerde.GeometryBufferFactory;
 import org.apache.sedona.common.geometrySerde.GeometrySerializer;
 import org.apache.sedona.common.geometrySerde.SerializedCoordinateFilters.StatisticsCollector;
-import org.apache.sedona.core.wrapper.UniqueGeometry;
 import org.apache.spark.sedona.core.index.DataItemFormat;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -66,7 +66,7 @@ public class GeometryDataItemFormat implements DataItemFormat<GeometryDataItem> 
     } else if (geometry instanceof UniqueGeometry) {
       out.writeByte((byte) Type.UNIQUE_GEOMETRY.id);
       UniqueGeometry<?> uniqueGeometry = (UniqueGeometry<?>) geometry;
-      out.writeString(((UniqueGeometry<?>) geometry).getUniqueId());
+      out.writeString(uniqueGeometry.getUniqueId());
       byte[] data = GeometrySerializer.serialize((Geometry) uniqueGeometry.getOriginalGeometry());
       out.writeInt(data.length);
       out.write(data, 0, data.length);
