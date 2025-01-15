@@ -513,4 +513,29 @@ public class AdvancedStatCollectorTest {
         perPartitionStats.get(2).getPartitionSizeInBytes()
             > perPartitionStats.get(1).getPartitionSizeInBytes());
   }
+
+  @Test
+  public void testPerPartitionStatsWithEmptyPartitions() {
+    AdvancedStatCollector stat0 = new AdvancedStatCollector(0, 100, 200, 0.01, 1.2, 10, 1);
+    for (int k = 0; k < 100; k++) {
+      stat0.update(factory.createPoint(new Coordinate(1, 1)));
+      stat0.finish();
+    }
+
+    AdvancedStatCollector stat1 = new AdvancedStatCollector(1, 100, 200, 0.01, 1.2, 10, 1);
+    stat1.finish();
+
+    AdvancedStatCollector stat2 = new AdvancedStatCollector(2, 100, 200, 0.01, 1.2, 10, 1);
+    stat2.finish();
+
+    stat0.combineWith(stat1);
+    stat0.combineWith(stat2);
+    assertEquals(100, stat0.getCount());
+    Map<Integer, AdvancedStatCollector.PerPartitionStats> perPartitionStats =
+        stat0.getPerPartitionStats();
+    assertEquals(3, perPartitionStats.size());
+    assertEquals(100, perPartitionStats.get(0).count);
+    assertEquals(0, perPartitionStats.get(1).count);
+    assertEquals(0, perPartitionStats.get(2).count);
+  }
 }

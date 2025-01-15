@@ -415,7 +415,7 @@ public class AdvancedStatCollector implements Serializable {
    * @param other The other StatCalculator object to be merged.
    */
   public void combineWith(AdvancedStatCollector other) {
-    if (other == null || other.count == 0) {
+    if (other == null) {
       return;
     }
 
@@ -426,6 +426,10 @@ public class AdvancedStatCollector implements Serializable {
       // We can simply replace the stats of the same partition id, since each partition is only
       // handled by one stats collector. There should be no conflict.
       perPartitionStats.put(partitionId, otherStats);
+    }
+
+    if (other.count == 0) {
+      return;
     }
 
     // Merge samples.

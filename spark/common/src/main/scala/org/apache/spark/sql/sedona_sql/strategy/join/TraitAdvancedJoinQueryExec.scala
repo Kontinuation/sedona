@@ -1075,12 +1075,16 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     if (stats.getCount < 10000) {
       // Don't bother to repartition if the number of geometries is small. The cost of
       // repartitioning may outweigh the benefit.
+      log.info(s"Too few records in the stream side (${stats.getCount}), no need to repartition.")
       return None
     }
 
     // Compute the skew score of the largest partition.
     val partitionSizes =
       stats.getPerPartitionStats.asScala.values.map(_.getPartitionSizeInBytes()).toArray
+    val partitionSizesMessage = partitionSizes.mkString(", ")
+    log.info(s"Partition sizes of the stream side: $partitionSizesMessage")
+
     val mean = partitionSizes.sum.toDouble / partitionSizes.length
     val score = if (partitionSizes.nonEmpty && mean > 0) {
       // We only look at the largest partition to determine the skew score, since the straggler
@@ -1093,6 +1097,8 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     // If the skew score is smaller than a threshold, we should not repartition
     val threshold = sedonaConf.getStreamSideSkewScoreThreshold
     if (score < threshold) {
+      log.info(
+        s"Skew score ($score) is smaller than the threshold ($threshold). Skip repartitioning.")
       return None
     }
 
@@ -1101,6 +1107,9 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     val parallelism = sparkContext.defaultParallelism
     val numPartitions =
       Math.max(partitionSizes.length, Math.min(parallelism, partitionSizes.length * 2))
+
+    log.info(
+      s"Skew score ($score) exceeds the threshold ($threshold), repartition to $numPartitions partitions.")
     Some(numPartitions)
   }
 }
