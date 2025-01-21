@@ -19,18 +19,31 @@
 package org.apache.spark.sql.sedona_sql.strategy.join
 
 import org.apache.commons.lang3.Range
+import org.apache.sedona.core.enums.DistanceMetric
+import org.apache.sedona.core.enums.IndexType
+import org.apache.sedona.core.enums.KNNJoinBroadcastSide
 import org.apache.sedona.core.spatialOperator.JoinQuery
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
-import org.apache.sedona.core.spatialPartitioning.{QuadTreeRTPartitioner, SpatialPartitioner, ZOrderPartitioner}
-import org.apache.sedona.core.utils.{ExecutorResourceUtils, SedonaConf}
+import org.apache.sedona.core.spatialPartitioning.QuadTreeRTPartitioner
+import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner
+import org.apache.sedona.core.spatialPartitioning.ZOrderPartitioner
+import org.apache.sedona.core.spatialRDD.SpatialRDD
+import org.apache.sedona.core.utils.ExecutorResourceUtils
+import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.BindReferences
+import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.expressions.Predicate
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
-import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression, Predicate, UnsafeRow}
-import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.{SQLExecution, SparkPlan}
+import org.apache.spark.sql.execution.SQLExecution
+import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.metric.SQLMetric
+import org.apache.spark.sql.sedona_sql.optimization.ExpressionUtils
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitKNNJoinQueryExec.knnJoinPartitionNumOptimizer
-import org.locationtech.jts.geom.{Envelope, Geometry}
+import org.locationtech.jts.geom.Envelope
+import org.locationtech.jts.geom.Geometry
 
 import java.io.PrintWriter
 import java.nio.file.Paths
@@ -47,7 +60,11 @@ import java.util
 trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
   self: SparkPlan =>
 
-  protected var broadcastJoin: Boolean = false
+  protected val k: Expression
+  protected val searchRadius: Expression
+  protected val isGeography: Boolean
+
+  protected var broadcastSide: KNNJoinBroadcastSide = KNNJoinBroadcastSide.NONE
   protected var querySide: JoinSide = null
 
   private lazy val sedonaConf = SedonaConf.fromActiveSession
@@ -142,20 +159,12 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
     }
 
     val matchesRDD: RDD[(Geometry, Geometry)] =
-      (queryShapes.spatialPartitionedRDD, objectShapes.spatialPartitionedRDD) match {
-        case (null, null) =>
-          if (broadcastJoin) {
-            JoinQuery
-              .knnJoin(
-                queryShapes,
-                objectShapes,
-                joinParams,
-                sedonaConf.isIncludeTieBreakersInKNNJoins,
-                broadcastJoin)
-              .rdd
-          } else {
-            sparkContext.parallelize(Seq[(Geometry, Geometry)]())
-          }
+      (
+        queryShapes.spatialPartitionedRDD,
+        objectShapes.spatialPartitionedRDD,
+        broadcastSide) match {
+        case (null, null, KNNJoinBroadcastSide.NONE) =>
+          sparkContext.parallelize(Seq[(Geometry, Geometry)]())
         case _ =>
           JoinQuery
             .knnJoin(
@@ -163,7 +172,8 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
               objectShapes,
               joinParams,
               sedonaConf.isIncludeTieBreakersInKNNJoins,
-              broadcastJoin)
+              broadcastSide,
+              sedonaConf)
             .rdd
       }
 
@@ -183,14 +193,11 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
    *   (SparkPlan, SparkPlan) The query and object plans.
    */
   private def getQueryAndObjectPlans(leftShape: Expression) = {
-    val isLeftQuerySide =
-      left.toString().toLowerCase().contains(leftShape.toString().toLowerCase())
-    if (isLeftQuerySide) {
-      querySide = LeftSide
-      (left, right, false)
-    } else {
-      querySide = RightSide
-      (right, left, true)
+    ExpressionUtils.matchExpressionsToPlans(leftShape, rightShape, left, right) match {
+      case Some((querySidePlan, objectSidePlan, swapped)) =>
+        (querySidePlan, objectSidePlan, swapped)
+      case None =>
+        throw new IllegalArgumentException("Cannot match joined shapes to joined relations.")
     }
   }
 
@@ -297,14 +304,85 @@ trait TraitKNNJoinQueryExec extends TraitJoinQueryExec {
     }
   }
 
-  // The following methods are abstract and must be implemented by the concrete class
-  // that extends this trait.
-  // Override these methods to provide the necessary functionality for the KNN join.
-  def getKNNJoinParams: JoinParams
+  /**
+   * Convert the both RDDs to SpatialRDDs
+   * @param leftRdd
+   *   the left RDD
+   * @param leftShapeExpr
+   *   the shape expression
+   * @param rightRdd
+   *   the right RDD
+   * @param rightShapeExpr
+   *   the shape expression
+   * @return
+   */
+  override def toSpatialRddPair(
+      leftRdd: RDD[UnsafeRow],
+      leftShapeExpr: Expression,
+      rightRdd: RDD[UnsafeRow],
+      rightShapeExpr: Expression): (SpatialRDD[Geometry], SpatialRDD[Geometry]) = {
+    if (isRasterJoin(leftShapeExpr, rightShapeExpr)) {
+      throw new UnsupportedOperationException("Raster join is not supported by KNNJoinExec.")
+    }
+    (leftToSpatialRDD(leftRdd, leftShapeExpr), rightToSpatialRDD(rightRdd, rightShapeExpr))
+  }
+
+  /**
+   * Convert the left RDD (queries) to SpatialRDD
+   * @param rdd
+   *   the left RDD
+   * @param shapeExpression
+   *   the shape expression
+   * @param projection
+   *   the projection
+   * @return
+   */
+  override def leftToSpatialRDD(
+      rdd: RDD[UnsafeRow],
+      shapeExpression: Expression,
+      projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
+    toSpatialRDD(rdd, shapeExpression, projection)
+  }
+
+  /**
+   * Convert the right RDD (queries) to SpatialRDD
+   * @param rdd
+   *   the right RDD
+   * @param shapeExpression
+   *   the shape expression
+   * @param projection
+   *   the projection
+   * @return
+   */
+  override def rightToSpatialRDD(
+      rdd: RDD[UnsafeRow],
+      shapeExpression: Expression,
+      projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
+    toSpatialRDD(rdd, shapeExpression, projection)
+  }
+
+  /**
+   * Get the KNN join parameters This is required to determine the join strategy to support
+   * different KNN join strategies. This function needs to be updated when new join strategies are
+   * supported.
+   *
+   * @return
+   *   the KNN join parameters
+   */
+  protected def getKNNJoinParams: JoinParams = {
+    // Please update this function when new join strategies are added
+    // Number of neighbors to find
+    val kValue: Int = this.k.eval().asInstanceOf[Int]
+    val searchRadius: Double =
+      Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(Double.MaxValue)
+    // Metric to use in the join to calculate the distance, only Euclidean and Haversine are supported
+    val distanceMetric = if (isGeography) DistanceMetric.HAVERSINE else DistanceMetric.EUCLIDEAN
+    val joinParams = new JoinParams(IndexType.RTREE, kValue, distanceMetric, searchRadius)
+    joinParams
+  }
 }
 
 object TraitKNNJoinQueryExec {
-  val counter = new java.util.concurrent.atomic.AtomicLong(0)
 
   /**
    * This method optimizes the number of partitions for a k-Nearest Neighbors (kNN) join in Spark.

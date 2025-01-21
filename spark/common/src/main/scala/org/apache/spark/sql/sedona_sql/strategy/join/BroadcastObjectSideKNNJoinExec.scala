@@ -18,20 +18,16 @@
  */
 package org.apache.spark.sql.sedona_sql.strategy.join
 
-import org.apache.sedona.core.enums.{DistanceMetric, GridType, IndexType}
-import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
+import org.apache.sedona.core.enums.KNNJoinBroadcastSide
 import org.apache.sedona.core.spatialOperator.SpatialPredicate
-import org.apache.sedona.core.spatialPartitioning.{QuadTreeRTPartitioner, ZOrderPartitioner}
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.internal.Logging
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.catalyst.expressions.{Expression, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.sedona_sql.execution.SedonaBinaryExecNode
 import org.locationtech.jts.geom.Geometry
-import org.locationtech.jts.index.strtree.STRtree
 
 case class BroadcastObjectSideKNNJoinExec(
     left: SparkPlan,
@@ -51,62 +47,7 @@ case class BroadcastObjectSideKNNJoinExec(
     with TraitKNNJoinQueryExec
     with Logging {
 
-  /**
-   * Convert the both RDDs to SpatialRDDs
-   * @param leftRdd
-   *   the left RDD
-   * @param leftShapeExpr
-   *   the shape expression
-   * @param rightRdd
-   *   the right RDD
-   * @param rightShapeExpr
-   *   the shape expression
-   * @return
-   */
-  override def toSpatialRddPair(
-      leftRdd: RDD[UnsafeRow],
-      leftShapeExpr: Expression,
-      rightRdd: RDD[UnsafeRow],
-      rightShapeExpr: Expression): (SpatialRDD[Geometry], SpatialRDD[Geometry]) = {
-    if (isRasterJoin(leftShapeExpr, rightShapeExpr)) {
-      throw new UnsupportedOperationException("Raster join is not supported by KNNJoinExec.")
-    }
-    (leftToSpatialRDD(leftRdd, leftShapeExpr), rightToSpatialRDD(rightRdd, rightShapeExpr))
-  }
-
-  /**
-   * Convert the left RDD (queries) to SpatialRDD
-   * @param rdd
-   *   the left RDD
-   * @param shapeExpression
-   *   the shape expression
-   * @param projection
-   *   the projection
-   * @return
-   */
-  override def leftToSpatialRDD(
-      rdd: RDD[UnsafeRow],
-      shapeExpression: Expression,
-      projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
-    toSpatialRDD(rdd, shapeExpression, projection)
-  }
-
-  /**
-   * Convert the right RDD (queries) to SpatialRDD
-   * @param rdd
-   *   the right RDD
-   * @param shapeExpression
-   *   the shape expression
-   * @param projection
-   *   the projection
-   * @return
-   */
-  override def rightToSpatialRDD(
-      rdd: RDD[UnsafeRow],
-      shapeExpression: Expression,
-      projection: Option[Seq[Expression]] = None): SpatialRDD[Geometry] = {
-    toSpatialRDD(rdd, shapeExpression, projection)
-  }
+  broadcastSide = KNNJoinBroadcastSide.OBJECT_SIDE
 
   /**
    * Broadcast the dominant shapes (objects) to all the partitions
@@ -131,35 +72,8 @@ case class BroadcastObjectSideKNNJoinExec(
       numPartitions: Integer,
       sedonaConf: SedonaConf): Unit = {
     require(numPartitions > 0, "The number of partitions must be greater than 0.")
-    val kValue: Int = this.k.eval().asInstanceOf[Int]
-    require(kValue >= 1, "The number of neighbors (k) must be equal or greater than 1.")
-    objectsShapes.setNeighborSampleNumber(kValue)
-    objectsShapes.setDistanceMetric(
-      if (isGeography) DistanceMetric.HAVERSINE else DistanceMetric.EUCLIDEAN)
-    val searchRadius: Double =
-      Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(-1)
-    if (searchRadius > 0) { objectsShapes.setSearchRadius(searchRadius) }
-    broadcastJoin = true
-  }
 
-  /**
-   * Get the KNN join parameters This is required to determine the join strategy to support
-   * different KNN join strategies. This function needs to be updated when new join strategies are
-   * supported.
-   *
-   * @return
-   *   the KNN join parameters
-   */
-  override def getKNNJoinParams: JoinParams = {
-    // Please update this function when new join strategies are added
-    // Number of neighbors to find
-    val kValue: Int = this.k.eval().asInstanceOf[Int]
-    val searchRadius: Double =
-      Option(this.searchRadius.eval()).map(_.asInstanceOf[Double]).getOrElse(Double.MaxValue)
-    // Metric to use in the join to calculate the distance, only Euclidean and Haversine are supported
-    val distanceMetric = if (isGeography) DistanceMetric.HAVERSINE else DistanceMetric.EUCLIDEAN
-    val joinParams = new JoinParams(IndexType.RTREE, kValue, distanceMetric, searchRadius)
-    joinParams
+    // No need to do spatial partitioning for broadcast join
   }
 
   /**

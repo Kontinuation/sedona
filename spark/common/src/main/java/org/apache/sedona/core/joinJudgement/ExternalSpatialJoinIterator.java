@@ -50,15 +50,7 @@ import org.apache.spark.sedona.core.index.ExternalSpatialIndexWithRefinement.Dat
 import org.apache.spark.sedona.core.index.dataformat.GeometryDataItem;
 import org.apache.spark.sedona.core.index.dataformat.GeometryDataItemFormat;
 import org.apache.spark.storage.BlockManager;
-import org.apache.spark.unsafe.Platform;
-import org.apache.spark.util.collection.unsafe.sort.PrefixComparators;
-import org.apache.spark.util.collection.unsafe.sort.RecordComparator;
-import org.apache.spark.util.collection.unsafe.sort.UnsafeExternalSorter;
-import org.apache.spark.util.collection.unsafe.sort.UnsafeSorterIterator;
-import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.index.ItemVisitor;
-import org.locationtech.jts.index.strtree.STRtree;
 
 /**
  * The actual heavy lifting of the local spatial join is done by this iterator. It spills data to
@@ -277,7 +269,13 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
         // of the index.
         if (!isStreamSideSorted && externalSpatialIndex.hasSpilled()) {
           try {
-            sortStreamSide();
+            streamIterator =
+                SortedGeometryIterator.sortGeometryIterator(
+                    streamIterator,
+                    sparkEnv,
+                    taskContext,
+                    externalSpatialIndex,
+                    validateEqualityInExternalSort);
             isStreamSideSorted = true;
           } catch (IOException e) {
             throw new RuntimeException(e);
@@ -340,62 +338,6 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
     }
   }
 
-  private void sortStreamSide() throws IOException {
-    // Construct a sorter to sort the stream side geometries by the leaf page id of the index side
-    BlockManager blockManager = sparkEnv.blockManager();
-    TaskMemoryManager taskMemoryManager = taskContext.taskMemoryManager();
-    long pageSizeBytes = taskMemoryManager.pageSizeBytes();
-    STRtree nonLeafTree = externalSpatialIndex.getNonLeafTree();
-    GeometryDataItemFormat format = new GeometryDataItemFormat();
-    DataItemComparator comparator;
-    if (validateEqualityInExternalSort) {
-      comparator = new DataItemComparator(nonLeafTree, format, true);
-    } else {
-      // Don't hold a reference to nonLeafTree if we don't need to validate equality, since
-      // this will make nonLeafTree not eligible for GC until the end of the task.
-      comparator = new DataItemComparator(null, null, false);
-    }
-
-    UnsafeExternalSorter sorter =
-        UnsafeExternalSorter.create(
-            taskMemoryManager,
-            blockManager,
-            blockManager.serializerManager(),
-            taskContext,
-            () -> comparator,
-            PrefixComparators.LONG,
-            (int) pageSizeBytes / 100,
-            pageSizeBytes,
-            Integer.MAX_VALUE,
-            true);
-
-    // Load remaining stream side geometries into the sorter
-    FirstLeafPageVisitor visitor = new FirstLeafPageVisitor();
-    int bufferLength = 0;
-    int[] leafPageRanks =
-        externalSpatialIndex.getSpatialIndex().getLeafPageIndex().rankLeafPagesBySpatialProximity();
-    while (streamIterator.hasNext()) {
-      T geometry = streamIterator.next();
-      Envelope envelope = geometry.getEnvelopeInternal();
-      byte[] serializedGeometry = format.serialize(geometry);
-      bufferLength = Math.max(bufferLength, serializedGeometry.length);
-      visitor.reset();
-      nonLeafTree.query(envelope, visitor);
-      long prefix = visitor.leafPageId >= 0 ? leafPageRanks[visitor.leafPageId] : -1;
-      sorter.insertRecord(
-          serializedGeometry, Platform.BYTE_ARRAY_OFFSET, serializedGeometry.length, prefix, false);
-    }
-
-    // Force the stream side sorter to spill, because we need memory for caching the data items
-    // when running the spatial join.
-    sorter.spill();
-
-    // Construct an iterator to iterate over the sorted stream side geometries. The set of
-    // geometries in
-    // the iterator should be the same as the initial streamIterator before sorting.
-    streamIterator = new SortedStreamGeometryIterator<>(sorter, format, bufferLength);
-  }
-
   /** For testing purposes */
   public void setEqualityValidation(boolean enabled) {
     validateEqualityInExternalSort = enabled;
@@ -404,119 +346,6 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
   /** For testing purposes */
   public void forceSpill() throws IOException {
     externalSpatialIndex.spill();
-  }
-
-  private static class SortedStreamGeometryIterator<T> implements Iterator<T> {
-    private UnsafeExternalSorter sorter;
-    private final UnsafeSorterIterator unsafeSorterIterator;
-    private final byte[] serializedGeometry;
-    private final GeometryDataItemFormat format;
-
-    SortedStreamGeometryIterator(
-        UnsafeExternalSorter sorter, GeometryDataItemFormat format, int bufferLength)
-        throws IOException {
-      this.sorter = sorter;
-      this.unsafeSorterIterator = sorter.getSortedIterator();
-      this.serializedGeometry = new byte[bufferLength];
-      this.format = format;
-    }
-
-    @Override
-    public boolean hasNext() {
-      boolean hasNext = unsafeSorterIterator.hasNext();
-      if (!hasNext && sorter != null) {
-        sorter.cleanupResources();
-        sorter = null;
-      }
-      return hasNext;
-    }
-
-    @SuppressWarnings("unchecked")
-    @Override
-    public T next() {
-      try {
-        unsafeSorterIterator.loadNext();
-      } catch (IOException e) {
-        throw new RuntimeException(e);
-      }
-      Object baseObject = unsafeSorterIterator.getBaseObject();
-      long baseOffset = unsafeSorterIterator.getBaseOffset();
-      int baseLength = unsafeSorterIterator.getRecordLength();
-      if (serializedGeometry.length < baseLength) {
-        throw new IllegalStateException("Serialized geometry buffer is too small");
-      }
-      Platform.copyMemory(
-          baseObject, baseOffset, serializedGeometry, Platform.BYTE_ARRAY_OFFSET, baseLength);
-      return (T) format.deserializeToGeometry(serializedGeometry);
-    }
-  }
-
-  private static class FirstLeafPageVisitor implements ItemVisitor {
-    int leafPageId = -1;
-
-    @Override
-    public void visitItem(Object item) {
-      if (leafPageId == -1) {
-        leafPageId = (int) item;
-      }
-    }
-
-    void reset() {
-      leafPageId = -1;
-    }
-  }
-
-  private static class DataItemComparator extends RecordComparator {
-    STRtree nonLeafTree;
-    FirstLeafPageVisitor visitor;
-    GeometryDataItemFormat format;
-    boolean validateEquality;
-
-    DataItemComparator(
-        STRtree nonLeafTree, GeometryDataItemFormat format, boolean validateEquality) {
-      this.nonLeafTree = nonLeafTree;
-      this.visitor = new FirstLeafPageVisitor();
-      this.format = format;
-      this.validateEquality = validateEquality;
-    }
-
-    @Override
-    public int compare(
-        Object leftBaseObject,
-        long leftBaseOffset,
-        int leftBaseLength,
-        Object rightBaseObject,
-        long rightBaseOffset,
-        int rightBaseLength) {
-      // NOTICE: This method is only called when the prefix of the left and right records are
-      // the same. We are already using first leafId as prefix for sorting, so we can directly
-      // return 0 here.
-      if (!validateEquality) {
-        return 0;
-      }
-
-      // If validateEquality is enabled, we'll decode the geometries and compare their leaf page ids
-      // to ensure that the sorting is correct. This only happens when running tests.
-      int leftLeafId = recordToLeafPageId(leftBaseObject, leftBaseOffset, leftBaseLength);
-      int rightLeafId = recordToLeafPageId(rightBaseObject, rightBaseOffset, rightBaseLength);
-      int result = Integer.compare(leftLeafId, rightLeafId);
-      if (result != 0) {
-        throw new IllegalStateException(
-            "leafIds should be equal. leftLeafId: " + leftLeafId + ", rightLeafId: " + rightLeafId);
-      }
-      return result;
-    }
-
-    private int recordToLeafPageId(Object baseObject, long baseOffset, int baseLength) {
-      byte[] serializedGeom = new byte[baseLength];
-      Platform.copyMemory(
-          baseObject, baseOffset, serializedGeom, Platform.BYTE_ARRAY_OFFSET, baseLength);
-      Geometry geom = format.deserializeToGeometry(serializedGeom);
-      Envelope envelope = geom.getEnvelopeInternal();
-      visitor.reset();
-      nonLeafTree.query(envelope, visitor);
-      return visitor.leafPageId;
-    }
   }
 
   @Override

@@ -111,32 +111,41 @@ class KnnJoinQueryTest extends TestBaseScala {
         queryRDD.spatialPartitioning(
           objectRDD.getPartitioner.asInstanceOf[ZOrderPartitioner].nonOverlappedPartitioner())
 
-        objectRDD.buildIndex(IndexType.RTREE, true)
-
         // Custom ordering for Point based on coordinates
         implicit val pointOrdering: Ordering[Point] = (p1: Point, p2: Point) => {
           val cmp = p1.getX.compare(p2.getX)
           if (cmp != 0) cmp else p1.getY.compare(p2.getY)
         }
 
-        val knnOutputs = JoinQuery
-          .KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, k, null, DistanceMetric.EUCLIDEAN)
-          .collect()
-          .asScala
-          .toList
+        Seq(false, true).foreach { useExternalSpatialIndex =>
+          withConf(
+            Map(
+              "spark.sedona.join.useExternalSpatialIndex" -> useExternalSpatialIndex.toString)) {
+            val knnOutputs = JoinQuery
+              .KNNJoinQuery(
+                objectRDD,
+                queryRDD,
+                IndexType.RTREE,
+                k,
+                null,
+                DistanceMetric.EUCLIDEAN)
+              .collect()
+              .asScala
+              .toList
 
-        val sortedKnnOutputs = knnOutputs.sortBy { case (queryPoint, _) => queryPoint }
+            val sortedKnnOutputs = knnOutputs.sortBy { case (queryPoint, _) => queryPoint }
 
-        val output = sortedKnnOutputs.map { case (queryPoint, neighbors) =>
-          val sortedNeighbors = neighbors.asScala.toList.sorted
-          val neighborsString = sortedNeighbors.mkString(",")
-          s"$queryPoint,$neighborsString\n"
-        }.mkString
+            val output = sortedKnnOutputs.map { case (queryPoint, neighbors) =>
+              val sortedNeighbors = neighbors.asScala.toList.sorted
+              val neighborsString = sortedNeighbors.mkString(",")
+              s"$queryPoint,$neighborsString\n"
+            }.mkString
 
-        val expectedOutput =
-          new String(Files.readAllBytes(Paths.get(testRootPath + resultLocation)))
-        print(output)
-        assert(expectedOutput == output)
+            val expectedOutput =
+              new String(Files.readAllBytes(Paths.get(testRootPath + resultLocation)))
+            assert(expectedOutput == output)
+          }
+        }
       }
   }
 
@@ -185,34 +194,41 @@ class KnnJoinQueryTest extends TestBaseScala {
         queryRDD.spatialPartitioning(
           objectRDD.getPartitioner.asInstanceOf[QuadTreeRTPartitioner].nonOverlappedPartitioner())
 
-        objectRDD.buildIndex(IndexType.RTREE, true)
-
         // Custom ordering for Point based on coordinates
         implicit val pointOrdering: Ordering[Point] = (p1: Point, p2: Point) => {
           val cmp = p1.getX.compare(p2.getX)
           if (cmp != 0) cmp else p1.getY.compare(p2.getY)
         }
 
-        val knnOutputs = JoinQuery
-          .KNNJoinQuery(objectRDD, queryRDD, IndexType.RTREE, k, null, DistanceMetric.EUCLIDEAN)
-          .collect()
-          .asScala
-          .toList
+        Seq(false, true).foreach { useExternalSpatialIndex =>
+          withConf(
+            Map(
+              "spark.sedona.join.useExternalSpatialIndex" -> useExternalSpatialIndex.toString)) {
+            val knnOutputs = JoinQuery
+              .KNNJoinQuery(
+                objectRDD,
+                queryRDD,
+                IndexType.RTREE,
+                k,
+                null,
+                DistanceMetric.EUCLIDEAN)
+              .collect()
+              .asScala
+              .toList
 
-        val sortedKnnOutputs = knnOutputs.sortBy { case (queryPoint, _) => queryPoint }
+            val sortedKnnOutputs = knnOutputs.sortBy { case (queryPoint, _) => queryPoint }
 
-        val output = sortedKnnOutputs.map { case (queryPoint, neighbors) =>
-          val sortedNeighbors = neighbors.asScala.toList.sorted
-          val neighborsString = sortedNeighbors.mkString(",")
-          s"$queryPoint,$neighborsString\n"
-        }.mkString
+            val output = sortedKnnOutputs.map { case (queryPoint, neighbors) =>
+              val sortedNeighbors = neighbors.asScala.toList.sorted
+              val neighborsString = sortedNeighbors.mkString(",")
+              s"$queryPoint,$neighborsString\n"
+            }.mkString
 
-        val expectedOutput =
-          new String(Files.readAllBytes(Paths.get(testRootPath + resultLocation)))
-        print(output)
-        assert(expectedOutput == output)
-
-        // java.lang.Thread.sleep(100*1000) // for debugging
+            val expectedOutput =
+              new String(Files.readAllBytes(Paths.get(testRootPath + resultLocation)))
+            assert(expectedOutput == output)
+          }
+        }
       }
   }
 }

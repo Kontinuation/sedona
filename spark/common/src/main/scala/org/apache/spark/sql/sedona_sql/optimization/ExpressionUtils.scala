@@ -56,8 +56,8 @@ object ExpressionUtils {
   def matchExpressionsToPlans[T <: QueryPlan[T]](
       exprA: Expression,
       exprB: Expression,
-      planA: QueryPlan[T],
-      planB: QueryPlan[T]): Option[(QueryPlan[T], QueryPlan[T], Boolean)] =
+      planA: T,
+      planB: T): Option[(T, T, Boolean)] =
     if (matches(exprA, planA) && matches(exprB, planB)) {
       Some((planA, planB, false))
     } else if (matches(exprA, planB) && matches(exprB, planA)) {

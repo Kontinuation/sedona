@@ -19,7 +19,6 @@
 package org.apache.sedona.core.joinJudgement;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
@@ -43,6 +42,7 @@ public class InMemoryKNNJoinIterator<T extends Geometry, U extends Geometry>
   private final Double searchRadius;
   private final DistanceMetric distanceMetric;
   private final boolean includeTies;
+  private final ItemDistance itemDistance;
 
   private final LongAccumulator streamCount;
   private final LongAccumulator resultCount;
@@ -66,6 +66,7 @@ public class InMemoryKNNJoinIterator<T extends Geometry, U extends Geometry>
     this.searchRadius = searchRadius;
     this.distanceMetric = distanceMetric;
     this.includeTies = includeTies;
+    this.itemDistance = KnnJoinIndexJudgement.getItemDistance(distanceMetric);
 
     this.streamCount = streamCount;
     this.resultCount = resultCount;
@@ -109,12 +110,13 @@ public class InMemoryKNNJoinIterator<T extends Geometry, U extends Geometry>
     streamCount.add(1);
 
     Object[] localK =
-        strTree.nearestNeighbour(queryGeom.getEnvelopeInternal(), queryGeom, getItemDistance(), k);
+        strTree.nearestNeighbour(queryGeom.getEnvelopeInternal(), queryGeom, itemDistance, k);
     if (includeTies) {
       localK = getUpdatedLocalKWithTies(queryGeom, localK, strTree);
     }
     if (searchRadius != null) {
-      localK = getInSearchRadius(localK, queryGeom);
+      localK =
+          KnnJoinIndexJudgement.getInSearchRadius(localK, queryGeom, distanceMetric, searchRadius);
     }
 
     for (Object obj : localK) {
@@ -123,26 +125,6 @@ public class InMemoryKNNJoinIterator<T extends Geometry, U extends Geometry>
       currentResults.add(pair);
       resultCount.add(1);
     }
-  }
-
-  private Object[] getInSearchRadius(Object[] localK, Geometry queryGeom) {
-    localK =
-        Arrays.stream(localK)
-            .filter(
-                candidate -> {
-                  Geometry candidateGeom = (Geometry) candidate;
-                  return KnnJoinIndexJudgement.distanceByMetric(
-                          queryGeom, candidateGeom, distanceMetric)
-                      <= searchRadius;
-                })
-            .toArray();
-    return localK;
-  }
-
-  private ItemDistance getItemDistance() {
-    ItemDistance itemDistance;
-    itemDistance = KnnJoinIndexJudgement.getItemDistanceByMetric(distanceMetric);
-    return itemDistance;
   }
 
   private Object[] getUpdatedLocalKWithTies(

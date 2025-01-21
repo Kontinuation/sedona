@@ -18,53 +18,103 @@
  */
 package org.apache.sedona.core.joinJudgement;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Answers.RETURNS_SMART_NULLS;
+import static org.mockito.Mockito.when;
 
-import java.util.*;
-import org.apache.commons.collections.iterators.SingletonIterator;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Random;
+import org.apache.commons.collections4.iterators.SingletonIterator;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.core.enums.DistanceMetric;
+import org.apache.sedona.core.index.ExternalIndexTestBase;
+import org.apache.sedona.core.utils.SedonaConf;
+import org.apache.spark.SparkEnv;
 import org.apache.spark.util.LongAccumulator;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.index.strtree.STRtree;
+import org.mockito.Mock;
 import org.mockito.Mockito;
 
-public class KnnJoinIndexJudgementTest {
+@RunWith(Parameterized.class)
+public class KnnJoinIndexJudgementTest extends ExternalIndexTestBase {
 
-  private KnnJoinIndexJudgement<Geometry, Geometry> judgement;
-  private LongAccumulator buildCount;
-  private LongAccumulator streamCount;
-  private LongAccumulator resultCount;
-  private LongAccumulator candidateCount;
-  private GeometryFactory factory;
+  @Parameterized.Parameters(name = "use external spatial index: {0}")
+  public static Collection<Boolean> testParams() {
+    return Arrays.asList(false, true);
+  }
+
+  private final boolean useExternalSpatialIndex;
+
+  public KnnJoinIndexJudgementTest(boolean useExternalSpatialIndex) {
+    this.useExternalSpatialIndex = useExternalSpatialIndex;
+  }
+
+  @Mock(answer = RETURNS_SMART_NULLS)
+  SedonaConf sedonaConf;
+
+  @Mock(answer = RETURNS_SMART_NULLS)
+  SparkEnv sparkEnv;
 
   @Before
-  public void setUp() {
+  public void setUpMock() {
+    when(sparkEnv.blockManager()).thenReturn(blockManager);
+    when(sedonaConf.useExternalSpatialIndex()).thenReturn(useExternalSpatialIndex);
+    when(sedonaConf.getExternalSpatialIndexLeafPageCapacity()).thenReturn(10);
+    when(sedonaConf.getExternalSpatialIndexInternalNodeCapacity()).thenReturn(10);
+    when(sedonaConf.forceSpillExternalSpatialIndex()).thenReturn(false);
     buildCount = Mockito.mock(LongAccumulator.class);
     streamCount = Mockito.mock(LongAccumulator.class);
     resultCount = Mockito.mock(LongAccumulator.class);
     candidateCount = Mockito.mock(LongAccumulator.class);
-    factory = new GeometryFactory();
-    judgement =
+  }
+
+  private LongAccumulator buildCount;
+  private LongAccumulator streamCount;
+  private LongAccumulator resultCount;
+  private LongAccumulator candidateCount;
+  private final GeometryFactory factory = new GeometryFactory();
+
+  private KnnJoinIndexJudgement<Geometry, Geometry> createTestJudgement(
+      int k, Double searchRadius, DistanceMetric distanceMetric, boolean includeTies) {
+    KnnJoinIndexJudgement<Geometry, Geometry> judgement =
         new KnnJoinIndexJudgement<>(
-            5,
-            null,
-            DistanceMetric.EUCLIDEAN,
-            false,
+            k,
+            searchRadius,
+            distanceMetric,
+            includeTies,
             null,
             null,
             buildCount,
             streamCount,
             resultCount,
-            candidateCount);
+            candidateCount,
+            sedonaConf);
+    judgement.setSparkEnv(sparkEnv);
+    judgement.setTaskContext(taskContext);
+    return judgement;
+  }
+
+  private KnnJoinIndexJudgement<Geometry, Geometry> createTestJudgement() {
+    return createTestJudgement(5, null, DistanceMetric.EUCLIDEAN, false);
   }
 
   @Test
   public void testCallWithEmptyIterators() throws Exception {
+    KnnJoinIndexJudgement<Geometry, Geometry> judgement = createTestJudgement();
     Iterator<Pair<Geometry, Geometry>> resultIterator =
         judgement.call(Collections.emptyIterator(), Collections.emptyIterator());
     assertFalse(resultIterator.hasNext());
@@ -72,32 +122,18 @@ public class KnnJoinIndexJudgementTest {
 
   @Test
   public void testCallWithNonEmptyIterators() throws Exception {
-    // Create an STRtree spatial index
-    STRtree strTree = new STRtree();
-
-    // Insert multiple points into the spatial index
-    strTree.insert(
-        factory.createPoint(new Coordinate(0, 0)).getEnvelopeInternal(),
-        factory.createPoint(new Coordinate(0, 0)));
-    strTree.insert(
-        factory.createPoint(new Coordinate(1, 1)).getEnvelopeInternal(),
-        factory.createPoint(new Coordinate(1, 1)));
-    strTree.insert(
-        factory.createPoint(new Coordinate(2, 2)).getEnvelopeInternal(),
-        factory.createPoint(new Coordinate(2, 2)));
-    strTree.insert(
-        factory.createPoint(new Coordinate(3, 3)).getEnvelopeInternal(),
-        factory.createPoint(new Coordinate(3, 3)));
-    strTree.insert(
-        factory.createPoint(new Coordinate(4, 4)).getEnvelopeInternal(),
-        factory.createPoint(new Coordinate(4, 4)));
+    List<Geometry> testObjects = new ArrayList<>();
+    for (int i = 0; i < 5; i++) {
+      testObjects.add(factory.createPoint(new Coordinate(i, i)));
+    }
 
     // Create a test point
     Geometry testPoint = factory.createPoint(new Coordinate(0, 0));
 
     // Perform a KNN search using the test point
+    KnnJoinIndexJudgement<Geometry, Geometry> judgement = createTestJudgement();
     Iterator<Pair<Geometry, Geometry>> resultIterator =
-        judgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
+        judgement.call(new SingletonIterator<>(testPoint), testObjects.iterator());
 
     // Assert that there are results
     assertTrue(resultIterator.hasNext());
@@ -115,8 +151,7 @@ public class KnnJoinIndexJudgementTest {
 
   @Test
   public void testCallWithRandomSpatialIndexData() throws Exception {
-    // Create an STRtree spatial index
-    STRtree strTree = new STRtree();
+    List<Geometry> testObjects = new ArrayList<>();
 
     // Create a Random object
     Random random = new Random();
@@ -126,7 +161,7 @@ public class KnnJoinIndexJudgementTest {
       double x = random.nextDouble() * 10; // generate random x-coordinate within range [0, 10)
       double y = random.nextDouble() * 10; // generate random y-coordinate within range [0, 10)
       Geometry point = factory.createPoint(new Coordinate(x, y));
-      strTree.insert(point.getEnvelopeInternal(), point);
+      testObjects.add(point);
     }
 
     // Create a list of test points
@@ -138,9 +173,10 @@ public class KnnJoinIndexJudgementTest {
     }
 
     // Perform a KNN search using each test point
+    KnnJoinIndexJudgement<Geometry, Geometry> judgement = createTestJudgement();
     for (Geometry testPoint : testPoints) {
       Iterator<Pair<Geometry, Geometry>> resultIterator =
-          judgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
+          judgement.call(new SingletonIterator<>(testPoint), testObjects.iterator());
 
       // Assert that there are results
       assertTrue(resultIterator.hasNext());
@@ -149,37 +185,21 @@ public class KnnJoinIndexJudgementTest {
       while (resultIterator.hasNext()) {
         Pair<Geometry, Geometry> pair = resultIterator.next();
         assertEquals(testPoint, pair.getKey());
-        assertTrue(pair.getValue() instanceof Geometry);
+        assertNotNull(pair.getValue());
       }
-
-      // Assert that there are no more results
-      assertFalse(resultIterator.hasNext());
     }
   }
 
   @Test
   public void testCase1() throws Exception {
-    // Create an STRtree spatial index
-    STRtree strTree = new STRtree();
+    KnnJoinIndexJudgement<Geometry, Geometry> thisJudgement =
+        createTestJudgement(4, null, DistanceMetric.EUCLIDEAN, false);
 
-    KnnJoinIndexJudgement thisJudgement =
-        new KnnJoinIndexJudgement<>(
-            4,
-            null,
-            DistanceMetric.EUCLIDEAN,
-            false,
-            null,
-            null,
-            buildCount,
-            streamCount,
-            resultCount,
-            candidateCount);
     // Points forming a grid
+    List<Geometry> testObjects = new ArrayList<>();
     for (int i = 0; i <= 7; i++) {
       for (int j = 0; j <= 4; j++) {
-        strTree.insert(
-            factory.createPoint(new Coordinate(i, j)).getEnvelopeInternal(),
-            factory.createPoint(new Coordinate(i, j)));
+        testObjects.add(factory.createPoint(new Coordinate(i, j)));
       }
     }
 
@@ -188,7 +208,7 @@ public class KnnJoinIndexJudgementTest {
 
     // Perform a KNN search using the test point
     Iterator<Pair<Geometry, Geometry>> resultIterator =
-        thisJudgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
+        thisJudgement.call(new SingletonIterator<>(testPoint), testObjects.iterator());
 
     // Assert that the results are correct
     int count = 0;
@@ -202,27 +222,14 @@ public class KnnJoinIndexJudgementTest {
 
   @Test
   public void testCase2() throws Exception {
-    // Create an STRtree spatial index
-    STRtree strTree = new STRtree();
+    KnnJoinIndexJudgement<Geometry, Geometry> thisJudgement =
+        createTestJudgement(4, 1.4, DistanceMetric.EUCLIDEAN, false);
 
-    KnnJoinIndexJudgement thisJudgement =
-        new KnnJoinIndexJudgement<>(
-            4,
-            1.4,
-            DistanceMetric.EUCLIDEAN,
-            false,
-            null,
-            null,
-            buildCount,
-            streamCount,
-            resultCount,
-            candidateCount);
     // Points forming a grid
+    List<Geometry> testObjects = new ArrayList<>();
     for (int i = 0; i <= 7; i++) {
       for (int j = 0; j <= 4; j++) {
-        strTree.insert(
-            factory.createPoint(new Coordinate(i, j)).getEnvelopeInternal(),
-            factory.createPoint(new Coordinate(i, j)));
+        testObjects.add(factory.createPoint(new Coordinate(i, j)));
       }
     }
 
@@ -231,7 +238,7 @@ public class KnnJoinIndexJudgementTest {
 
     // Perform a KNN search using the test point
     Iterator<Pair<Geometry, Geometry>> resultIterator =
-        thisJudgement.call(new SingletonIterator(testPoint), new SingletonIterator(strTree));
+        thisJudgement.call(new SingletonIterator<>(testPoint), testObjects.iterator());
 
     // Assert that the results are correct
     int count = 0;
@@ -241,5 +248,44 @@ public class KnnJoinIndexJudgementTest {
     }
     // with search radius 1.4, the result should be 3
     assertEquals(3, count);
+  }
+
+  @Test
+  public void testSpill() throws Exception {
+    if (!useExternalSpatialIndex) {
+      return;
+    }
+
+    KnnJoinIndexJudgement<Geometry, Geometry> thisJudgement =
+        createTestJudgement(4, 1.4, DistanceMetric.EUCLIDEAN, false);
+
+    // Points forming a grid
+    List<Geometry> testObjects = new ArrayList<>();
+    for (int i = 0; i <= 7; i++) {
+      for (int j = 0; j <= 4; j++) {
+        testObjects.add(factory.createPoint(new Coordinate(i, j)));
+      }
+    }
+
+    // Create a test points
+    Geometry testPoint = factory.createPoint(new Coordinate(3.3, 4.4));
+    List<Geometry> testPoints = new ArrayList<>();
+    for (int k = 0; k < 10; k++) {
+      testPoints.add(testPoint);
+    }
+
+    // Perform a KNN search using the test point
+    Iterator<Pair<Geometry, Geometry>> resultIterator =
+        thisJudgement.call(testPoints.iterator(), testObjects.iterator());
+    ((ExternalKNNJoinIterator<Geometry, Geometry>) resultIterator).forceSpill();
+
+    // Assert that the results are correct
+    int count = 0;
+    while (resultIterator.hasNext()) {
+      resultIterator.next();
+      count++;
+    }
+    // with search radius 1.4, the result should be 3
+    assertEquals(30, count);
   }
 }

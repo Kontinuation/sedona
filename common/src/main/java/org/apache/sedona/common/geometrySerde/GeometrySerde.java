@@ -70,7 +70,7 @@ public class GeometrySerde extends Serializer implements Serializable {
     } else if (object instanceof UniqueGeometry) {
       writeType(out, Type.UNIQUE_GEOMETRY);
       UniqueGeometry<?> uniqueGeometry = (UniqueGeometry<?>) object;
-      out.writeString(uniqueGeometry.getUniqueId());
+      out.writeLong(uniqueGeometry.getUniqueId());
       writeGeometry(kryo, out, (Geometry) uniqueGeometry.getOriginalGeometry());
     } else {
       throw new UnsupportedOperationException(
@@ -132,7 +132,7 @@ public class GeometrySerde extends Serializer implements Serializable {
         nullGeom.setUserData(readUserData(kryo, input));
         return nullGeom;
       case UNIQUE_GEOMETRY:
-        String uniqueId = input.readString();
+        long uniqueId = input.readLong();
         Geometry geometry = readGeometry(kryo, input);
         return new UniqueGeometry<>(uniqueId, geometry);
       default:

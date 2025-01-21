@@ -18,19 +18,14 @@
  */
 package org.apache.sedona.common.geometryObjects;
 
-import java.util.UUID;
 import org.apache.commons.lang3.NotImplementedException;
 import org.locationtech.jts.geom.*;
 
 public class UniqueGeometry<T> extends Geometry {
   private final T originalGeometry;
-  private final String uniqueId;
+  private final long uniqueId;
 
-  public UniqueGeometry(T originalGeometry) {
-    this(UUID.randomUUID().toString(), originalGeometry);
-  }
-
-  public UniqueGeometry(String uniqueId, T originalGeometry) {
+  public UniqueGeometry(long uniqueId, T originalGeometry) {
     super(new GeometryFactory());
     this.uniqueId = uniqueId;
     this.originalGeometry = originalGeometry;
@@ -40,13 +35,13 @@ public class UniqueGeometry<T> extends Geometry {
     return originalGeometry;
   }
 
-  public String getUniqueId() {
+  public long getUniqueId() {
     return uniqueId;
   }
 
   @Override
   public int hashCode() {
-    return uniqueId.hashCode(); // Uniqueness ensured by uniqueId
+    return Long.hashCode(uniqueId); // Uniqueness ensured by uniqueId
   }
 
   @Override
@@ -94,7 +89,7 @@ public class UniqueGeometry<T> extends Geometry {
     if (this == obj) return true;
     if (obj == null || getClass() != obj.getClass()) return false;
     UniqueGeometry<?> that = (UniqueGeometry<?>) obj;
-    return uniqueId.equals(that.uniqueId);
+    return uniqueId == that.uniqueId;
   }
 
   @Override
@@ -102,9 +97,8 @@ public class UniqueGeometry<T> extends Geometry {
     return "UniqueGeometry{"
         + "originalGeometry="
         + originalGeometry
-        + ", uniqueId='"
+        + ", uniqueId="
         + uniqueId
-        + '\''
         + '}';
   }
 

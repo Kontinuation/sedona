@@ -66,7 +66,7 @@ public class GeometryDataItemFormat implements DataItemFormat<GeometryDataItem> 
     } else if (geometry instanceof UniqueGeometry) {
       out.writeByte((byte) Type.UNIQUE_GEOMETRY.id);
       UniqueGeometry<?> uniqueGeometry = (UniqueGeometry<?>) geometry;
-      out.writeString(uniqueGeometry.getUniqueId());
+      out.writeLong(uniqueGeometry.getUniqueId());
       byte[] data = GeometrySerializer.serialize((Geometry) uniqueGeometry.getOriginalGeometry());
       out.writeInt(data.length);
       out.write(data, 0, data.length);
@@ -107,7 +107,7 @@ public class GeometryDataItemFormat implements DataItemFormat<GeometryDataItem> 
         geometry.setUserData(UserDataSerializer.read(kryo, in));
         break;
       case UNIQUE_GEOMETRY:
-        String uniqueId = in.readString();
+        long uniqueId = in.readLong();
         data = new byte[in.readInt()];
         in.readBytes(data);
         geometry = new UniqueGeometry<>(uniqueId, GeometrySerializer.deserialize(data));
