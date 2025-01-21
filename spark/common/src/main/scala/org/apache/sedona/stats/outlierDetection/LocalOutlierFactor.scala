@@ -19,7 +19,7 @@
 package org.apache.sedona.stats.outlierDetection
 
 import org.apache.sedona.stats.MetricsRegistrator
-import org.apache.sedona.stats.Util.getGeometryColumnName
+import org.apache.sedona.util.DfUtils.getGeometryColumnName
 import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_Distance, ST_DistanceSphere}
 import org.apache.spark.sql.{Column, DataFrame, SparkSession, functions => f}
 
@@ -36,7 +36,7 @@ object LocalOutlierFactor {
    * column name must be provided.
    *
    * @param dataframe
-   *   apache sedona idDataframe containing the point geometries
+   *   dataframe containing the point geometries
    * @param k
    *   number of nearest neighbors that will be considered for the LOF calculation
    * @param geometry
@@ -51,7 +51,7 @@ object LocalOutlierFactor {
    *   the name of the column containing the lof for each row. Default is "lof"
    *
    * @return
-   *   A PySpark DataFrame containing the lof for each row
+   *   A DataFrame containing the lof for each row
    */
   def localOutlierFactor(
       dataframe: DataFrame,
