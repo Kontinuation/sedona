@@ -19,6 +19,7 @@
 package org.apache.sedona.common.raster.inputstream;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -58,5 +59,51 @@ public class HadoopImageInputStreamFactoryTest {
     int percent = HadoopImageInputStreamFactory.getCacheMaxDiskSpacePercent(conf);
     Assert.assertEquals(
         HadoopImageInputStreamFactory.DEFAULT_CACHE_MAX_DISK_SPACE_PERCENT, percent);
+  }
+
+  @Test
+  public void testConvertHttpToS3PathStyleRequests() {
+    Path httpPath = new Path("https://s3.us-west-2.amazonaws.com/my-bucket/path/to/file.jpg");
+    Path s3Path = HadoopImageInputStreamFactory.convertHttpToS3Path(httpPath);
+    Assert.assertNotNull(s3Path);
+    Assert.assertEquals("s3a://my-bucket/path/to/file.jpg", s3Path.toString());
+
+    // Test with different region
+    httpPath = new Path("https://s3.eu-central-1.amazonaws.com/another-bucket/data.png");
+    s3Path = HadoopImageInputStreamFactory.convertHttpToS3Path(httpPath);
+    Assert.assertNotNull(s3Path);
+    Assert.assertEquals("s3a://another-bucket/data.png", s3Path.toString());
+  }
+
+  @Test
+  public void testConvertHttpToS3VirtualHostedStyle() {
+    Path httpPath = new Path("https://my-bucket.s3.us-west-2.amazonaws.com/path/to/file.jpg");
+    Path s3Path = HadoopImageInputStreamFactory.convertHttpToS3Path(httpPath);
+    Assert.assertNotNull(s3Path);
+    Assert.assertEquals("s3a://my-bucket/path/to/file.jpg", s3Path.toString());
+
+    // Test with different region
+    httpPath = new Path("https://another-bucket.s3.eu-central-1.amazonaws.com/data.png");
+    s3Path = HadoopImageInputStreamFactory.convertHttpToS3Path(httpPath);
+    Assert.assertNotNull(s3Path);
+    Assert.assertEquals("s3a://another-bucket/data.png", s3Path.toString());
+  }
+
+  @Test
+  public void testConvertHttpToS3NonS3Urls() {
+    // Test with non-S3 HTTP URL
+    Path httpPath = new Path("https://example.com/path/to/file.jpg");
+    Path s3Path = HadoopImageInputStreamFactory.convertHttpToS3Path(httpPath);
+    Assert.assertNull(s3Path);
+
+    // Test with already S3A URL
+    httpPath = new Path("s3a://my-bucket/path/to/file.jpg");
+    s3Path = HadoopImageInputStreamFactory.convertHttpToS3Path(httpPath);
+    Assert.assertNull(s3Path);
+
+    // Test with local file path
+    httpPath = new Path("/path/to/local/file.jpg");
+    s3Path = HadoopImageInputStreamFactory.convertHttpToS3Path(httpPath);
+    Assert.assertNull(s3Path);
   }
 }

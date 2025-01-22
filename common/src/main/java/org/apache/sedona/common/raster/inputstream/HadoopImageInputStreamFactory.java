@@ -20,6 +20,7 @@ package org.apache.sedona.common.raster.inputstream;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import javax.imageio.stream.ImageInputStream;
@@ -63,6 +64,17 @@ public class HadoopImageInputStreamFactory {
   public static ImageInputStream create(Path path, Configuration conf) throws IOException {
     Configuration tunedConf = new Configuration(conf);
     String scheme = path.toUri().getScheme();
+    if (scheme != null && (scheme.equals("http") || scheme.equals("https"))) {
+      Path s3Path = convertHttpToS3Path(path);
+      if (s3Path != null) {
+        path = s3Path;
+      } else {
+        throw new UnsupportedOperationException(
+            "Only http or https path of S3 objects is supported: " + path);
+      }
+    }
+
+    scheme = path.toUri().getScheme();
 
     if ("s3a".equals(scheme)) {
       tunedConf.set("fs.s3a.experimental.input.fadvise", "random");
@@ -100,6 +112,42 @@ public class HadoopImageInputStreamFactory {
       stream.close();
       throw e;
     }
+  }
+
+  /**
+   * Detect if the path is the http or https path of an S3 object, and convert it to the s3a path.
+   *
+   * @param path the path to convert
+   * @return the converted path, or null if the path is not an http or https path of an S3 object
+   */
+  public static Path convertHttpToS3Path(Path path) {
+    URI uri = path.toUri();
+    String scheme = uri.getScheme();
+    if (scheme != null && (scheme.equals("http") || scheme.equals("https"))) {
+      String host = uri.getHost();
+      String pathStr = uri.getPath();
+
+      // Handle path-style requests: https://s3.region-code.amazonaws.com/bucket-name/key-name
+      if (host.startsWith("s3.") && host.endsWith(".amazonaws.com")) {
+        if (pathStr.startsWith("/")) {
+          pathStr = pathStr.substring(1); // Remove leading slash
+        }
+        int firstSlash = pathStr.indexOf('/');
+        if (firstSlash > 0) {
+          String bucket = pathStr.substring(0, firstSlash);
+          String key = pathStr.substring(firstSlash + 1);
+          return new Path("s3a://" + bucket + "/" + key);
+        }
+      }
+
+      // Handle virtual-hosted-style: https://bucket-name.s3.region-code.amazonaws.com/key-name
+      if (host.contains(".s3.") && host.endsWith(".amazonaws.com")) {
+        int s3Index = host.indexOf(".s3.");
+        String bucket = host.substring(0, s3Index);
+        return new Path("s3a://" + bucket + pathStr);
+      }
+    }
+    return null;
   }
 
   /**

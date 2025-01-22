@@ -107,7 +107,10 @@ def _normalize_path(src_path: str) -> str:
         src_path = src_path.replace("s3a://", "s3://")
     elif src_path.startswith("file:"):
         src_path = src_path[5:]
-    src_path = src_path.replace("s3://", "/vsis3/")
+    if src_path.startswith("s3://"):
+        src_path = src_path.replace("s3://", "/vsis3/")
+    elif src_path.startswith("http://") or src_path.startswith("https://"):
+        src_path = "/vsicurl/" + src_path
     return src_path
 
 
