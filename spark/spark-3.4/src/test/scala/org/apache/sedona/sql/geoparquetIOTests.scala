@@ -771,6 +771,14 @@ class geoparquetIOTests extends TestBaseScala with BeforeAndAfterAll {
     }
   }
 
+  describe("stac-geoparquet as an alias of geoparquet") {
+    val df = sparkSession.read.format("stac-geoparquet").load(geoparquetdatalocation1)
+    val rows =
+      df.where(ST_Intersects(ST_Point(35.174722, -6.552465), col("geometry"))).collect()
+    assert(rows.length == 1)
+    assert(rows(0).getAs[String]("name") == "Tanzania")
+  }
+
   def validateGeoParquetMetadata(path: String)(body: org.json4s.JValue => Unit): Unit = {
     val parquetFiles = new File(path).listFiles().filter(_.getName.endsWith(".parquet"))
     parquetFiles.foreach { filePath =>
