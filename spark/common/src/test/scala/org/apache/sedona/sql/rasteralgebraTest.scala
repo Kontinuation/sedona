@@ -2563,6 +2563,12 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       }
     }
 
+    it("Passed RS_TileExplode - null") {
+      val resultDf = sparkSession.sql("SELECT RS_TileExplode(null, 100, 100) AS (x, y, tile)")
+      val result = resultDf.collect()
+      assert(result.length == 0)
+    }
+
     it("Passed RS_MapAlgebra with two raster columns") {
       var df = sparkSession.read
         .format("binaryFile")

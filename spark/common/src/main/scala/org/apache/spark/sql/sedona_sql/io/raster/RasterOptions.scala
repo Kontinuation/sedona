@@ -24,6 +24,36 @@ private[io] class RasterOptions(@transient private val parameters: CaseInsensiti
     extends Serializable {
   def this(parameters: Map[String, String]) = this(CaseInsensitiveMap(parameters))
 
+  // The following options are used to read raster data
+
+  /**
+   * Whether to retile the raster data. If true, the raster data will be retiled into smaller
+   * tiles. If false, the raster data will be read as a single tile.
+   */
+  val retile = parameters.getOrElse("retile", "true").toBoolean
+
+  /**
+   * The width of the tile. This is only effective when retile is true. If retile is true and
+   * tileWidth is not set, the default value is the width of the internal tiles in the raster
+   * files. Each raster file may have different internal tile sizes.
+   */
+  val tileWidth = parameters.get("tileWidth").map(_.toInt)
+
+  /**
+   * The height of the tile. This is only effective when retile is true. If retile is true and
+   * tileHeight is not set, the default value is the same as tileWidth. IF tileHeight is set,
+   * tileWidth must be set as well.
+   */
+  val tileHeight = parameters
+    .get("tileHeight")
+    .map { value =>
+      require(tileWidth.isDefined, "tileWidth must be set when tileHeight is set")
+      value.toInt
+    }
+    .orElse(tileWidth)
+
+  // The following options are used to write raster data
+
   // The file format of the raster image
   val fileExtension = parameters.getOrElse("fileExtension", ".tiff")
   // Column of the raster image name

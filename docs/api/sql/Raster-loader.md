@@ -20,11 +20,75 @@
 !!!note
 	Sedona loader are available in Scala, Java and Python and have the same APIs.
 
+## Loading raster using the raster loader
+
+We can use the `raster` loader to load raster data from files. The `raster` loader will load the binary files as out-db rasters and automatically split the raster into smaller tiles.
+
+=== "Scala"
+    ```scala
+    var rawDf = sedona.read.format("raster").load("/some/path/*.tif")
+    rawDf.createOrReplaceTempView("rawdf")
+    rawDf.show()
+    ```
+
+=== "Java"
+    ```java
+    Dataset<Row> rawDf = sedona.read().format("raster").load("/some/path/*.tif")
+    rawDf.createOrReplaceTempView("rawdf")
+    rawDf.show()
+    ```
+
+=== "Python"
+    ```python
+    rawDf = sedona.read.format("raster").load("/some/path/*.tif")
+    rawDf.createOrReplaceTempView("rawdf")
+    rawDf.show()
+    ```
+
+The output will look like this:
+
+```
++--------------------+---+---+
+|                rast|  x|  y|
++--------------------+---+---+
+|OutDbGridCoverage...|  0|  0|
+|OutDbGridCoverage...|  1|  0|
+|OutDbGridCoverage...|  2|  0|
+...
+```
+
+The output contains the following columns:
+
+- `rast`: The raster data in `Raster` format. This is an out-db raster tile that references to the original raster data file.
+- `x`: The 0-based x-coordinate of the tile. This column only presents when retile is not disabled.
+- `y`: The 0-based y-coordinate of the tile. This column only presents when retile is not disabled.
+
+The size of the tile is determined by the internal tiling scheme of the raster data. It is recommended to use [Cloud Optimized GeoTIFF (COG)](https://www.cogeo.org/) format for raster data since they usually organize pixel data as square tiles. You can also disable automatic tiling using `option("retile", "false")`, or specify the tile size manually using options such as `option("tileWidth", "256")` and `option("tileHeight", "256")`.
+
+The options for the `raster` loader are as follows:
+
+- `retile`: Whether to enable tiling. Default is `true`.
+- `tileWidth`: The width of the tile. If not specified, the size of internal tiles will be used.
+- `tileHeight`: The height of the tile. If not specified, will use `tileWidth` if `tileWidth` is explicitly set, otherwise the size of internal tiles will be used.
+
+!!!note
+    If the internal tiling scheme of raster data is not friendly for tiling, the `raster` loader will throw an error, and you can disable automatic tiling using `option("retile", "false")`, or specify the tile size manually to workaround this issue. A better solution is to translate the raster data into COG format using `gdal_translate` or other tools.
+
+The `raster` loader also works with Spark generic file source options, such as `option("pathGlobFilter", "*.tif*")` and `option("recursiveFileLookup", "true")`. For instance, you can load all the `.tif` files recursively in a directory using
+
+```python
+sedona.read.format("raster").option("recursiveFileLookup", "true").option("pathGlobFilter", "*.tif*").load(path_to_raster_data_folder)
+```
+
+The DataFrame loaded by the `raster` loader will be automatically repartitioned by default, this is for evenly distributing the workload of processing raster tiles to the entire cluster. The number of partitions is proportional to the number of executor CPU cores in the cluster. You can disable auto repartitioning by setting the Spark session configuration `spark.wherobots.raster.load.autoRepartition` to `false`. If you want to manually specify the number of partitions, you can set the Spark session configuration `spark.wherobots.raster.load.numPartitions` to the desired number of partitions.
+
+## Loading raster using binaryFile loader (Deprecated)
+
 The raster loader of Sedona leverages Spark built-in binary data source and works with several RS constructors to produce Raster type. Each raster is a row in the resulting DataFrame and stored in a `Raster` format.
 
 By default, these functions uses lon/lat order since `v1.5.0`. Before, it used lat/lon order.
 
-## Step 1: Load raster to a binary DataFrame
+### Step 1: Load raster to a binary DataFrame
 
 You can load any type of raster data using the code below. Then use the RS constructors below to create a Raster DataFrame.
 
@@ -32,9 +96,9 @@ You can load any type of raster data using the code below. Then use the RS const
 sedona.read.format("binaryFile").load("/some/path/*.asc")
 ```
 
-## Step 2: Create a raster type column
+### Step 2: Create a raster type column
 
-### RS_FromArcInfoAsciiGrid
+#### RS_FromArcInfoAsciiGrid
 
 Introduction: Returns a raster geometry from an Arc Info Ascii Grid file.
 
@@ -49,7 +113,7 @@ var df = sedona.read.format("binaryFile").load("/some/path/*.asc")
 df = df.withColumn("raster", f.expr("RS_FromArcInfoAsciiGrid(content)"))
 ```
 
-### RS_FromGeoTiff
+#### RS_FromGeoTiff
 
 Introduction: Returns a raster geometry from a GeoTiff file.
 

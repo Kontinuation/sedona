@@ -172,6 +172,9 @@ case class RS_TileExplode(children: Seq[Expression]) extends Generator with Code
 
   override def eval(input: InternalRow): TraversableOnce[InternalRow] = {
     val raster = arguments.rasterExpr.toRaster(input)
+    if (raster == null) {
+      return Seq.empty
+    }
     try {
       val bandIndices = arguments.bandIndicesExpr.eval(input).asInstanceOf[ArrayData] match {
         case null => null

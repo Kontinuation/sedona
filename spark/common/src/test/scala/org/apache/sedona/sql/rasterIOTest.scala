@@ -20,9 +20,14 @@ package org.apache.sedona.sql
 
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.hdfs.MiniDFSCluster
+import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D
 import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.execution.exchange.Exchange
+import org.apache.spark.sql.execution.SparkPlan
+import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
 import org.junit.Assert.assertEquals
-import org.scalatest.{BeforeAndAfter, GivenWhenThen}
+import org.scalatest.BeforeAndAfter
+import org.scalatest.GivenWhenThen
 
 import java.io.File
 import java.nio.file.Files
@@ -232,6 +237,107 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
       rasterDf = rasterDf.selectExpr("RS_FromGeoTiff(content)")
       assert(rasterDf.count() == rasterCount)
       miniHDFS._1.shutdown()
+    }
+  }
+
+  describe("Raster read test") {
+    it("should read geotiff using raster source with explicit tiling") {
+      val rasterDf = sparkSession.read
+        .format("raster")
+        .options(Map("retile" -> "true", "tileWidth" -> "64"))
+        .load(rasterdatalocation)
+      assert(rasterDf.count() > 100)
+      rasterDf.collect().foreach { row =>
+        val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
+        assert(raster.getGridGeometry.getGridRange2D.width <= 64)
+        assert(raster.getGridGeometry.getGridRange2D.height <= 64)
+        val x = row.getInt(1)
+        val y = row.getInt(2)
+        assert(x >= 0 && y >= 0)
+        raster.dispose(true)
+      }
+
+      // Check the execution plan to see if the repartitioning is actually happening
+      val plan = rasterDf.queryExecution.executedPlan match {
+        case adaptive: AdaptiveSparkPlanExec => adaptive.initialPlan
+        case plan: SparkPlan => plan
+      }
+      assert(plan.collect { case _: Exchange => true }.size == 1)
+
+      // Check if auto-repartitioning is actually working
+      val partitions = rasterDf.rdd.getNumPartitions
+      assert(partitions >= sparkSession.sparkContext.defaultParallelism)
+
+      // Test projection push-down
+      rasterDf.selectExpr("y", "rast as r").collect().foreach { row =>
+        val raster = row.getAs[Object](1).asInstanceOf[OutDbGridCoverage2D]
+        assert(raster.getGridGeometry.getGridRange2D.width <= 64)
+        assert(raster.getGridGeometry.getGridRange2D.height <= 64)
+        val y = row.getInt(0)
+        assert(y >= 0)
+        raster.dispose(true)
+      }
+    }
+
+    it("should read geotiff using raster source without tiling") {
+      val rasterDf = sparkSession.read
+        .format("raster")
+        .options(Map("retile" -> "false"))
+        .load(rasterdatalocation)
+      assert(rasterDf.schema.fields.length == 1)
+      rasterDf.collect().foreach { row =>
+        val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
+        raster.dispose(true)
+      }
+    }
+
+    it("should read geotiff using raster source with auto-tiling") {
+      val rasterDf = sparkSession.read
+        .format("raster")
+        .options(Map("retile" -> "true"))
+        .load(rasterdatalocation)
+      val rasterDfNoTiling = sparkSession.read
+        .format("raster")
+        .options(Map("retile" -> "false"))
+        .load(rasterdatalocation)
+      assert(rasterDf.count() > rasterDfNoTiling.count())
+    }
+
+    it("should throw exception when only tileHeight is specified") {
+      assertThrows[IllegalArgumentException] {
+        val df = sparkSession.read
+          .format("raster")
+          .options(Map("retile" -> "true", "tileHeight" -> "64"))
+          .load(rasterdatalocation)
+        df.collect()
+      }
+    }
+
+    it("should throw exception when the geotiff is badly tiled") {
+      val exception = intercept[Exception] {
+        val rasterDf = sparkSession.read
+          .format("raster")
+          .options(Map("retile" -> "true"))
+          .load(resourceFolder + "raster_geotiff_color/*")
+        rasterDf.collect()
+      }
+      assert(exception.getMessage.contains("Please set tileWidth and tileHeight explicitly"))
+    }
+
+    it("should support AsciiGrid") {
+      val rasterDf = sparkSession.read
+        .format("raster")
+        .load(resourceFolder + "raster_asc/")
+      assert(rasterDf.count() == 1)
+      rasterDf.collect().foreach { row =>
+        val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
+        assert(raster.getGridGeometry.getGridRange2D.width == 2)
+        assert(raster.getGridGeometry.getGridRange2D.height == 2)
+        raster.dispose(true)
+        val x = row.getInt(1)
+        val y = row.getInt(2)
+        assert(x == 0 && y == 0)
+      }
     }
   }
 

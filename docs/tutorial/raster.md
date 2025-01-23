@@ -227,6 +227,45 @@ You can also register everything by passing `--conf spark.sql.extensions=org.apa
 
 Assume we have a single raster data file called rasterData.tiff, [at Path](https://github.com/apache/sedona/blob/0eae42576c2588fe278f75cef3b17fee600eac90/spark/common/src/test/resources/raster/raster_with_no_data/test5.tiff).
 
+We can use the `raster` loader to load the data. The `raster` loader will load the binary files as out-db rasters and automatically split the raster into multiple tiles.
+
+=== "Scala"
+    ```scala
+    var rawDf = sedona.read.format("raster").load(path_to_raster_data)
+    rawDf.createOrReplaceTempView("rawdf")
+    rawDf.show()
+    ```
+
+=== "Java"
+    ```java
+    Dataset<Row> rawDf = sedona.read().format("raster").load(path_to_raster_data)
+    rawDf.createOrReplaceTempView("rawdf")
+    rawDf.show()
+    ```
+
+=== "Python"
+    ```python
+    rawDf = sedona.read.format("raster").load(path_to_raster_data)
+    rawDf.createOrReplaceTempView("rawdf")
+    rawDf.show()
+    ```
+
+The output will look like the following. We can see that the rasters are divided into smaller tiles with the tile coordinates `x` and `y` attached to each tile.
+
+```
++--------------------+---+---+
+|                rast|  x|  y|
++--------------------+---+---+
+|OutDbGridCoverage...|  0|  0|
+|OutDbGridCoverage...|  1|  0|
+|OutDbGridCoverage...|  2|  0|
+...
+```
+
+For more details about the `raster` loader, please refer to [Raster loader](../api/sql/Raster-loader.md).
+
+## Load data using binaryFile loader (Deprecated)
+
 Use the following code to load the data and create a raw Dataframe.
 
 === "Scala"
@@ -297,11 +336,11 @@ The output will look like this:
 
 The content column in the raster table is still in the raw form, binary form.
 
-## Create a Raster type column
+### Create a Raster type column
 
 All raster operations in SedonaSQL require Raster type objects. Therefore, this should be the next step after loading the data.
 
-### From Geotiff
+#### From Geotiff
 
 ```sql
 SELECT RS_FromGeoTiff(content) AS rast, modificationTime, length, path FROM rawdf
@@ -323,7 +362,7 @@ root
  |-- path: string (nullable = true)
 ```
 
-### From Arc Grid
+#### From Arc Grid
 
 The raster data is loaded the same way as `tiff` file, but the raster data is stored with the extension `.asc`, ASCII format. The following code creates a Raster type objects from binary data:
 

@@ -91,6 +91,12 @@ object SedonaContext {
         new SpatialFilterPushDownForGeoParquet(sparkSession))
     }
 
+    if (!sparkSession.experimental.extraOptimizations.exists(
+        _.isInstanceOf[AutoRepartitionRasterRelation])) {
+      sparkSession.experimental.extraOptimizations ++= Seq(
+        new AutoRepartitionRasterRelation(sparkSession))
+    }
+
     customOptimizations.foreach { opt =>
       if (!sparkSession.experimental.extraOptimizations.contains(opt)) {
         sparkSession.experimental.extraOptimizations ++= Seq(opt)
