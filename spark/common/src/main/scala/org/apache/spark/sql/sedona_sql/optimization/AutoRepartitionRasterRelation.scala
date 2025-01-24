@@ -18,6 +18,7 @@
  */
 package org.apache.spark.sql.sedona_sql.optimization
 
+import org.apache.sedona.core.utils.ExecutorResourceUtils
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.plans.logical.Repartition
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -25,6 +26,10 @@ import org.apache.spark.sql.execution.datasources.HadoopFsRelation
 import org.apache.spark.sql.execution.datasources.LogicalRelation
 import org.apache.spark.sql.sedona_sql.io.raster.RasterFileFormat
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.execution.datasources.DataSource
+import org.apache.spark.sql.execution.datasources.binaryfile.BinaryFileFormat
+import org.apache.spark.sql.functions.sum
+import org.apache.spark.util.Utils
 
 import scala.collection.mutable
 
@@ -50,7 +55,7 @@ class AutoRepartitionRasterRelation(sparkSession: SparkSession) extends Rule[Log
             r
           } else {
             visited.add(r)
-            val numPartitions = getNumPartitions
+            val numPartitions = getNumPartitions(r)
             Repartition(numPartitions, shuffle = true, r)
           }
       }
@@ -69,9 +74,36 @@ class AutoRepartitionRasterRelation(sparkSession: SparkSession) extends Rule[Log
     }
   }
 
-  private def getNumPartitions: Int = {
+  private def getNumPartitions(lr: LogicalRelation): Int = {
     sparkSession.conf.get("spark.wherobots.raster.load.numPartitions", "0").toInt match {
-      case 0 => sparkSession.sparkContext.defaultParallelism * 4
+      case 0 =>
+        val conf = sparkSession.sparkContext.getConf
+        val isDynamicAllocationEnabled = Utils.isDynamicAllocationEnabled(conf) ||
+          sparkSession.conf.get("spark.wherobots.testing.dynamicAllocation", "false").toBoolean
+        if (isDynamicAllocationEnabled) {
+          // Determine number of partitions based on the total file size. The executors
+          // could scale up to process more partitions concurrently.
+          val relation = lr.relation.asInstanceOf[HadoopFsRelation]
+          val options = relation.options
+          val location = relation.location
+          val paths = location.rootPaths
+          val dfFiles = sparkSession.baseRelationToDataFrame(
+            DataSource
+              .apply(
+                sparkSession,
+                paths = paths.map(_.toString),
+                className = classOf[BinaryFileFormat].getName,
+                options = options ++ Map(DataSource.GLOB_PATHS_KEY -> "false"))
+              .resolveRelation(checkFilesExist = false))
+          val totalSize = dfFiles.select("length").agg(sum("length")).collect()(0).getLong(0)
+          val sizePerPartition = Utils.byteStringAsBytes(
+            sparkSession.conf.get("spark.wherobots.raster.load.perPartitionSize", "500mb"))
+          val parallelism = ExecutorResourceUtils.inferParallelism(sparkSession.sparkContext)
+          Math.max(parallelism, totalSize / sizePerPartition).toInt
+        } else {
+          // Try distributing the workload to all executor cores in the cluster
+          sparkSession.sparkContext.defaultParallelism * 4
+        }
       case n => n
     }
   }

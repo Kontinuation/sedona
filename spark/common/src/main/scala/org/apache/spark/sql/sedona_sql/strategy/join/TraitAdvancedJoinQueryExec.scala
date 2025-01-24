@@ -32,6 +32,7 @@ import org.apache.sedona.core.spatialPartitioning.SpatialPartitioningMetrics
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector.PerPartitionStats
+import org.apache.sedona.core.utils.ExecutorResourceUtils
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
@@ -1104,9 +1105,14 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
 
     // Otherwise, we should repartition. The number of partitions cannot be larger than twice the
     // number of partitions of the original spatial RDD.
-    val parallelism = sparkContext.defaultParallelism
+    val rowsPerPartition = 1000000
+    val targetParallelism = Math
+      .max(
+        ExecutorResourceUtils.inferParallelism(sparkContext),
+        stats.getCount / rowsPerPartition)
+      .toInt
     val numPartitions =
-      Math.max(partitionSizes.length, Math.min(parallelism, partitionSizes.length * 2))
+      Math.max(partitionSizes.length, Math.min(targetParallelism, partitionSizes.length * 2))
 
     log.info(
       s"Skew score ($score) exceeds the threshold ($threshold), repartition to $numPartitions partitions.")

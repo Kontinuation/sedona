@@ -18,6 +18,7 @@
  */
 package org.apache.sedona.core.utils;
 
+import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 
 public class ExecutorResourceUtils {
@@ -29,5 +30,22 @@ public class ExecutorResourceUtils {
         Double.parseDouble(context.getConf().get("spark.memory.storageFraction", "0.5"));
     int executorCores = Integer.parseInt(context.getConf().get("spark.executor.cores", "1"));
     return (long) (executorMemory * memoryFraction * (1 - storageFraction) / executorCores);
+  }
+
+  public static int inferParallelism(SparkContext context) {
+    SparkConf conf = context.getConf();
+    int executorInstances = conf.getInt("spark.executor.instances", 0);
+    int executorCores = conf.getInt("spark.executor.cores", 1);
+    boolean isDynamicAllocationEnabled = conf.getBoolean("spark.dynamicAllocation.enabled", false);
+    if (isDynamicAllocationEnabled) {
+      // Take the maximum of minExecutors, initialExecutors and spark.executor.instances as
+      // the number of executor instances. This is the same as
+      // Utils.getDynamicAllocationInitialExecutors in Spark source.
+      int initialExecutors = conf.getInt("spark.dynamicAllocation.initialExecutors", 0);
+      int minExecutors = conf.getInt("spark.dynamicAllocation.minExecutors", 0);
+      executorInstances = Math.max(executorInstances, initialExecutors);
+      executorInstances = Math.max(executorInstances, minExecutors);
+    }
+    return Math.max(context.defaultParallelism(), executorInstances * executorCores);
   }
 }

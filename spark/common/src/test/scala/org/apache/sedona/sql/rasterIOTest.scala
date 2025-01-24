@@ -279,6 +279,28 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
       }
     }
 
+    it("auto repartitioning should work with dynamic allocation enabled") {
+      withConf(
+        Map(
+          "spark.wherobots.testing.dynamicAllocation" -> "true",
+          "spark.wherobots.raster.load.perPartitionSize" -> "100kb")) {
+        val rasterDf = sparkSession.read
+          .format("raster")
+          .options(Map("retile" -> "true", "tileWidth" -> "64"))
+          .load(rasterdatalocation)
+
+        val plan = rasterDf.queryExecution.executedPlan match {
+          case adaptive: AdaptiveSparkPlanExec => adaptive.initialPlan
+          case plan: SparkPlan => plan
+        }
+        assert(plan.collect { case _: Exchange => true }.size == 1)
+
+        val partitions = rasterDf.rdd.getNumPartitions
+        assert(partitions >= 4)
+        assert(rasterDf.count() > 100)
+      }
+    }
+
     it("should read geotiff using raster source without tiling") {
       val rasterDf = sparkSession.read
         .format("raster")

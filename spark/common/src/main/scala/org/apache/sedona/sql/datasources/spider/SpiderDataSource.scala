@@ -18,6 +18,7 @@
  */
 package org.apache.sedona.sql.datasources.spider
 
+import org.apache.sedona.core.utils.ExecutorResourceUtils
 import org.apache.spark.sql.connector.catalog.{Table, TableProvider}
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.sources.DataSourceRegister
@@ -46,12 +47,17 @@ class SpiderDataSource extends TableProvider with DataSourceRegister {
       partitioning: Array[Transform],
       properties: util.Map[String, String]): Table = {
     val opts = new CaseInsensitiveStringMap(properties)
+    val numRows = opts.getOrDefault("cardinality", opts.getOrDefault("n", "100")).toLong
     var numPartitions = opts.getInt("numPartitions", -1)
     if (numPartitions < 0) {
-      numPartitions = SparkSession.active.sparkContext.defaultParallelism
+      val spark = SparkSession.active
+      val rowsPerPartition = 1000000
+      numPartitions = Math.max(
+        ExecutorResourceUtils.inferParallelism(spark.sparkContext),
+        Math.ceil(numRows.toDouble / rowsPerPartition).toInt)
     }
     new SpiderTable(
-      numRows = opts.getOrDefault("cardinality", opts.getOrDefault("n", "100")).toLong,
+      numRows = numRows,
       numPartitions = numPartitions,
       seed = opts.getLong("seed", System.currentTimeMillis()),
       distribution = opts.getOrDefault("distribution", "uniform"),
