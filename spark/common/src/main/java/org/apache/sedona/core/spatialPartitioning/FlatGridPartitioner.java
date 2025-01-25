@@ -27,23 +27,41 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
+/**
+ * The FlatGridPartitioner is used when there is already a set of grids which the data should be
+ * partitioned into. It iterates through all the grids to find the grids to place a geometry into.
+ * Unless you have very few objects to place, it may make more sense to use the
+ * IndexedGridPartitioner. If you do not have a strict requirement to use a specific set of grids,
+ * it may make more sense to use another partitioner that generates its own grids from a
+ * space-partitioning tree, e.g. the KDBTreePartitioner or the QuadTreePartitioner.
+ */
 public class FlatGridPartitioner extends SpatialPartitioner {
-  private final List<Envelope> grids;
+  protected final Boolean preserveUncontainedGeometries;
+  protected final List<Envelope> grids;
 
-  public FlatGridPartitioner(GridType gridType, List<Envelope> grids) {
+  public FlatGridPartitioner(
+      GridType gridType, List<Envelope> grids, Boolean preserveUncontainedGeometries) {
     super(gridType);
     this.grids = grids;
+    this.preserveUncontainedGeometries = preserveUncontainedGeometries;
+  }
+
+  public FlatGridPartitioner(GridType gridType, List<Envelope> grids) {
+    this(gridType, grids, true);
+  }
+
+  public FlatGridPartitioner(List<Envelope> grids, Boolean preserveUncontainedGeometries) {
+    this(null, grids, preserveUncontainedGeometries);
   }
 
   // For backwards compatibility (see SpatialRDD.spatialPartitioning(otherGrids))
   public FlatGridPartitioner(List<Envelope> grids) {
-    super(null);
-    this.grids = grids;
+    this(null, grids);
   }
 
   @Override
   public Iterator<Tuple2<Integer, Geometry>> placeObject(Geometry spatialObject) throws Exception {
-    EqualPartitioning partitioning = new EqualPartitioning(grids);
+    EqualPartitioning partitioning = new EqualPartitioning(grids, preserveUncontainedGeometries);
     return partitioning.placeObject(spatialObject);
   }
 
@@ -70,7 +88,7 @@ public class FlatGridPartitioner extends SpatialPartitioner {
 
   @Override
   public int numPartitions() {
-    return grids.size() + 1 /* overflow partition */;
+    return grids.size() + (preserveUncontainedGeometries ? 1 : 0);
   }
 
   @Override
