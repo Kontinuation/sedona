@@ -24,7 +24,6 @@ import org.apache.spark.sql.catalyst.analysis.Resolver
 import org.apache.spark.sql.catalyst.json.{JSONOptions, JacksonParser}
 import org.apache.spark.sql.catalyst.util.{DateFormatter, TimestampFormatter}
 import org.apache.spark.sql.catalyst.util.LegacyDateFormats.LegacyDateFormat
-import org.apache.spark.sql.execution.datasources.PartitionedFile
 import org.apache.spark.sql.execution.datasources.json.JsonDataSource
 import org.apache.spark.sql.types.{DataType, StructField, StructType}
 
@@ -166,7 +165,7 @@ object SparkCompatUtil {
   def readFile(
       jsonDataSource: JsonDataSource,
       conf: Configuration,
-      file: PartitionedFile,
+      file: Object,
       parser: JacksonParser,
       schema: StructType): Iterator[InternalRow] = {
     val readFileMethods =

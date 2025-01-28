@@ -57,6 +57,12 @@ object SedonaContext {
     ExtractGeoStatsFunctions,
     OrderByOptimization)
 
+  private def customOptimizationsWithSession(sparkSession: SparkSession) =
+    Seq(
+      new SpatialFilterPushDownForGeoParquet(sparkSession),
+      new SpatialTemporalFilterPushDownForStacScan(sparkSession),
+      new AutoRepartitionRasterRelation(sparkSession))
+
   def create(sqlContext: SQLContext): SQLContext = {
     create(sqlContext.sparkSession)
     sqlContext
@@ -85,16 +91,13 @@ object SedonaContext {
         new EvalGeoStatsFunctionStrategy(sparkSession))
     }
 
-    if (!sparkSession.experimental.extraOptimizations.exists(
-        _.isInstanceOf[SpatialFilterPushDownForGeoParquet])) {
-      sparkSession.experimental.extraOptimizations ++= Seq(
-        new SpatialFilterPushDownForGeoParquet(sparkSession))
-    }
-
-    if (!sparkSession.experimental.extraOptimizations.exists(
-        _.isInstanceOf[AutoRepartitionRasterRelation])) {
-      sparkSession.experimental.extraOptimizations ++= Seq(
-        new AutoRepartitionRasterRelation(sparkSession))
+    customOptimizationsWithSession(sparkSession).foreach { opt =>
+      if (!sparkSession.experimental.extraOptimizations.exists {
+          case _: opt.type => true
+          case _ => false
+        }) {
+        sparkSession.experimental.extraOptimizations ++= Seq(opt)
+      }
     }
 
     customOptimizations.foreach { opt =>
