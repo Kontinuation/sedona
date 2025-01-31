@@ -20,12 +20,9 @@ package org.apache.spark.sql.sedona_sql.io.stac
 
 import org.apache.sedona.sql.TestBaseScala
 import org.apache.spark.sql.sedona_sql.UDT.{GeometryUDT, RasterUDT}
-import org.apache.spark.sql.types.{ArrayType, DoubleType, MapType, StringType, StructField, StructType, TimestampType}
-import org.scalatest.BeforeAndAfterAll
+import org.apache.spark.sql.types._
 
-import java.util.TimeZone
-
-class StacDataSourceTest extends TestBaseScala with BeforeAndAfterAll {
+class StacDataSourceTest extends TestBaseScala {
 
   val STAC_COLLECTION_LOCAL: String = resourceFolder + "datasource_stac/collection.json"
   val STAC_ITEM_LOCAL: String = resourceFolder + "geojson/core-item.json"
@@ -37,28 +34,16 @@ class StacDataSourceTest extends TestBaseScala with BeforeAndAfterAll {
     "https://earthdatahub.destine.eu/api/stac/v1/collections/copernicus-dem",
     "https://planetarycomputer.microsoft.com/api/stac/v1/collections/naip")
 
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-  }
-
-  override def afterAll(): Unit = {
-    TimeZone.setDefault(null) // Reset to the system default time zone
-    super.afterAll()
-  }
-
   it("basic df load from local file should work") {
     val dfStac = sparkSession.read.format("stac").load(STAC_COLLECTION_LOCAL)
-    dfStac.printSchema()
-    dfStac.show(false)
+    val rowCount = dfStac.count()
+    assert(rowCount > 0)
   }
 
   it("basic df load from remote service endpoints should work") {
     STAC_COLLECTION_REMOTE.foreach { endpoint =>
       val dfStac = sparkSession.read.format("stac").load(endpoint)
       assertSchema(dfStac.schema)
-      dfStac.printSchema()
-      dfStac.show(true)
     }
   }
 
@@ -69,7 +54,6 @@ class StacDataSourceTest extends TestBaseScala with BeforeAndAfterAll {
     val dfSelect =
       sparkSession.sql("SELECT id, datetime as dt, geometry, bbox FROM STACTBL")
 
-    dfSelect.printSchema()
     assert(dfSelect.schema.fieldNames.contains("id"))
     assert(dfSelect.schema.fieldNames.contains("dt"))
     assert(dfSelect.schema.fieldNames.contains("geometry"))
@@ -86,9 +70,7 @@ class StacDataSourceTest extends TestBaseScala with BeforeAndAfterAll {
     val dfSelect = sparkSession.sql(
       "SELECT id, datetime as dt, geometry, bbox " +
         "FROM STACTBL " +
-        "WHERE datetime BETWEEN '2020-01-01' AND '2020-12-13'")
-
-    dfSelect.explain(true)
+        "WHERE datetime BETWEEN '2020-01-01T00:00:00Z' AND '2020-12-13T00:00:00Z'")
 
     val physicalPlan = dfSelect.queryExecution.executedPlan.toString()
     assert(physicalPlan.contains(
@@ -107,8 +89,6 @@ class StacDataSourceTest extends TestBaseScala with BeforeAndAfterAll {
         "FROM STACTBL " +
         "WHERE st_contains(ST_GeomFromText('POLYGON((17 10, 18 10, 18 11, 17 11, 17 10))'), geometry)")
 
-    dfSelect.explain(true)
-
     val physicalPlan = dfSelect.queryExecution.executedPlan.toString()
     assert(physicalPlan.contains(
       "PushedSpatialFilters -> LeafFilter(geometry,INTERSECTS,POLYGON ((17 10, 18 10, 18 11, 17 11, 17 10)))"))
@@ -123,10 +103,8 @@ class StacDataSourceTest extends TestBaseScala with BeforeAndAfterAll {
 
     val dfSelect = sparkSession.sql("SELECT id, datetime as dt, geometry, bbox " +
       "FROM STACTBL " +
-      "WHERE datetime BETWEEN '2020-01-01' AND '2020-12-13' " +
+      "WHERE datetime BETWEEN '2020-01-01T00:00:00Z' AND '2020-12-13T00:00:00Z' " +
       "AND st_contains(ST_GeomFromText('POLYGON((17 10, 18 10, 18 11, 17 11, 17 10))'), geometry)")
-
-    dfSelect.explain(true)
 
     val physicalPlan = dfSelect.queryExecution.executedPlan.toString()
     assert(physicalPlan.contains(
@@ -147,8 +125,6 @@ class StacDataSourceTest extends TestBaseScala with BeforeAndAfterAll {
         "FROM STACTBL " +
         "WHERE id = 'some-id'")
 
-    dfSelect.explain(true)
-
     val physicalPlan = dfSelect.queryExecution.executedPlan.toString()
     assert(physicalPlan.contains("PushedSpatialFilters -> None, PushedTemporalFilters -> None"))
 
@@ -163,10 +139,8 @@ class StacDataSourceTest extends TestBaseScala with BeforeAndAfterAll {
     val dfSelect = sparkSession.sql("SELECT id, datetime as dt, geometry, bbox " +
       "FROM STACTBL " +
       "WHERE id = 'some-id' " +
-      "AND datetime BETWEEN '2020-01-01' AND '2020-12-13' " +
+      "AND datetime BETWEEN '2020-01-01T00:00:00Z' AND '2020-12-13T00:00:00Z' " +
       "AND st_contains(ST_GeomFromText('POLYGON((17 10, 18 10, 18 11, 17 11, 17 10))'), geometry)")
-
-    dfSelect.explain(true)
 
     val physicalPlan = dfSelect.queryExecution.executedPlan.toString()
     assert(physicalPlan.contains(
