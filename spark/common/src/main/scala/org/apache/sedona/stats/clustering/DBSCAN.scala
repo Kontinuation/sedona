@@ -71,7 +71,7 @@ object DBSCAN {
     MetricsRegistrator.getOrCreate.DBScanFitPerform.inc()
 
     val geometryCol = geometry match {
-      case null => getGeometryColumnName(dataframe)
+      case null => getGeometryColumnName(dataframe.schema)
       case _ => geometry
     }
 

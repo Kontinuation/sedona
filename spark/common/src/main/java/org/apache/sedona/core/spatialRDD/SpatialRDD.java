@@ -18,14 +18,6 @@
  */
 package org.apache.sedona.core.spatialRDD;
 
-import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import org.apache.commons.collections4.iterators.SingletonIterator;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.tuple.Pair;
@@ -37,8 +29,12 @@ import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
 import org.apache.sedona.core.monitoring.JavaMetrics;
 import org.apache.sedona.core.serde.ShuffledGeometrySerializer;
-import org.apache.sedona.core.spatialPartitioning.*;
+import org.apache.sedona.core.spatialPartitioning.FlatGridPartitioner;
+import org.apache.sedona.core.spatialPartitioning.QuadTreePartitioner;
+import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner;
+import org.apache.sedona.core.spatialPartitioning.SpatialPartitionerBuilder;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitionerBuilder.SpatialPartitionBuildingStrategy;
+import org.apache.sedona.core.spatialPartitioning.SpatialPartitioningMetrics;
 import org.apache.sedona.core.spatialPartitioning.quadtree.StandardQuadTree;
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector;
 import org.apache.sedona.core.spatialRddTool.IndexBuilder;
@@ -55,6 +51,7 @@ import org.apache.spark.api.java.function.Function;
 import org.apache.spark.api.java.function.Function2;
 import org.apache.spark.rdd.ShuffledRDD;
 import org.apache.spark.serializer.Serializer;
+import org.apache.spark.sql.types.StructType;
 import org.apache.spark.storage.StorageLevel;
 import org.apache.spark.util.LongAccumulator;
 import org.apache.spark.util.random.SamplingUtils;
@@ -71,6 +68,15 @@ import org.locationtech.jts.io.WKTWriter;
 import org.wololo.geojson.Feature;
 import org.wololo.jts2geojson.GeoJSONWriter;
 import scala.Tuple2;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 // TODO: Auto-generated Javadoc
 
@@ -99,6 +105,8 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
   public JavaRDD<T> rawSpatialRDD;
 
   public List<String> fieldNames;
+
+  public StructType schema;
   /** The CR stransformation. */
   protected boolean CRStransformation = false;
   /** The source epsg code. */

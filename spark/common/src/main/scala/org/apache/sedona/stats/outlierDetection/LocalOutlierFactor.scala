@@ -79,7 +79,8 @@ object LocalOutlierFactor {
       if (useSphere) ST_DistanceSphere else ST_Distance
     val useSpheroidString = if (useSphere) "True" else "False" // for the SQL expression
 
-    val geometryColumn = if (geometry == null) getGeometryColumnName(dataframe) else geometry
+    val geometryColumn =
+      if (geometry == null) getGeometryColumnName(dataframe.schema) else geometry
 
     val KNNFunction = if (approximateKNN) "ST_AKNN" else "ST_KNN"
 
