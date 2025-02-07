@@ -30,10 +30,18 @@ import org.locationtech.jts.geom.Geometry;
 import scala.Tuple2;
 
 public abstract class SpatialPartitioner extends Partitioner implements Serializable {
+
   protected final GridType gridType;
+  protected final List<Envelope> grids;
+
+  protected SpatialPartitioner() {
+    gridType = null;
+    grids = null;
+  }
 
   protected SpatialPartitioner(GridType gridType) {
     this.gridType = gridType;
+    this.grids = null;
   }
 
   /**

@@ -57,7 +57,8 @@ object SpatiallyStratifiedSampling {
     MetricsRegistrator.getOrCreate.SpatiallyStratifiedSamplePerform.inc()
 
     // Validate input parameters
-    val geometryColumn = if (geometry != null) geometry else getGeometryColumnName(dataframe)
+    val geometryColumn =
+      if (geometry != null) geometry else getGeometryColumnName(dataframe.schema)
 
     if (fraction <= 0 || fraction > 1) {
       throw new IllegalArgumentException(
