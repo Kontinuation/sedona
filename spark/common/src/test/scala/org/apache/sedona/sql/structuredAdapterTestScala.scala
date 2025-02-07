@@ -19,10 +19,10 @@
 package org.apache.sedona.sql
 
 import org.apache.sedona.core.enums.{GridType, IndexType}
-import org.apache.sedona.core.spatialOperator.{JoinQuery, SpatialPredicate}
+import org.apache.sedona.core.spatialOperator.JoinQuery
 import org.apache.sedona.core.spatialRDD.CircleRDD
-import org.apache.spark.sql.functions.spark_partition_id
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.functions.spark_partition_id
 import org.apache.spark.sql.sedona_sql.adapters.StructuredAdapter
 import org.junit.Assert.assertEquals
 import org.scalatest.GivenWhenThen
@@ -69,14 +69,11 @@ class structuredAdapterTestScala extends TestBaseScala with GivenWhenThen {
     it("Should convert a spatial join result back to DataFrame") {
       val pointRdd =
         StructuredAdapter.toSpatialRdd(sparkSession.createDataFrame(generateTestData()))
-      val circleRDD = new CircleRDD(pointRdd, 0.0001)
-      circleRDD.analyze()
       pointRdd.analyze()
-      circleRDD.spatialPartitioning(GridType.KDBTREE)
-      pointRdd.spatialPartitioning(circleRDD.getPartitioner)
-      circleRDD.buildIndex(IndexType.QUADTREE, true)
+      pointRdd.spatialPartitioning(GridType.KDBTREE)
+      pointRdd.buildIndex(IndexType.RTREE, true)
       val pairRdd =
-        JoinQuery.DistanceJoinQueryFlat(pointRdd, circleRDD, true, SpatialPredicate.INTERSECTS)
+        JoinQuery.SpatialJoinQueryFlat(pointRdd, pointRdd, true, true)
       var resultDf =
         StructuredAdapter.toDf(pairRdd, pointRdd.schema, pointRdd.schema, sparkSession)
       assertEquals(pointRdd.rawSpatialRDD.count(), resultDf.count())
