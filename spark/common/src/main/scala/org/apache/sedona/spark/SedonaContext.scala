@@ -22,7 +22,7 @@ import org.apache.log4j.Logger
 import org.apache.sedona.common.utils.TelemetryCollector
 import org.apache.sedona.core.serde.SedonaKryoRegistrator
 import org.apache.sedona.sql.RasterRegistrator
-import org.apache.sedona.sql.UDF.UdfRegistrator
+import org.apache.sedona.sql.UDF.Catalog
 import org.apache.sedona.sql.UDT.UdtRegistrator
 import org.apache.spark.SparkConf
 import org.apache.spark.api.java.JavaSparkContext
@@ -30,8 +30,8 @@ import org.apache.spark.deploy.PythonRunner
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.monitoring.ListenerRegistrator
 import org.apache.spark.sql.sedona_sql.optimization._
-import org.apache.spark.sql.sedona_sql.strategy.geostats.EvalGeoStatsFunctionStrategy
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
+import org.apache.spark.sql.sedona_sql.strategy.physical.function.EvalPhysicalFunctionStrategy
 import org.apache.spark.sql.{SQLContext, SparkSession}
 
 import scala.annotation.StaticAnnotation
@@ -54,7 +54,7 @@ object SedonaContext {
     UsePreparedPredicate,
     GetReverseGeocodeLayersFunction,
     ReverseGeocodingFunction,
-    ExtractGeoStatsFunctions,
+    ExtractPhysicalFunctions,
     OrderByOptimization)
 
   private def customOptimizationsWithSession(sparkSession: SparkSession) =
@@ -86,9 +86,9 @@ object SedonaContext {
     }
 
     if (!sparkSession.experimental.extraStrategies.exists(
-        _.isInstanceOf[EvalGeoStatsFunctionStrategy])) {
+        _.isInstanceOf[EvalPhysicalFunctionStrategy])) {
       sparkSession.experimental.extraStrategies ++= Seq(
-        new EvalGeoStatsFunctionStrategy(sparkSession))
+        new EvalPhysicalFunctionStrategy(sparkSession))
     }
 
     customOptimizationsWithSession(sparkSession).foreach { opt =>
@@ -109,7 +109,7 @@ object SedonaContext {
     addGeoParquetToSupportNestedFilterSources(sparkSession)
     RasterRegistrator.registerAll(sparkSession)
     UdtRegistrator.registerAll()
-    UdfRegistrator.registerAll(sparkSession)
+    Catalog.registerAll(sparkSession)
     ListenerRegistrator.registerAll(sparkSession)
     jsc = new JavaSparkContext(sparkSession.sparkContext)
     jconf = jsc.getConf
