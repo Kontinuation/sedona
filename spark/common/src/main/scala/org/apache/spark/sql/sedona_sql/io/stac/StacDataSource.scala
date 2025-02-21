@@ -110,9 +110,11 @@ class StacDataSource() extends TableProvider with DataSourceRegister {
         .inferParallelism(SparkSession.active.sparkContext)
         .toString,
       "maxPartitionItemFiles" -> SparkSession.active.conf
-        .get("spark.wherobots.stac.load.maxPartitionItemFiles", "0"),
+        .get("spark.sedona.stac.load.maxPartitionItemFiles", "0"),
       "numPartitions" -> SparkSession.active.conf
-        .get("spark.wherobots.stac.load.numPartitions", "-1"))
+        .get("spark.sedona.stac.load.numPartitions", "-1"),
+      "itemsLimitMax" -> SparkSession.active.conf
+        .get("spark.sedona.stac.load.itemsLimitMax", "-1"))
     val stacCollectionJsonString = StacUtils.loadStacCollectionToJson(optsMap)
 
     new StacTable(stacCollectionJson = stacCollectionJsonString, opts = optsMap)

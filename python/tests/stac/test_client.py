@@ -35,7 +35,7 @@ class TestStacClient(TestBase):
             return_dataframe=False,
         )
         assert items is not None
-        assert len(list(items)) == 2
+        assert len(list(items)) == 4
 
     def test_search_with_ids(self) -> None:
         client = Client.open(STAC_URLS["PLANETARY-COMPUTER"])
@@ -45,7 +45,7 @@ class TestStacClient(TestBase):
             return_dataframe=False,
         )
         assert items is not None
-        assert len(list(items)) == 1
+        assert len(list(items)) == 2
 
     def test_search_with_single_id(self) -> None:
         client = Client.open(STAC_URLS["PLANETARY-COMPUTER"])
@@ -55,7 +55,7 @@ class TestStacClient(TestBase):
             return_dataframe=False,
         )
         assert items is not None
-        assert len(list(items)) == 1
+        assert len(list(items)) == 2
 
     def test_search_with_bbox_and_datetime(self) -> None:
         client = Client.open(STAC_URLS["PLANETARY-COMPUTER"])
@@ -81,7 +81,7 @@ class TestStacClient(TestBase):
             return_dataframe=False,
         )
         assert items is not None
-        assert len(list(items)) == 4
+        assert len(list(items)) == 8
 
     def test_search_with_bbox_and_non_overlapping_intervals(self) -> None:
         client = Client.open(STAC_URLS["PLANETARY-COMPUTER"])
@@ -95,7 +95,7 @@ class TestStacClient(TestBase):
             return_dataframe=False,
         )
         assert items is not None
-        assert len(list(items)) == 10
+        assert len(list(items)) == 20
 
     def test_search_with_max_items(self) -> None:
         client = Client.open(STAC_URLS["PLANETARY-COMPUTER"])
@@ -133,7 +133,7 @@ class TestStacClient(TestBase):
             return_dataframe=False,
         )
         assert items is not None
-        assert len(list(items)) == 10
+        assert len(list(items)) == 20
 
     def test_search_with_return_dataframe(self) -> None:
         client = Client.open(STAC_URLS["PLANETARY-COMPUTER"])

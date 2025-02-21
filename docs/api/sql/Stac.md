@@ -147,6 +147,35 @@ In this example, the data source will push down the temporal filter to the under
 
 In this example, the data source will push down the spatial filter to the underlying data source.
 
+## Sedona Configuration for STAC Reader
+
+When using the STAC reader in Sedona, several configuration options can be set to control the behavior of the reader. These configurations are typically set in a `Map[String, String]` and passed to the reader. Below are the key configuration options:
+
+- **spark.sedona.stac.load.maxPartitionItemFiles**: This option specifies the maximum number of item files that can be included in a single partition. It helps in controlling the size of partitions. The default value is set to -1, meaning the system will automatically determine the number of item files per partition.
+
+- **spark.sedona.stac.load.numPartitions**: This option sets the number of partitions to be created for the STAC data. It allows for better control over data distribution and parallel processing. The default value is set to -1, meaning the system will automatically determine the number of item files per partition.
+
+- **spark.sedona.stac.load.itemsLimitMax**: This option specifies the maximum number of items to be loaded from the STAC collection. It helps in limiting the amount of data processed. The default value is set to -1, meaning all items will be loaded.
+
+These configurations can be combined into a single `Map[String, String]` and passed to the STAC reader as shown below:
+
+```scala
+  def defaultSparkConfig: Map[String, String] = Map(
+    "spark.sedona.stac.load.maxPartitionItemFiles" -> "100",
+    "spark.sedona.stac.load.numPartitions" -> "10",
+    "spark.sedona.stac.load.itemsLimitMax" -> "20")
+
+  val sparkSession: SparkSession = {
+    val builder = SedonaContext
+            .builder()
+            .master("local[*]")
+    defaultSparkConfig.foreach { case (key, value) => builder.config(key, value) }
+    builder.getOrCreate()
+  }
+```
+
+These options above provide fine-grained control over how the STAC data is read and processed in Sedona.
+
 # Python API
 
 The Python API allows you to interact with a SpatioTemporal Asset Catalog (STAC) API using the Client class. This class provides methods to open a connection to a STAC API, retrieve collections, and search for items with various filters.

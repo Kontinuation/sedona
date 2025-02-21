@@ -48,23 +48,23 @@ class StacBatchTest extends TestBaseScala {
         |  "id": "sample-collection",
         |  "description": "A sample STAC collection",
         |  "links": [
-        |    {"rel": "item", "href": "https://path/to/item1.json"},
-        |    {"rel": "item", "href": "https://path/to/item2.json"},
-        |    {"rel": "item", "href": "https://path/to/item3.json"}
+        |    {"rel": "item", "href": "https://storage.googleapis.com/cfo-public/vegetation/California-Vegetation-CanopyBaseHeight-2016-Summer-00010m.json"},
+        |    {"rel": "item", "href": "https://storage.googleapis.com/cfo-public/vegetation/California-Vegetation-CanopyBaseHeight-2016-Summer-00010m.json"},
+        |    {"rel": "item", "href": "https://storage.googleapis.com/cfo-public/vegetation/California-Vegetation-CanopyBaseHeight-2016-Summer-00010m.json"}
         |  ]
         |}
       """.stripMargin
 
-    val opts = mutable.Map("numPartitions" -> "2").toMap
-    val collectionUrl = "https://path/to/collection.json"
+    val opts = mutable.Map("numPartitions" -> "2", "itemsLimitMax" -> "20").toMap
+    val collectionUrl = "https://storage.googleapis.com/cfo-public/vegetation/collection.json"
 
     val stacBatch =
       StacBatch(collectionUrl, stacCollectionJson, StructType(Seq()), opts, None, None)
     val partitions: Array[InputPartition] = stacBatch.planInputPartitions()
 
     assert(partitions.length == 2)
-    assert(partitions(0).asInstanceOf[StacPartition].items.length == 2)
-    assert(partitions(1).asInstanceOf[StacPartition].items.length == 1)
+    assert(partitions(0).asInstanceOf[StacPartition].items.length == 3)
+    assert(partitions(1).asInstanceOf[StacPartition].items.length == 3)
   }
 
   it("planInputPartitions should handle empty links array") {
@@ -75,7 +75,7 @@ class StacBatchTest extends TestBaseScala {
         |}
       """.stripMargin
 
-    val opts = mutable.Map("numPartitions" -> "2").toMap
+    val opts = mutable.Map("numPartitions" -> "2", "itemsLimitMax" -> "20").toMap
     val collectionUrl = "https://path/to/collection.json"
 
     val stacBatch =
@@ -88,7 +88,7 @@ class StacBatchTest extends TestBaseScala {
   it("planInputPartitions should create correct number of partitions with real collection.json") {
     val rootJsonFile = "datasource_stac/collection.json"
     val stacCollectionJson = loadJsonFromResource(rootJsonFile)
-    val opts = mutable.Map("numPartitions" -> "3").toMap
+    val opts = mutable.Map("numPartitions" -> "3", "itemsLimitMax" -> "20").toMap
     val collectionUrl = getAbsolutePathOfResource(rootJsonFile)
 
     val stacBatch =
@@ -96,8 +96,8 @@ class StacBatchTest extends TestBaseScala {
     val partitions: Array[InputPartition] = stacBatch.planInputPartitions()
 
     assert(partitions.length == 3)
-    assert(partitions(0).asInstanceOf[StacPartition].items.length == 2)
-    assert(partitions(1).asInstanceOf[StacPartition].items.length == 2)
-    assert(partitions(2).asInstanceOf[StacPartition].items.length == 1)
+    assert(partitions(0).asInstanceOf[StacPartition].items.length == 4)
+    assert(partitions(1).asInstanceOf[StacPartition].items.length == 4)
+    assert(partitions(2).asInstanceOf[StacPartition].items.length == 2)
   }
 }

@@ -54,9 +54,16 @@ class TestBase:
                         "spark.sql.extensions",
                         "org.apache.sedona.sql.SedonaSqlExtensions",
                     )
+                    .config(
+                        "spark.sedona.stac.load.itemsLimitMax",
+                        "10",
+                    )
                 )
             else:
-                builder = builder.master("local[*]")
+                builder = builder.master("local[*]").config(
+                    "spark.sedona.stac.load.itemsLimitMax",
+                    "10",
+                )
 
             # Allows the Sedona .jar to be explicitly set by the caller (e.g, to run
             # pytest against a freshly-built development version of Sedona)

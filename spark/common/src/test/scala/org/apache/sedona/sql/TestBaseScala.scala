@@ -50,7 +50,8 @@ trait TestBaseScala extends FunSpec with BeforeAndAfterAll {
     "spark.sql.warehouse.dir" -> (System.getProperty("user.dir") + "/target/"),
     "sedona.join.autoBroadcastJoinThreshold" -> "-1",
     "spark.kryoserializer.buffer.max" -> "64m",
-    "spark.sedona.join.useExternalSpatialIndex" -> "true")
+    "spark.sedona.join.useExternalSpatialIndex" -> "true",
+    "spark.sedona.stac.load.itemsLimitMax" -> "20")
 
   // Method to be overridden by subclasses to provide additional configurations
   def sparkConfig: Map[String, String] = defaultSparkConfig

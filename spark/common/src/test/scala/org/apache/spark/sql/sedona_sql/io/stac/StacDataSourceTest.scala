@@ -60,7 +60,7 @@ class StacDataSourceTest extends TestBaseScala {
     assert(dfSelect.schema.fieldNames.contains("bbox"))
 
     val rowCount = dfSelect.count()
-    assert(rowCount == 6)
+    assert(rowCount == 12)
   }
 
   it("select SQL with filter on datetime") {
@@ -77,7 +77,7 @@ class StacDataSourceTest extends TestBaseScala {
       "PushedTemporalFilters -> AndFilter(GreaterThanFilter(datetime,2020-01-01T00:00),LessThanFilter(datetime,2020-12-13T00:00))"))
 
     val rowCount = dfSelect.count()
-    assert(rowCount == 4)
+    assert(rowCount == 8)
   }
 
   it("select SQL with spatial filter") {
@@ -94,7 +94,7 @@ class StacDataSourceTest extends TestBaseScala {
       "PushedSpatialFilters -> LeafFilter(geometry,INTERSECTS,POLYGON ((17 10, 18 10, 18 11, 17 11, 17 10)))"))
 
     val rowCount = dfSelect.count()
-    assert(rowCount == 3)
+    assert(rowCount == 6)
   }
 
   it("select SQL with both spatial and temporal filters") {
@@ -113,7 +113,7 @@ class StacDataSourceTest extends TestBaseScala {
       "PushedTemporalFilters -> AndFilter(GreaterThanFilter(datetime,2020-01-01T00:00),LessThanFilter(datetime,2020-12-13T00:00))"))
 
     val rowCount = dfSelect.count()
-    assert(rowCount == 3)
+    assert(rowCount == 6)
   }
 
   it("select SQL with regular filter on id") {
