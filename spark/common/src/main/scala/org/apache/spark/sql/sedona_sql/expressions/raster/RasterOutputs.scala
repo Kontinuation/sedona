@@ -26,7 +26,10 @@ import org.apache.spark.sql.sedona_sql.expressions.InferredExpression
 
 case class RS_AsGeoTiff(inputExpressions: Seq[Expression])
     extends InferredExpression(
+      inferrableFunction5(RasterOutputs.asGeoTiff),
+      inferrableFunction4(RasterOutputs.asGeoTiff),
       inferrableFunction3(RasterOutputs.asGeoTiff),
+      inferrableFunction2(RasterOutputs.asGeoTiff),
       inferrableFunction1(RasterOutputs.asGeoTiff)) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)

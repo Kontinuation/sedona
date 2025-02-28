@@ -79,11 +79,19 @@ Possible values for `compressionType`: `None`, `PackBits`, `Deflate`, `Huffman`,
 
 Possible values for `imageQuality`: any decimal number between 0 and 1. 0 means the lowest quality and 1 means the highest quality.
 
+`tileSize` is the width and height of the internal tiles in the GeoTiff file. If not provided, it will use the default value of 256.
+
 Format:
 
 `RS_AsGeoTiff(raster: Raster)`
 
+`RS_AsGeoTiff(raster: Raster, tileSize: Int)`
+
 `RS_AsGeoTiff(raster: Raster, compressionType: String, imageQuality: Double)`
+
+`RS_AsGeoTiff(raster: Raster, compressionType: String, imageQuality: Double, tileSize: Int)`
+
+`RS_AsGeoTiff(raster: Raster, compressionType: String, imageQuality: Double, tileWidth: Int, tileHeight: Int)`
 
 Since: `v1.4.1`
 

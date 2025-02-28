@@ -88,6 +88,24 @@ public class RasterOutputTest extends RasterTestBase {
             RasterOutputs.asGeoTiff(rasterFromGeoTiff(resourceFolder + "raster/test1.tiff")));
     assert (rasterTest != null);
     assertEquals(rasterTest.getEnvelope().toString(), rasterOg.getEnvelope().toString());
+    int tileWidth = rasterTest.getRenderedImage().getTileWidth();
+    int tileHeight = rasterTest.getRenderedImage().getTileHeight();
+    assert (tileWidth == 256);
+    assert (tileHeight == 256);
+  }
+
+  @Test
+  public void testAsGeoTiffWithCustomTileSize() throws IOException {
+    GridCoverage2D rasterOg = rasterFromGeoTiff(resourceFolder + "raster/test1.tiff");
+    GridCoverage2D rasterTest =
+        RasterConstructors.fromGeoTiff(
+            RasterOutputs.asGeoTiff(rasterFromGeoTiff(resourceFolder + "raster/test1.tiff"), 512));
+    assert (rasterTest != null);
+    assertEquals(rasterTest.getEnvelope().toString(), rasterOg.getEnvelope().toString());
+    int tileWidth = rasterTest.getRenderedImage().getTileWidth();
+    int tileHeight = rasterTest.getRenderedImage().getTileHeight();
+    assert (tileWidth == 512);
+    assert (tileHeight == 512);
   }
 
   @Test

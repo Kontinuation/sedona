@@ -1237,8 +1237,8 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       val resultRaw = df.selectExpr("RS_FromGeoTiff(content) as raster").first().get(0)
       val resultLoadedDf = df
         .selectExpr("RS_FromGeoTiff(content) as raster")
-        .withColumn("geotiff", expr("RS_AsGeoTiff(raster, 'LZW', 1)"))
-        .withColumn("geotiff2", expr("RS_AsGeoTiff(raster, 'Deflate', 0.5)"))
+        .withColumn("geotiff", expr("RS_AsGeoTiff(raster, 'LZW', 1, 512)"))
+        .withColumn("geotiff2", expr("RS_AsGeoTiff(raster, 'Deflate', 0.5, 512)"))
         .withColumn("raster_new", expr("RS_FromGeoTiff(geotiff)"))
       val resultLoaded = resultLoadedDf.first().getAs[GridCoverage2D]("raster_new")
       val writtenBinary1 = resultLoadedDf.first().getAs[Array[Byte]]("geotiff")

@@ -48,7 +48,11 @@ import org.opengis.parameter.ParameterValueGroup;
 
 public class RasterOutputs {
   public static byte[] asGeoTiff(
-      GridCoverage2D raster, String compressionType, double compressionQuality) {
+      GridCoverage2D raster,
+      String compressionType,
+      double compressionQuality,
+      int tileWidth,
+      int tileHeight) {
     ByteArrayOutputStream out = new ByteArrayOutputStream();
     GridCoverageWriter writer;
     try {
@@ -57,18 +61,31 @@ public class RasterOutputs {
       throw new RuntimeException(e);
     }
     ParameterValueGroup defaultParams = writer.getFormat().getWriteParameters();
+
+    // Create GeoTiffWriteParams to configure the output
+    GeoTiffWriteParams params = new GeoTiffWriteParams();
+
+    // Set tiling parameters if valid values are provided
+    if (tileWidth > 0 && tileHeight > 0) {
+      params.setTilingMode(ImageWriteParam.MODE_EXPLICIT);
+      params.setTiling(tileWidth, tileHeight);
+    }
+
+    // Set compression parameters if valid values are provided
     if (compressionType != null && compressionQuality >= 0 && compressionQuality <= 1) {
-      GeoTiffWriteParams params = new GeoTiffWriteParams();
       params.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
       // Available compression types: None, PackBits, Deflate, Huffman, LZW and JPEG
       params.setCompressionType(compressionType);
       // Should be a value between 0 and 1
       // 0 means max compression, 1 means no compression
       params.setCompressionQuality((float) compressionQuality);
-      defaultParams
-          .parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString())
-          .setValue(params);
     }
+
+    // Apply the parameters
+    defaultParams
+        .parameter(AbstractGridFormat.GEOTOOLS_WRITE_PARAMS.getName().toString())
+        .setValue(params);
+
     GeneralParameterValue[] wps = defaultParams.values().toArray(new GeneralParameterValue[0]);
     try {
       writer.write(raster, wps);
@@ -78,6 +95,20 @@ public class RasterOutputs {
       throw new RuntimeException(e);
     }
     return out.toByteArray();
+  }
+
+  public static byte[] asGeoTiff(
+      GridCoverage2D raster, String compressionType, double compressionQuality, int tileSize) {
+    return asGeoTiff(raster, compressionType, compressionQuality, tileSize, tileSize);
+  }
+
+  public static byte[] asGeoTiff(
+      GridCoverage2D raster, String compressionType, double compressionQuality) {
+    return asGeoTiff(raster, compressionType, compressionQuality, 256, 256);
+  }
+
+  public static byte[] asGeoTiff(GridCoverage2D raster, int tileSize) {
+    return asGeoTiff(raster, null, -1, tileSize, tileSize);
   }
 
   public static byte[] asGeoTiff(GridCoverage2D raster) {
