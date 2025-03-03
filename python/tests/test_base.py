@@ -56,13 +56,13 @@ class TestBase:
                     )
                     .config(
                         "spark.sedona.stac.load.itemsLimitMax",
-                        "10",
+                        "20",
                     )
                 )
             else:
                 builder = builder.master("local[*]").config(
                     "spark.sedona.stac.load.itemsLimitMax",
-                    "10",
+                    "20",
                 )
 
             # Allows the Sedona .jar to be explicitly set by the caller (e.g, to run

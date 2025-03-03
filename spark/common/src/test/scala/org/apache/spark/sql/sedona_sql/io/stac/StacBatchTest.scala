@@ -40,6 +40,33 @@ class StacBatchTest extends TestBaseScala {
     }
   }
 
+  it("collectItemLinks should collect correct item links") {
+    val collectionUrl =
+      "https://earth-search.aws.element84.com/v1/collections/sentinel-2-pre-c1-l2a"
+    val stacCollectionJson = StacUtils.loadStacCollectionToJson(collectionUrl)
+    val opts = mutable
+      .Map(
+        "itemsLimitMax" -> "1000",
+        "itemsLimitPerRequest" -> "200",
+        "itemsLoadProcessReportThreshold" -> "1000000")
+      .toMap
+
+    val stacBatch =
+      StacBatch(collectionUrl, stacCollectionJson, StructType(Seq()), opts, None, None)
+    stacBatch.setItemMaxLeft(1000)
+    val itemLinks = mutable.ArrayBuffer[String]()
+    val needCountNextItems = true
+
+    val startTime = System.nanoTime()
+    stacBatch.collectItemLinks(collectionUrl, stacCollectionJson, itemLinks, needCountNextItems)
+    val endTime = System.nanoTime()
+    val duration = (endTime - startTime) / 1e6 // Convert to milliseconds
+
+    assert(itemLinks.nonEmpty)
+    assert(itemLinks.length == 5)
+    assert(duration > 0)
+  }
+
   it("planInputPartitions should create correct number of partitions") {
     val stacCollectionJson =
       """
@@ -63,8 +90,8 @@ class StacBatchTest extends TestBaseScala {
     val partitions: Array[InputPartition] = stacBatch.planInputPartitions()
 
     assert(partitions.length == 2)
-    assert(partitions(0).asInstanceOf[StacPartition].items.length == 3)
-    assert(partitions(1).asInstanceOf[StacPartition].items.length == 3)
+    assert(partitions(0).asInstanceOf[StacPartition].items.length == 2)
+    assert(partitions(1).asInstanceOf[StacPartition].items.length == 1)
   }
 
   it("planInputPartitions should handle empty links array") {
@@ -96,8 +123,8 @@ class StacBatchTest extends TestBaseScala {
     val partitions: Array[InputPartition] = stacBatch.planInputPartitions()
 
     assert(partitions.length == 3)
-    assert(partitions(0).asInstanceOf[StacPartition].items.length == 4)
-    assert(partitions(1).asInstanceOf[StacPartition].items.length == 4)
-    assert(partitions(2).asInstanceOf[StacPartition].items.length == 2)
+    assert(partitions(0).asInstanceOf[StacPartition].items.length == 2)
+    assert(partitions(1).asInstanceOf[StacPartition].items.length == 2)
+    assert(partitions(2).asInstanceOf[StacPartition].items.length == 1)
   }
 }

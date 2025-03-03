@@ -27,12 +27,15 @@ class StacDataSourceTest extends TestBaseScala {
   val STAC_COLLECTION_LOCAL: String = resourceFolder + "datasource_stac/collection.json"
   val STAC_ITEM_LOCAL: String = resourceFolder + "geojson/core-item.json"
 
+  val STAC_CATALOG_REMOTE: String =
+    "https://satellogic-earthview.s3.us-west-2.amazonaws.com/stac/catalog.json"
   val STAC_COLLECTION_REMOTE: List[String] = List(
     "https://earth-search.aws.element84.com/v1/collections/sentinel-2-pre-c1-l2a",
     "https://storage.googleapis.com/cfo-public/vegetation/collection.json",
     "https://storage.googleapis.com/cfo-public/wildfire/collection.json",
     "https://earthdatahub.destine.eu/api/stac/v1/collections/copernicus-dem",
-    "https://planetarycomputer.microsoft.com/api/stac/v1/collections/naip")
+    "https://planetarycomputer.microsoft.com/api/stac/v1/collections/naip",
+    "https://satellogic-earthview.s3.us-west-2.amazonaws.com/stac/catalog.json")
 
   it("basic df load from local file should work") {
     val dfStac = sparkSession.read.format("stac").load(STAC_COLLECTION_LOCAL)
@@ -60,7 +63,7 @@ class StacDataSourceTest extends TestBaseScala {
     assert(dfSelect.schema.fieldNames.contains("bbox"))
 
     val rowCount = dfSelect.count()
-    assert(rowCount == 12)
+    assert(rowCount == 6)
   }
 
   it("select SQL with filter on datetime") {
@@ -77,7 +80,7 @@ class StacDataSourceTest extends TestBaseScala {
       "PushedTemporalFilters -> AndFilter(GreaterThanFilter(datetime,2020-01-01T00:00),LessThanFilter(datetime,2020-12-13T00:00))"))
 
     val rowCount = dfSelect.count()
-    assert(rowCount == 8)
+    assert(rowCount == 4)
   }
 
   it("select SQL with spatial filter") {
@@ -94,7 +97,7 @@ class StacDataSourceTest extends TestBaseScala {
       "PushedSpatialFilters -> LeafFilter(geometry,INTERSECTS,POLYGON ((17 10, 18 10, 18 11, 17 11, 17 10)))"))
 
     val rowCount = dfSelect.count()
-    assert(rowCount == 6)
+    assert(rowCount == 3)
   }
 
   it("select SQL with both spatial and temporal filters") {
@@ -113,7 +116,7 @@ class StacDataSourceTest extends TestBaseScala {
       "PushedTemporalFilters -> AndFilter(GreaterThanFilter(datetime,2020-01-01T00:00),LessThanFilter(datetime,2020-12-13T00:00))"))
 
     val rowCount = dfSelect.count()
-    assert(rowCount == 6)
+    assert(rowCount == 3)
   }
 
   it("select SQL with regular filter on id") {
@@ -150,6 +153,12 @@ class StacDataSourceTest extends TestBaseScala {
 
     val rowCount = dfSelect.count()
     assert(rowCount == 0)
+  }
+
+  it("should load from catalog without using collection id") {
+    val dfStac = sparkSession.read.format("stac").load(STAC_CATALOG_REMOTE)
+    val rowCount = dfStac.count()
+    assert(rowCount > 0)
   }
 
   def assertSchema(actualSchema: StructType): Unit = {

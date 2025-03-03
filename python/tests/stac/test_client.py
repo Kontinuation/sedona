@@ -21,7 +21,8 @@ from pyspark.sql import DataFrame
 from tests.test_base import TestBase
 
 STAC_URLS = {
-    "PLANETARY-COMPUTER": "https://planetarycomputer.microsoft.com/api/stac/v1"
+    "PLANETARY-COMPUTER": "https://planetarycomputer.microsoft.com/api/stac/v1",
+    "EARTHVIEW-CATALOG": "https://satellogic-earthview.s3.us-west-2.amazonaws.com/stac/catalog.json",
 }
 
 
@@ -35,7 +36,7 @@ class TestStacClient(TestBase):
             return_dataframe=False,
         )
         assert items is not None
-        assert len(list(items)) == 4
+        assert len(list(items)) == 2
 
     def test_search_with_ids(self) -> None:
         client = Client.open(STAC_URLS["PLANETARY-COMPUTER"])
@@ -45,7 +46,7 @@ class TestStacClient(TestBase):
             return_dataframe=False,
         )
         assert items is not None
-        assert len(list(items)) == 2
+        assert len(list(items)) == 1
 
     def test_search_with_single_id(self) -> None:
         client = Client.open(STAC_URLS["PLANETARY-COMPUTER"])
@@ -55,7 +56,7 @@ class TestStacClient(TestBase):
             return_dataframe=False,
         )
         assert items is not None
-        assert len(list(items)) == 2
+        assert len(list(items)) == 1
 
     def test_search_with_bbox_and_datetime(self) -> None:
         client = Client.open(STAC_URLS["PLANETARY-COMPUTER"])
@@ -81,7 +82,7 @@ class TestStacClient(TestBase):
             return_dataframe=False,
         )
         assert items is not None
-        assert len(list(items)) == 8
+        assert len(list(items)) == 4
 
     def test_search_with_bbox_and_non_overlapping_intervals(self) -> None:
         client = Client.open(STAC_URLS["PLANETARY-COMPUTER"])
@@ -141,6 +142,14 @@ class TestStacClient(TestBase):
             collection_id="aster-l1t",
             bbox=[-180.0, -90.0, 180.0, 90.0],
             datetime=["2006-01-01T00:00:00Z", "2007-01-01T00:00:00Z"],
+        )
+        assert df is not None
+        assert isinstance(df, DataFrame)
+
+    def test_search_with_catalog_url(self) -> None:
+        client = Client.open(STAC_URLS["EARTHVIEW-CATALOG"])
+        df = client.search(
+            return_dataframe=True,
         )
         assert df is not None
         assert isinstance(df, DataFrame)

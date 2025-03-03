@@ -29,7 +29,7 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatterBuilder
 import java.time.temporal.ChronoField
 import scala.jdk.CollectionConverters.asScalaIteratorConverter
-import scala.util.control.Breaks.{break, breakable}
+import scala.util.control.Breaks.breakable
 
 /**
  * The `StacBatch` class represents a batch of partitions for reading data in the SpatioTemporal
@@ -48,9 +48,23 @@ case class StacBatch(
     temporalFilter: Option[TemporalFilter])
     extends Batch {
 
-  val DEFAULT_ITEMS_LIMIT = 10
+  private val defaultItemsLimitPerRequest = opts.getOrElse("itemsLimitPerRequest", "10").toInt
+  private val itemsLoadProcessReportThreshold =
+    opts.getOrElse("itemsLoadProcessReportThreshold", "1000000").toInt
+  private var itemMaxLeft: Int = -1
+  private var lastReportCount: Int = 0
 
   val mapper = new ObjectMapper()
+
+  /**
+   * Sets the maximum number of items left to process.
+   *
+   * @param value
+   *   The maximum number of items left.
+   */
+  def setItemMaxLeft(value: Int): Unit = {
+    itemMaxLeft = value
+  }
 
   /**
    * Plans the input partitions for reading data from the STAC data source.
@@ -63,16 +77,12 @@ case class StacBatch(
 
     // Initialize the itemLinks array
     val itemLinks = scala.collection.mutable.ArrayBuffer[String]()
-    val itemsLimitMax = opts.getOrElse("itemsLimitMax", "-1").toInt
-    val checkItemsLimitMax = itemsLimitMax > 0
 
     // Start the recursive collection of item links
-    collectItemLinks(
-      stacCollectionBasePath,
-      stacCollectionJson,
-      itemLinks,
-      itemsLimitMax,
-      checkItemsLimitMax)
+    val itemsLimitMax = opts.getOrElse("itemsLimitMax", "-1").toInt
+    val checkItemsLimitMax = itemsLimitMax > 0
+    setItemMaxLeft(itemsLimitMax)
+    collectItemLinks(stacCollectionBasePath, stacCollectionJson, itemLinks, checkItemsLimitMax)
 
     // Handle when the number of items is less than 1
     if (itemLinks.isEmpty) {
@@ -115,16 +125,20 @@ case class StacBatch(
    *   The JSON string representation of the STAC collection.
    * @param itemLinks
    *   The list of item links to populate.
-   * @param limitItemsToLoad
-   *   The maximum number of items to load.
    */
-  private def collectItemLinks(
+  def collectItemLinks(
       collectionBasePath: String,
       collectionJson: String,
       itemLinks: scala.collection.mutable.ArrayBuffer[String],
-      limitItemsToLoad: Int,
       needCountNextItems: Boolean): Unit = {
-    var itemMaxLeft = limitItemsToLoad
+
+    // end early if there are no more items to process
+    if (needCountNextItems && itemMaxLeft <= 0) return
+
+    if (itemLinks.size - lastReportCount >= itemsLoadProcessReportThreshold) {
+      Console.out.println(s"Searched or partitioned ${itemLinks.size} items so far.")
+      lastReportCount = itemLinks.size
+    }
 
     // Parse the JSON string into a JsonNode (tree representation of JSON)
     val rootNode: JsonNode = mapper.readTree(collectionJson)
@@ -133,12 +147,11 @@ case class StacBatch(
     val linksNode = rootNode.get("links")
     val iterator = linksNode.elements()
 
-    def iterateItemsWithLimit(itemUrl: String, checkNext: Boolean): Boolean = {
+    def iterateItemsWithLimit(itemUrl: String, needCountNextItems: Boolean): Boolean = {
       // Load the item URL and process the response
       var nextUrl: Option[String] = Some(itemUrl)
       breakable {
         while (nextUrl.isDefined) {
-          itemLinks += nextUrl.get
           val itemJson = StacUtils.loadStacCollectionToJson(nextUrl.get)
           val itemRootNode = mapper.readTree(itemJson)
           // Check if there exists a "next" link
@@ -160,14 +173,14 @@ case class StacBatch(
                 // The optional limit parameter limits the number of
                 // items that are presented in the response document.
                 // The default value is 10.
-                DEFAULT_ITEMS_LIMIT
+                defaultItemsLimitPerRequest
               } else {
                 numberReturnedNode.asInt()
               }
               // count the number of items returned and left to be processed
               itemMaxLeft = itemMaxLeft - numberReturned
               // early exit if there are no more items to process
-              if (checkNext && itemMaxLeft <= 0) {
+              if (needCountNextItems && itemMaxLeft <= 0) {
                 return true
               }
               nextUrl = Some(if (itemHref.startsWith("http") || itemHref.startsWith("file")) {
@@ -176,6 +189,9 @@ case class StacBatch(
                 collectionBasePath + itemHref
               })
             }
+          }
+          if (nextUrl.isDefined) {
+            itemLinks += nextUrl.get
           }
         }
       }
@@ -195,12 +211,23 @@ case class StacBatch(
         } else {
           collectionBasePath + href
         }
-        itemLinks += itemUrl
+        if (rel == "items" && href.startsWith("http")) {
+          itemLinks += (itemUrl + "?limit=" + defaultItemsLimitPerRequest)
+        } else {
+          itemLinks += itemUrl
+        }
         if (needCountNextItems && itemMaxLeft <= 0) {
           return
         } else {
-          // iterate through the items and check if the limit is reached
-          if (iterateItemsWithLimit(itemUrl, needCountNextItems)) return
+          if (rel == "item" && needCountNextItems) {
+            // count the number of items returned and left to be processed
+            itemMaxLeft = itemMaxLeft - 1
+          } else if (rel == "items" && href.startsWith("http")) {
+            // iterate through the items and check if the limit is reached (if needed)
+            if (iterateItemsWithLimit(
+                itemUrl + "?limit=" + defaultItemsLimitPerRequest,
+                needCountNextItems)) return
+          }
         }
       } else if (rel == "child") {
         val childUrl = if (href.startsWith("http") || href.startsWith("file")) {
@@ -219,7 +246,6 @@ case class StacBatch(
             nestedCollectionBasePath,
             linkedCollectionJson,
             itemLinks,
-            itemMaxLeft,
             needCountNextItems)
         }
       }

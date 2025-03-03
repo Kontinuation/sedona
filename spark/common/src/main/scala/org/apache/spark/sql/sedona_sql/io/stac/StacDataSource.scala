@@ -113,8 +113,13 @@ class StacDataSource() extends TableProvider with DataSourceRegister {
         .get("spark.sedona.stac.load.maxPartitionItemFiles", "0"),
       "numPartitions" -> SparkSession.active.conf
         .get("spark.sedona.stac.load.numPartitions", "-1"),
-      "itemsLimitMax" -> SparkSession.active.conf
-        .get("spark.sedona.stac.load.itemsLimitMax", "-1"))
+      "itemsLimitMax" -> opts
+        .asCaseSensitiveMap()
+        .asScala
+        .toMap
+        .get("itemsLimitMax")
+        .filter(_.toInt > 0)
+        .getOrElse(SparkSession.active.conf.get("spark.sedona.stac.load.itemsLimitMax", "-1")))
     val stacCollectionJsonString = StacUtils.loadStacCollectionToJson(optsMap)
 
     new StacTable(stacCollectionJson = stacCollectionJsonString, opts = optsMap)
