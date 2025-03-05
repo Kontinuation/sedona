@@ -131,6 +131,12 @@ public class SedonaConf implements Serializable {
   private boolean autoReBalanceStreamSide;
   private double streamSideSkewScoreThreshold;
 
+  // Parameters for raster loading
+  private boolean enableRasterLoadAutoRepartition;
+  private int rasterLoadNumPartitions;
+  private long rasterLoadPerPartitionSize;
+  private int rasterLoadingParallelism;
+
   public static SedonaConf fromActiveSession() {
     return new SedonaConf(SparkSession.active().conf());
   }
@@ -354,6 +360,39 @@ public class SedonaConf implements Serializable {
     this.streamSideSkewScoreThreshold =
         Double.parseDouble(
             runtimeConfig.get("spark.sedona.join.streamSideSkewScoreThreshold", "2.0"));
+
+    // Parameters for raster loading
+
+    // Automatically repartition the loaded DataFrame when using
+    // spark.read.format("raster").load(...)
+    // to load rasters. This is for re-balancing the tiles evenly to multiple executor cores.
+    this.enableRasterLoadAutoRepartition =
+        Boolean.parseBoolean(runtimeConfig.get("spark.sedona.raster.load.autoRepartition", "true"));
+
+    // The number of partitions to repartition the DataFrame loaded by
+    // spark.read.format("raster").load(...). This is only effective when
+    // spark.sedona.raster.load.autoRepartition is true. If not set, the default value is 0, which
+    // means that the number of partitions will be determined on the fly based on the size of
+    // the DataFrame and the number of available cores.
+    this.rasterLoadNumPartitions =
+        Integer.parseInt(runtimeConfig.get("spark.sedona.raster.load.numPartitions", "0"));
+
+    // The size of each partition when repartitioning the DataFrame loaded by
+    // spark.read.format("raster").load(...). This is only effective when
+    // spark.sedona.raster.load.autoRepartition is true and Spark dynamic allocation is enabled.
+    this.rasterLoadPerPartitionSize =
+        bytesFromString(runtimeConfig.get("spark.sedona.raster.load.perPartitionSize", "500mb"));
+
+    // The number of threads used to load the metadata of out-db rasters in parallel when using
+    // spark.read.format("raster").load(...). This is only effective when retile is true, or
+    // Sedona detected that raster metadata is needed right away after loading. If not set, the
+    // default value is 4 * number of available processors.
+    int defaultRasterLoadingParallelism = Runtime.getRuntime().availableProcessors() * 4;
+    this.rasterLoadingParallelism =
+        Integer.parseInt(
+            runtimeConfig.get(
+                "spark.sedona.raster.load.parallelism",
+                Integer.toString(defaultRasterLoadingParallelism)));
 
     this.reverseGeocodingTableName =
         runtimeConfig.get(
@@ -684,5 +723,21 @@ public class SedonaConf implements Serializable {
 
   public double getStreamSideSkewScoreThreshold() {
     return streamSideSkewScoreThreshold;
+  }
+
+  public int getRasterLoadingParallelism() {
+    return rasterLoadingParallelism;
+  }
+
+  public int getRasterLoadNumPartitions() {
+    return rasterLoadNumPartitions;
+  }
+
+  public long getRasterLoadPerPartitionSize() {
+    return rasterLoadPerPartitionSize;
+  }
+
+  public boolean isEnableRasterLoadAutoRepartition() {
+    return enableRasterLoadAutoRepartition;
   }
 }

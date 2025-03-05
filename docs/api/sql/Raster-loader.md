@@ -70,6 +70,7 @@ The options for the `raster` loader are as follows:
 - `retile`: Whether to enable tiling. Default is `true`.
 - `tileWidth`: The width of the tile. If not specified, the size of internal tiles will be used.
 - `tileHeight`: The height of the tile. If not specified, will use `tileWidth` if `tileWidth` is explicitly set, otherwise the size of internal tiles will be used.
+- `autoRescale`: Whether to rescale the pixel values using the scale and offset values in the GeoTiff file. Default is `false`.
 
 !!!note
     If the internal tiling scheme of raster data is not friendly for tiling, the `raster` loader will throw an error, and you can disable automatic tiling using `option("retile", "false")`, or specify the tile size manually to workaround this issue. A better solution is to translate the raster data into COG format using `gdal_translate` or other tools.
@@ -80,7 +81,7 @@ The `raster` loader also works with Spark generic file source options, such as `
 sedona.read.format("raster").option("recursiveFileLookup", "true").option("pathGlobFilter", "*.tif*").load(path_to_raster_data_folder)
 ```
 
-The DataFrame loaded by the `raster` loader will be automatically repartitioned by default, this is for evenly distributing the workload of processing raster tiles to the entire cluster. The number of partitions is proportional to the number of executor CPU cores in the cluster. You can disable auto repartitioning by setting the Spark session configuration `spark.wherobots.raster.load.autoRepartition` to `false`. If you want to manually specify the number of partitions, you can set the Spark session configuration `spark.wherobots.raster.load.numPartitions` to the desired number of partitions.
+The DataFrame loaded by the `raster` loader will be automatically repartitioned by default, this is for evenly distributing the workload of processing raster tiles to the entire cluster. The number of partitions is proportional to the number of executor CPU cores in the cluster. You can disable auto repartitioning by setting the Spark session configuration `spark.sedona.raster.load.autoRepartition` to `false`. If you want to manually specify the number of partitions, you can set the Spark session configuration `spark.sedona.raster.load.numPartitions` to the desired number of partitions.
 
 ## Loading raster using binaryFile loader (Deprecated)
 

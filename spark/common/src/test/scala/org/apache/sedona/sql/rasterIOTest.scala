@@ -20,15 +20,18 @@ package org.apache.sedona.sql
 
 import org.apache.commons.io.FileUtils
 import org.apache.hadoop.hdfs.MiniDFSCluster
+import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D
 import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.execution.exchange.Exchange
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
+import org.apache.spark.sql.functions.expr
 import org.junit.Assert.assertEquals
 import org.scalatest.BeforeAndAfter
 import org.scalatest.GivenWhenThen
 
+import java.awt.image.DataBuffer
 import java.io.File
 import java.nio.file.Files
 
@@ -287,7 +290,7 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
       withConf(
         Map(
           "spark.wherobots.testing.dynamicAllocation" -> "true",
-          "spark.wherobots.raster.load.perPartitionSize" -> "100kb")) {
+          "spark.sedona.raster.load.perPartitionSize" -> "100kb")) {
         val rasterDf = sparkSession.read
           .format("raster")
           .options(Map("retile" -> "true", "tileWidth" -> "64"))
@@ -305,6 +308,20 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
       }
     }
 
+    it("should not auto-repartition when limit or show is used") {
+      var rasterDf = sparkSession.read
+        .format("raster")
+        .options(Map("retile" -> "false"))
+        .load(rasterdatalocation)
+        .limit(3)
+      // Check the execution plan to see if the repartitioning is actually happening
+      val plan = rasterDf.queryExecution.executedPlan match {
+        case adaptive: AdaptiveSparkPlanExec => adaptive.initialPlan
+        case plan: SparkPlan => plan
+      }
+      assert(plan.collect { case _: Exchange => true }.isEmpty)
+    }
+
     it("should read geotiff using raster source without tiling") {
       val rasterDf = sparkSession.read
         .format("raster")
@@ -313,7 +330,70 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
       assert(rasterDf.schema.fields.length == 1)
       rasterDf.collect().foreach { row =>
         val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
+        // Should not load metadata eagerly
+        assert(raster.isInstanceOf[LazyLoadOutDbGridCoverage2D])
         raster.dispose(true)
+      }
+    }
+
+    it("should read geotiff using raster source with eager metadata loading") {
+      val rasterDf = sparkSession.read
+        .format("raster")
+        .options(Map("retile" -> "false", "loadMetadata" -> "true"))
+        .load(rasterdatalocation)
+      assert(rasterDf.schema.fields.length == 1)
+      rasterDf.collect().foreach { row =>
+        val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
+        assert(!raster.isInstanceOf[LazyLoadOutDbGridCoverage2D])
+        raster.dispose(true)
+      }
+    }
+
+    it("should use eager metadata loading when RS function is called") {
+      val rasterDf = sparkSession.read
+        .format("raster")
+        .options(Map("retile" -> "false"))
+        .load(rasterdatalocation)
+        .withColumn("width", expr("RS_Width(rast)"))
+        .withColumn("height", expr("RS_Height(rast)"))
+      assert(rasterDf.schema.fields.length == 3)
+      rasterDf.collect().foreach { row =>
+        val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
+        // RS_Width and RS_Height were called, should load metadata early in the raster data source
+        assert(!raster.isInstanceOf[LazyLoadOutDbGridCoverage2D])
+        raster.dispose(true)
+      }
+    }
+
+    it("should not use eager metadata loading when user explicitly set loadMetadata to false") {
+      val rasterDf = sparkSession.read
+        .format("raster")
+        .options(Map("retile" -> "false", "loadMetadata" -> "false"))
+        .load(rasterdatalocation)
+        .withColumn("width", expr("RS_Width(rast)"))
+        .withColumn("height", expr("RS_Height(rast)"))
+      assert(rasterDf.schema.fields.length == 3)
+      rasterDf.collect().foreach { row =>
+        val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
+        // RS_Width and RS_Height were called, but user explicitly set loadMetadata to false.
+        // We should not load metadata early in the raster data source
+        assert(raster.isInstanceOf[LazyLoadOutDbGridCoverage2D])
+        raster.dispose(true)
+      }
+    }
+
+    it("should read geotiff using raster source with non-parallel eager metadata loading") {
+      withConf(Map("spark.sedona.raster.load.parallelism" -> "0")) {
+        val rasterDf = sparkSession.read
+          .format("raster")
+          .options(Map("retile" -> "false", "loadMetadata" -> "true"))
+          .load(rasterdatalocation)
+        assert(rasterDf.schema.fields.length == 1)
+        rasterDf.collect().foreach { row =>
+          val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
+          assert(!raster.isInstanceOf[LazyLoadOutDbGridCoverage2D])
+          raster.dispose(true)
+        }
       }
     }
 
@@ -350,6 +430,32 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
       assert(exception.getMessage.contains("Please set tileWidth and tileHeight explicitly"))
     }
 
+    it("should support geotiff rescaling") {
+      Seq("false", "true").foreach { loadMetadata =>
+        var dfRasters = sparkSession.read
+          .format("raster")
+          .options(
+            Map("retile" -> "false", "loadMetadata" -> loadMetadata, "autoRescale" -> "false"))
+          .load(resourceFolder + "raster_geotiff_rescale/test.tif")
+        dfRasters.collect().foreach { row =>
+          val raster = row.getAs[OutDbGridCoverage2D]("rast")
+          assert(raster.getRenderedImage.getSampleModel.getDataType == DataBuffer.TYPE_USHORT)
+          raster.dispose(true)
+        }
+
+        dfRasters = sparkSession.read
+          .format("raster")
+          .options(
+            Map("retile" -> "false", "loadMetadata" -> loadMetadata, "autoRescale" -> "true"))
+          .load(resourceFolder + "raster_geotiff_rescale/test.tif")
+        dfRasters.collect().foreach { row =>
+          val raster = row.getAs[OutDbGridCoverage2D]("rast")
+          assert(raster.getRenderedImage.getSampleModel.getDataType == DataBuffer.TYPE_DOUBLE)
+          raster.dispose(true)
+        }
+      }
+    }
+
     it("should support AsciiGrid") {
       val rasterDf = sparkSession.read
         .format("raster")
@@ -363,6 +469,39 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
         val x = row.getInt(1)
         val y = row.getInt(2)
         assert(x == 0 && y == 0)
+      }
+    }
+
+    it("read partitioned directory") {
+      FileUtils.cleanDirectory(new File(tempDir))
+      Files.createDirectory(new File(tempDir + "/part=1").toPath)
+      Files.createDirectory(new File(tempDir + "/part=2").toPath)
+      FileUtils.copyFile(
+        new File(resourceFolder + "raster/test1.tiff"),
+        new File(tempDir + "/part=1/test1.tiff"))
+      FileUtils.copyFile(
+        new File(resourceFolder + "raster/test2.tiff"),
+        new File(tempDir + "/part=1/test2.tiff"))
+      FileUtils.copyFile(
+        new File(resourceFolder + "raster/test4.tiff"),
+        new File(tempDir + "/part=2/test4.tiff"))
+      FileUtils.copyFile(
+        new File(resourceFolder + "raster/test4.tiff"),
+        new File(tempDir + "/part=2/test5.tiff"))
+
+      val shapefileDf = sparkSession.read
+        .format("raster")
+        .load(tempDir)
+      val rows = shapefileDf.collect()
+      assert(rows.length >= 4)
+      rows.foreach { row =>
+        val raster = row.getAs[OutDbGridCoverage2D]("rast")
+        val path = raster.getOutDbPath.toString
+        if (path.endsWith("test1.tiff") || path.endsWith("test2.tiff")) {
+          assert(row.getAs[Int]("part") == 1)
+        } else {
+          assert(row.getAs[Int]("part") == 2)
+        }
       }
     }
   }

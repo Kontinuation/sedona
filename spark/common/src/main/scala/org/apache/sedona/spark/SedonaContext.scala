@@ -61,7 +61,7 @@ object SedonaContext {
     Seq(
       new SpatialFilterPushDownForGeoParquet(sparkSession),
       new SpatialTemporalFilterPushDownForStacScan(sparkSession),
-      new AutoRepartitionRasterRelation(sparkSession))
+      new OptimizeOutDbRasterLoading(sparkSession))
 
   def create(sqlContext: SQLContext): SQLContext = {
     create(sqlContext.sparkSession)
