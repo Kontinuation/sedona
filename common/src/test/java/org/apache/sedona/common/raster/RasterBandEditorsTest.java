@@ -192,7 +192,7 @@ public class RasterBandEditorsTest extends RasterTestBase {
         "POLYGON ((-8682522.873537656 4572703.890837922, -8673439.664183248 4572993.532747675, -8673155.57366801 4563873.2099182755, -8701890.325907696 4562931.7093397, -8682522.873537656 4572703.890837922))";
     Geometry geom = Constructors.geomFromWKT(polygon, 3857);
 
-    GridCoverage2D clippedRaster = RasterBandEditors.clip(raster, 1, geom, 200, false);
+    GridCoverage2D clippedRaster = RasterBandEditors.clip(raster, 1, geom, false, 200, false);
     double[] clippedMetadata =
         Arrays.stream(RasterAccessors.metadata(clippedRaster), 0, 9).toArray();
     double[] originalMetadata = Arrays.stream(RasterAccessors.metadata(raster), 0, 9).toArray();
@@ -219,7 +219,7 @@ public class RasterBandEditorsTest extends RasterTestBase {
         "POLYGON ((236722 4204770, 243900 4204770, 243900 4197590, 221170 4197590, 236722 4204770))";
     Geometry geom = Constructors.geomFromWKT(polygon, RasterAccessors.srid(raster));
 
-    GridCoverage2D clippedRaster = RasterBandEditors.clip(raster, 1, geom, 200, false);
+    GridCoverage2D clippedRaster = RasterBandEditors.clip(raster, 1, geom, false, 200, false);
     double[] clippedMetadata =
         Arrays.stream(RasterAccessors.metadata(clippedRaster), 0, 9).toArray();
     double[] originalMetadata = Arrays.stream(RasterAccessors.metadata(raster), 0, 9).toArray();
@@ -240,7 +240,7 @@ public class RasterBandEditorsTest extends RasterTestBase {
     Double[] expectedValues = new Double[] {null, null, 0.0, 0.0, null};
     assertTrue(Arrays.equals(expectedValues, actualValues));
 
-    GridCoverage2D croppedRaster = RasterBandEditors.clip(raster, 1, geom, 200, true);
+    GridCoverage2D croppedRaster = RasterBandEditors.clip(raster, 1, geom, false, 200, true);
     assertEquals(0, croppedRaster.getRenderedImage().getMinX());
     assertEquals(0, croppedRaster.getRenderedImage().getMinY());
     GridCoverage2D croppedRaster2 = Serde.deserialize(Serde.serialize(croppedRaster));
@@ -332,7 +332,7 @@ public class RasterBandEditorsTest extends RasterTestBase {
         () -> {
           Geometry geom2 = Constructors.polygonFromEnvelope(-13050398, 4013378, -13025157, 4025967);
           geom2.setSRID(3857);
-          RasterBandEditors.clip(raster, 1, geom2, Integer.MIN_VALUE, true, false);
+          RasterBandEditors.clip(raster, 1, geom2, false, Integer.MIN_VALUE, true, false);
         });
 
     // Return null for non-intersecting geometries in lenient mode
@@ -357,10 +357,11 @@ public class RasterBandEditorsTest extends RasterTestBase {
     // Throws an exception in non-lenient mode
     assertThrows(
         CannotCropException.class,
-        () -> RasterBandEditors.clip(raster, 1, nonIntersectingGeom, 200, false, false));
+        () -> RasterBandEditors.clip(raster, 1, nonIntersectingGeom, false, 200, false, false));
 
     // Returns null in lenient mode
-    GridCoverage2D result = RasterBandEditors.clip(raster, 1, nonIntersectingGeom, 200, false);
+    GridCoverage2D result =
+        RasterBandEditors.clip(raster, 1, nonIntersectingGeom, false, 200, false);
     assertNull(result);
     raster.dispose(true);
   }

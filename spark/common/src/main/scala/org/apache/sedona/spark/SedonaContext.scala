@@ -106,6 +106,11 @@ object SedonaContext {
       }
     }
 
+    // Support order by optimization
+    if (!sparkSession.experimental.extraOptimizations.contains(OrderByOptimization)) {
+      sparkSession.experimental.extraOptimizations ++= Seq(OrderByOptimization)
+    }
+
     addGeoParquetToSupportNestedFilterSources(sparkSession)
     RasterRegistrator.registerAll(sparkSession)
     UdtRegistrator.registerAll()
