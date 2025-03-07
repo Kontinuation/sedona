@@ -502,68 +502,7 @@ Since v`1.7.0`, Sedona supports loading Shapefile as a DataFrame.
 
 The input path can be a directory containing one or multiple shapefiles, or path to a `.shp` file.
 
-- When the input path is a directory, all shapefiles directly under the directory will be loaded. If you want to load all shapefiles in subdirectories, please specify `.option("recursiveFileLookup", "true")`.
-- When the input path is a `.shp` file, that shapefile will be loaded. Sedona will look for sibling files (`.dbf`, `.shx`, etc.) with the same main file name and load them automatically.
-
-The name of the geometry column is `geometry` by default. You can change the name of the geometry column using the `geometry.name` option. If one of the non-spatial attributes is named "geometry", `geometry.name` must be configured to avoid conflict.
-
-=== "Scala/Java"
-
-    ```scala
-    val df = sedona.read.format("shapefile").option("geometry.name", "geom").load("/path/to/shapefile")
-    ```
-
-=== "Java"
-
-    ```java
-    Dataset<Row> df = sedona.read().format("shapefile").option("geometry.name", "geom").load("/path/to/shapefile")
-    ```
-
-=== "Python"
-
-    ```python
-    df = sedona.read.format("shapefile").option("geometry.name", "geom").load("/path/to/shapefile")
-    ```
-
-Each record in shapefile has a unique record number, that record number is not loaded by default. If you want to include record number in the loaded DataFrame, you can set the `key.name` option to the name of the record number column:
-
-=== "Scala/Java"
-
-    ```scala
-    val df = sedona.read.format("shapefile").option("key.name", "FID").load("/path/to/shapefile")
-    ```
-
-=== "Java"
-
-    ```java
-    Dataset<Row> df = sedona.read().format("shapefile").option("key.name", "FID").load("/path/to/shapefile")
-    ```
-
-=== "Python"
-
-    ```python
-    df = sedona.read.format("shapefile").option("key.name", "FID").load("/path/to/shapefile")
-    ```
-
-The character encoding of string attributes are inferred from the `.cpg` file. If you see garbled values in string fields, you can manually specify the correct charset using the `charset` option. For example:
-
-=== "Scala/Java"
-
-    ```scala
-    val df = sedona.read.format("shapefile").option("charset", "UTF-8").load("/path/to/shapefile")
-    ```
-
-=== "Java"
-
-    ```java
-    Dataset<Row> df = sedona.read().format("shapefile").option("charset", "UTF-8").load("/path/to/shapefile")
-    ```
-
-=== "Python"
-
-    ```python
-    df = sedona.read.format("shapefile").option("charset", "UTF-8").load("/path/to/shapefile")
-    ```
+See [this page](../files/shapefile-sedona-spark) for more information on loading Shapefiles.
 
 ## Load GeoParquet
 
@@ -611,54 +550,7 @@ Please refer to [Reading Legacy Parquet Files](../api/sql/Reading-legacy-parquet
 	GeoParquet file reader does not work on Databricks runtime when Photon is enabled. Please disable Photon when using
 	GeoParquet file reader on Databricks runtime.
 
-### Inspect GeoParquet metadata
-
-Since v`1.5.1`, Sedona provides a Spark SQL data source `"geoparquet.metadata"` for inspecting GeoParquet metadata. The resulting dataframe contains
-the "geo" metadata for each input file.
-
-=== "Scala/Java"
-
-	```scala
-	val df = sedona.read.format("geoparquet.metadata").load(geoparquetdatalocation1)
-	df.printSchema()
-	```
-
-=== "Java"
-
-	```java
-	Dataset<Row> df = sedona.read.format("geoparquet.metadata").load(geoparquetdatalocation1)
-	df.printSchema()
-	```
-
-=== "Python"
-
-	```python
-	df = sedona.read.format("geoparquet.metadata").load(geoparquetdatalocation1)
-	df.printSchema()
-	```
-
-The output will be as follows:
-
-```
-root
- |-- path: string (nullable = true)
- |-- version: string (nullable = true)
- |-- primary_column: string (nullable = true)
- |-- columns: map (nullable = true)
- |    |-- key: string
- |    |-- value: struct (valueContainsNull = true)
- |    |    |-- encoding: string (nullable = true)
- |    |    |-- geometry_types: array (nullable = true)
- |    |    |    |-- element: string (containsNull = true)
- |    |    |-- bbox: array (nullable = true)
- |    |    |    |-- element: double (containsNull = true)
- |    |    |-- crs: string (nullable = true)
-```
-
-If the input Parquet file does not have GeoParquet metadata, the values of `version`, `primary_column` and `columns` fields of the resulting dataframe will be `null`.
-
-!!! note
-	`geoparquet.metadata` only supports reading GeoParquet specific metadata. Users can use [G-Research/spark-extension](https://github.com/G-Research/spark-extension/blob/13109b8e43dfba9272c85896ba5e30cfe280426f/PARQUET.md) to read comprehensive metadata of generic Parquet files.
+See [this page](../files/geoparquet-sedona-spark) for more information on loading GeoParquet.
 
 ## Load data from JDBC data sources
 
@@ -720,7 +612,7 @@ For Postgis there is no need to add a query to convert geometry types since it's
 		.withColumn("geom", f.expr("ST_GeomFromWKB(geom)")))
 	```
 
-## Load from geopackage
+## Load from GeoPackage
 
 Since v1.7.0, Sedona supports loading Geopackage file format as a DataFrame.
 
@@ -742,66 +634,102 @@ Since v1.7.0, Sedona supports loading Geopackage file format as a DataFrame.
 	df = sedona.read.format("geopackage").option("tableName", "tab").load("/path/to/geopackage")
 	```
 
-Geopackage files can contain vector data and raster data. To show the possible options from a file you can
-look into the metadata table by adding parameter showMetadata and set its value as true.
+See [this page](../files/geopackage-sedona-spark) for more information on loading GeoPackage.
+
+## Load from OSM PBF
+
+Since v1.7.1, Sedona supports loading OSM PBF file format as a DataFrame.
 
 === "Scala/Java"
 
 	```scala
-	val df = sedona.read.format("geopackage").option("showMetadata", "true").load("/path/to/geopackage")
+	val df = sedona.read.format("osmpbf").load("/path/to/osmpbf")
 	```
 
 === "Java"
 
 	```java
-	Dataset<Row> df = sedona.read().format("geopackage").option("showMetadata", "true").load("/path/to/geopackage")
+	Dataset<Row> df = sedona.read().format("osmpbf").load("/path/to/osmpbf")
 	```
 
 === "Python"
 
 	```python
-	df = sedona.read.format("geopackage").option("showMetadata", "true").load("/path/to/geopackage")
-
-Then you can see the metadata of the geopackage file like below.
-
-```
-+--------------------+---------+--------------------+-----------+--------------------+----------+-----------------+----------+----------+------+
-|          table_name|data_type|          identifier|description|         last_change|     min_x|            min_y|     max_x|     max_y|srs_id|
-+--------------------+---------+--------------------+-----------+--------------------+----------+-----------------+----------+----------+------+
-|gis_osm_water_a_f...| features|gis_osm_water_a_f...|           |2024-09-30 23:07:...|-9.0257084|57.96814069999999|33.4866675|80.4291867|  4326|
-+--------------------+---------+--------------------+-----------+--------------------+----------+-----------------+----------+----------+------+
-```
-
-You can also load data from raster tables in the geopackage file. To load raster data, you can use the following code.
-
-=== "Scala/Java"
-
-	```scala
-	val df = sedona.read.format("geopackage").option("tableName", "raster_table").load("/path/to/geopackage")
+	df = sedona.read.format("osmpbf").load("/path/to/osmpbf")
 	```
 
-=== "Java"
-
-	```java
-	Dataset<Row> df = sedona.read().format("geopackage").option("tableName", "raster_table").load("/path/to/geopackage")
-	```
-
-=== "Python"
-
-	```python
-	df = sedona.read.format("geopackage").option("tableName", "raster_table").load("/path/to/geopackage")
-	```
+OSM PBF files can contain nodes, ways, and relations. Currently Sedona support
+DenseNodes, Ways and Relations. When you load the data you get a DataFrame with the following schema.
 
 ```
-+---+----------+-----------+--------+--------------------+
-| id|zoom_level|tile_column|tile_row|           tile_data|
-+---+----------+-----------+--------+--------------------+
-|  1|        11|        428|     778|GridCoverage2D["c...|
-|  2|        11|        429|     778|GridCoverage2D["c...|
-|  3|        11|        428|     779|GridCoverage2D["c...|
-|  4|        11|        429|     779|GridCoverage2D["c...|
-|  5|        11|        427|     777|GridCoverage2D["c...|
-+---+----------+-----------+--------+--------------------+
+root
+ |-- id: long (nullable = true)
+ |-- kind: string (nullable = true)
+ |-- location: struct (nullable = true)
+ |    |-- longitude: double (nullable = true)
+ |    |-- latitude: double (nullable = true)
+ |-- tags: map (nullable = true)
+ |    |-- key: string
+ |    |-- value: string (valueContainsNull = true)
+ |-- refs: array (nullable = true)
+ |    |-- element: long (containsNull = true)
+ |-- ref_roles: array (nullable = true)
+ |    |-- element: string (containsNull = true)
+ |-- ref_types: array (nullable = true)
+ |    |-- element: string (containsNull = true)
+```
+
+Where:
+
+- `id` is the unique identifier of the object.
+- `kind` is the type of the object, it can be `node`, `way` or `relation`.
+- `location` is the location of the object, it contains the `longitude` and `latitude` of the object.
+- `tags` is a map of key-value pairs that represent the tags of the object.
+- `refs` is an array of the references of the object.
+- `ref_roles` is an array of the roles of the references.
+- `ref_types` is an array of the types of the references.
+
+The dataframe for ways might look like this for nodes:
+
+```
++---------+----+--------------------+--------------------+----+---------+---------+
+|       id|kind|            location|                tags|refs|ref_roles|ref_types|
++---------+----+--------------------+--------------------+----+---------+---------+
+|248675410|node|{21.0884952545166...|{tactile_paving -...|NULL|     NULL|     NULL|
+|260821820|node|{21.0191555023193...|{created_by -> JOSM}|NULL|     NULL|     NULL|
+|349189665|node|{22.1437530517578...|{source -> http:/...|NULL|     NULL|     NULL|
+|353366899|node|{22.9787712097167...|{source -> http:/...|NULL|     NULL|     NULL|
+|359460224|node|{22.4816703796386...|{source -> http:/...|NULL|     NULL|     NULL|
++---------+----+--------------------+--------------------+----+---------+---------+
+only showing top 5 rows
+```
+
+and for way
+
+```
++-------+----+--------+--------------------+--------------------+---------+---------+
+|     id|kind|location|                tags|                refs|ref_roles|ref_types|
++-------+----+--------+--------------------+--------------------+---------+---------+
+|4307329| way|    NULL|{junction -> roun...|[2448759046, 7093...|     NULL|     NULL|
+|4307330| way|    NULL|{surface -> aspha...|[26063923, 260639...|     NULL|     NULL|
+|4308966| way|    NULL|{sidewalk -> sepa...|[3387797238, 9252...|     NULL|     NULL|
+|4308968| way|    NULL|{surface -> pavin...|[26083890, 744724...|     NULL|     NULL|
+|4308969| way|    NULL|{cycleway:both ->...|[9526831176, 1218...|     NULL|     NULL|
++-------+----+--------+--------------------+--------------------+---------+---------+
+```
+
+and for relation
+
+```
++-----+--------+--------+--------------------+--------------------+--------------------+--------------------+
+|   id|    kind|location|                tags|                refs|           ref_roles|           ref_types|
++-----+--------+--------+--------------------+--------------------+--------------------+--------------------+
+|28124|relation|    NULL|{official_name ->...|[26382394, 26259985]|      [inner, outer]|          [WAY, WAY]|
+|28488|relation|    NULL|  {type -> junction}|[26409253, 303249...|[roundabout, roun...|[WAY, WAY, WAY, WAY]|
+|32939|relation|    NULL|{ref -> E 67, rou...|[140673970, 14067...|        [, , , , , ]|[WAY, WAY, RELATI...|
+|34387|relation|    NULL|{note -> rząd III...|[209161000, 52154...|[main_stream, mai...|[WAY, WAY, WAY, W...|
+|34392|relation|    NULL|{distance -> 1047...|[150033976, 25076...|[main_stream, mai...|[WAY, WAY, WAY, W...|
++-----+--------+--------+--------------------+--------------------+--------------------+--------------------+
 ```
 
 Known limitations (v1.7.0):
@@ -1489,77 +1417,7 @@ Since v`1.3.0`, Sedona natively supports writing GeoParquet file. GeoParquet can
 df.write.format("geoparquet").save(geoparquetoutputlocation + "/GeoParquet_File_Name.parquet")
 ```
 
-### CRS Metadata
-
-Since v`1.5.1`, Sedona supports writing GeoParquet files with custom GeoParquet spec version and crs.
-The default GeoParquet spec version is `1.0.0` and the default crs is `null`. You can specify the GeoParquet spec version and crs as follows:
-
-```scala
-val projjson = "{...}" // PROJJSON string for all geometry columns
-df.write.format("geoparquet")
-		.option("geoparquet.version", "1.0.0")
-		.option("geoparquet.crs", projjson)
-		.save(geoparquetoutputlocation + "/GeoParquet_File_Name.parquet")
-```
-
-If you have multiple geometry columns written to the GeoParquet file, you can specify the CRS for each column.
-For example, `g0` and `g1` are two geometry columns in the DataFrame `df`, and you want to specify the CRS for each column as follows:
-
-```scala
-val projjson_g0 = "{...}" // PROJJSON string for g0
-val projjson_g1 = "{...}" // PROJJSON string for g1
-df.write.format("geoparquet")
-		.option("geoparquet.version", "1.0.0")
-		.option("geoparquet.crs.g0", projjson_g0)
-		.option("geoparquet.crs.g1", projjson_g1)
-		.save(geoparquetoutputlocation + "/GeoParquet_File_Name.parquet")
-```
-
-The value of `geoparquet.crs` and `geoparquet.crs.<column_name>` can be one of the following:
-
-- `"null"`: Explicitly setting `crs` field to `null`. This is the default behavior.
-- `""` (empty string): Omit the `crs` field. This implies that the CRS is [OGC:CRS84](https://www.opengis.net/def/crs/OGC/1.3/CRS84) for CRS-aware implementations.
-- `"{...}"` (PROJJSON string): The `crs` field will be set as the PROJJSON object representing the Coordinate Reference System (CRS) of the geometry. You can find the PROJJSON string of a specific CRS from here: https://epsg.io/ (click the JSON option at the bottom of the page). You can also customize your PROJJSON string as needed.
-
-Please note that Sedona currently cannot set/get a projjson string to/from a CRS. Its geoparquet reader will ignore the projjson metadata and you will have to set your CRS via [`ST_SetSRID`](../api/sql/Function.md#st_setsrid) after reading the file.
-Its geoparquet writer will not leverage the SRID field of a geometry so you will have to always set the `geoparquet.crs` option manually when writing the file, if you want to write a meaningful CRS field.
-
-Due to the same reason, Sedona geoparquet reader and writer do NOT check the axis order (lon/lat or lat/lon) and assume they are handled by the users themselves when writing / reading the files. You can always use [`ST_FlipCoordinates`](../api/sql/Function.md#st_flipcoordinates) to swap the axis order of your geometries.
-
-### Covering Metadata
-
-Since `v1.6.1`, Sedona supports writing the [`covering` field](https://github.com/opengeospatial/geoparquet/blob/v1.1.0/format-specs/geoparquet.md#covering) to geometry column metadata. The `covering` field specifies a bounding box column to help accelerate spatial data retrieval. The bounding box column should be a top-level struct column containing `xmin`, `ymin`, `xmax`, `ymax` columns. If the DataFrame you are writing contains such columns, you can specify `.option("geoparquet.covering.<geometryColumnName>", "<coveringColumnName>")` option to write `covering` metadata to GeoParquet files:
-
-```scala
-df.write.format("geoparquet")
-		.option("geoparquet.covering.geometry", "bbox")
-		.save("/path/to/saved_geoparquet.parquet")
-```
-
-If the DataFrame has only one geometry column, you can simply specify the `geoparquet.covering` option and omit the geometry column name:
-
-```scala
-df.write.format("geoparquet")
-		.option("geoparquet.covering", "bbox")
-		.save("/path/to/saved_geoparquet.parquet")
-```
-
-If the DataFrame does not have a covering column, you can construct one using Sedona's SQL functions:
-
-```scala
-val df_bbox = df.withColumn("bbox", expr("struct(ST_XMin(geometry) AS xmin, ST_YMin(geometry) AS ymin, ST_XMax(geometry) AS xmax, ST_YMax(geometry) AS ymax)"))
-df_bbox.write.format("geoparquet").option("geoparquet.covering.geometry", "bbox").save("/path/to/saved_geoparquet.parquet")
-```
-
-## Sort then Save GeoParquet
-
-To maximize the performance of Sedona GeoParquet filter pushdown, we suggest that you sort the data by their geohash values (see [ST_GeoHash](../api/sql/Function.md#st_geohash)) and then save as a GeoParquet file. An example is as follows:
-
-```
-SELECT col1, col2, geom, ST_GeoHash(geom, 5) as geohash
-FROM spatialDf
-ORDER BY geohash
-```
+See [this page](../files/geoparquet-sedona-spark) for more information on writing to GeoParquet.
 
 ## Save to Postgis
 
