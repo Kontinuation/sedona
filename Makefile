@@ -15,57 +15,29 @@
 # specific language governing permissions and limitations
 # under the License.
 
-PYTHON := $(shell command -v python || command -v python3 || echo python)
-PIP := $(PYTHON) -m pip
-MKDOCS := mkdocs
-MIKE := mike
-
-.PHONY: check checkinstall checkupdate install docsinstall docsbuild clean test
-
-check:
-	@echo "Running pre-commit checks..."
-	@if ! command -v pre-commit >/dev/null 2>&1; then \
-		echo "Error: pre-commit is not installed. Run 'make checkinstall' first."; \
-		exit 1; \
-	fi
+check :
 	pre-commit run --all-files
+.PHONY : check
 
-checkinstall:
-	@echo "Installing pre-commit..."
-	@if ! command -v pre-commit >/dev/null 2>&1; then \
-		$(PIP) install pre-commit; \
-	fi
+checkinstall :
 	pre-commit install
+.PHONY : checkinstall
 
-checkupdate: checkinstall
-	@echo "Updating pre-commit hooks..."
+checkupdate :
 	pre-commit autoupdate
+.PHONY : checkupdate
 
-install:
-	@echo "Installing dependencies..."
-	@if [ -f requirements.txt ]; then \
-		$(PIP) install -r requirements.txt; \
-	else \
-		echo "Error: requirements.txt not found."; \
-		exit 1; \
-	fi
+docsinstall :
+	pip install mkdocs
+	pip install mkdocs-jupyter
+	pip install mkdocs-material
+	pip install mkdocs-macros-plugin
+	pip install mkdocs-git-revision-date-localized-plugin
+	pip install mike
+.PHONY : docsinstall
 
-docsinstall:
-	@echo "Installing documentation dependencies..."
-	$(PIP) install -r requirements-docs.txt
-
-docsbuild: docsinstall
-	@echo "Building documentation..."
-	$(MKDOCS) build
-	$(MIKE) deploy --update-aliases latest-snapshot -b website -p
-	$(MIKE) serve
-
-clean:
-	@echo "Cleaning up generated files... (TODO)"
-	rm -rf __pycache__
-	rm -rf .mypy_cache
-	rm -rf .pytest_cache
-
-run-docs:
-	docker build -f docker/docs/Dockerfile -t mkdocs-sedona .
-	docker run --rm -it -p 8000:8000 -v ${PWD}:/docs mkdocs-sedona
+docsbuild : docsinstall
+	mkdocs build
+	mike deploy --update-aliases latest-snapshot -b website -p
+	mike serve
+.PHONY : docsbuild

@@ -1796,7 +1796,7 @@ case class ST_DelaunayTriangles(inputExpressions: Seq[Expression])
 }
 
 /**
- * Return the number of dimensions in geometry.
+ * Return the number of ddimensions in geometry.
  *
  * @param inputExpressions
  */

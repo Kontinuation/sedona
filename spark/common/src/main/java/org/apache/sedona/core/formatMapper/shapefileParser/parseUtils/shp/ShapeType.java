@@ -30,14 +30,14 @@ public enum ShapeType implements Serializable {
   POLYLINE(3, true),
   POLYGON(5, true),
   MULTIPOINT(8, true),
-  POINTZ(11, true),
-  POLYLINEZ(13, true),
-  POLYGONZ(15, true),
-  MULTIPOINTZ(18, true),
-  POINTM(21, true),
-  POLYLINEM(23, true),
-  POLYGONM(25, true),
-  MULTIPOINTM(28, true),
+  POINTZ(11, false),
+  POLYLINEZ(13, false),
+  POLYGONZ(15, false),
+  MULTIPOINTZ(18, false),
+  POINTM(21, false),
+  POLYLINEM(23, false),
+  POLYGONM(25, false),
+  MULTIPOINTM(28, false),
   MULTIPATCH(31, false),
   // A normal shapefile should NOT have UNDEFINED type
   UNDEFINED(-1, false);
@@ -78,21 +78,13 @@ public enum ShapeType implements Serializable {
   public ShapeParser getParser(GeometryFactory geometryFactory) {
     switch (this) {
       case POINT:
-      case POINTZ:
-      case POINTM:
-        return new PointParser(geometryFactory, this);
+        return new PointParser(geometryFactory);
       case POLYLINE:
-      case POLYLINEZ:
-      case POLYLINEM:
-        return new PolyLineParser(geometryFactory, this);
+        return new PolyLineParser(geometryFactory);
       case POLYGON:
-      case POLYGONZ:
-      case POLYGONM:
-        return new PolygonParser(geometryFactory, this);
+        return new PolygonParser(geometryFactory);
       case MULTIPOINT:
-      case MULTIPOINTZ:
-      case MULTIPOINTM:
-        return new MultiPointParser(geometryFactory, this);
+        return new MultiPointParser(geometryFactory);
       default:
         throw new TypeUnknownException(id);
     }

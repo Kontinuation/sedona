@@ -392,7 +392,7 @@ class GeometryTypesAndFunctionsTestScala extends TestBaseScala with BeforeAndAft
       assert(actual == 1)
     }
     ignore("T29") {
-      // Interior rings are 1 indexed in OGC and PostGIS.
+      // Interor rings are 1 indexed in OGC and PostGIS.
       // In Sedona they are 0 indexed.
       val actual = sparkSession
         .sql("""
@@ -416,7 +416,7 @@ class GeometryTypesAndFunctionsTestScala extends TestBaseScala with BeforeAndAft
       assert(actual == 2)
     }
     ignore("T31") {
-      // Interior rings are 1 indexed in OGC and PostGIS.
+      // Interor rings are 1 indexed in OGC and PostGIS.
       // In Sedona they are 0 indexed.
       val actual = sparkSession
         .sql("""
