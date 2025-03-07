@@ -167,7 +167,9 @@ Below are reader options that can be set to control the behavior of the STAC rea
 
 - **itemsLimitPerRequest**: This option specifies the maximum number of items to be requested in a single API call. It helps in controlling the size of each request. The default value is set to 10.
 
-These configurations can be combined into a single `Map[String, String]` and passed to the STAC reader as shown below:
+- **generateOutDBRaster**: This method generates the output database raster fields for a given row and schema. It processes the "assets" field in the provided row, updating each asset with a raster linked to its "href" value. The updated assets are then stored in the new row values. The default value is set to true.
+
+- These configurations can be combined into a single `Map[String, String]` and passed to the STAC reader as shown below:
 
 ```scala
   def defaultSparkConfig: Map[String, String] = Map(
@@ -188,6 +190,7 @@ These configurations can be combined into a single `Map[String, String]` and pas
       .option("itemsLimitMax", "100")
       .option("itemsLoadProcessReportThreshold", "2000000")
       .option("itemsLimitPerRequest", "100")
+      .option("generateOutDBRaster", "false")
       .load("https://earth-search.aws.element84.com/v1/collections/sentinel-2-pre-c1-l2a")
 ```
 

@@ -48,6 +48,7 @@ class StacPartitionReader(
   private var currentFile: File = _
   private var featureIterator: Iterator[InternalRow] = Iterator.empty
   private val mapper = new ObjectMapper()
+  private val generateOutDBRaster = opts.getOrElse("generateOutDBRaster", "true").toBoolean
 
   override def next(): Boolean = {
     if (featureIterator.hasNext) {
@@ -62,7 +63,7 @@ class StacPartitionReader(
         val tempFile = File.createTempFile("stac_item_", ".json")
         val writer = new PrintWriter(tempFile)
         try {
-          val fileContent = Source.fromURL(url).mkString
+          val fileContent = fetchContentWithRetry(url)
           val rootNode = mapper.readTree(fileContent)
           val nodeType = rootNode.get("type").asText()
 
@@ -120,7 +121,11 @@ class StacPartitionReader(
 
         rows.map(row => {
           val geometryConvertedRow = GeoJSONUtils.convertGeoJsonToGeometry(row, alteredSchema)
-          val rasterAddedRow = buildOutDbRasterFields(geometryConvertedRow, alteredSchema)
+          val rasterAddedRow = if (generateOutDBRaster) {
+            buildOutDbRasterFields(geometryConvertedRow, alteredSchema)
+          } else {
+            geometryConvertedRow
+          }
           val propertiesPromotedRow = promotePropertiesToTop(rasterAddedRow, alteredSchema)
           propertiesPromotedRow
         })
@@ -140,6 +145,29 @@ class StacPartitionReader(
 
   override def close(): Unit = {
     checkAndDeleteTempFile(currentFile)
+  }
+
+  def fetchContentWithRetry(url: java.net.URL, maxRetries: Int = 3): String = {
+    var attempt = 0
+    var success = false
+    var fileContent: String = ""
+
+    while (attempt < maxRetries && !success) {
+      try {
+        fileContent = Source.fromURL(url).mkString
+        success = true
+      } catch {
+        case e: Exception =>
+          attempt += 1
+          if (attempt >= maxRetries) {
+            throw new RuntimeException(
+              s"Failed to fetch content from URL after $maxRetries attempts",
+              e)
+          }
+      }
+    }
+
+    fileContent
   }
 
   private def checkAndDeleteTempFile(file: File): Unit = {

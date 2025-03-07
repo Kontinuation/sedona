@@ -27,10 +27,12 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.util.ArrayBasedMapData
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
+import org.apache.spark.sql.sedona_sql.io.stac.StacAssetType._
 import org.apache.spark.sql.types.{MapType, StringType, StructField, StructType}
 
 import java.net.URI
 import scala.io.Source
+import scala.util.Try
 
 object StacUtils {
 
@@ -217,18 +219,21 @@ object StacUtils {
               val assetRow = value.asInstanceOf[InternalRow]
               if (assetRow != null) {
                 val hrefIndex = valueType.fieldIndex("href")
-                val href = assetRow.getString(hrefIndex)
-                if (href != null) {
-                  val rast = linkToRaster(href)
-                  val newAssetValues = new Array[Any](valueType.fields.length + 1)
-                  valueType.fields.zipWithIndex.foreach { case (field, i) =>
-                    newAssetValues(i) = assetRow.get(i, field.dataType)
+                val typeIndex = valueType.fieldIndex("type")
+                val href = Try(Option(assetRow.getString(hrefIndex))).getOrElse(None)
+                val assetType = Try(Option(assetRow.getString(typeIndex))).getOrElse(None)
+                val rast =
+                  if (href.isDefined && assetType.isDefined && isImageAssetType(assetType.get)) {
+                    linkToRaster(href.get)
+                  } else {
+                    null
                   }
-                  newAssetValues(valueType.fields.length) = rast
-                  key -> InternalRow.fromSeq(newAssetValues)
-                } else {
-                  key -> assetRow
+                val newAssetValues = new Array[Any](valueType.fields.length + 1)
+                valueType.fields.zipWithIndex.foreach { case (field, i) =>
+                  newAssetValues(i) = assetRow.get(i, field.dataType)
                 }
+                newAssetValues(valueType.fields.length) = rast
+                key -> InternalRow.fromSeq(newAssetValues)
               } else {
                 key -> null
               }
@@ -300,6 +305,50 @@ object StacUtils {
         Math.ceil(itemCount.toDouble / defaultParallelism).toInt
       }
       Math.max(1, Math.ceil(itemCount.toDouble / maxSplitFiles).toInt)
+    }
+  }
+
+  /**
+   * Returns the asset type based on the content type.
+   *
+   * @param assetType
+   *   The content type of the asset.
+   * @return
+   *   The asset type.
+   */
+  def getAssetType(assetType: String): AssetType = {
+    assetType.toLowerCase match {
+      case t if t.startsWith("image/tiff; application=geotiff") => GeoTIFF
+      case t if t.startsWith("image/jp2") => JPEG2000
+      case t if t.startsWith("image/png") => PNG
+      case t if t.startsWith("image/jpeg") => JPEG
+      case t if t.startsWith("text/xml") || t.startsWith("application/xml") => XML
+      case t if t.startsWith("application/json") => JSON
+      case t if t.startsWith("text/plain") => PlainText
+      case t if t.startsWith("application/geo+json") => GeoJSON
+      case t if t.startsWith("application/geopackage+sqlite3") => GeoPackage
+      case t if t.startsWith("application/x-hdf5") => HDF5
+      case t if t.startsWith("application/x-hdf") => HDF
+      case t if t.startsWith("application/vnd.laszip+copc") => COPC
+      case t if t.startsWith("application/vnd.apache.parquet") => Parquet
+      case t if t.startsWith("application/3dtiles+json") => Tiles3D
+      case t if t.startsWith("application/vnd.pmtiles") => PMTiles
+      case _ => Other
+    }
+  }
+
+  /**
+   * Returns whether the asset type is an image asset type.
+   *
+   * @param assetType
+   *   The asset type.
+   * @return
+   *   Whether the asset type is an image asset type.
+   */
+  def isImageAssetType(assetType: String): Boolean = {
+    getAssetType(assetType) match {
+      case GeoTIFF | JPEG2000 | PNG | JPEG => true
+      case _ => false
     }
   }
 }
