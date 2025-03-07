@@ -40,9 +40,9 @@ In case there are ties in the distance, the result will include all the tied geo
 
 **Note for Inner Join:**
 
-- The `ST_KNN` join only supports left inner join.
-- It returns only pairs where there is at least one matching neighbor within the k nearest neighbors.
-- If a query point has no valid neighbor (e.g., because k is too large), it is excluded from the result.
+* The `ST_KNN` join only supports left inner join.
+* It returns only pairs where there is at least one matching neighbor within the k nearest neighbors.
+* If a query point has no valid neighbor (e.g., because k is too large), it is excluded from the result.
 
 ```
 spark.sedona.join.knn.includeTieBreakers=true

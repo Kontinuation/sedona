@@ -141,7 +141,7 @@ def _load_spark_conf() -> Optional[Dict[str, str]]:
 
 
 def _parse_s3a_conf(
-    spark_conf: Dict[str, str]
+    spark_conf: Dict[str, str],
 ) -> Tuple[Dict[str, str], Dict[str, Dict[str, str]]]:
     regex = re.compile(r"spark\.hadoop\.fs\.s3a(\.bucket\.([^.]+]*))?\.(.*)")
     global_s3_configs = {}
