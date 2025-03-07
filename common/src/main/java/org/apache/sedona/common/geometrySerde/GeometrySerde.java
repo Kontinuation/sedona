@@ -24,6 +24,7 @@ import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 import java.io.Serializable;
 import org.apache.sedona.common.geometryObjects.Circle;
+import org.apache.sedona.common.geometryObjects.Geography;
 import org.apache.sedona.common.geometryObjects.NullGeometry;
 import org.apache.sedona.common.geometryObjects.UniqueGeometry;
 import org.locationtech.jts.geom.Envelope;
@@ -37,7 +38,7 @@ import org.locationtech.jts.geom.Polygon;
  * Provides methods to efficiently serialize and deserialize geometry types.
  *
  * <p>Supports Point, LineString, Polygon, MultiPoint, MultiLineString, MultiPolygon,
- * GeometryCollection, Circle and Envelope types.
+ * GeometryCollection, Circle, Envelope, and Geography types.
  *
  * <p>First byte contains {@link Type#id}. Then go type-specific bytes, followed by user-data
  * attached to the geometry.
@@ -72,6 +73,9 @@ public class GeometrySerde extends Serializer implements Serializable {
       UniqueGeometry<?> uniqueGeometry = (UniqueGeometry<?>) object;
       out.writeLong(uniqueGeometry.getUniqueId());
       writeGeometry(kryo, out, (Geometry) uniqueGeometry.getOriginalGeometry());
+    } else if (object instanceof Geography) {
+      writeType(out, Type.GEOGRAPHY);
+      writeGeometry(kryo, out, ((Geography) object).getGeometry());
     } else {
       throw new UnsupportedOperationException(
           "Cannot serialize object of type " + object.getClass().getName());
@@ -135,6 +139,8 @@ public class GeometrySerde extends Serializer implements Serializable {
         long uniqueId = input.readLong();
         Geometry geometry = readGeometry(kryo, input);
         return new UniqueGeometry<>(uniqueId, geometry);
+      case GEOGRAPHY:
+        return new Geography(readGeometry(kryo, input));
       default:
         throw new UnsupportedOperationException(
             "Cannot deserialize object of type " + geometryType);
@@ -163,7 +169,8 @@ public class GeometrySerde extends Serializer implements Serializable {
     CIRCLE(1),
     ENVELOPE(2),
     NULL_GEOMETRY(3),
-    UNIQUE_GEOMETRY(4);
+    UNIQUE_GEOMETRY(4),
+    GEOGRAPHY(5);
 
     private final int id;
 
@@ -185,6 +192,8 @@ public class GeometrySerde extends Serializer implements Serializable {
           return NULL_GEOMETRY;
         case 4:
           return UNIQUE_GEOMETRY;
+        case 5:
+          return GEOGRAPHY;
         default:
           throw new IllegalArgumentException("Unknown type id: " + id);
       }
