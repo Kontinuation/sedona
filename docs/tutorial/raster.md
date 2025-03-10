@@ -67,8 +67,6 @@ Detailed SedonaSQL APIs are available here: [SedonaSQL API](../api/sql/Overview.
 
 Use the following code to create your Sedona config at the beginning. If you already have a SparkSession (usually named `spark`) created by Wherobots/AWS EMR/Databricks, please skip this step and use `spark` directly.
 
-==Sedona >= 1.4.1==
-
 You can add additional Spark runtime config to the config builder. For example, `SedonaContext.builder().config("spark.sql.autoBroadcastJoinThreshold", "10485760")`
 
 === "Scala"
@@ -114,64 +112,9 @@ You can add additional Spark runtime config to the config builder. For example, 
 	```
     Please replace the `3.3` in the package name of sedona-spark-shaded with the corresponding major.minor version of Spark, such as `sedona-spark-shaded-3.4_2.12:{{ sedona.current_version }}`.
 
-==Sedona < 1.4.1==
-
-The following method has been deprecated since Sedona 1.4.1. Please use the method above to create your Sedona config.
-
-=== "Scala"
-
-	```scala
-	var sparkSession = SparkSession.builder()
-	.master("local[*]") // Delete this if run in cluster mode
-	.appName("readTestScala") // Change this to a proper name
-	// Enable Sedona custom Kryo serializer
-	.config("spark.serializer", classOf[KryoSerializer].getName) // org.apache.spark.serializer.KryoSerializer
-	.config("spark.kryo.registrator", classOf[SedonaKryoRegistrator].getName)
-	.getOrCreate() // org.apache.sedona.core.serde.SedonaKryoRegistrator
-	```
-	If you use SedonaViz together with SedonaSQL, please use the following two lines to enable Sedona Kryo serializer instead:
-	```scala
-	.config("spark.serializer", classOf[KryoSerializer].getName) // org.apache.spark.serializer.KryoSerializer
-	.config("spark.kryo.registrator", classOf[SedonaVizKryoRegistrator].getName) // org.apache.sedona.viz.core.Serde.SedonaVizKryoRegistrator
-	```
-
-=== "Java"
-
-	```java
-	SparkSession sparkSession = SparkSession.builder()
-	.master("local[*]") // Delete this if run in cluster mode
-	.appName("readTestScala") // Change this to a proper name
-	// Enable Sedona custom Kryo serializer
-	.config("spark.serializer", KryoSerializer.class.getName) // org.apache.spark.serializer.KryoSerializer
-	.config("spark.kryo.registrator", SedonaKryoRegistrator.class.getName)
-	.getOrCreate() // org.apache.sedona.core.serde.SedonaKryoRegistrator
-	```
-	If you use SedonaViz together with SedonaSQL, please use the following two lines to enable Sedona Kryo serializer instead:
-	```scala
-	.config("spark.serializer", KryoSerializer.class.getName) // org.apache.spark.serializer.KryoSerializer
-	.config("spark.kryo.registrator", SedonaVizKryoRegistrator.class.getName) // org.apache.sedona.viz.core.Serde.SedonaVizKryoRegistrator
-	```
-
-=== "Python"
-
-	```python
-	sparkSession = SparkSession. \
-	    builder. \
-	    appName('appName'). \
-	    config("spark.serializer", KryoSerializer.getName). \
-	    config("spark.kryo.registrator", SedonaKryoRegistrator.getName). \
-	    config('spark.jars.packages',
-	           'org.apache.sedona:sedona-spark-shaded-3.3_2.12:{{ sedona.current_version }},'
-	           'org.datasyslab:geotools-wrapper:{{ sedona.current_geotools }}'). \
-	    getOrCreate()
-	```
-    Please replace the `3.3` in the package name of sedona-spark-shaded with the corresponding major.minor version of Spark, such as `sedona-spark-shaded-3.4_2.12:{{ sedona.current_version }}`.
-
 ## Initiate SedonaContext
 
 Add the following line after creating the Sedona config. If you already have a SparkSession (usually named `spark`) created by Wherobots/AWS EMR/Databricks, please call `SedonaContext.create(spark)` instead.
-
-==Sedona >= 1.4.1==
 
 === "Scala"
 
@@ -195,30 +138,6 @@ Add the following line after creating the Sedona config. If you already have a S
 	from sedona.spark import *
 
 	sedona = SedonaContext.create(config)
-	```
-
-==Sedona < 1.4.1==
-
-The following method has been deprecated since Sedona 1.4.1. Please use the method above to create your SedonaContext.
-
-=== "Scala"
-
-	```scala
-	SedonaSQLRegistrator.registerAll(sparkSession)
-	```
-
-=== "Java"
-
-	```java
-	SedonaSQLRegistrator.registerAll(sparkSession)
-	```
-
-=== "Python"
-
-	```python
-	from sedona.register import SedonaRegistrator
-
-	SedonaRegistrator.registerAll(spark)
 	```
 
 You can also register everything by passing `--conf spark.sql.extensions=org.apache.sedona.sql.SedonaSqlExtensions` to `spark-submit` or `spark-shell`.
