@@ -146,6 +146,51 @@ public class RasterConstructorsTest extends RasterTestBase {
   }
 
   @Test
+  public void fromGeoTiffMultiBandPredictor2() throws IOException {
+    byte[] content =
+        Files.readAllBytes(Paths.get(resourceFolder + "raster_geotiff_io/sampleRGBA.tif"));
+    GridCoverage2D ref = RasterConstructors.fromGeoTiff(content);
+
+    String[] paths = {
+      resourceFolder + "raster_geotiff_io/sampleRGBA32f_DEFLATE_p2.tif",
+      resourceFolder + "raster_geotiff_io/sampleRGBA32f_LZW_p2.tif",
+      resourceFolder + "raster_geotiff_io/sampleRGBA32f_ZSTD_p2.tif"
+    };
+    for (String path : paths) {
+      byte[] content2 = Files.readAllBytes(Paths.get(path));
+      GridCoverage2D gridCoverage2D = RasterConstructors.fromGeoTiff(content2);
+      assertSameCoverage(ref, gridCoverage2D);
+      gridCoverage2D.dispose(true);
+    }
+
+    ref.dispose(true);
+  }
+
+  @Test
+  public void fromGeoTiffBandInterleavedPredictor() throws IOException {
+    byte[] content =
+        Files.readAllBytes(Paths.get(resourceFolder + "raster_geotiff_io/sampleRGBA.tif"));
+    GridCoverage2D ref = RasterConstructors.fromGeoTiff(content);
+
+    String[] paths = {
+      resourceFolder + "raster_geotiff_io/sampleRGBA32f_DEFLATE_p2_bi.tif",
+      resourceFolder + "raster_geotiff_io/sampleRGBA32f_DEFLATE_p3_bi.tif",
+      resourceFolder + "raster_geotiff_io/sampleRGBA32f_LZW_p2_bi.tif",
+      resourceFolder + "raster_geotiff_io/sampleRGBA32f_LZW_p3_bi.tif",
+      resourceFolder + "raster_geotiff_io/sampleRGBA32f_ZSTD_p2_bi.tif",
+      resourceFolder + "raster_geotiff_io/sampleRGBA32f_ZSTD_p3_bi.tif"
+    };
+    for (String path : paths) {
+      byte[] content2 = Files.readAllBytes(Paths.get(path));
+      GridCoverage2D gridCoverage2D = RasterConstructors.fromGeoTiff(content2);
+      assertSameCoverage(ref, gridCoverage2D);
+      gridCoverage2D.dispose(true);
+    }
+
+    ref.dispose(true);
+  }
+
+  @Test
   public void fromPath() throws IOException, ClassNotFoundException {
     Configuration conf = new Configuration();
     byte[] serializedConf = HadoopConfigSerializer.serialize(conf);

@@ -20,7 +20,6 @@ package org.apache.sedona.common.raster.workarounds.imageioext.tiff;
 
 import it.geosolutions.imageio.plugins.tiff.BaselineTIFFTagSet;
 import it.geosolutions.imageio.plugins.tiff.TIFFDecompressor;
-import it.geosolutions.imageioimpl.plugins.tiff.PredictorDecompressor;
 import java.io.IOException;
 import javax.imageio.IIOException;
 
@@ -99,9 +98,13 @@ public class SedonaTIFFLZWDecompressor extends TIFFDecompressor {
       throw new IIOException("TIFF 5.0-style LZW compression is not supported!");
     }
 
-    PredictorDecompressor predictorDecompressor =
-        new PredictorDecompressor(
-            predictor, bitsPerSample, sampleFormat, samplesPerPixel, stream.getByteOrder());
+    SedonaPredictorDecompressor predictorDecompressor =
+        new SedonaPredictorDecompressor(
+            predictor,
+            bitsPerSample,
+            sampleFormat,
+            planar ? 1 : samplesPerPixel,
+            stream.getByteOrder());
     predictorDecompressor.validate();
 
     this.srcData = sdata;

@@ -32,7 +32,6 @@ import it.geosolutions.imageio.stream.input.FileImageInputStreamExtImpl;
 import it.geosolutions.imageio.utilities.ImageIOUtilities;
 import it.geosolutions.imageioimpl.plugins.tiff.TIFFCIELabColorConverter;
 import it.geosolutions.imageioimpl.plugins.tiff.TIFFCodecLibFaxDecompressor;
-import it.geosolutions.imageioimpl.plugins.tiff.TIFFDeflateDecompressor;
 import it.geosolutions.imageioimpl.plugins.tiff.TIFFFaxDecompressor;
 import it.geosolutions.imageioimpl.plugins.tiff.TIFFImageMetadata;
 import it.geosolutions.imageioimpl.plugins.tiff.TIFFImageReader;
@@ -46,7 +45,6 @@ import it.geosolutions.imageioimpl.plugins.tiff.TIFFRenderedImage;
 import it.geosolutions.imageioimpl.plugins.tiff.TIFFStreamMetadata;
 import it.geosolutions.imageioimpl.plugins.tiff.TIFFYCbCrColorConverter;
 import it.geosolutions.imageioimpl.plugins.tiff.TIFFYCbCrDecompressor;
-import it.geosolutions.imageioimpl.plugins.tiff.TIFFZSTDDecompressor;
 import it.geosolutions.imageioimpl.plugins.tiff.TiffDatasetLayoutImpl;
 import it.geosolutions.imageioimpl.plugins.tiff.gdal.GDALMetadata;
 import it.geosolutions.imageioimpl.plugins.tiff.gdal.GDALMetadataParser;
@@ -1782,7 +1780,7 @@ public class SedonaTIFFImageReader extends TIFFImageReader {
             ((predictorField == null)
                 ? BaselineTIFFTagSet.PREDICTOR_NONE
                 : predictorField.getAsInt(0));
-        this.decompressor = new TIFFDeflateDecompressor(predictor);
+        this.decompressor = new SedonaTIFFDeflateDecompressor(predictor);
       } else if (compression == BaselineTIFFTagSet.COMPRESSION_OLD_JPEG) {
         TIFFField JPEGProcField = imageMetadata.getTIFFField(BaselineTIFFTagSet.TAG_JPEG_PROC);
         if (JPEGProcField == null) {
@@ -1800,7 +1798,7 @@ public class SedonaTIFFImageReader extends TIFFImageReader {
             ((predictorField == null)
                 ? BaselineTIFFTagSet.PREDICTOR_NONE
                 : predictorField.getAsInt(0));
-        this.decompressor = new TIFFZSTDDecompressor(predictor);
+        this.decompressor = new SedonaTIFFZSTDDecompressor(predictor);
       } else {
         throw new IIOException("Unsupported compression type (tag number = " + compression + ")!");
       }
