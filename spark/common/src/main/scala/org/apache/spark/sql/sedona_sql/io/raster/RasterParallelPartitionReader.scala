@@ -119,6 +119,10 @@ class RasterParallelPartitionReader(
       queue.take() match {
         case Success(serializedRaster) =>
           numRastersLoaded += 1
+          if (currentRaster != null) {
+            currentRaster.dispose(true)
+            currentRaster = null
+          }
           currentRaster =
             RasterUDT.deserialize(serializedRaster).asInstanceOf[OutDbGridCoverage2D]
           currentIterator = rasterToInternalRows(currentRaster, dataSchema, rasterOptions)
