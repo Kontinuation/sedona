@@ -28,6 +28,7 @@ import org.apache.spark.sql.sedona_sql.io.geojson.GeoJSONUtils
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
+import org.apache.spark.util.SerializableConfiguration
 
 import java.util
 import java.util.concurrent.ConcurrentHashMap
@@ -102,26 +103,30 @@ class StacDataSource() extends TableProvider with DataSourceRegister {
       partitioning: Array[Transform],
       properties: util.Map[String, String]): Table = {
     val opts = new CaseInsensitiveStringMap(properties)
+    val sparkSession = SparkSession.active
 
     val optsMap: Map[String, String] = opts.asCaseSensitiveMap().asScala.toMap ++ Map(
-      "sessionLocalTimeZone" -> SparkSession.active.sessionState.conf.sessionLocalTimeZone,
-      "columnNameOfCorruptRecord" -> SparkSession.active.sessionState.conf.columnNameOfCorruptRecord,
+      "sessionLocalTimeZone" -> sparkSession.sessionState.conf.sessionLocalTimeZone,
+      "columnNameOfCorruptRecord" -> sparkSession.sessionState.conf.columnNameOfCorruptRecord,
       "defaultParallelism" -> ExecutorResourceUtils
-        .inferParallelism(SparkSession.active.sparkContext)
+        .inferParallelism(sparkSession.sparkContext)
         .toString,
-      "maxPartitionItemFiles" -> SparkSession.active.conf
+      "maxPartitionItemFiles" -> sparkSession.conf
         .get("spark.sedona.stac.load.maxPartitionItemFiles", "0"),
-      "numPartitions" -> SparkSession.active.conf
+      "numPartitions" -> sparkSession.conf
         .get("spark.sedona.stac.load.numPartitions", "-1"),
       "itemsLimitMax" -> opts
         .asCaseSensitiveMap()
         .asScala
         .toMap
-        .get("itemsLimitMax")
-        .filter(_.toInt > 0)
-        .getOrElse(SparkSession.active.conf.get("spark.sedona.stac.load.itemsLimitMax", "-1")))
+        .getOrElse(
+          "itemsLimitMax",
+          sparkSession.conf.get("spark.sedona.stac.load.itemsLimitMax", "-1")))
     val stacCollectionJsonString = StacUtils.loadStacCollectionToJson(optsMap)
+    val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(opts.asScala.toMap)
+    val broadcastedConf =
+      sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
-    new StacTable(stacCollectionJson = stacCollectionJsonString, opts = optsMap)
+    new StacTable(stacCollectionJson = stacCollectionJsonString, opts = optsMap, broadcastedConf)
   }
 }

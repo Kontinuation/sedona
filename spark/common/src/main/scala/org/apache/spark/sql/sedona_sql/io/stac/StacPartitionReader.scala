@@ -19,7 +19,7 @@
 package org.apache.spark.sql.sedona_sql.io.stac
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import org.apache.hadoop.conf.Configuration
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.json.JSONOptionsInRead
 import org.apache.spark.sql.connector.read.PartitionReader
@@ -30,12 +30,14 @@ import org.apache.spark.sql.execution.datasources.parquet.GeoParquetSpatialFilte
 import org.apache.spark.sql.sedona_sql.io.geojson.{GeoJSONUtils, SparkCompatUtil}
 import org.apache.spark.sql.sedona_sql.io.stac.StacUtils.{buildOutDbRasterFields, promotePropertiesToTop}
 import org.apache.spark.sql.types.{StringType, StructType}
+import org.apache.spark.util.SerializableConfiguration
 
 import java.io.{File, PrintWriter}
 import java.lang.reflect.Constructor
 import scala.io.Source
 
 class StacPartitionReader(
+    broadcast: Broadcast[SerializableConfiguration],
     partition: StacPartition,
     schema: StructType,
     opts: Map[String, String],
@@ -82,6 +84,39 @@ class StacPartitionReader(
                 writer.write(content)
                 writer.write("\n")
               }
+
+              // Check if the URL has the parameter "checknext=true"
+              if (currentItem.contains("checknext=true")) {
+                var nextUrl: Option[String] = None
+                var fileContent = fetchContentWithRetry(new java.net.URL(currentItem))
+
+                do {
+                  val rootNode = mapper.readTree(fileContent)
+                  val linksNode = rootNode.get("links")
+                  val linksIterator = linksNode.elements()
+
+                  nextUrl = None
+                  while (linksIterator.hasNext) {
+                    val linkNode = linksIterator.next()
+                    val rel = linkNode.get("rel").asText()
+                    if (rel == "next") {
+                      nextUrl = Some(linkNode.get("href").asText())
+                    }
+                  }
+
+                  if (nextUrl.isDefined) {
+                    fileContent = fetchContentWithRetry(new java.net.URL(nextUrl.get))
+                    val nextFeatures = mapper.readTree(fileContent).get("features")
+                    val nextFeatureIterator = nextFeatures.elements()
+                    while (nextFeatureIterator.hasNext) {
+                      val feature = nextFeatureIterator.next()
+                      val content = mapper.writeValueAsString(feature)
+                      writer.write(content)
+                      writer.write("\n")
+                    }
+                  }
+                } while (nextUrl.isDefined)
+              }
             case _ =>
               throw new IllegalArgumentException(s"Unsupported type for item: $nodeType")
           }
@@ -114,7 +149,7 @@ class StacPartitionReader(
         val rows = SparkCompatUtil
           .readFile(
             dataSource,
-            new Configuration(),
+            broadcast.value.value,
             createPartitionedFile(currentFile),
             parser,
             schema)
@@ -122,7 +157,7 @@ class StacPartitionReader(
         rows.map(row => {
           val geometryConvertedRow = GeoJSONUtils.convertGeoJsonToGeometry(row, alteredSchema)
           val rasterAddedRow = if (generateOutDBRaster) {
-            buildOutDbRasterFields(geometryConvertedRow, alteredSchema)
+            buildOutDbRasterFields(geometryConvertedRow, alteredSchema, broadcast.value.value)
           } else {
             geometryConvertedRow
           }

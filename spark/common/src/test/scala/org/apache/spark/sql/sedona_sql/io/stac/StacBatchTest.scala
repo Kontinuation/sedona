@@ -22,6 +22,8 @@ import org.apache.sedona.sql.TestBaseScala
 import org.apache.spark.sql.connector.read.InputPartition
 import org.apache.spark.sql.types.StructType
 
+import java.time.format.DateTimeFormatter
+import java.time.{LocalDate, ZoneOffset}
 import scala.io.Source
 import scala.collection.mutable
 
@@ -52,7 +54,15 @@ class StacBatchTest extends TestBaseScala {
       .toMap
 
     val stacBatch =
-      StacBatch(collectionUrl, stacCollectionJson, StructType(Seq()), opts, None, None)
+      StacBatch(
+        null,
+        collectionUrl,
+        stacCollectionJson,
+        StructType(Seq()),
+        opts,
+        None,
+        None,
+        None)
     stacBatch.setItemMaxLeft(1000)
     val itemLinks = mutable.ArrayBuffer[String]()
     val needCountNextItems = true
@@ -86,7 +96,15 @@ class StacBatchTest extends TestBaseScala {
     val collectionUrl = "https://storage.googleapis.com/cfo-public/vegetation/collection.json"
 
     val stacBatch =
-      StacBatch(collectionUrl, stacCollectionJson, StructType(Seq()), opts, None, None)
+      StacBatch(
+        null,
+        collectionUrl,
+        stacCollectionJson,
+        StructType(Seq()),
+        opts,
+        None,
+        None,
+        None)
     val partitions: Array[InputPartition] = stacBatch.planInputPartitions()
 
     assert(partitions.length == 2)
@@ -106,7 +124,15 @@ class StacBatchTest extends TestBaseScala {
     val collectionUrl = "https://path/to/collection.json"
 
     val stacBatch =
-      StacBatch(collectionUrl, stacCollectionJson, StructType(Seq()), opts, None, None)
+      StacBatch(
+        null,
+        collectionUrl,
+        stacCollectionJson,
+        StructType(Seq()),
+        opts,
+        None,
+        None,
+        None)
     val partitions: Array[InputPartition] = stacBatch.planInputPartitions()
 
     assert(partitions.isEmpty)
@@ -119,12 +145,93 @@ class StacBatchTest extends TestBaseScala {
     val collectionUrl = getAbsolutePathOfResource(rootJsonFile)
 
     val stacBatch =
-      StacBatch(collectionUrl, stacCollectionJson, StructType(Seq()), opts, None, None)
+      StacBatch(
+        null,
+        collectionUrl,
+        stacCollectionJson,
+        StructType(Seq()),
+        opts,
+        None,
+        None,
+        None)
     val partitions: Array[InputPartition] = stacBatch.planInputPartitions()
 
     assert(partitions.length == 3)
     assert(partitions(0).asInstanceOf[StacPartition].items.length == 2)
     assert(partitions(1).asInstanceOf[StacPartition].items.length == 2)
     assert(partitions(2).asInstanceOf[StacPartition].items.length == 1)
+  }
+
+  it("parseTemporalIntervals should handle open end date") {
+    val collectionJson =
+      """
+        |{
+        |  "extent": {
+        |    "temporal": {
+        |      "interval": [ [ "2020-01-01T00:00:00.000000Z", null ] ]
+        |    }
+        |  }
+        |}
+    """.stripMargin
+
+    val intervals = StacBatch.parseTemporalIntervalsByMonth(collectionJson)
+    val today = LocalDate
+      .now(ZoneOffset.UTC)
+      .atStartOfDay()
+      .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'"))
+    assert(intervals.head.startsWith("2020-01-01T00:00:00.000000Z"))
+  }
+
+  it("parseTemporalIntervals should handle closed interval") {
+    val collectionJson =
+      """
+        |{
+        |  "extent": {
+        |    "temporal": {
+        |      "interval": [ [ "2020-01-01T00:00:00.000000Z", "2020-03-01T00:00:00.000000Z" ] ]
+        |    }
+        |  }
+        |}
+    """.stripMargin
+
+    val intervals = StacBatch.parseTemporalIntervalsByMonth(collectionJson)
+    assert(intervals.contains("2020-01-01T00:00:00.000000Z/2020-01-31T23:59:59.999999Z"))
+    assert(intervals.contains("2020-02-01T00:00:00.000000Z/2020-02-29T23:59:59.999999Z"))
+  }
+
+  it("parseTemporalIntervals should handle multiple intervals") {
+    val collectionJson =
+      """
+        |{
+        |  "extent": {
+        |    "temporal": {
+        |      "interval": [
+        |        [ "2020-01-01T00:00:00.000000Z", "2020-01-31T00:00:00.000000Z" ],
+        |        [ "2020-03-01T00:00:00.000000Z", "2020-03-31T00:00:00.000000Z" ]
+        |      ]
+        |    }
+        |  }
+        |}
+    """.stripMargin
+
+    val intervals = StacBatch.parseTemporalIntervalsByMonth(collectionJson)
+    assert(intervals.contains("2020-01-01T00:00:00.000000Z/2020-01-31T23:59:59.999999Z"))
+    assert(intervals.contains("2020-03-01T00:00:00.000000Z/2020-03-31T23:59:59.999999Z"))
+  }
+
+  it("parseTemporalIntervals should handle empty intervals") {
+    val collectionJson =
+      """
+        |{
+        |  "extent": {
+        |    "temporal": {
+        |      "interval": []
+        |    }
+        |  }
+        |}
+    """.stripMargin
+
+    val intervals = StacBatch.parseTemporalIntervalsByMonth(collectionJson)
+    assert(intervals.isEmpty)
   }
 }

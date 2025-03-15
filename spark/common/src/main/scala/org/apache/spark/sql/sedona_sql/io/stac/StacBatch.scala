@@ -19,16 +19,21 @@
 package org.apache.spark.sql.sedona_sql.io.stac
 
 import com.fasterxml.jackson.databind.{JsonNode, ObjectMapper}
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.connector.read.{Batch, InputPartition, PartitionReaderFactory}
 import org.apache.spark.sql.execution.datasource.stac.TemporalFilter
 import org.apache.spark.sql.execution.datasources.parquet.{GeoParquetSpatialFilter, GeometryFieldMetaData}
+import org.apache.spark.sql.sedona_sql.io.stac.StacBatch.{parseTemporalIntervalsByDay, parseTemporalIntervalsByMonth}
 import org.apache.spark.sql.sedona_sql.io.stac.StacUtils.getNumPartitions
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.util.SerializableConfiguration
 
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatterBuilder
+import java.net.URLEncoder
+import java.time.format.{DateTimeFormatter, DateTimeFormatterBuilder}
 import java.time.temporal.ChronoField
+import java.time.{LocalDate, LocalDateTime, ZoneOffset}
 import scala.jdk.CollectionConverters.asScalaIteratorConverter
+import scala.util.Random
 import scala.util.control.Breaks.breakable
 
 /**
@@ -40,12 +45,14 @@ import scala.util.control.Breaks.breakable
  * which are necessary for batch data processing.
  */
 case class StacBatch(
+    broadcastConf: Broadcast[SerializableConfiguration],
     stacCollectionUrl: String,
     stacCollectionJson: String,
     schema: StructType,
     opts: Map[String, String],
     spatialFilter: Option[GeoParquetSpatialFilter],
-    temporalFilter: Option[TemporalFilter])
+    temporalFilter: Option[TemporalFilter],
+    limitFilter: Option[Int])
     extends Batch {
 
   private val defaultItemsLimitPerRequest: Int = {
@@ -82,10 +89,16 @@ case class StacBatch(
     // Initialize the itemLinks array
     val itemLinks = scala.collection.mutable.ArrayBuffer[String]()
 
-    // Start the recursive collection of item links
-    val itemsLimitMax = opts.getOrElse("itemsLimitMax", "-1").toInt
+    // Get the maximum number of items to process
+    val itemsLimitMax = limitFilter match {
+      case Some(limit) if limit >= 0 => limit
+      case _ => opts.getOrElse("itemsLimitMax", "-1").toInt
+    }
     val checkItemsLimitMax = itemsLimitMax > 0
+
+    // Start the recursive collection of item links
     setItemMaxLeft(itemsLimitMax)
+
     collectItemLinks(stacCollectionBasePath, stacCollectionJson, itemLinks, checkItemsLimitMax)
 
     // Handle when the number of items is less than 1
@@ -109,8 +122,9 @@ case class StacBatch(
     // Determine how many items to put in each partition
     val partitionSize = Math.ceil(itemLinks.length.toDouble / numPartitions).toInt
 
-    // Group the item links into partitions
-    itemLinks
+    // Group the item links into partitions, but randomize first for better load balancing
+    Random
+      .shuffle(itemLinks)
       .grouped(partitionSize)
       .zipWithIndex
       .map { case (items, index) =>
@@ -216,7 +230,34 @@ case class StacBatch(
           collectionBasePath + href
         }
         if (rel == "items" && href.startsWith("http")) {
-          itemLinks += (itemUrl + "?limit=" + defaultItemsLimitPerRequest)
+          if (spatialFilter.isEmpty && temporalFilter.isEmpty && limitFilter.isEmpty && !needCountNextItems) {
+            // if no filters are provided, add the item link with the default limit
+            // we split the temporal intervals into monthly or daily intervals
+            // and construct the item links for each interval
+            // such way, we distribute the items into partitions based on the temporal intervals on to spark executors
+            val temporalPartitionInterval =
+              opts.getOrElse("temporalPartitionInterval", "month").toLowerCase
+            val temporalIntervals = temporalPartitionInterval match {
+              case "month" => parseTemporalIntervalsByMonth(collectionJson)
+              case "day" => parseTemporalIntervalsByDay(collectionJson)
+              case invalid =>
+                throw new IllegalArgumentException(
+                  s"Invalid temporalPartitionInterval: '$invalid'. Valid values are 'day' or 'month'.")
+            }
+            temporalIntervals.foreach { interval =>
+              val itemsLink = itemUrl + "?datetime=" + URLEncoder.encode(
+                interval,
+                "UTF-8") + "&limit=" + defaultItemsLimitPerRequest + "&checknext=true"
+              itemLinks += itemsLink
+            }
+          } else {
+            // if spatial or temporal filters are provided, add the item link with the filters
+            itemLinks += getItemLink(
+              itemUrl,
+              defaultItemsLimitPerRequest,
+              spatialFilter,
+              temporalFilter)
+          }
         } else {
           itemLinks += itemUrl
         }
@@ -227,9 +268,12 @@ case class StacBatch(
             // count the number of items returned and left to be processed
             itemMaxLeft = itemMaxLeft - 1
           } else if (rel == "items" && href.startsWith("http")) {
+            if (spatialFilter.isEmpty && temporalFilter.isEmpty && limitFilter.isEmpty && !needCountNextItems) {
+              return // no need to iterate through the items if no filters are provided
+            }
             // iterate through the items and check if the limit is reached (if needed)
             if (iterateItemsWithLimit(
-                itemUrl + "?limit=" + defaultItemsLimitPerRequest,
+                getItemLink(itemUrl, defaultItemsLimitPerRequest, spatialFilter, temporalFilter),
                 needCountNextItems)) return
           }
         }
@@ -254,6 +298,17 @@ case class StacBatch(
         }
       }
     }
+  }
+
+  /** Adds an item link to the list of item links. */
+  def getItemLink(
+      itemUrl: String,
+      defaultItemsLimitPerRequest: Int,
+      spatialFilter: Option[GeoParquetSpatialFilter],
+      temporalFilter: Option[TemporalFilter]): String = {
+    val baseUrl = itemUrl + "?limit=" + defaultItemsLimitPerRequest
+    val urlWithFilters = StacUtils.addFiltersToUrl(baseUrl, spatialFilter, temporalFilter)
+    urlWithFilters
   }
 
   /**
@@ -361,11 +416,164 @@ case class StacBatch(
   override def createReaderFactory(): PartitionReaderFactory = { (partition: InputPartition) =>
     {
       new StacPartitionReader(
+        broadcastConf,
         partition.asInstanceOf[StacPartition],
         schema,
         opts,
         spatialFilter,
         temporalFilter)
     }
+  }
+}
+
+object StacBatch {
+
+  /**
+   * Parses the temporal interval information from a STAC collection JSON and breaks it down into
+   * monthly chunks for optimized processing.
+   *
+   * This method:
+   *   1. Extracts temporal intervals from the collection's metadata 2. For each interval, breaks
+   *      it into month-by-month periods 3. Formats each period as "start/end" timestamp strings
+   *      compatible with STAC API queries
+   *
+   * This monthly chunking approach optimizes driver performance by:
+   *   - Enabling more efficient parallel processing across Spark executors
+   *   - Preventing the driver from having to process large result sets from a single query
+   *   - Allowing temporal-based partitioning for better load balancing
+   *
+   * Used primarily when querying STAC APIs without filters to ensure manageable data volumes by
+   * distributing workload across time periods rather than loading all data at once.
+   *
+   * Ref: https://api.stacspec.org/v1.0.0/ogcapi-features/#tag/Features/operation/getFeatures
+   *
+   * @param collectionJson
+   *   The JSON string representation of a STAC collection
+   * @return
+   *   Array of formatted temporal interval strings (format: "start/end")
+   */
+  def parseTemporalIntervalsByMonth(collectionJson: String): Array[String] = {
+    val mapper = new ObjectMapper()
+    val rootNode: JsonNode = mapper.readTree(collectionJson)
+    val temporalNode = rootNode.path("extent").path("temporal").path("interval")
+
+    val intervals = new scala.collection.mutable.ArrayBuffer[String]()
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+    val outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+
+    val today = LocalDate.now(ZoneOffset.UTC).atStartOfDay()
+
+    temporalNode.elements().asScala.foreach { intervalNode =>
+      val start = LocalDateTime
+        .parse(intervalNode.get(0).asText(), formatter)
+        .withDayOfMonth(1) // First day of month
+        .withHour(0) // 00 hours
+        .withMinute(0) // 00 minutes
+        .withSecond(0) // 00 seconds
+        .withNano(0) // 000000 nanoseconds
+
+      val rawEnd =
+        if (intervalNode.get(1).isNull) today
+        else LocalDateTime.parse(intervalNode.get(1).asText(), formatter)
+      val end = rawEnd
+        .withDayOfMonth(rawEnd.toLocalDate.lengthOfMonth()) // Last day of month
+        .withHour(23) // 23 hours
+        .withMinute(59) // 59 minutes
+        .withSecond(59) // 59 seconds
+        .withNano(999999999) // 999999999 nanoseconds
+
+      var current = start.withDayOfMonth(1)
+      while (!current.isAfter(end)) {
+        val next = current
+          .plusMonths(1)
+          .withDayOfMonth(1)
+          .minusDays(1)
+          .withHour(23)
+          .withMinute(59)
+          .withSecond(59)
+          .withNano(999999999)
+        val intervalEnd =
+          if (next.isAfter(end))
+            end.withHour(23).withMinute(59).withSecond(59).withNano(999999999)
+          else next
+        intervals += s"${current.format(outputFormatter)}/${intervalEnd.format(outputFormatter)}"
+        current = current.plusMonths(1).withDayOfMonth(1)
+      }
+    }
+
+    intervals.toArray
+  }
+
+  /**
+   * Parses the temporal interval information from a STAC collection JSON and breaks it down into
+   * daily chunks for finer-grained optimized processing.
+   *
+   * This method:
+   *   1. Extracts temporal intervals from the collection's metadata 2. For each interval, breaks
+   *      it into day-by-day periods 3. Formats each period as "start/end" timestamp strings
+   *      compatible with STAC API queries
+   *
+   * This daily chunking approach provides more granular parallelism than monthly chunking:
+   *   - Creates smaller, more numerous partitions for better work distribution
+   *   - Allows for more precise temporal filtering at the day level
+   *   - Further reduces the risk of timeouts on large STAC collections
+   *   - May improve load balancing across executors with daily-level granularity
+   *
+   * Useful for very large collections or when more fine-grained parallelism is needed.
+   *
+   * @param collectionJson
+   *   The JSON string representation of a STAC collection
+   * @return
+   *   Array of formatted daily temporal interval strings (format: "start/end")
+   */
+  def parseTemporalIntervalsByDay(collectionJson: String): Array[String] = {
+    val mapper = new ObjectMapper()
+    val rootNode: JsonNode = mapper.readTree(collectionJson)
+    val temporalNode = rootNode.path("extent").path("temporal").path("interval")
+
+    val intervals = new scala.collection.mutable.ArrayBuffer[String]()
+    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+    val outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+
+    val today = LocalDate.now(ZoneOffset.UTC).atStartOfDay()
+
+    temporalNode.elements().asScala.foreach { intervalNode =>
+      val start = LocalDateTime
+        .parse(intervalNode.get(0).asText(), formatter)
+        .withHour(0) // 00 hours
+        .withMinute(0) // 00 minutes
+        .withSecond(0) // 00 seconds
+        .withNano(0) // 000000 nanoseconds
+
+      val rawEnd =
+        if (intervalNode.get(1).isNull) today
+        else LocalDateTime.parse(intervalNode.get(1).asText(), formatter)
+      val end = rawEnd
+        .withHour(23) // 23 hours
+        .withMinute(59) // 59 minutes
+        .withSecond(59) // 59 seconds
+        .withNano(999999999) // 999999999 nanoseconds
+
+      var current = start
+      while (!current.isAfter(end)) {
+        // Calculate the end of current day (23:59:59.999999999)
+        val intervalEnd = current
+          .withHour(23)
+          .withMinute(59)
+          .withSecond(59)
+          .withNano(999999999)
+
+        // Use the calculated day end or actual end date, whichever comes first
+        val dayEnd = if (intervalEnd.isAfter(end)) end else intervalEnd
+
+        // Format and add the interval to our collection
+        intervals += s"${current.format(outputFormatter)}/${dayEnd.format(outputFormatter)}"
+
+        // Move to the next day
+        current = current.plusDays(1).withHour(0).withMinute(0).withSecond(0).withNano(0)
+      }
+    }
+
+    intervals.toArray
   }
 }
