@@ -283,6 +283,7 @@ class InDbSedonaRaster(SedonaRaster):
             dataset = _rasterio_open(desc, driver="MEM")
         else:
             # construct a VRT to wrap this MEM dataset, with SRS set up properly
+            band_no_data = [bm.nodata for bm in self._bands_meta]
             vrt_xml = OutDbSedonaRaster.generate_vrt_xml(
                 desc,
                 data_type,
@@ -293,6 +294,7 @@ class InDbSedonaRaster(SedonaRaster):
                 0,
                 0,
                 list(range(num_bands)),
+                band_no_data,
             )
             self.rasterio_memfile = MemoryFile(vrt_xml, ext=".vrt")
             dataset = _rasterio_open_memfile("", self.rasterio_memfile, driver="VRT")[0]
@@ -410,6 +412,8 @@ class OutDbSedonaRaster(OutDbSedonaRasterBase):
                 else:
                     raise RuntimeError("unknown outdb band data type: " + str(dt))
 
+                band_no_data = [src.nodatavals[k] for k in band_indices]
+
                 # assemble a VRT XML file to describe how we want to retrieve the sub region
                 vrt_xml = self.generate_vrt_xml(
                     src_path,
@@ -421,6 +425,7 @@ class OutDbSedonaRaster(OutDbSedonaRasterBase):
                     off_x,
                     off_y,
                     band_indices,
+                    band_no_data,
                 )
                 self.rasterio_memfile = MemoryFile(vrt_xml, ext=".vrt")
 
@@ -457,6 +462,7 @@ class OutDbSedonaRaster(OutDbSedonaRasterBase):
         off_x,
         off_y,
         band_indices,
+        band_no_data,
     ) -> bytes:
         # Create root element
         root = Element("VRTDataset")
@@ -477,6 +483,10 @@ class OutDbSedonaRaster(OutDbSedonaRasterBase):
             band = SubElement(root, "VRTRasterBand")
             band.set("dataType", data_type)
             band.set("band", str(i))
+
+            if band_no_data[i - 1] is not None:
+                no_data = SubElement(band, "NoDataValue")
+                no_data.text = str(band_no_data[i - 1])
 
             # Add source
             source = SubElement(band, "SimpleSource")

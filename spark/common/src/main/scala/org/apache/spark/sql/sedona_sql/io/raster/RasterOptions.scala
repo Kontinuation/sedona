@@ -53,6 +53,12 @@ class RasterOptions(@transient private val parameters: CaseInsensitiveMap[String
     .orElse(tileWidth)
 
   /**
+   * Whether to pad the right and bottom of the tile with NoData values if the tile is smaller
+   * than the specified tile size. Default is `false`.
+   */
+  val padWithNoData: Boolean = parameters.getOrElse("padWithNoData", "false").toBoolean
+
+  /**
    * Rescale pixel values according to the metadata of the raster data. If true, the pixel values
    * will be computed using the offset and scale in the metadata. The pixel types will be float64
    * when auto rescale happens. If false, the pixel values will be read as they are stored in the

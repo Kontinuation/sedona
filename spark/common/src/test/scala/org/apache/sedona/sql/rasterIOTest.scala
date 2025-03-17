@@ -286,6 +286,23 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
       }
     }
 
+    it("should tile geotiff using raster source with padding enabled") {
+      val rasterDf = sparkSession.read
+        .format("raster")
+        .options(Map("retile" -> "true", "tileWidth" -> "64", "padWithNoData" -> "true"))
+        .load(rasterdatalocation)
+      assert(rasterDf.count() > 100)
+      rasterDf.collect().foreach { row =>
+        val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
+        assert(raster.getGridGeometry.getGridRange2D.width == 64)
+        assert(raster.getGridGeometry.getGridRange2D.height == 64)
+        val x = row.getInt(1)
+        val y = row.getInt(2)
+        assert(x >= 0 && y >= 0)
+        raster.dispose(true)
+      }
+    }
+
     it("auto repartitioning should work with dynamic allocation enabled") {
       withConf(
         Map(

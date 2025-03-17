@@ -630,7 +630,7 @@ public class RasterConstructors {
     }
     if (gridCoverage2D instanceof OutDbGridCoverage2D) {
       return TileGenerator.generateOutDbTiles(
-          (OutDbGridCoverage2D) gridCoverage2D, bandIndices, tileWidth, tileHeight);
+          (OutDbGridCoverage2D) gridCoverage2D, bandIndices, tileWidth, tileHeight, padWithNoData);
     } else {
       return TileGenerator.generateInDbTiles(
           gridCoverage2D, bandIndices, tileWidth, tileHeight, padWithNoData, padNoDataValue);

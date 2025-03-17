@@ -2462,11 +2462,13 @@ otherwise bands specified by `bandIndices` will be included. Band indices are 1-
 
 If `padWithNoData` = false, edge tiles on the right and bottom sides of the raster may have different dimensions than the rest of
 the tiles. If `padWithNoData` = true, all tiles will have the same dimensions with the possibility that edge tiles being padded with
-NODATA values. If raster band(s) do not have NODATA value(s) specified, one can be specified by setting `noDataVal`. These parameters
-for padding only works for in-db rasters.
+NODATA values. If raster band(s) do not have NODATA value(s) specified, one can be specified by setting `noDataVal`.
 
 !!!note
     If the input raster is an out-db raster, the output tiles will also be out-db rasters.
+
+!!!note
+    `noDataVal` only works for in-db rasters.
 
 SQL example:
 
@@ -2528,8 +2530,10 @@ specifying `bandIndices` as `ARRAY(bandIndex)`.Band indices are 1-based.
 
 If `padWithNoData` = false, edge tiles on the right and bottom sides of the raster may have different dimensions than the rest of
 the tiles. If `padWithNoData` = true, all tiles will have the same dimensions with the possibility that edge tiles being padded with
-NODATA values. If raster band(s) do not have NODATA value(s) specified, one can be specified by setting `noDataVal`. These parameters
-for padding only works for in-db rasters.
+NODATA values. If raster band(s) do not have NODATA value(s) specified, one can be specified by setting `noDataVal`.
+
+!!!note
+    `noDataVal` only works for in-db rasters.
 
 The returned records have the following schema:
 

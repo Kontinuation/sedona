@@ -101,11 +101,16 @@ public class TileGenerator {
    * @param bandIndices the indices of the bands to select (1-based)
    * @param tileWidth the width of the tiles
    * @param tileHeight the height of the tiles
+   * @param padWithNoData whether to pad the tiles with no data value
    * @return the tiles
    */
   public static OutDbTileIterator generateOutDbTiles(
-      OutDbGridCoverage2D gridCoverage2D, int[] bandIndices, int tileWidth, int tileHeight) {
-    return new OutDbTileIterator(gridCoverage2D, bandIndices, tileWidth, tileHeight);
+      OutDbGridCoverage2D gridCoverage2D,
+      int[] bandIndices,
+      int tileWidth,
+      int tileHeight,
+      boolean padWithNoData) {
+    return new OutDbTileIterator(gridCoverage2D, bandIndices, tileWidth, tileHeight, padWithNoData);
   }
 
   public abstract static class TileIterator implements Iterator<Tile> {
@@ -294,6 +299,7 @@ public class TileGenerator {
     private final int[] bandIndices;
     private final int tileWidth;
     private final int tileHeight;
+    private final boolean padWithNoData;
     private final AffineTransform2D affine;
     private final Path outDbPath;
     private final Map<String, String> outDbParams;
@@ -303,11 +309,16 @@ public class TileGenerator {
     private final int imageHeight;
 
     public OutDbTileIterator(
-        OutDbGridCoverage2D gridCoverage2D, int[] bandIndices, int tileWidth, int tileHeight) {
+        OutDbGridCoverage2D gridCoverage2D,
+        int[] bandIndices,
+        int tileWidth,
+        int tileHeight,
+        boolean padWithNoData) {
       super(gridCoverage2D);
       this.bandIndices = bandIndices;
       this.tileWidth = tileWidth;
       this.tileHeight = tileHeight;
+      this.padWithNoData = padWithNoData;
 
       affine = RasterUtils.getAffineTransform(gridCoverage2D, PixelOrientation.CENTER);
       GridEnvelope2D gridRange = gridCoverage2D.getGridGeometry().getGridRange2D();
@@ -332,10 +343,10 @@ public class TileGenerator {
       int x0 = tileX * tileWidth;
       int y0 = tileY * tileHeight;
 
-      // XXX: We do not handle padding with no data value for OutDbGridCoverage2D. If we want to
-      // handle it, we can add a Border Operation before cropping the image.
-      int currentTileWidth = Math.min(tileWidth, imageWidth - x0);
-      int currentTileHeight = Math.min(tileHeight, imageHeight - y0);
+      int rectTileWidth = Math.min(tileWidth, imageWidth - x0);
+      int rectTileHeight = Math.min(tileHeight, imageHeight - y0);
+      int currentTileWidth = padWithNoData ? tileWidth : rectTileWidth;
+      int currentTileHeight = padWithNoData ? tileHeight : rectTileHeight;
       AffineTransform2D tileAffine = RasterUtils.translateAffineTransform(affine, x0, y0);
       GridGeometry2D gridGeometry2D =
           new GridGeometry2D(

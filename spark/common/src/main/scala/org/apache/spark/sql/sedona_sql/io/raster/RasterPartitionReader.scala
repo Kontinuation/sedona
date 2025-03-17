@@ -146,6 +146,7 @@ object RasterPartitionReader {
     val retile = rasterOptions.retile
     val tileWidth = rasterOptions.tileWidth
     val tileHeight = rasterOptions.tileHeight
+    val padWithNoData = rasterOptions.padWithNoData
 
     val writer = new UnsafeRowWriter(dataSchema.length)
     writer.resetRowWriter()
@@ -178,7 +179,8 @@ object RasterPartitionReader {
           throw new IllegalArgumentException("Both tileWidth and tileHeight must be set")
       }
 
-      val iter = RasterConstructors.generateTiles(currentRaster, null, tw, th, false, Double.NaN)
+      val iter =
+        RasterConstructors.generateTiles(currentRaster, null, tw, th, padWithNoData, Double.NaN)
       iter.asScala.map { tile =>
         val tileRaster = tile.getCoverage
         writer.reset()

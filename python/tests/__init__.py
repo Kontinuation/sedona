@@ -62,3 +62,6 @@ chicago_crimes_input_location = os.path.join(tests_resource, "Chicago_Crimes.csv
 world_map_raster_input_location = os.path.join(
     tests_resource, "raster/raster_with_no_data/test5.tiff"
 )
+usgs_13_clip = os.path.join(
+    tests_resource, "raster_geotiff_usgs/USGS_13_pred_clip_ref.tif"
+)

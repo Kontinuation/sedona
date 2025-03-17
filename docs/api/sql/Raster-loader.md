@@ -70,6 +70,7 @@ The options for the `raster` loader are as follows:
 - `retile`: Whether to enable tiling. Default is `true`.
 - `tileWidth`: The width of the tile. If not specified, the size of internal tiles will be used.
 - `tileHeight`: The height of the tile. If not specified, will use `tileWidth` if `tileWidth` is explicitly set, otherwise the size of internal tiles will be used.
+- `padWithNoData`: Pad the right and bottom of the tile with NODATA values if the tile is smaller than the specified tile size. Default is `false`.
 - `autoRescale`: Whether to rescale the pixel values using the scale and offset values in the GeoTiff file. Default is `false`.
 
 !!!note

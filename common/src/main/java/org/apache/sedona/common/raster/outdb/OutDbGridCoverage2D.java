@@ -38,6 +38,7 @@ import org.apache.sedona.common.raster.serde.GridEnvelopeSerializer;
 import org.apache.sedona.common.raster.serde.GridSampleDimensionSerializer;
 import org.apache.sedona.common.raster.serde.KryoUtil;
 import org.apache.sedona.common.utils.ImageUtils;
+import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.TypeMap;
 import org.geotools.coverage.grid.GridCoordinates2D;
@@ -83,6 +84,18 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
     this.pooledResource = pooledResource;
   }
 
+  /**
+   * Create an out-db grid coverage from resource key
+   *
+   * @param name name of the grid coverage
+   * @param gridGeometry grid geometry
+   * @param dataType data type of raster data buffer, e.g. DataBuffer.TYPE_FLOAT. can be -1 to infer
+   *     data type from bands (this is not always accurate). Currently, this parameter is used by
+   *     havasu to construct out-db grid coverages from its internal raster objects.
+   * @param bands sample dimensions
+   * @param bandIndices indices of bands to be used
+   * @param resourceKey resource key
+   */
   public OutDbGridCoverage2D(
       final CharSequence name,
       GridGeometry2D gridGeometry,
@@ -93,8 +106,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
     // We use a placeholder image object to make sure that the parent class (GridCoverage2D) can be
     // constructed.
     // The placeholder image will be replaced by the real image when the pixel data is needed.
-    // Please refer to
-    // replacePlaceHolderImage() for more details.
+    // Please refer to replacePlaceHolderImage() for more details.
     super(
         name,
         createPlaceHolderImage(gridGeometry, dataType, bands, bandIndices),
@@ -104,7 +116,6 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         null,
         null);
     this.resourceKey = resourceKey;
-    this.pooledResource = null;
     this.bandIndices = bandIndices;
   }
 
@@ -497,18 +508,47 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
     GridCoordinates2D bound = gridRange.getHigh();
     int width = bound.x + 1;
     int height = bound.y + 1;
+    int imageWidth = image.getWidth();
+    int imageHeight = image.getHeight();
+    int paddingWidth = 0;
+    int paddingHeight = 0;
+    if (offsetX >= imageWidth || offsetY >= imageHeight) {
+      throw new DataSourceException("The grid coverage is out of the image boundary.");
+    }
+    if (offsetX + width > imageWidth) {
+      paddingWidth = offsetX + width - imageWidth;
+    }
+    if (offsetY + height > imageHeight) {
+      paddingHeight = offsetY + height - imageHeight;
+    }
     RenderedImage croppedImage =
-        ImageUtils.cropAndTranslateImage(image, offsetX, offsetY, width, height);
+        ImageUtils.cropAndTranslateImage(
+            image, offsetX, offsetY, width - paddingWidth, height - paddingHeight);
 
     // Select a subset of bands from the source grid
+    double[] paddingValues = new double[bands.length];
     for (int i = 0; i < bands.length; i++) {
       int bandIndex = bandIndices[i];
       GridSampleDimension sampleDimension = sourceGrid.getSampleDimension(bandIndex);
       if (!sampleDimension.getSampleDimensionType().equals(bands[i].getSampleDimensionType())) {
         throw new DataSourceException("Sample dimension type does not match.");
       }
+
+      double noDataValue = RasterUtils.getNoDataValue(sampleDimension);
+      if (!Double.isNaN(noDataValue)) {
+        paddingValues[i] = noDataValue;
+      } else {
+        paddingValues[i] = 0;
+      }
     }
-    return PlanarImage.wrapRenderedImage(ImageUtils.selectBands(croppedImage, bandIndices));
+    RenderedImage bandSelectedImage = ImageUtils.selectBands(croppedImage, bandIndices);
+
+    // Add padding to the image if needed.
+    RenderedImage finalImage =
+        ImageUtils.padImage(bandSelectedImage, paddingWidth, paddingHeight, paddingValues);
+
+    // Finished building the image
+    return PlanarImage.wrapRenderedImage(finalImage);
   }
 
   private static PlanarImage createPlaceHolderImage(
@@ -547,8 +587,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
     AffineTransform2D transform1 = (AffineTransform2D) gridGeom1.getGridToCRS2D();
 
     // CRS should match. However, due to the weird behavior of GeoTools, sometimes the CRS won't
-    // equal to itself
-    // after formatting to WKT then read back, so let's just log a warning here.
+    // equal to itself after formatting to WKT then read back, so let's just log a warning here.
     if (!CRS.equalsIgnoreMetadata(crs0, crs1)) {
       LOGGER.warning(
           String.format(
@@ -556,8 +595,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
     }
 
     // Scale must match. Please note that PostGIS allows the scales to have the different sign, but
-    // the same
-    // absolute value. We do not support this case.
+    // the same absolute value. We do not support this case.
     if (DBL_NEQ(transform0.getScaleX(), transform1.getScaleX())) {
       throw new IllegalStateException("The grid coverages have different scales on the X axis");
     }

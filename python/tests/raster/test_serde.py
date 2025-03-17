@@ -16,11 +16,10 @@
 #  under the License.
 
 import numpy as np
-import pytest
 import rasterio
 from pyspark.sql.functions import expr
-from sedona.sql.types import RasterType
 from tests import world_map_raster_input_location
+from tests import usgs_13_clip
 from tests.test_base import TestBase
 
 
@@ -215,6 +214,43 @@ class TestRasterSerde(TestBase):
                 assert scale_y == r_tile.affine_trans.scale_y
                 assert skew_x == r_tile.affine_trans.skew_x
                 assert skew_y == r_tile.affine_trans.skew_y
+                start_x = row["x"] * 256
+                end_x = (row["x"] + 1) * 256
+                start_y = row["y"] * 256
+                end_y = (row["y"] + 1) * 256
+
+                # test as_numpy
+                assert (band[start_y:end_y, start_x:end_x] == r_tile.as_numpy()).all()
+
+                # test as_rasterio
+                ds = r_tile.as_rasterio()
+                assert ds.crs is not None
+                assert (band[start_y:end_y, start_x:end_x] == ds.read(1)).all()
+
+                r_tile.close()
+
+    def test_outdb_tiled_raster_with_padding(self):
+        for raster_path in [
+            usgs_13_clip,
+            "file:" + usgs_13_clip,
+            "file://" + usgs_13_clip,
+        ]:
+            r_orig = rasterio.open(raster_path)
+            # The original size of the raster is 454 x 336. We pad the raster with no data value
+            # to make the size 512 x 512.
+            band = np.ones((512, 512)) * r_orig.nodata
+            band[: r_orig.height, : r_orig.width] = r_orig.read(1)
+            r_orig.close()
+
+            # Tile the raster with padding. Padding value is the no data value of the raster.
+            df = TestRasterSerde.spark.sql(
+                "SELECT RS_TileExplode(RS_FromPath('{}'), 1, 256, 256, true) AS (x, y, rast)".format(
+                    raster_path
+                )
+            )
+            rows = df.collect()
+            for row in rows:
+                r_tile = row["rast"]
                 start_x = row["x"] * 256
                 end_x = (row["x"] + 1) * 256
                 start_y = row["y"] * 256

@@ -18,6 +18,7 @@
  */
 package org.apache.sedona.common.raster.outdb;
 
+import java.awt.image.Raster;
 import java.io.File;
 import java.io.IOException;
 import org.apache.commons.lang3.ArrayUtils;
@@ -25,6 +26,8 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.raster.RasterTestBase;
 import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
+import org.apache.sedona.common.raster.outdb.OutDbResourcePool.ResourceKey;
+import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
@@ -157,5 +160,78 @@ public class OutDbGridCoverage2DTest extends RasterTestBase {
     } finally {
       outDbGridCoverage2D.dispose(true);
     }
+  }
+
+  @Test
+  public void testOutDbRasterWithPadding() throws IOException {
+    String path = testFilePath;
+
+    OutDbGridCoverage2D fullRaster = OutDbGridCoverage2D.create("full", new Path(path), conf);
+    GridGeometry2D gridGeometry = fullRaster.getGridGeometry();
+    GridEnvelope2D gridRange = gridGeometry.getGridRange2D();
+    int width = gridRange.width;
+    int height = gridRange.height;
+    int offsetX = (int) (width * 0.7);
+    int offsetY = (int) (height * 0.7);
+
+    GridEnvelope partialGridEnvelope = new GridEnvelope2D(0, 0, width, height);
+
+    AffineTransform2D affine = (AffineTransform2D) gridGeometry.getGridToCRS2D();
+    double scaleX = affine.getScaleX();
+    double scaleY = affine.getScaleY();
+    double skewX = affine.getShearX();
+    double skewY = affine.getShearY();
+    double upperLeftX = affine.getTranslateX() + offsetX * scaleX;
+    double upperLeftY = affine.getTranslateY() + offsetY * scaleY;
+    AffineTransform2D affinePartial =
+        new AffineTransform2D(scaleX, skewY, skewX, scaleY, upperLeftX, upperLeftY);
+
+    GridGeometry2D partialGridGeometry =
+        new GridGeometry2D(
+            partialGridEnvelope, affinePartial, gridGeometry.getCoordinateReferenceSystem());
+
+    ResourceKey resourceKey = new ResourceKey(new Path(path), conf);
+    OutDbGridCoverage2D partialRaster =
+        OutDbGridCoverage2D.create(
+            "cropped", // name
+            partialGridGeometry, // gridGeometry
+            -1, // dataType
+            fullRaster.getSampleDimensions(), // bands
+            null, // bandIndices
+            resourceKey); // resourceKey
+
+    Assert.assertEquals(width, partialRaster.getRenderedImage().getWidth());
+    Assert.assertEquals(height, partialRaster.getRenderedImage().getHeight());
+
+    double[] paddedValues = new double[fullRaster.getNumSampleDimensions()];
+    for (int i = 0; i < paddedValues.length; i++) {
+      double noDataValue = RasterUtils.getNoDataValue(fullRaster.getSampleDimension(i));
+      if (Double.isNaN(noDataValue)) {
+        paddedValues[i] = 0;
+      } else {
+        paddedValues[i] = noDataValue;
+      }
+    }
+
+    // Verify pixel values
+    Raster data = fullRaster.getRenderedImage().getData();
+    Raster paddedData = partialRaster.getRenderedImage().getData();
+    for (int y = 0; y < height; y++) {
+      for (int x = 0; x < width; x++) {
+        for (int b = 0; b < fullRaster.getNumSampleDimensions(); b++) {
+          double expected;
+          if (x + offsetX >= width || y + offsetY >= height) {
+            expected = paddedValues[b];
+          } else {
+            expected = data.getSampleDouble(x + offsetX, y + offsetY, b);
+          }
+          double actual = paddedData.getSampleDouble(x, y, b);
+          Assert.assertEquals(expected, actual, 1e-6);
+        }
+      }
+    }
+
+    fullRaster.dispose(true);
+    partialRaster.dispose(true);
   }
 }

@@ -27,6 +27,8 @@ import java.awt.image.RenderedImage;
 import java.awt.image.WritableRaster;
 import java.awt.image.renderable.ParameterBlock;
 import java.util.Vector;
+import javax.media.jai.BorderExtender;
+import javax.media.jai.BorderExtenderConstant;
 import javax.media.jai.ImageLayout;
 import javax.media.jai.JAI;
 import javax.media.jai.PlanarImage;
@@ -83,6 +85,35 @@ public class ImageUtils {
     translateParams.add((float) -offsetX);
     translateParams.add((float) -offsetY);
     return JAI.create("translate", translateParams);
+  }
+
+  /**
+   * Pad an image with a specified value.
+   *
+   * @param image the original image
+   * @param paddingWidth the width of the padding
+   * @param paddingHeight the height of the padding
+   * @param paddingValues the value to pad the image with
+   * @return the padded image
+   */
+  public static RenderedImage padImage(
+      RenderedImage image, int paddingWidth, int paddingHeight, double[] paddingValues) {
+    // If no padding is required, return the original image
+    if (paddingWidth == 0 && paddingHeight == 0) {
+      return image;
+    }
+
+    // Create a border operation with padding only on right and bottom
+    ParameterBlock borderParams = new ParameterBlock();
+    borderParams.addSource(image);
+    borderParams.add(0); // left border (pixels)
+    borderParams.add(paddingWidth); // right border (pixels)
+    borderParams.add(0); // top border (pixels)
+    borderParams.add(paddingHeight); // bottom border (pixels)
+    BorderExtender extender = new BorderExtenderConstant(paddingValues);
+    borderParams.add(extender); // the border extender
+
+    return JAI.create("border", borderParams);
   }
 
   /**

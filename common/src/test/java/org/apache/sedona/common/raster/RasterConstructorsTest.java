@@ -839,6 +839,37 @@ public class RasterConstructorsTest extends RasterTestBase {
     }
   }
 
+  @Test
+  public void testOutDbTileWithPadding() {
+    for (String path : testGeoTiffPaths) {
+      GridCoverage2D raster =
+          new LazyLoadOutDbGridCoverage2D("test", new Path(path), new Configuration());
+      TileIterator tileIterator =
+          RasterConstructors.generateTiles(raster, null, 100, 100, true, Double.NaN);
+      Tile[] tiles = tileIteratorToArray(tileIterator);
+
+      GridCoverage2D inDbRaster = RasterConstructors.asInDbRaster(raster);
+      TileIterator inDbTileIterator =
+          RasterConstructors.generateTiles(inDbRaster, null, 100, 100, true, Double.NaN);
+      Tile[] inDbTiles = tileIteratorToArray(inDbTileIterator);
+
+      assertEquals(inDbTiles.length, tiles.length);
+      for (int i = 0; i < tiles.length; i++) {
+        assertSameCoverage(tiles[i].getCoverage(), inDbTiles[i].getCoverage(), 1);
+      }
+
+      raster.dispose(true);
+      for (Tile tile : tiles) {
+        Assert.assertTrue(tile.getCoverage() instanceof OutDbGridCoverage2D);
+        tile.getCoverage().dispose(true);
+      }
+      inDbRaster.dispose(true);
+      for (Tile tile : inDbTiles) {
+        tile.getCoverage().dispose(true);
+      }
+    }
+  }
+
   private static Tile[] tileIteratorToArray(TileIterator tileIterator) {
     Tile[] tiles = new Tile[tileIterator.getNumTiles()];
     for (int i = 0; i < tiles.length; i++) {
@@ -921,8 +952,7 @@ public class RasterConstructorsTest extends RasterTestBase {
           }
 
           // Check that the pixel at the point translates to the same world coordinate as the
-          // corresponding
-          // pixel in the grid coverage
+          // corresponding pixel in the grid coverage
           try {
             DirectPosition actualWorldCoord =
                 tileRaster.getGridGeometry().gridToWorld(tileGridCoord);
