@@ -377,7 +377,7 @@ public class RasterBandAccessors {
         try {
           clippedRaster =
               RasterBandEditors.clip(
-                  raster, band, roi.getFactory().toGeometry(expandedGeomEnvelope));
+                  raster, band, roi.getFactory().toGeometry(expandedGeomEnvelope), allTouched);
         } catch (TransformException e) {
           throw new RuntimeException("Error while clipping the raster: " + e.getMessage(), e);
         }
