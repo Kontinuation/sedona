@@ -234,4 +234,58 @@ class StacBatchTest extends TestBaseScala {
     val intervals = StacBatch.parseTemporalIntervalsByMonth(collectionJson)
     assert(intervals.isEmpty)
   }
+
+  it("createTemporalFormatters should handle various date formats") {
+    // Access the private method using reflection
+    val method = StacBatch.getClass.getDeclaredMethod("createTemporalFormatters")
+    method.setAccessible(true)
+    val (inputFormatter, outputFormatter) =
+      method.invoke(StacBatch).asInstanceOf[(DateTimeFormatter, DateTimeFormatter)]
+
+    // Test simple date format (YYYY-MM-DD)
+    val simpleDate = "2017-01-01"
+    val parsedSimpleDate = LocalDate.parse(simpleDate).atStartOfDay()
+    assert(parsedSimpleDate.format(outputFormatter) === "2017-01-01T00:00:00.000000Z")
+
+    // Test date-time format with Z
+    val dateTimeWithZ = "2017-01-01T12:34:56Z"
+    val parsedDateTimeWithZ = LocalDate.parse("2017-01-01").atTime(12, 34, 56)
+    assert(parsedDateTimeWithZ.format(outputFormatter) === "2017-01-01T12:34:56.000000Z")
+
+    // Test date-time with milliseconds
+    val dateTimeWithMillis = "2017-01-01T12:34:56.789Z"
+    val parsedDateTimeWithMillis = LocalDate.parse("2017-01-01").atTime(12, 34, 56, 789000000)
+    assert(parsedDateTimeWithMillis.format(outputFormatter) === "2017-01-01T12:34:56.789000Z")
+  }
+
+  it("parseTemporalIntervalsByDay should work with different date formats") {
+    val collectionJson =
+      """
+        |{
+        |  "extent": {
+        |    "temporal": {
+        |      "interval": [
+        |        [ "2020-01-01", "2020-01-03" ],
+        |        [ "2020-03-15T12:30:45Z", "2020-03-17T16:20:30.123Z" ]
+        |      ]
+        |    }
+        |  }
+        |}
+    """.stripMargin
+
+    val intervals = StacBatch.parseTemporalIntervalsByDay(collectionJson)
+
+    // Check if the simple date formats are parsed correctly
+    assert(intervals.contains("2020-01-01T00:00:00.000000Z/2020-01-01T23:59:59.999999Z"))
+    assert(intervals.contains("2020-01-02T00:00:00.000000Z/2020-01-02T23:59:59.999999Z"))
+    assert(intervals.contains("2020-01-03T00:00:00.000000Z/2020-01-03T23:59:59.999999Z"))
+
+    // Check if the date-time formats with different precisions are parsed correctly
+    assert(intervals.contains("2020-03-15T00:00:00.000000Z/2020-03-15T23:59:59.999999Z"))
+    assert(intervals.contains("2020-03-16T00:00:00.000000Z/2020-03-16T23:59:59.999999Z"))
+    assert(intervals.contains("2020-03-17T00:00:00.000000Z/2020-03-17T23:59:59.999999Z"))
+
+    // Verify the expected number of intervals
+    assert(intervals.length === 6) // 3 days from first interval + 3 days from second interval
+  }
 }

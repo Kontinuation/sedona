@@ -456,11 +456,8 @@ object StacBatch {
     val mapper = new ObjectMapper()
     val rootNode: JsonNode = mapper.readTree(collectionJson)
     val temporalNode = rootNode.path("extent").path("temporal").path("interval")
-
     val intervals = new scala.collection.mutable.ArrayBuffer[String]()
-    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
-    val outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
-
+    val (formatter, outputFormatter) = createTemporalFormatters()
     val today = LocalDate.now(ZoneOffset.UTC).atStartOfDay()
 
     temporalNode.elements().asScala.foreach { intervalNode =>
@@ -530,11 +527,8 @@ object StacBatch {
     val mapper = new ObjectMapper()
     val rootNode: JsonNode = mapper.readTree(collectionJson)
     val temporalNode = rootNode.path("extent").path("temporal").path("interval")
-
     val intervals = new scala.collection.mutable.ArrayBuffer[String]()
-    val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
-    val outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
-
+    val (formatter, outputFormatter) = createTemporalFormatters()
     val today = LocalDate.now(ZoneOffset.UTC).atStartOfDay()
 
     temporalNode.elements().asScala.foreach { intervalNode =>
@@ -575,5 +569,43 @@ object StacBatch {
     }
 
     intervals.toArray
+  }
+
+  /**
+   * Creates DateTimeFormatter instances for parsing and formatting STAC temporal intervals.
+   *
+   * The input formatter is flexible and handles various date formats:
+   *   - 2017-01-01
+   *   - 2017-01-01T00:00:00Z
+   *   - 2017-01-01T00:00:00.000Z
+   *   - 2017-01-01T00:00:00.000000Z
+   *
+   * The output formatter produces consistent date format for STAC API queries.
+   *
+   * @return
+   *   A tuple of (inputFormatter, outputFormatter)
+   */
+  private def createTemporalFormatters(): (DateTimeFormatter, DateTimeFormatter) = {
+    val inputFormatter = new DateTimeFormatterBuilder()
+      .appendPattern("yyyy-MM-dd")
+      // Make time part optional
+      .optionalStart()
+      .appendLiteral('T')
+      .appendPattern("HH:mm:ss")
+      // Make fractional seconds optional with variable precision
+      .optionalStart()
+      .appendFraction(ChronoField.NANO_OF_SECOND, 0, 9, true)
+      .optionalEnd()
+      .appendLiteral('Z')
+      .optionalEnd()
+      .parseDefaulting(ChronoField.HOUR_OF_DAY, 0)
+      .parseDefaulting(ChronoField.MINUTE_OF_HOUR, 0)
+      .parseDefaulting(ChronoField.SECOND_OF_MINUTE, 0)
+      .parseDefaulting(ChronoField.NANO_OF_SECOND, 0)
+      .toFormatter()
+
+    val outputFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
+
+    (inputFormatter, outputFormatter)
   }
 }
