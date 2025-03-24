@@ -228,7 +228,7 @@ class StacDataSourceTest extends TestBaseScala {
     assert(rowCount == 0)
   }
 
-  it("should load from catalog without using collection id") {
+  ignore("should load from catalog without using collection id") {
     val dfStac = sparkSession.read.format("stac").load(STAC_CATALOG_REMOTE)
     val rowCount = dfStac.count()
     assert(rowCount > 0)

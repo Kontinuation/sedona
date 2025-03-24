@@ -31,8 +31,6 @@ import org.locationtech.jts.io.WKTReader
 import org.scalatest.funsuite.AnyFunSuite
 
 import java.io.{File, PrintWriter}
-import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import java.time.LocalDateTime
 import scala.io.Source
 import scala.jdk.CollectionConverters.asScalaIteratorConverter
@@ -718,5 +716,39 @@ class StacUtilsTest extends AnyFunSuite {
     val result = StacUtils.addFiltersToUrl(baseUrl, spatialFilter, temporalFilter)
     val expectedUrl = s"$baseUrl&bbox=1.0%2C3.0%2C2.0%2C4.0&datetime=2025-03-06T00:00:00.000Z/.."
     assert(result == expectedUrl)
+  }
+
+  test("convertHttpToS3 should convert path-style S3 URL to s3a format") {
+    // Using reflection to access the private method
+    val method = StacUtils.getClass.getDeclaredMethod("convertHttpToS3", classOf[String])
+    method.setAccessible(true)
+
+    // Test path-style URL
+    val pathStyleUrl = "https://s3.us-west-2.amazonaws.com/my-bucket/path/to/data.tif"
+    val result = method.invoke(StacUtils, pathStyleUrl).asInstanceOf[String]
+
+    assert(result === "s3a://my-bucket/path/to/data.tif")
+  }
+
+  test("convertHttpToS3 should convert virtual-hosted style S3 URL to s3a format") {
+    val method = StacUtils.getClass.getDeclaredMethod("convertHttpToS3", classOf[String])
+    method.setAccessible(true)
+
+    // Test virtual-hosted style URL
+    val virtualHostedUrl = "https://my-bucket.s3.us-west-2.amazonaws.com/path/to/data.tif"
+    val result = method.invoke(StacUtils, virtualHostedUrl).asInstanceOf[String]
+
+    assert(result === "s3a://my-bucket/path/to/data.tif")
+  }
+
+  test("convertHttpToS3 should return original URL if not an S3 URL") {
+    val method = StacUtils.getClass.getDeclaredMethod("convertHttpToS3", classOf[String])
+    method.setAccessible(true)
+
+    // Test non-S3 URL
+    val regularUrl = "https://example.com/path/to/resource.tif"
+    val result = method.invoke(StacUtils, regularUrl).asInstanceOf[String]
+
+    assert(result === regularUrl)
   }
 }

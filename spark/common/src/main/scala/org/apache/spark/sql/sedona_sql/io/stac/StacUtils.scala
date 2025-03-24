@@ -211,6 +211,7 @@ object StacUtils {
   def buildOutDbRasterFields(
       row: InternalRow,
       schema: StructType,
+      enableConvertHttpToS3: Boolean,
       configuration: Configuration): InternalRow = {
     val newValues = new Array[Any](schema.fields.length)
 
@@ -231,7 +232,11 @@ object StacUtils {
                 val assetType = Try(Option(assetRow.getString(typeIndex))).getOrElse(None)
                 val rast =
                   if (href.isDefined && assetType.isDefined && isImageAssetType(assetType.get)) {
-                    linkToRaster(href.get, configuration)
+                    if (enableConvertHttpToS3) {
+                      val s3Url = StacUtils.convertHttpToS3(href.get)
+                      linkToRaster(s3Url, configuration)
+                    } else
+                      linkToRaster(href.get, configuration)
                   } else {
                     null
                   }
@@ -255,6 +260,48 @@ object StacUtils {
     }
 
     InternalRow.fromSeq(newValues)
+  }
+
+  /**
+   * Detect if the URL is the HTTP or HTTPS path of an S3 object, and convert it to the s3a path.
+   *
+   * @param url
+   *   The URL to convert
+   * @return
+   *   The converted URL using s3a scheme, or the original URL if it's not an S3 HTTP path
+   */
+  private def convertHttpToS3(url: String): String = {
+    try {
+      val uri = new URI(url)
+      val scheme = uri.getScheme
+
+      if (scheme != null && (scheme == "http" || scheme == "https")) {
+        val host = uri.getHost
+        val path = uri.getPath
+
+        // Handle path-style requests: https://s3.region-code.amazonaws.com/bucket-name/key-name
+        if (host != null && host.startsWith("s3.") && host.endsWith(".amazonaws.com")) {
+          val pathWithoutLeadingSlash = if (path.startsWith("/")) path.substring(1) else path
+          val firstSlash = pathWithoutLeadingSlash.indexOf('/')
+
+          if (firstSlash > 0) {
+            val bucket = pathWithoutLeadingSlash.substring(0, firstSlash)
+            val key = pathWithoutLeadingSlash.substring(firstSlash + 1)
+            return s"s3a://$bucket/$key"
+          }
+        }
+
+        // Handle virtual-hosted-style: https://bucket-name.s3.region-code.amazonaws.com/key-name
+        if (host != null && host.contains(".s3.") && host.endsWith(".amazonaws.com")) {
+          val s3Index = host.indexOf(".s3.")
+          val bucket = host.substring(0, s3Index)
+          return s"s3a://$bucket$path"
+        }
+      }
+      url // Return original if no conversion was performed
+    } catch {
+      case _: Exception => url // Return original on any error
+    }
   }
 
   /**

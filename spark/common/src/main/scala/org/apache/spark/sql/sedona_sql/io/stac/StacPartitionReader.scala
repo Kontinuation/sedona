@@ -51,6 +51,7 @@ class StacPartitionReader(
   private var featureIterator: Iterator[InternalRow] = Iterator.empty
   private val mapper = new ObjectMapper()
   private val generateOutDBRaster = opts.getOrElse("generateOutDBRaster", "true").toBoolean
+  private val enableConvertHttpToS3 = opts.getOrElse("convertHttpToS3", "false").toBoolean
 
   override def next(): Boolean = {
     if (featureIterator.hasNext) {
@@ -157,7 +158,11 @@ class StacPartitionReader(
         rows.map(row => {
           val geometryConvertedRow = GeoJSONUtils.convertGeoJsonToGeometry(row, alteredSchema)
           val rasterAddedRow = if (generateOutDBRaster) {
-            buildOutDbRasterFields(geometryConvertedRow, alteredSchema, broadcast.value.value)
+            buildOutDbRasterFields(
+              geometryConvertedRow,
+              alteredSchema,
+              enableConvertHttpToS3,
+              broadcast.value.value)
           } else {
             geometryConvertedRow
           }
