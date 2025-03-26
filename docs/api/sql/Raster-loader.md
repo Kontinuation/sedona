@@ -62,6 +62,7 @@ The output contains the following columns:
 - `rast`: The raster data in `Raster` format. This is an out-db raster tile that references to the original raster data file.
 - `x`: The 0-based x-coordinate of the tile. This column only presents when retile is not disabled.
 - `y`: The 0-based y-coordinate of the tile. This column only presents when retile is not disabled.
+- `name`: The name of the raster file.
 
 The size of the tile is determined by the internal tiling scheme of the raster data. It is recommended to use [Cloud Optimized GeoTIFF (COG)](https://www.cogeo.org/) format for raster data since they usually organize pixel data as square tiles. You can also disable automatic tiling using `option("retile", "false")`, or specify the tile size manually using options such as `option("tileWidth", "256")` and `option("tileHeight", "256")`.
 

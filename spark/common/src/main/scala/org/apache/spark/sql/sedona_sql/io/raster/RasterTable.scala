@@ -72,18 +72,23 @@ object RasterTable {
   val RASTER = "rast"
   val TILE_X = "x"
   val TILE_Y = "y"
+  val RASTER_NAME = "name"
 
   val MAX_AUTO_TILE_SIZE = 4096
 
   def inferSchema(options: RasterOptions): StructType = {
-    if (options.retile) {
-      StructType(
-        Seq(
-          StructField(RASTER, RasterUDT, nullable = false),
-          StructField(TILE_X, IntegerType, nullable = false),
-          StructField(TILE_Y, IntegerType, nullable = false)))
+    val baseFields = if (options.retile) {
+      Seq(
+        StructField(RASTER, RasterUDT, nullable = false),
+        StructField(TILE_X, IntegerType, nullable = false),
+        StructField(TILE_Y, IntegerType, nullable = false))
     } else {
-      StructType(Seq(StructField(RASTER, RasterUDT, nullable = false)))
+      Seq(StructField(RASTER, RasterUDT, nullable = false))
     }
+
+    val nameField = Seq(
+      StructField(RASTER_NAME, org.apache.spark.sql.types.StringType, nullable = true))
+
+    StructType(baseFields ++ nameField)
   }
 }

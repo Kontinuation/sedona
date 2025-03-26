@@ -344,12 +344,15 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
         .format("raster")
         .options(Map("retile" -> "false"))
         .load(rasterdatalocation)
-      assert(rasterDf.schema.fields.length == 1)
+      assert(rasterDf.schema.fields.length == 2)
       rasterDf.collect().foreach { row =>
         val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
         // Should not load metadata eagerly
         assert(raster.isInstanceOf[LazyLoadOutDbGridCoverage2D])
         raster.dispose(true)
+        // Should load name correctly
+        val name = row.getString(1)
+        assert(name != null)
       }
     }
 
@@ -358,7 +361,7 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
         .format("raster")
         .options(Map("retile" -> "false", "loadMetadata" -> "true"))
         .load(rasterdatalocation)
-      assert(rasterDf.schema.fields.length == 1)
+      assert(rasterDf.schema.fields.length == 2)
       rasterDf.collect().foreach { row =>
         val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
         assert(!raster.isInstanceOf[LazyLoadOutDbGridCoverage2D])
@@ -373,7 +376,7 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
         .load(rasterdatalocation)
         .withColumn("width", expr("RS_Width(rast)"))
         .withColumn("height", expr("RS_Height(rast)"))
-      assert(rasterDf.schema.fields.length == 3)
+      assert(rasterDf.schema.fields.length == 4)
       rasterDf.collect().foreach { row =>
         val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
         // RS_Width and RS_Height were called, should load metadata early in the raster data source
@@ -389,7 +392,7 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
         .load(rasterdatalocation)
         .withColumn("width", expr("RS_Width(rast)"))
         .withColumn("height", expr("RS_Height(rast)"))
-      assert(rasterDf.schema.fields.length == 3)
+      assert(rasterDf.schema.fields.length == 4)
       rasterDf.collect().foreach { row =>
         val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
         // RS_Width and RS_Height were called, but user explicitly set loadMetadata to false.
@@ -405,7 +408,7 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
           .format("raster")
           .options(Map("retile" -> "false", "loadMetadata" -> "true"))
           .load(rasterdatalocation)
-        assert(rasterDf.schema.fields.length == 1)
+        assert(rasterDf.schema.fields.length == 2)
         rasterDf.collect().foreach { row =>
           val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
           assert(!raster.isInstanceOf[LazyLoadOutDbGridCoverage2D])

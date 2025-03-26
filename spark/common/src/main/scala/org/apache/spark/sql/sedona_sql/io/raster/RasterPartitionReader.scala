@@ -32,10 +32,7 @@ import org.apache.spark.sql.errors.QueryExecutionErrors
 import org.apache.spark.sql.execution.datasources.PartitionedFile
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
 import org.apache.spark.sql.sedona_sql.io.raster.RasterPartitionReader.rasterToInternalRows
-import org.apache.spark.sql.sedona_sql.io.raster.RasterTable.MAX_AUTO_TILE_SIZE
-import org.apache.spark.sql.sedona_sql.io.raster.RasterTable.RASTER
-import org.apache.spark.sql.sedona_sql.io.raster.RasterTable.TILE_X
-import org.apache.spark.sql.sedona_sql.io.raster.RasterTable.TILE_Y
+import org.apache.spark.sql.sedona_sql.io.raster.RasterTable.{MAX_AUTO_TILE_SIZE, RASTER, RASTER_NAME, TILE_X, TILE_Y}
 import org.apache.spark.sql.types.StructType
 import org.geotools.coverage.grid.GridCoverage2D
 import org.slf4j.LoggerFactory
@@ -151,6 +148,22 @@ object RasterPartitionReader {
     val writer = new UnsafeRowWriter(dataSchema.length)
     writer.resetRowWriter()
 
+    // Extract the file name from the path - ensure path is a String
+    val fileName = {
+      val path = currentRaster.getOutDbPath
+      if (path == null) {
+        null
+      } else {
+        val pathStr = path.toString
+        val lastSlashIndex = pathStr.lastIndexOf('/')
+        if (lastSlashIndex >= 0 && lastSlashIndex < pathStr.length - 1) {
+          pathStr.substring(lastSlashIndex + 1)
+        } else {
+          pathStr // Use the whole path if no slash is found
+        }
+      }
+    }
+
     if (retile) {
       val (tw, th) = (tileWidth, tileHeight) match {
         case (Some(tw), Some(th)) => (tw, th)
@@ -184,12 +197,12 @@ object RasterPartitionReader {
       iter.asScala.map { tile =>
         val tileRaster = tile.getCoverage
         writer.reset()
-        writeRaster(writer, dataSchema, tileRaster, tile.getTileX, tile.getTileY)
+        writeRaster(writer, dataSchema, tileRaster, tile.getTileX, tile.getTileY, fileName)
         tileRaster.dispose(true)
         writer.getRow
       }
     } else {
-      writeRaster(writer, dataSchema, currentRaster, 0, 0)
+      writeRaster(writer, dataSchema, currentRaster, 0, 0, fileName)
       Iterator.single(writer.getRow)
     }
   }
@@ -199,11 +212,16 @@ object RasterPartitionReader {
       dataSchema: StructType,
       raster: GridCoverage2D,
       x: Int,
-      y: Int): Unit = {
+      y: Int,
+      fileName: String): Unit = {
     dataSchema.fieldNames.zipWithIndex.foreach {
       case (RASTER, i) => writer.write(i, RasterUDT.serialize(raster))
       case (TILE_X, i) => writer.write(i, x)
       case (TILE_Y, i) => writer.write(i, y)
+      case (RASTER_NAME, i) if fileName != null =>
+        if (fileName != null)
+          writer.write(i, org.apache.spark.unsafe.types.UTF8String.fromString(fileName))
+        else writer.setNullAt(i)
       case (other, _) =>
         throw QueryExecutionErrors.unsupportedFieldNameError(other)
     }
