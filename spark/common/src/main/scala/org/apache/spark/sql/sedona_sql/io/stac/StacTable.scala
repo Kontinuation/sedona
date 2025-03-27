@@ -50,6 +50,9 @@ class StacTable(
   // Cache to store inferred schemas
   private val schemaCache = new ConcurrentHashMap[Map[String, String], StructType]()
 
+  // Extension schemas
+  private val extensions = StacExtension.getStacExtensionDefinitions()
+
   /**
    * Returns the name of the table.
    *
@@ -69,7 +72,8 @@ class StacTable(
     val fullSchema = schemaCache.computeIfAbsent(opts, _ => inferStacSchema(opts))
     val updatedGeometrySchema = GeoJSONUtils.updateGeometrySchema(fullSchema, GeometryUDT)
     val updatedPropertiesSchema = updatePropertiesPromotedSchema(updatedGeometrySchema)
-    updateRasterAddedSchema(updatedPropertiesSchema)
+    val updatedRasterSchema = updateRasterAddedSchema(updatedPropertiesSchema)
+    updatedRasterSchema
   }
 
   /**
