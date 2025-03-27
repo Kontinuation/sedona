@@ -25,10 +25,7 @@ import org.apache.spark.sql.catalyst.plans.logical.Repartition
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.sedona_sql.io.raster.RasterTable
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.plans.logical.Filter
 import org.apache.spark.sql.catalyst.plans.logical.GlobalLimit
-import org.apache.spark.sql.catalyst.plans.logical.LocalLimit
-import org.apache.spark.sql.catalyst.plans.logical.Project
 import org.apache.spark.sql.catalyst.plans.logical.V2WriteCommand
 import org.apache.spark.sql.execution.datasources.DataSource
 import org.apache.spark.sql.execution.datasources.binaryfile.BinaryFileFormat
@@ -39,7 +36,6 @@ import org.apache.spark.sql.sedona_sql.io.raster.RasterScan
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
 import org.apache.spark.util.Utils
 
-import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.collection.JavaConverters._
 
@@ -62,36 +58,36 @@ class OptimizeOutDbRasterLoading(sparkSession: SparkSession) extends Rule[Logica
   override def apply(plan: LogicalPlan): LogicalPlan = {
     val sedonaConf = new SedonaConf(sparkSession.conf)
     if (sedonaConf.isEnableRasterLoadAutoRepartition) {
-      val visited = mutable.HashSet.empty[DataSourceV2ScanRelation]
-      val limited = mutable.HashSet.empty[DataSourceV2ScanRelation]
+      val visited = mutable.HashSet.empty[LogicalPlan]
       var loadRasterMetadata = false
       plan transformDown {
         case p @ Repartition(_, _, r: DataSourceV2ScanRelation) =>
           visited.add(r)
           p
+        case p @ Repartition(_, _, l: GlobalLimit) =>
+          visited.add(l)
+          p
         case r: DataSourceV2ScanRelation if isRasterRelation(r) =>
           val rasterScan = r.scan.asInstanceOf[RasterScan]
-          if (visited.contains(r) || limited.contains(r)) {
-            if (loadRasterMetadata && rasterScan.loadRasterMetadata.isEmpty) {
-              val newRasterScan = r.copy(scan = rasterScan.copy(loadRasterMetadata = Some(true)))
-              visited.add(newRasterScan)
-              newRasterScan
-            } else {
-              r
-            }
-          } else {
+          if (visited.contains(r)) r
+          else {
             visited.add(r)
-            val numPartitions = getNumPartitions(r, sedonaConf)
 
             // Only override the loadRasterMetadata option if it is not set. If user explicitly
             // set the option, we should respect it.
-            if (loadRasterMetadata && rasterScan.loadRasterMetadata.isEmpty) {
-              val newRasterScan = r.copy(scan = rasterScan.copy(loadRasterMetadata = Some(true)))
-              visited.add(newRasterScan)
-              Repartition(numPartitions, shuffle = true, newRasterScan)
-            } else {
-              Repartition(numPartitions, shuffle = true, r)
-            }
+            val rasterScanWithLoadMetadata =
+              if (loadRasterMetadata && rasterScan.loadRasterMetadata.isEmpty) {
+                val newRasterScan =
+                  r.copy(scan = rasterScan.copy(loadRasterMetadata = Some(true)))
+                visited.add(newRasterScan)
+                newRasterScan
+              } else {
+                r
+              }
+
+            // Repartition the data source to distribute the dataframe across the cluster.
+            val numPartitions = getNumPartitions(r, sedonaConf)
+            Repartition(numPartitions, shuffle = true, rasterScanWithLoadMetadata)
           }
         case p: V2WriteCommand =>
           if (p.query.schema.existsRecursively(_.isInstanceOf[RasterUDT])) {
@@ -99,14 +95,6 @@ class OptimizeOutDbRasterLoading(sparkSession: SparkSession) extends Rule[Logica
             // raster metadata eagerly in the data source in case of the data source needs
             // to persist it.
             loadRasterMetadata = true
-          }
-          p
-        case p: GlobalLimit =>
-          // We should not repartition the data source if the query has a global limit,
-          // otherwise we have to load all data to shuffle them, which defeats the purpose
-          // of the global limit.
-          findRasterScanDirectlyUnderLimit(p.child).foreach { r =>
-            limited.add(r)
           }
           p
         case p =>
@@ -164,28 +152,6 @@ class OptimizeOutDbRasterLoading(sparkSession: SparkSession) extends Rule[Logica
           sparkSession.sparkContext.defaultParallelism * 4
         }
       case n => n
-    }
-  }
-
-  @tailrec
-  private def findRasterScanDirectlyUnderLimit(
-      plan: LogicalPlan): Option[DataSourceV2ScanRelation] = {
-    plan match {
-      // Direct child is a DataSourceV2ScanRelation
-      case r: DataSourceV2ScanRelation if isRasterRelation(r) =>
-        Some(r)
-      // Look through local limit
-      case LocalLimit(_, child) =>
-        findRasterScanDirectlyUnderLimit(child)
-      // Look through Project nodes
-      case Project(_, child) =>
-        findRasterScanDirectlyUnderLimit(child)
-      // Look through Filter nodes
-      case Filter(_, child) =>
-        findRasterScanDirectlyUnderLimit(child)
-      // No match found
-      case _ =>
-        None
     }
   }
 }

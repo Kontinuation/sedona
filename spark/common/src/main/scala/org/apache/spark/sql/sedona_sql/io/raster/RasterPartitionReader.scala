@@ -172,9 +172,14 @@ object RasterPartitionReader {
           val path = currentRaster.getOutDbPath
           val tw = currentRaster.getRenderedImage.getTileWidth
           val th = currentRaster.getRenderedImage.getTileHeight
-          val tileSizeError =
-            "Please set tileWidth and tileHeight explicitly, or convert the raster to Cloud Optimized GeoTIFF (COG) using tools like gdal_translate. " +
-              "Reference: https://docs.wherobots.com/latest/references/havasu/raster/performance-tips/#using-cloud-optimized-geotiff-cog-for-out-db-rasters"
+          val tileSizeError = {
+            """To resolve this issue, you can try one of the following methods:
+            |  1. Disable retile by setting `.option("retile", "false")`.
+            |  2. Explicitly set `tileWidth` and `tileHeight`.
+            |  3. Convert the raster to a Cloud Optimized GeoTIFF (COG) using tools like `gdal_translate`.
+            | For more information, refer to: https://docs.wherobots.com/latest/references/wherobotsdb/raster-data/Raster-loader/
+            |""".stripMargin
+          }
           if (tw >= MAX_AUTO_TILE_SIZE || th >= MAX_AUTO_TILE_SIZE) {
             throw new IllegalArgumentException(
               s"Internal tile size of $path is too large ($tw x $th). " + tileSizeError)

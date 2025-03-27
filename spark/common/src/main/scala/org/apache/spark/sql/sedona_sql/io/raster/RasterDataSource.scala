@@ -40,10 +40,38 @@ class RasterDataSource extends FileDataSourceV2 with TableProvider with DataSour
   private def createRasterTable(
       options: CaseInsensitiveStringMap,
       userSchema: Option[StructType] = None): Table = {
-    val paths = getPaths(options)
-    val optionsWithoutPaths = getOptionsWithoutPaths(options)
+    var paths = getPaths(options)
+    var optionsWithoutPaths = getOptionsWithoutPaths(options)
     val tableName = getTableName(options, paths)
     val rasterOptions = new RasterOptions(optionsWithoutPaths.asScala.toMap)
+
+    if (paths.size == 1) {
+      if (paths.head.endsWith("/")) {
+        // Paths ends with / will be recursively loaded
+        val newOptions =
+          new java.util.HashMap[String, String](optionsWithoutPaths.asCaseSensitiveMap())
+        newOptions.put("recursiveFileLookup", "true")
+        if (!newOptions.containsKey("pathGlobFilter")) {
+          newOptions.put("pathGlobFilter", "*.{tif,tiff,TIF,TIFF}")
+        }
+        optionsWithoutPaths = new CaseInsensitiveStringMap(newOptions)
+      } else {
+        // Rewrite paths such as /path/to/some*glob*.tif into /path/to with
+        // pathGlobFilter="some*glob*.tif". This is for avoiding listing .tif
+        // files as directories when discovering files to load. Globs ends with
+        // .tif or .tiff should be files in the context of raster data loading.
+        val loadTifPattern = "(.*)/([^/]*\\*[^/]*\\.(?:tif|tiff))$".r
+        paths.head match {
+          case loadTifPattern(prefix, glob) =>
+            paths = Seq(prefix)
+            val newOptions =
+              new java.util.HashMap[String, String](optionsWithoutPaths.asCaseSensitiveMap())
+            newOptions.put("pathGlobFilter", glob)
+            optionsWithoutPaths = new CaseInsensitiveStringMap(newOptions)
+          case _ =>
+        }
+      }
+    }
 
     new RasterTable(
       tableName,

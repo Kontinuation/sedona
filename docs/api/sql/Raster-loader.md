@@ -83,6 +83,8 @@ The `raster` loader also works with Spark generic file source options, such as `
 sedona.read.format("raster").option("recursiveFileLookup", "true").option("pathGlobFilter", "*.tif*").load(path_to_raster_data_folder)
 ```
 
+One difference from other file source loaders is that when the loaded path ends with `/`, the `raster` loader will look up raster files in the directory and all its subdirectories recursively. This is equivalent to specifying a path without trailing `/` and setting `option("recursiveFileLookup", "true")`.
+
 The DataFrame loaded by the `raster` loader will be automatically repartitioned by default, this is for evenly distributing the workload of processing raster tiles to the entire cluster. The number of partitions is proportional to the number of executor CPU cores in the cluster. You can disable auto repartitioning by setting the Spark session configuration `spark.sedona.raster.load.autoRepartition` to `false`. If you want to manually specify the number of partitions, you can set the Spark session configuration `spark.sedona.raster.load.numPartitions` to the desired number of partitions.
 
 ## Loading raster using binaryFile loader (Deprecated)

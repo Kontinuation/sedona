@@ -26,7 +26,12 @@ import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.execution.exchange.Exchange
 import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
+import org.apache.spark.sql.execution.LimitExec
 import org.apache.spark.sql.functions.expr
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.execution.SampleExec
+import org.apache.spark.sql.execution.datasources.v2.BatchScanExec
+import org.apache.spark.sql.sedona_sql.io.raster.RasterTable
 import org.junit.Assert.assertEquals
 import org.scalatest.BeforeAndAfter
 import org.scalatest.GivenWhenThen
@@ -37,7 +42,7 @@ import java.nio.file.Files
 
 class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen {
 
-  var rasterdatalocation: String = resourceFolder + "raster/"
+  var rasterdatalocation: String = resourceFolder + "raster"
   val tempDir: String = Files.createTempDirectory("sedona_raster_io_test_").toFile.getAbsolutePath
 
   describe("Raster IO test") {
@@ -192,21 +197,21 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
     }
 
     it("Passed RS_AsRaster with raster extent") {
-      var df = sparkSession.sql(
+      val df = sparkSession.sql(
         "SELECT RS_MakeEmptyRaster(2, 255, 255, 3, 215, 2, -2, 0, 0, 0) as raster, ST_GeomFromWKT('POLYGON((15 15, 18 20, 15 24, 24 25, 15 15))') as geom")
-      var rasterized =
+      val rasterized =
         df.selectExpr("RS_AsRaster(geom, raster, 'd', false, 255, 0d, false) as rasterized")
-      var actualSeq =
+      val actualSeq =
         rasterized.selectExpr("RS_BandAsArray(rasterized, 1)").first().getSeq[Double](0)
-      var actualMax = actualSeq.max
-      var actualSum = actualSeq.sum
-      var expectedMax = 255.0d
-      var expectedSum = 255.0 * 7
+      val actualMax = actualSeq.max
+      val actualSum = actualSeq.sum
+      val expectedMax = 255.0d
+      val expectedSum = 255.0 * 7
       assertEquals(expectedMax, actualMax, 1e-5)
       assertEquals(expectedSum, actualSum, 1e-5)
 
-      var actualWidth = rasterized.selectExpr("RS_Width(rasterized)").first().getInt(0)
-      var actualHeight = rasterized.selectExpr("RS_Height(rasterized)").first().getInt(0)
+      val actualWidth = rasterized.selectExpr("RS_Width(rasterized)").first().getInt(0)
+      val actualHeight = rasterized.selectExpr("RS_Height(rasterized)").first().getInt(0)
       assertEquals(255, actualWidth)
       assertEquals(255, actualHeight)
     }
@@ -265,10 +270,7 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
       }
 
       // Check the execution plan to see if the repartitioning is actually happening
-      val plan = rasterDf.queryExecution.executedPlan match {
-        case adaptive: AdaptiveSparkPlanExec => adaptive.initialPlan
-        case plan: SparkPlan => plan
-      }
+      val plan = queryPlan(rasterDf)
       assert(plan.collect { case _: Exchange => true }.size == 1)
 
       // Check if auto-repartitioning is actually working
@@ -313,10 +315,7 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
           .options(Map("retile" -> "true", "tileWidth" -> "64"))
           .load(rasterdatalocation)
 
-        val plan = rasterDf.queryExecution.executedPlan match {
-          case adaptive: AdaptiveSparkPlanExec => adaptive.initialPlan
-          case plan: SparkPlan => plan
-        }
+        val plan = queryPlan(rasterDf)
         assert(plan.collect { case _: Exchange => true }.size == 1)
 
         val partitions = rasterDf.rdd.getNumPartitions
@@ -326,17 +325,69 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
     }
 
     it("should not auto-repartition when limit or show is used") {
-      var rasterDf = sparkSession.read
+      FileUtils.cleanDirectory(new File(tempDir))
+
+      val sourceDir = new File(rasterdatalocation)
+      val files = sourceDir.listFiles().filter(_.isFile)
+      var numUniqueFiles = 0
+      var numTotalFiles = 0
+      files.foreach { file =>
+        if (file.getPath.endsWith(".tif") || file.getPath.endsWith(".tiff")) {
+          // Create 4 copies for each file
+          for (i <- 0 until 4) {
+            val destFile = new File(tempDir + "/" + file.getName + "_" + i)
+            FileUtils.copyFile(file, destFile)
+            numTotalFiles += 1
+          }
+          numUniqueFiles += 1
+        }
+      }
+
+      val df = sparkSession.read
         .format("raster")
         .options(Map("retile" -> "false"))
-        .load(rasterdatalocation)
-        .limit(3)
-      // Check the execution plan to see if the repartitioning is actually happening
-      val plan = rasterDf.queryExecution.executedPlan match {
-        case adaptive: AdaptiveSparkPlanExec => adaptive.initialPlan
-        case plan: SparkPlan => plan
+        .load(tempDir)
+        .withColumn("width", expr("RS_Width(rast)"))
+
+      // No limit, should have an exchange node, eager metadata loading is enabled
+      var plan = queryPlan(df)
+      assert(plan.collect { case _: Exchange => true }.nonEmpty)
+      df.collect().foreach { row =>
+        val rast = row.getAs[OutDbGridCoverage2D]("rast")
+        assert(!rast.isInstanceOf[LazyLoadOutDbGridCoverage2D])
+        rast.dispose(true)
       }
-      assert(plan.collect { case _: Exchange => true }.isEmpty)
+
+      val dfWithLimit = df.limit(numUniqueFiles)
+      plan = queryPlan(dfWithLimit)
+      // Global/local limits are all pushed down to data source
+      assert(plan.collect { case e: LimitExec => e }.isEmpty)
+      assert(dfWithLimit.count() == numUniqueFiles)
+
+      val dfWithSample = df.sample(0.3, seed = 42)
+      plan = queryPlan(dfWithSample)
+      // Sample is pushed down to data source
+      assert(plan.collect { case e: SampleExec => e }.isEmpty)
+      val count = dfWithLimit.count()
+      assert(count >= numTotalFiles * 0.1 && count <= numTotalFiles * 0.5)
+
+      val dfWithSampleAndLimit = df.sample(0.5, seed = 42).limit(numUniqueFiles)
+      plan = queryPlan(dfWithSampleAndLimit)
+      assert(plan.collect { case e: LimitExec => e }.isEmpty)
+      assert(plan.collect { case e: SampleExec => e }.isEmpty)
+      assert(dfWithSampleAndLimit.count() == numUniqueFiles)
+
+      // Limit and sample cannot be fully pushed down when retile is enabled
+      val dfReTiledWithSampleAndLimit = sparkSession.read
+        .format("raster")
+        .options(Map("retile" -> "true"))
+        .load(tempDir)
+        .sample(0.5, seed = 42)
+        .limit(numUniqueFiles)
+      dfReTiledWithSampleAndLimit.explain(true)
+      plan = queryPlan(dfReTiledWithSampleAndLimit)
+      assert(plan.collect { case e: LimitExec => e }.nonEmpty)
+      assert(plan.collect { case e: SampleExec => e }.nonEmpty)
     }
 
     it("should read geotiff using raster source without tiling") {
@@ -447,7 +498,9 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
           .load(resourceFolder + "raster_geotiff_color/*")
         rasterDf.collect()
       }
-      assert(exception.getMessage.contains("Please set tileWidth and tileHeight explicitly"))
+      assert(
+        exception.getMessage.contains(
+          "To resolve this issue, you can try one of the following methods"))
     }
 
     it("should support geotiff rescaling") {
@@ -479,7 +532,7 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
     it("should support AsciiGrid") {
       val rasterDf = sparkSession.read
         .format("raster")
-        .load(resourceFolder + "raster_asc/")
+        .load(resourceFolder + "raster_asc")
       assert(rasterDf.count() == 1)
       rasterDf.collect().foreach { row =>
         val raster = row.getAs[Object](0).asInstanceOf[OutDbGridCoverage2D]
@@ -509,10 +562,10 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
         new File(resourceFolder + "raster/test4.tiff"),
         new File(tempDir + "/part=2/test5.tiff"))
 
-      val shapefileDf = sparkSession.read
+      val rasterDf = sparkSession.read
         .format("raster")
         .load(tempDir)
-      val rows = shapefileDf.collect()
+      val rows = rasterDf.collect()
       assert(rows.length >= 4)
       rows.foreach { row =>
         val raster = row.getAs[OutDbGridCoverage2D]("rast")
@@ -524,10 +577,99 @@ class rasterIOTest extends TestBaseScala with BeforeAndAfter with GivenWhenThen 
         }
       }
     }
+
+    it("read directory recursively from a temp directory with subdirectories") {
+      // Create temp subdirectories in tempDir
+      FileUtils.cleanDirectory(new File(tempDir))
+      val subDir1 = tempDir + "/subdir1"
+      val subDir2 = tempDir + "/nested/subdir2"
+      new File(subDir1).mkdirs()
+      new File(subDir2).mkdirs()
+
+      // Copy raster files from resourceFolder/raster to the temp subdirectories
+      val sourceDir = new File(resourceFolder + "raster")
+      val files = sourceDir.listFiles().filter(_.isFile)
+      files.zipWithIndex.foreach { case (file, idx) =>
+        idx % 3 match {
+          case 0 => FileUtils.copyFile(file, new File(tempDir, file.getName))
+          case 1 => FileUtils.copyFile(file, new File(subDir1, file.getName))
+          case 2 => FileUtils.copyFile(file, new File(subDir2, file.getName))
+        }
+      }
+
+      val rasterDfNonRecursive = sparkSession.read
+        .format("raster")
+        .option("retile", "false")
+        .load(sourceDir.getPath)
+
+      val rasterDfRecursive = sparkSession.read
+        .format("raster")
+        .option("retile", "false")
+        .load(tempDir + "/")
+
+      val rowsNonRecursive = rasterDfNonRecursive.collect()
+      val rowsRecursive = rasterDfRecursive.collect()
+      assert(rowsRecursive.length == rowsNonRecursive.length)
+    }
+
+    it("read directory suffixed by /*.tif") {
+      val df = sparkSession.read
+        .format("raster")
+        .option("retile", "false")
+        .load(resourceFolder + "raster")
+
+      val dfTif = sparkSession.read
+        .format("raster")
+        .option("retile", "false")
+        .load(resourceFolder + "raster/*.tif")
+
+      val dfTiff = sparkSession.read
+        .format("raster")
+        .option("retile", "false")
+        .load(resourceFolder + "raster/*.tiff")
+
+      assert(df.count() == dfTif.count() + dfTiff.count())
+      queryPlan(dfTif).collect { case scan: BatchScanExec => scan }.foreach { scan =>
+        val table = scan.table.asInstanceOf[RasterTable]
+        assert(!table.paths.head.endsWith("*.tif"))
+        assert(table.options.get("pathGlobFilter") == "*.tif")
+      }
+      queryPlan(dfTiff).collect { case scan: BatchScanExec => scan }.foreach { scan =>
+        val table = scan.table.asInstanceOf[RasterTable]
+        assert(!table.paths.head.endsWith("*.tiff"))
+        assert(table.options.get("pathGlobFilter") == "*.tiff")
+      }
+
+      var dfComplexGlob = sparkSession.read
+        .format("raster")
+        .option("retile", "false")
+        .load(resourceFolder + "raster/test*.tiff")
+      queryPlan(dfComplexGlob).collect { case scan: BatchScanExec => scan }.foreach { scan =>
+        val table = scan.table.asInstanceOf[RasterTable]
+        assert(!table.paths.head.endsWith("*.tiff"))
+        assert(table.options.get("pathGlobFilter") == "test*.tiff")
+      }
+      dfComplexGlob = sparkSession.read
+        .format("raster")
+        .option("retile", "false")
+        .load(resourceFolder + "raster/*1.tiff")
+      queryPlan(dfComplexGlob).collect { case scan: BatchScanExec => scan }.foreach { scan =>
+        val table = scan.table.asInstanceOf[RasterTable]
+        assert(!table.paths.head.endsWith("*1.tiff"))
+        assert(table.options.get("pathGlobFilter") == "*1.tiff")
+      }
+    }
   }
 
   override def afterAll(): Unit = {
     FileUtils.deleteDirectory(new File(tempDir))
     super.afterAll()
+  }
+
+  private def queryPlan(df: DataFrame): SparkPlan = {
+    df.queryExecution.executedPlan match {
+      case adaptive: AdaptiveSparkPlanExec => adaptive.initialPlan
+      case plan: SparkPlan => plan
+    }
   }
 }

@@ -25,16 +25,21 @@ import org.apache.spark.sql.connector.read.Batch
 import org.apache.spark.sql.connector.read.InputPartition
 import org.apache.spark.sql.connector.read.PartitionReaderFactory
 import org.apache.spark.sql.connector.read.Scan
+import org.apache.spark.sql.connector.read.SupportsPushDownLimit
+import org.apache.spark.sql.connector.read.SupportsPushDownTableSample
 import org.apache.spark.sql.execution.datasources.PartitioningAwareFileIndex
 import org.apache.spark.sql.execution.datasources.v2.FileScanBuilder
 import org.apache.spark.sql.execution.datasources.FilePartition
 import org.apache.spark.sql.execution.datasources.v2.FileScan
+import org.apache.spark.sql.execution.datasources.v2.TableSampleInfo
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
 import org.apache.spark.util.SerializableConfiguration
 
 import scala.collection.JavaConverters._
+import scala.collection.mutable
+import scala.util.Random
 
 case class RasterScanBuilder(
     sparkSession: SparkSession,
@@ -43,7 +48,12 @@ case class RasterScanBuilder(
     dataSchema: StructType,
     options: CaseInsensitiveStringMap,
     rasterOptions: RasterOptions)
-    extends FileScanBuilder(sparkSession, fileIndex, dataSchema) {
+    extends FileScanBuilder(sparkSession, fileIndex, dataSchema)
+    with SupportsPushDownTableSample
+    with SupportsPushDownLimit {
+
+  private var pushedTableSample: Option[TableSampleInfo] = None
+  private var pushedLimit: Option[Int] = None
 
   override def build(): Scan = {
     val loadRasterMetadata = if (rasterOptions.retile) Some(true) else rasterOptions.loadMetadata
@@ -58,8 +68,30 @@ case class RasterScanBuilder(
       pushedDataFilters,
       partitionFilters,
       dataFilters,
-      loadRasterMetadata)
+      loadRasterMetadata,
+      pushedTableSample,
+      pushedLimit)
   }
+
+  override def pushTableSample(
+      lowerBound: Double,
+      upperBound: Double,
+      withReplacement: Boolean,
+      seed: Long): Boolean = {
+    if (withReplacement || rasterOptions.retile) {
+      false
+    } else {
+      pushedTableSample = Some(TableSampleInfo(lowerBound, upperBound, withReplacement, seed))
+      true
+    }
+  }
+
+  override def pushLimit(limit: Int): Boolean = {
+    pushedLimit = Some(limit)
+    true
+  }
+
+  override def isPartiallyPushed: Boolean = rasterOptions.retile
 }
 
 case class RasterScan(
@@ -73,9 +105,57 @@ case class RasterScan(
     pushedFilters: Array[Filter],
     partitionFilters: Seq[Expression] = Seq.empty,
     dataFilters: Seq[Expression] = Seq.empty,
-    loadRasterMetadata: Option[Boolean] = None)
+    loadRasterMetadata: Option[Boolean] = None,
+    pushedTableSample: Option[TableSampleInfo] = None,
+    pushedLimit: Option[Int] = None)
     extends FileScan
     with Batch {
+
+  private lazy val inputPartitions = {
+    var partitions = super.planInputPartitions()
+
+    // Sample the files based on the table sample
+    pushedTableSample.foreach { tableSample =>
+      val r = new Random(tableSample.seed)
+      var partitionIndex = 0
+      partitions = partitions.flatMap {
+        case filePartition: FilePartition =>
+          val files = filePartition.files
+          val sampledFiles = files.filter(_ => r.nextDouble() < tableSample.upperBound)
+          if (sampledFiles.nonEmpty) {
+            val index = partitionIndex
+            partitionIndex += 1
+            Some(FilePartition(index, sampledFiles))
+          } else {
+            None
+          }
+        case partition =>
+          throw new IllegalArgumentException(
+            s"Unexpected partition type: ${partition.getClass.getCanonicalName}")
+      }
+    }
+
+    // Limit the number of files to read
+    pushedLimit.foreach { limit =>
+      val partiallySelectedPartitions = mutable.ArrayBuffer.empty[FilePartition]
+      var remaining = limit
+      val limitedPartitions = partitions.iterator.takeWhile(_ => remaining > 0).map { partition =>
+        val filePartition = partition.asInstanceOf[FilePartition]
+        val files = filePartition.files
+        if (files.length <= remaining) {
+          remaining -= files.length
+          filePartition
+        } else {
+          val selectedFiles = files.take(remaining)
+          remaining = 0
+          FilePartition(filePartition.index, selectedFiles)
+        }
+      }
+      partitions = limitedPartitions.toArray
+    }
+
+    partitions
+  }
 
   private val rasterLoadingParallelism = {
     val sedonaConf = new SedonaConf(sparkSession.conf)
@@ -86,7 +166,7 @@ case class RasterScan(
     if (loadRasterMetadata.getOrElse(false) && rasterLoadingParallelism > 0) {
       planInputPartitionsForParallelLoading()
     } else {
-      convertInputPartitions(super.planInputPartitions())
+      convertInputPartitions(inputPartitions)
     }
   }
 
@@ -108,7 +188,6 @@ case class RasterScan(
     val minRasterPerPartition = rasterLoadingParallelism * 2
 
     // Regroup the files into partitions with at least minRasterPerPartition rasters
-    val inputPartitions = super.planInputPartitions()
     if (inputPartitions.isEmpty) {
       return Array.empty
     }
