@@ -29,20 +29,21 @@ import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.api.java.JavaSparkContext.toSparkContext
 import org.apache.spark.deploy.PythonRunner
 import org.apache.spark.serializer.KryoSerializer
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.monitoring.ListenerRegistrator
 import org.apache.spark.sql.sedona_sql.optimization._
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
 import org.apache.spark.sql.sedona_sql.strategy.physical.function.EvalPhysicalFunctionStrategy
-import org.apache.spark.sql.{SQLContext, SparkSession}
-import org.apache.spark.sql.sedona_sql.optimization.LogicalRepartitionBeforeExpensiveOperation
+import org.apache.spark.sql.{SQLContext, SparkSession, Strategy}
 
 import scala.annotation.StaticAnnotation
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
 class InternalApi(
-    description: String = "This method is for internal use only and may change without notice.")
-    extends StaticAnnotation
+                   description: String = "This method is for internal use only and may change without notice.")
+  extends StaticAnnotation
 
 object SedonaContext {
   val logger: Logger = Logger.getLogger("SedonaContext")
@@ -89,16 +90,38 @@ object SedonaContext {
     }
 
     if (!sparkSession.experimental.extraStrategies.exists(
-        _.isInstanceOf[EvalPhysicalFunctionStrategy])) {
+      _.isInstanceOf[EvalPhysicalFunctionStrategy])) {
       sparkSession.experimental.extraStrategies ++= Seq(
         new EvalPhysicalFunctionStrategy(sparkSession))
     }
 
+    val sedonaArrowStrategy = Try(
+      Class
+        .forName("org.apache.spark.sql.udf.SedonaArrowStrategy")
+        .getDeclaredConstructor()
+        .newInstance()
+        .asInstanceOf[Strategy])
+
+    val extractSedonaUDFRule =
+      Try(
+        Class
+          .forName("org.apache.spark.sql.udf.ExtractSedonaUDFRule")
+          .getDeclaredConstructor()
+          .newInstance()
+          .asInstanceOf[Rule[LogicalPlan]])
+
+    if (sedonaArrowStrategy.isSuccess && extractSedonaUDFRule.isSuccess) {
+      sparkSession.experimental.extraStrategies =
+        sparkSession.experimental.extraStrategies :+ sedonaArrowStrategy.get
+      sparkSession.experimental.extraOptimizations =
+        sparkSession.experimental.extraOptimizations :+ extractSedonaUDFRule.get
+    }
+
     customOptimizationsWithSession(sparkSession).foreach { opt =>
       if (!sparkSession.experimental.extraOptimizations.exists {
-          case _: opt.type => true
-          case _ => false
-        }) {
+        case _: opt.type => true
+        case _ => false
+      }) {
         sparkSession.experimental.extraOptimizations ++= Seq(opt)
       }
     }
