@@ -130,6 +130,17 @@
             <groupId>edu.ucar</groupId>
             <artifactId>cdm-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.locationtech.geomesa</groupId>
+            <artifactId>geomesa-z3_${scala.compat.version}</artifactId>
+            <version>5.2.2</version>
+            <exclusions>
+                <exclusion> <!-- Exclude s2-geometry to avoid conflict with s2-geometry from com.google.geometry -->
+                    <groupId>io.sgr</groupId>
+                    <artifactId>s2-geometry-library-java</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
     <build>
         <sourceDirectory>src/main/java</sourceDirectory>

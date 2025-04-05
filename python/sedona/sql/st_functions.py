@@ -28,6 +28,7 @@ from sedona.sql.dataframe_api import (
     validate_argument_types,
 )
 
+
 _call_st_function = partial(call_sedona_function, "st_functions")
 
 
@@ -2722,6 +2723,28 @@ def ST_WeightedDistanceBandColumn(
             attributes,
         ),
     )
+
+
+def ST_XZ2(
+    geometry: ColumnOrName, precision: Union[ColumnOrName, int] = None
+) -> Column:
+    """A space filling curve function that generates a XZ2 value from a geometry.
+
+    Only supports data in lon/lat format. XZ2 is a 2D space filling curve that is used to index 2D data. Compared
+    to a GeoHash, it provides improved sorting for non-point data that takes into account the bounding box of
+    the Geometry. The precision parameter is used to control the number of bits used in the XZ2 value.
+    Larger values take longer to compute but provide more precision.
+
+    :param geometry: Geometry column to  retrieve the XZ2 value of.
+    :param precision: The precision of the XZ2 value to generate.
+    :type geometry: ColumnOrName
+    :return: A numeric index (a long integer) representing the XZ2 value.
+    :rtype: long
+    """
+    if isinstance(precision, int):
+        precision = lit(precision)
+
+    return _call_st_function("ST_XZ2", (geometry, precision))
 
 
 # Automatically populate __all__

@@ -37,6 +37,7 @@ import org.apache.sedona.common.subDivide.ExtentBasedGeometrySubDivider;
 import org.apache.sedona.common.subDivide.GeometrySubDivider;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.common.utils.*;
+import org.locationtech.geomesa.curve.XZ2SFC;
 import org.locationtech.jts.algorithm.Angle;
 import org.locationtech.jts.algorithm.MinimumBoundingCircle;
 import org.locationtech.jts.algorithm.Orientation;
@@ -2706,5 +2707,33 @@ public class Functions {
     // Interpolate the M value
     return fractionAlongLine * (end.getCoordinate().getM() - start.getCoordinate().getM())
         + start.getCoordinate().getM();
+  }
+
+  /**
+   * This function returns a hash code for the input geometry based on the XZ2 space filling curve
+   *
+   * <p>It uses a precision of 12 bits
+   *
+   * @param geom The input geometry
+   * @return A hash code for the input geometry based on the XZ2 space filling curve
+   */
+  public static Long xz2(Geometry geom) {
+    return xz2(geom, 12);
+  }
+
+  /**
+   * This function returns a hash code for the input geometry based on the XZ2 space filling curve
+   *
+   * @param geom The input geometry
+   * @param precision The precision of the hash code in bits. The higher the precision, the more
+   *     unique the hash codes will be.
+   * @return A hash code for the input geometry based on the XZ2 space filling curve
+   */
+  public static Long xz2(Geometry geom, long precision) {
+    Envelope envelope = geom.getEnvelopeInternal();
+    return XZ2SFC
+        .apply((short) precision)
+        .index(
+            envelope.getMinX(), envelope.getMinY(), envelope.getMaxX(), envelope.getMaxY(), false);
   }
 }

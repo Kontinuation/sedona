@@ -1904,3 +1904,23 @@ class TestDataFrameAPI(TestBase):
         df.withColumn(
             "localOutlierFactor", ST_LocalOutlierFactor("geometry", 2, False)
         ).collect()
+
+    def test_st_xz2(self):
+        test_data = self.spark.createDataFrame(
+            [
+                ("POLYGON ((0 0, 1 1, 1 0, 0 0))", 16777223, 17),
+                ("LINESTRING (-122.419 37.779, -74.006 40.714)", 12233388, 12),
+                ("POINT (4 4)", 16790485, 17),
+            ],
+            ["wkt", "expected_xz2_g12", "expected_xz2_g2"],
+        )
+
+        df = (
+            test_data.withColumn("geom", f.expr("ST_GeomFromWKT(wkt)"))
+            .withColumn("xz2_g12", ST_XZ2(f.col("geom"), 12))
+            .withColumn("xz2_g2", ST_XZ2("geom", 2))
+        )
+
+        # Verify all rows match expected values
+        assert df.count() == df.where("xz2_g12 = expected_xz2_g12").count()
+        assert df.count() == df.where("xz2_g2 = expected_xz2_g2").count()

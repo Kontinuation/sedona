@@ -1902,3 +1902,9 @@ case class ST_InterpolatePoint(inputExpressions: Seq[Expression])
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) =
     copy(inputExpressions = newChildren)
 }
+
+case class ST_XZ2(inputExpressions: Seq[Expression])
+    extends InferredExpression(inferrableFunction2(Functions.xz2)) {
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) =
+    copy(inputExpressions = newChildren)
+}

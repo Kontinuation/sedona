@@ -32,6 +32,7 @@ import org.apache.sedona.common.utils.*;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.operation.projection.ProjectionException;
 import org.junit.Test;
+import org.locationtech.geomesa.curve.XZ2SFC;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
@@ -4401,5 +4402,45 @@ public class FunctionsTest extends TestBase {
     actual = Functions.interpolatePoint(line, point);
     expected = 2.75;
     assertEquals(expected, actual, 1e-6);
+  }
+
+  @Test
+  public void xz2() {
+    XZ2SFC xz2g12 = XZ2SFC.apply((short) 12);
+    XZ2SFC xz2g2 = XZ2SFC.apply((short) 2);
+    // Create an array of geometries
+    Geometry[] geometries =
+        new Geometry[] {
+          GEOMETRY_FACTORY.createPolygon(coordArray(0, 0, 1, 1, 1, 0, 0, 0)),
+          GEOMETRY_FACTORY.createLineString(coordArray(-122.419, 37.779, -74.006, 40.714)),
+          GEOMETRY_FACTORY.createGeometryCollection(
+              new Geometry[] {
+                GEOMETRY_FACTORY.createPoint(new Coordinate(4, 4)),
+                GEOMETRY_FACTORY.createLineString(coordArray(5, 5, 6, 6))
+              })
+        };
+
+    // Test each geometry in the array
+    for (Geometry geom : geometries) {
+      Long xz2g12Actual = Functions.xz2(geom);
+      Long xz2g12Expected =
+          xz2g12.index(
+              geom.getEnvelopeInternal().getMinX(),
+              geom.getEnvelopeInternal().getMinY(),
+              geom.getEnvelopeInternal().getMaxX(),
+              geom.getEnvelopeInternal().getMaxY(),
+              false);
+      assertEquals(xz2g12Expected, xz2g12Actual);
+
+      Long xz2g2Actual = Functions.xz2(geom, 2);
+      Long xz2g2Expected =
+          xz2g2.index(
+              geom.getEnvelopeInternal().getMinX(),
+              geom.getEnvelopeInternal().getMinY(),
+              geom.getEnvelopeInternal().getMaxX(),
+              geom.getEnvelopeInternal().getMaxY(),
+              false);
+      assertEquals(xz2g2Expected, xz2g2Actual);
+    }
   }
 }

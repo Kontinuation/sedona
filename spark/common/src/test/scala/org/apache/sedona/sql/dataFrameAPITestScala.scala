@@ -21,14 +21,14 @@ package org.apache.sedona.sql
 import org.apache.commons.codec.binary.Hex
 import org.apache.sedona.common.geometryObjects.Geography
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.functions.{col, element_at, expr, lit, radians}
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.sedona_sql.expressions.InferredExpressionException
 import org.apache.spark.sql.sedona_sql.expressions.st_aggregates._
 import org.apache.spark.sql.sedona_sql.expressions.st_constructors._
 import org.apache.spark.sql.sedona_sql.expressions.st_functions._
 import org.apache.spark.sql.sedona_sql.expressions.st_predicates._
 import org.junit.Assert.{assertEquals, assertFalse, assertTrue}
-import org.locationtech.jts.geom.{Geometry, Point, Polygon}
+import org.locationtech.jts.geom.{Geometry, Polygon}
 import org.locationtech.jts.io.WKTWriter
 import org.locationtech.jts.operation.buffer.BufferParameters
 
@@ -2510,5 +2510,19 @@ class dataFrameAPITestScala extends TestBaseScala {
           assert(actual == expected, s"Expected $expected but got $actual")
         }
     }
+  }
+
+  it("Passed ST_XZ2") {
+    val testData = Seq(
+      ("POLYGON ((0 0, 1 1, 1 0, 0 0))", 16777223L, 17L),
+      ("LINESTRING (-122.419 37.779, -74.006 40.714)", 12233388L, 12L),
+      ("POINT (4 4)", 16790485L, 17L))
+      .toDF("wkt", "expectedXZ2G12", "expectedXZ2G2")
+      .withColumn("geom", ST_GeomFromWKT(col("wkt")))
+      .withColumn("xz2G12", ST_XZ2(col("geom"), lit(12)))
+      .withColumn("xz2G2", ST_XZ2(col("geom"), lit(2)))
+
+    assert(testData.count() == testData.where("xz2G12 = expectedXZ2G12").count())
+    assert(testData.count() == testData.where("xz2G2 = expectedXZ2G2").count())
   }
 }

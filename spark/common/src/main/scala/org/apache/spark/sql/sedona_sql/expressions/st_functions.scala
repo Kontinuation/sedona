@@ -1028,4 +1028,7 @@ object st_functions extends DataFrameAPI {
       selfWeight,
       useSpheroid,
       attributes)
+
+  def ST_XZ2(geometry: Column, precision: Column): Column =
+    wrapExpression[ST_XZ2](geometry, precision)
 }
