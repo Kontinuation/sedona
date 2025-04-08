@@ -60,6 +60,7 @@ import org.locationtech.jts.operation.distance3d.Distance3DOp;
 import org.locationtech.jts.operation.linemerge.LineMerger;
 import org.locationtech.jts.operation.overlay.snap.GeometrySnapper;
 import org.locationtech.jts.operation.polygonize.Polygonizer;
+import org.locationtech.jts.operation.relateng.RelateNG;
 import org.locationtech.jts.operation.union.UnaryUnionOp;
 import org.locationtech.jts.operation.valid.IsSimpleOp;
 import org.locationtech.jts.operation.valid.IsValidOp;
@@ -1124,14 +1125,14 @@ public class Functions {
   }
 
   public static Geometry intersection(Geometry leftGeometry, Geometry rightGeometry) {
-    boolean isIntersects = leftGeometry.intersects(rightGeometry);
-    if (!isIntersects) {
+    IntersectionMatrix relation = RelateNG.relate(leftGeometry, rightGeometry);
+    if (relation.isDisjoint()) {
       return leftGeometry.getFactory().createPolygon();
     }
-    if (leftGeometry.contains(rightGeometry)) {
+    if (relation.isContains()) {
       return rightGeometry;
     }
-    if (rightGeometry.contains(leftGeometry)) {
+    if (relation.isWithin()) {
       return leftGeometry;
     }
     return leftGeometry.intersection(rightGeometry);
