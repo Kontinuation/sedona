@@ -99,7 +99,12 @@ case class StacBatch(
     // Start the recursive collection of item links
     setItemMaxLeft(itemsLimitMax)
 
-    collectItemLinks(stacCollectionBasePath, stacCollectionJson, itemLinks, checkItemsLimitMax)
+    collectItemLinks(
+      stacCollectionBasePath,
+      stacCollectionUrl,
+      stacCollectionJson,
+      itemLinks,
+      checkItemsLimitMax)
 
     // Handle when the number of items is less than 1
     if (itemLinks.isEmpty) {
@@ -146,6 +151,7 @@ case class StacBatch(
    */
   def collectItemLinks(
       collectionBasePath: String,
+      collectionUrl: String,
       collectionJson: String,
       itemLinks: scala.collection.mutable.ArrayBuffer[String],
       needCountNextItems: Boolean): Unit = {
@@ -157,13 +163,6 @@ case class StacBatch(
       Console.out.println(s"Searched or partitioned ${itemLinks.size} items so far.")
       lastReportCount = itemLinks.size
     }
-
-    // Parse the JSON string into a JsonNode (tree representation of JSON)
-    val rootNode: JsonNode = mapper.readTree(collectionJson)
-
-    // Extract item links from the "links" array
-    val linksNode = rootNode.get("links")
-    val iterator = linksNode.elements()
 
     def iterateItemsWithLimit(itemUrl: String, needCountNextItems: Boolean): Boolean = {
       // Load the item URL and process the response
@@ -216,6 +215,33 @@ case class StacBatch(
       false
     }
 
+    // Parse the JSON string into a JsonNode (tree representation of JSON)
+    val rootNode: JsonNode = mapper.readTree(collectionJson)
+
+    // Extract item links from the "links" array
+    val collectType = rootNode.get("type").asText()
+    val linksNode = rootNode.get("links")
+    val iterator = linksNode.elements()
+
+    // Check if the collection is a "FeatureCollection" or "Collection"
+    if (collectType == "FeatureCollection") {
+      // If the collection is a "FeatureCollection", we need to check if there are any items
+      itemLinks += getItemLink(
+        collectionUrl,
+        defaultItemsLimitPerRequest,
+        spatialFilter,
+        temporalFilter)
+      iterateItemsWithLimit(
+        getItemLink(collectionUrl, defaultItemsLimitPerRequest, spatialFilter, temporalFilter),
+        needCountNextItems)
+      return
+    } else if (collectType != "Collection") {
+      // throw an error if the collection type is not "Collection" or "FeatureCollection"
+      throw new IllegalArgumentException(
+        s"Invalid STAC collection type: '$collectType'. Expected 'Collection' or 'FeatureCollection'.")
+    }
+
+    // Iterate through the links in the collection
     while (iterator.hasNext) {
       val linkNode = iterator.next()
       val rel = linkNode.get("rel").asText()
@@ -292,6 +318,7 @@ case class StacBatch(
         if (!collectionFiltered) {
           collectItemLinks(
             nestedCollectionBasePath,
+            childUrl,
             linkedCollectionJson,
             itemLinks,
             needCountNextItems)
@@ -306,7 +333,8 @@ case class StacBatch(
       defaultItemsLimitPerRequest: Int,
       spatialFilter: Option[GeoParquetSpatialFilter],
       temporalFilter: Option[TemporalFilter]): String = {
-    val baseUrl = itemUrl + "?limit=" + defaultItemsLimitPerRequest
+    val separator = if (itemUrl.contains("?")) "&" else "?"
+    val baseUrl = itemUrl + separator + "limit=" + defaultItemsLimitPerRequest
     val urlWithFilters = StacUtils.addFiltersToUrl(baseUrl, spatialFilter, temporalFilter)
     urlWithFilters
   }

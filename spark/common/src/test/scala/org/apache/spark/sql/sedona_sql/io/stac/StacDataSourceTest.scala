@@ -38,16 +38,17 @@ class StacDataSourceTest extends TestBaseScala {
     "https://planetarycomputer.microsoft.com/api/stac/v1/collections/naip",
     "https://satellogic-earthview.s3.us-west-2.amazonaws.com/stac/catalog.json")
 
-  ignore("performance benchmark using remote service endpoint") {
+  it("performance benchmark using remote service endpoint") {
     val dfStac = sparkSession.read
       .format("stac")
       .option("itemsLimitMax", "-1")
       .option("itemsLimitPerRequest", "200")
       .option("generateOutDBRaster", "true")
-      .load("https://earth-search.aws.element84.com/v1/collections/sentinel-2-c1-l2a")
+      .load("https://earth-search.aws.element84.com/v1/search?collections=sentinel-2-c1-l2a")
 
     dfStac.createOrReplaceTempView("STACTBL")
-    val dfSelect = sparkSession.sql("SELECT * FROM STACTBL")
+    val dfSelect = sparkSession.sql(
+      "SELECT id, datetime as dt, geometry, bbox FROM STACTBL WHERE datetime > '2023-01-01T00:00:00Z' AND datetime < '2023-02-14T00:00:00Z' LIMIT 1000")
     val rowCount = dfSelect.count()
 
     assert(rowCount > 0)

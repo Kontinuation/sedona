@@ -45,6 +45,7 @@ class StacBatchTest extends TestBaseScala {
   it("collectItemLinks should collect correct item links") {
     val collectionUrl =
       "https://earth-search.aws.element84.com/v1/collections/sentinel-2-pre-c1-l2a"
+    val stacCollectionBasePath = StacUtils.getStacCollectionBasePath(collectionUrl)
     val stacCollectionJson = StacUtils.loadStacCollectionToJson(collectionUrl)
     val opts = mutable
       .Map(
@@ -68,7 +69,12 @@ class StacBatchTest extends TestBaseScala {
     val needCountNextItems = true
 
     val startTime = System.nanoTime()
-    stacBatch.collectItemLinks(collectionUrl, stacCollectionJson, itemLinks, needCountNextItems)
+    stacBatch.collectItemLinks(
+      stacCollectionBasePath,
+      collectionUrl,
+      stacCollectionJson,
+      itemLinks,
+      needCountNextItems)
     val endTime = System.nanoTime()
     val duration = (endTime - startTime) / 1e6 // Convert to milliseconds
 
@@ -77,11 +83,44 @@ class StacBatchTest extends TestBaseScala {
     assert(duration > 0)
   }
 
+  it("collectItemLinks should collect correct item links from catalog search endpoint") {
+    val collectionUrl =
+      "https://earth-search.aws.element84.com/v1/search?collections=sentinel-2-c1-l2a"
+    val stacCollectionBasePath = StacUtils.getStacCollectionBasePath(collectionUrl)
+    val stacFeatureCollectionJson = StacUtils.loadStacCollectionToJson(collectionUrl)
+    val opts = mutable.Map("itemsLimitPerRequest" -> "200").toMap
+
+    val stacBatch =
+      StacBatch(
+        null,
+        collectionUrl,
+        stacFeatureCollectionJson,
+        StructType(Seq()),
+        opts,
+        None,
+        None,
+        None)
+    stacBatch.setItemMaxLeft(1000)
+    val itemLinks = mutable.ArrayBuffer[String]()
+    val needCountNextItems = true
+
+    stacBatch.collectItemLinks(
+      stacCollectionBasePath,
+      collectionUrl,
+      stacFeatureCollectionJson,
+      itemLinks,
+      needCountNextItems)
+
+    assert(itemLinks.nonEmpty)
+    assert(itemLinks.length == 5)
+  }
+
   it("planInputPartitions should create correct number of partitions") {
     val stacCollectionJson =
       """
         |{
         |  "stac_version": "1.0.0",
+        |  "type": "Collection",
         |  "id": "sample-collection",
         |  "description": "A sample STAC collection",
         |  "links": [
@@ -116,6 +155,8 @@ class StacBatchTest extends TestBaseScala {
     val stacCollectionJson =
       """
         |{
+        |
+        |  "type": "Collection",
         |  "links": []
         |}
       """.stripMargin
