@@ -3873,6 +3873,43 @@ public class FunctionsTest extends TestBase {
   }
 
   @Test
+  public void testIntersection() throws ParseException {
+    // Case 1: Disjoint envelopes - should return empty polygon
+    Geometry geom1 = wktReader.read("POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))");
+    Geometry geom2 = wktReader.read("POLYGON((2 2, 3 2, 3 3, 2 3, 2 2))");
+    Geometry result = Functions.intersection(geom1, geom2);
+    assertTrue(result.isEmpty());
+    assertTrue(result instanceof Polygon);
+
+    // Case 2: Disjoint geometries but overlapping envelopes
+    geom1 = wktReader.read("POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))");
+    Geometry hole = wktReader.read("POLYGON((1 1, 1.5 1, 1.5 1.5, 1 1.5, 1 1))");
+    geom1 = geom1.difference(hole); // Create a donut polygon
+    geom2 = wktReader.read("POLYGON((1.1 1.1, 1.4 1.1, 1.4 1.4, 1.1 1.4, 1.1 1.1))");
+    assertTrue(geom1.getEnvelopeInternal().intersects(geom2.getEnvelopeInternal()));
+    result = Functions.intersection(geom1, geom2);
+    assertTrue(result.isEmpty());
+    assertTrue(result instanceof Polygon);
+
+    // Case 3: One geometry contains the other
+    geom1 = wktReader.read("POLYGON((0 0, 3 0, 3 3, 0 3, 0 0))");
+    geom2 = wktReader.read("POLYGON((1 1, 2 1, 2 2, 1 2, 1 1))");
+    result = Functions.intersection(geom1, geom2);
+    assertEquals(geom2, result);
+
+    // Case 4: Other geometry contains the first
+    result = Functions.intersection(geom2, geom1);
+    assertEquals(geom2, result);
+
+    // Case 5: Partial intersects - general case
+    geom1 = wktReader.read("POLYGON((0 0, 2 0, 2 2, 0 2, 0 0))");
+    geom2 = wktReader.read("POLYGON((1 1, 3 1, 3 3, 1 3, 1 1))");
+    result = Functions.intersection(geom1, geom2);
+    Geometry expected = wktReader.read("POLYGON((1 1, 2 1, 2 2, 1 2, 1 1))");
+    assertTrue(result.equals(expected));
+  }
+
+  @Test
   public void hausdorffDistanceDefaultGeom2D() throws Exception {
     Polygon polygon1 =
         GEOMETRY_FACTORY.createPolygon(coordArray3d(1, 0, 1, 1, 1, 2, 2, 1, 5, 2, 0, 1, 1, 0, 1));

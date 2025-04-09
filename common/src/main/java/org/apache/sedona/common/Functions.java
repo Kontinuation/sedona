@@ -1125,6 +1125,15 @@ public class Functions {
   }
 
   public static Geometry intersection(Geometry leftGeometry, Geometry rightGeometry) {
+    // Quick check to skip computing relation and intersection if their envelopes are disjoint
+    Envelope leftEnv = leftGeometry.getEnvelopeInternal();
+    Envelope rightEnv = rightGeometry.getEnvelopeInternal();
+    if (leftEnv.disjoint(rightEnv)) {
+      return leftGeometry.getFactory().createPolygon();
+    }
+
+    // Check the relationship between the two geometries, and only perform intersection if they
+    // overlap or touch each other
     IntersectionMatrix relation = RelateNG.relate(leftGeometry, rightGeometry);
     if (relation.isDisjoint()) {
       return leftGeometry.getFactory().createPolygon();
