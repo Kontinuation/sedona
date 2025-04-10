@@ -109,6 +109,13 @@ public class NearestNeighborSearchTest extends ExternalIndexTestBase {
 
   @Test
   public void testNearestNeighborSearch() throws IOException {
+    int[] topKs = {1, 10, 100};
+    for (int topK : topKs) {
+      testNearestNeighborSearch(topK);
+    }
+  }
+
+  private void testNearestNeighborSearch(int topK) throws IOException {
     STRtree tree = new STRtree();
     try (ExternalSpatialIndexWithRefinement<GeometryDataItem> index = create()) {
       // Index grids of geometries
@@ -127,7 +134,6 @@ public class NearestNeighborSearchTest extends ExternalIndexTestBase {
       tree.build();
 
       // Query the top-K nearest neighbors
-      int topK = 100;
       for (int trials = 0; trials < 2; trials++) {
         for (int i = 0; i < 10; i++) {
           for (int j = 0; j < 10; j++) {

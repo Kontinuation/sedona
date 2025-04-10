@@ -23,10 +23,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.spark.sedona.core.index.DataItemFormat;
-import org.apache.spark.sedona.core.index.ExternalLeafPageIndex;
-import org.apache.spark.sedona.core.index.ExternalLeafPageIndex.LeafPageMetadata;
 import org.apache.spark.sedona.core.index.ExternalSpatialIndexWithRefinement;
 import org.apache.spark.sedona.core.index.ExternalSpatialIndexWithRefinement.DataObjectWithId;
+import org.apache.spark.sedona.core.index.nearestneighbor.BoundablePair.PageOrDataItemBoundable;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.index.strtree.Boundable;
 import org.locationtech.jts.index.strtree.ItemBoundable;
@@ -48,30 +47,20 @@ public class NearestNeighborSearch {
       ItemDistance itemDist,
       int k)
       throws IOException {
+    if (index.count() == 0) {
+      return new ArrayList<>();
+    }
+
     DataItemFormat<T> format = index.getDataItemFormat();
     STRtree nonLeafTree = index.getNonLeafTree();
-    Object[] nearestLeafs =
-        nonLeafTree.nearestNeighbour(
-            env,
-            item,
-            (item1, item2) ->
-                ((Envelope) item1.getBounds()).distance(((Envelope) item2.getBounds())),
-            k);
 
     // initialize internal structures
     PriorityQueue<BoundablePair> priQ = new PriorityQueue<>();
 
-    ExternalLeafPageIndex leafPageIndex = index.getSpatialIndex().getLeafPageIndex();
     Boundable itemBnd = new ItemBoundable(env, item);
-    for (Object leaf : nearestLeafs) {
-      int leafId = (int) leaf;
-      LeafPageMetadata leafPageMetadata = leafPageIndex.metadata.get(leafId);
-      BoundablePair.LeafPageOrDataItemBoundable leafBnd =
-          new BoundablePair.LeafPageOrDataItemBoundable(
-              leafPageMetadata.getEnvelope(), leafId, false);
-      BoundablePair bp = new BoundablePair(leafBnd, itemBnd, itemDist, format);
-      priQ.add(bp);
-    }
+    PageOrDataItemBoundable rootBnd = PageOrDataItemBoundable.internalNode(nonLeafTree.getRoot());
+    BoundablePair root = new BoundablePair(rootBnd, itemBnd, itemDist, format);
+    priQ.add(root);
 
     PriorityQueue<BoundablePair> kNearestNeighbors = new PriorityQueue<>();
 

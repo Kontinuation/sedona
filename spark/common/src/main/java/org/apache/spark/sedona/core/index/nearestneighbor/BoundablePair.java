@@ -21,13 +21,17 @@ package org.apache.spark.sedona.core.index.nearestneighbor;
 import it.unimi.dsi.fastutil.ints.IntList;
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.List;
 import java.util.PriorityQueue;
 import org.apache.spark.sedona.core.index.DataItemFormat;
+import org.apache.spark.sedona.core.index.ExternalLeafPageIndex;
 import org.apache.spark.sedona.core.index.ExternalLeafPageIndex.EnvelopeFilter;
+import org.apache.spark.sedona.core.index.ExternalLeafPageIndex.LeafPageMetadata;
 import org.apache.spark.sedona.core.index.ExternalSpatialIndexWithRefinement;
 import org.apache.spark.sedona.core.index.ExternalSpatialIndexWithRefinement.DataObjectWithId;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.index.strtree.AbstractNode;
 import org.locationtech.jts.index.strtree.Boundable;
 import org.locationtech.jts.index.strtree.ItemBoundable;
 import org.locationtech.jts.index.strtree.ItemDistance;
@@ -42,23 +46,40 @@ import org.locationtech.jts.index.strtree.ItemDistance;
  */
 public class BoundablePair implements Comparable<BoundablePair> {
 
-  public static class LeafPageOrDataItemBoundable extends ItemBoundable {
+  public enum Type {
+    INTERNAL_NODE,
+    LEAF_PAGE,
+    DATA_ITEM,
+  }
 
-    public final boolean isDataItem;
+  public static class PageOrDataItemBoundable extends ItemBoundable {
+    public static PageOrDataItemBoundable internalNode(AbstractNode node) {
+      return new PageOrDataItemBoundable((Envelope) node.getBounds(), node, Type.INTERNAL_NODE);
+    }
 
-    public LeafPageOrDataItemBoundable(Envelope bounds, Object item, boolean isDataItem) {
+    public static PageOrDataItemBoundable leafPage(Envelope bounds, int leafId) {
+      return new PageOrDataItemBoundable(bounds, leafId, Type.LEAF_PAGE);
+    }
+
+    public static PageOrDataItemBoundable dataItem(Envelope bounds, Object data) {
+      return new PageOrDataItemBoundable(bounds, data, Type.DATA_ITEM);
+    }
+
+    public final Type type;
+
+    public PageOrDataItemBoundable(Envelope bounds, Object item, Type type) {
       super(bounds, item);
-      this.isDataItem = isDataItem;
+      this.type = type;
     }
   }
 
-  private final LeafPageOrDataItemBoundable boundable1;
+  private final PageOrDataItemBoundable boundable1;
   private final Boundable boundable2;
   private final double distance;
   private final ItemDistance itemDistance;
 
   public <T> BoundablePair(
-      LeafPageOrDataItemBoundable boundable1,
+      PageOrDataItemBoundable boundable1,
       Boundable boundable2,
       ItemDistance itemDistance,
       DataItemFormat<T> format) {
@@ -122,7 +143,7 @@ public class BoundablePair implements Comparable<BoundablePair> {
    * @return true if both pair elements cannot be further expanded
    */
   public boolean containsDataItem() {
-    return boundable1.isDataItem;
+    return boundable1.type == Type.DATA_ITEM;
   }
 
   /**
@@ -146,16 +167,24 @@ public class BoundablePair implements Comparable<BoundablePair> {
       ExternalSpatialIndexWithRefinement<T> index,
       DataItemFormat<T> format)
       throws IOException {
-    if (containsDataItem()) {
-      throw new IllegalArgumentException("neither boundable is composite");
+    switch (boundable1.type) {
+      case INTERNAL_NODE:
+        expandInternalNode(boundable1, boundable2, priQ, minDistance, index, format);
+        break;
+      case LEAF_PAGE:
+        expandLeafPage(boundable1, boundable2, priQ, minDistance, index, format);
+        break;
+      case DATA_ITEM:
+        throw new IllegalArgumentException("neither boundable is composite");
+      default:
+        throw new IllegalStateException("Unknown boundable type: " + boundable1.type);
     }
-    expand(boundable1, boundable2, priQ, minDistance, index, format);
   }
 
   private static final EnvelopeFilter ALWAYS_TRUE = (leafPageId1, env) -> true;
 
-  private <T> void expand(
-      LeafPageOrDataItemBoundable bnd,
+  private <T> void expandLeafPage(
+      PageOrDataItemBoundable bnd,
       Boundable bndOther,
       PriorityQueue<BoundablePair> priQ,
       double minDistance,
@@ -169,8 +198,44 @@ public class BoundablePair implements Comparable<BoundablePair> {
     while (dataIter.hasNext()) {
       DataObjectWithId<T> data = dataIter.next();
       Envelope envData = format.extractEnvelope(data.dataObject);
-      LeafPageOrDataItemBoundable bndData = new LeafPageOrDataItemBoundable(envData, data, true);
+      PageOrDataItemBoundable bndData = PageOrDataItemBoundable.dataItem(envData, data);
       BoundablePair bp = new BoundablePair(bndData, bndOther, itemDistance, format);
+      // only add to queue if this pair might contain the closest points
+      // MD - it's actually faster to construct the object rather than called distance(child,
+      // bndOther)!
+      if (bp.getDistance() < minDistance) {
+        priQ.add(bp);
+      }
+    }
+  }
+
+  private <T> void expandInternalNode(
+      PageOrDataItemBoundable bnd,
+      Boundable bndOther,
+      PriorityQueue<BoundablePair> priQ,
+      double minDistance,
+      ExternalSpatialIndexWithRefinement<T> index,
+      DataItemFormat<T> format) {
+    List children = ((AbstractNode) bnd.getItem()).getChildBoundables();
+    for (Iterator i = children.iterator(); i.hasNext(); ) {
+      Boundable child = (Boundable) i.next();
+      BoundablePair bp;
+
+      if (child instanceof AbstractNode) {
+        // child is internal node
+        PageOrDataItemBoundable childBnd =
+            PageOrDataItemBoundable.internalNode((AbstractNode) child);
+        bp = new BoundablePair(childBnd, bndOther, itemDistance, format);
+      } else {
+        // child is leaf node
+        int leafId = (int) ((ItemBoundable) child).getItem();
+        ExternalLeafPageIndex leafPageIndex = index.getSpatialIndex().getLeafPageIndex();
+        LeafPageMetadata leafPageMetadata = leafPageIndex.metadata.get(leafId);
+        PageOrDataItemBoundable leafBnd =
+            PageOrDataItemBoundable.leafPage(leafPageMetadata.getEnvelope(), leafId);
+        bp = new BoundablePair(leafBnd, bndOther, itemDistance, format);
+      }
+
       // only add to queue if this pair might contain the closest points
       // MD - it's actually faster to construct the object rather than called distance(child,
       // bndOther)!
