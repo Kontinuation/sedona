@@ -19,11 +19,12 @@
 package org.apache.sedona.core.knnJudgement;
 
 import org.apache.sedona.common.sphere.Spheroid;
+import org.apache.spark.sedona.core.index.nearestneighbor.SphericalEnvelopeDistance;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.index.strtree.ItemBoundable;
 import org.locationtech.jts.index.strtree.ItemDistance;
 
-public class SpheroidDistance implements ItemDistance {
+public class SpheroidDistance implements ItemDistance, SphericalEnvelopeDistance {
 
   public SpheroidDistance() {}
 

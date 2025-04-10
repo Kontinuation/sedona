@@ -29,6 +29,8 @@ import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 
 public class Haversine {
+  public static final double AVG_EARTH_RADIUS = 6371008.0;
+
   /**
    * Calculate the distance between two points on the earth using the "haversine" formula. This is
    * also known as the great-circle distance This will produce almost identical result to PostGIS
@@ -52,6 +54,17 @@ public class Haversine {
     double lat1 = coordinate1.getY();
     double lon2 = coordinate2.getX();
     double lat2 = coordinate2.getY();
+    return distance(lon1, lat1, lon2, lat2, AVG_EARTH_RADIUS);
+  }
+
+  // Calculate the distance between two points on the earth using the "haversine" formula.
+  // The radius of the earth is 6371.0 km
+  public static double distance(Geometry geom1, Geometry geom2) {
+    return distance(geom1, geom2, AVG_EARTH_RADIUS);
+  }
+
+  public static double distance(
+      double lon1, double lat1, double lon2, double lat2, double AVG_EARTH_RADIUS) {
     double latDistance = toRadians(lat2 - lat1);
     double lngDistance = toRadians(lon2 - lon1);
     double a =
@@ -64,10 +77,8 @@ public class Haversine {
     return AVG_EARTH_RADIUS * c * 1.0;
   }
 
-  // Calculate the distance between two points on the earth using the "haversine" formula.
-  // The radius of the earth is 6371.0 km
-  public static double distance(Geometry geom1, Geometry geom2) {
-    return distance(geom1, geom2, 6371008.0);
+  public static double distance(double lon1, double lat1, double lon2, double lat2) {
+    return distance(lon1, lat1, lon2, lat2, AVG_EARTH_RADIUS);
   }
 
   /**

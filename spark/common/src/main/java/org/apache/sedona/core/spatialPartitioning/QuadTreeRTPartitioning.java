@@ -26,6 +26,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 import org.apache.log4j.Logger;
+import org.apache.sedona.common.sphere.Haversine;
 import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.joinJudgement.KnnJoinIndexJudgement;
 import org.apache.sedona.core.spatialPartitioning.quadtree.QuadRectangle;
@@ -576,7 +577,7 @@ public class QuadTreeRTPartitioning extends QuadtreePartitioning {
     }
 
     // Convert spheroid distance to angular distance in degrees
-    double angularDistance = Math.toDegrees(spheroidDistance / 6371008.0);
+    double angularDistance = Math.toDegrees(spheroidDistance / Haversine.AVG_EARTH_RADIUS);
 
     // Calculate the latitude and longitude differences based on the centroid's coordinates
     double latDiff = angularDistance;

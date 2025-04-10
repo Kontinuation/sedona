@@ -117,7 +117,14 @@ public class BoundablePair implements Comparable<BoundablePair> {
           new ItemBoundable(geometry.getEnvelopeInternal(), geometry), (ItemBoundable) boundable2);
     }
     // otherwise compute distance between bounds of boundables
-    return ((Envelope) boundable1.getBounds()).distance(((Envelope) boundable2.getBounds()));
+    if (itemDistance instanceof EnvelopeDistance) {
+      // Our distance function supports computing distance between envelope and query item,
+      // this helps efficiently pruning the search space when using spherical distances.
+      return ((EnvelopeDistance) itemDistance)
+          .distanceLowerBound((Envelope) boundable1.getBounds(), (ItemBoundable) boundable2);
+    } else {
+      return ((Envelope) boundable1.getBounds()).distance(((Envelope) boundable2.getBounds()));
+    }
   }
 
   /**

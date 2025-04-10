@@ -18,11 +18,13 @@
  */
 package org.apache.sedona.core.knnJudgement;
 
+import org.apache.spark.sedona.core.index.nearestneighbor.EnvelopeDistance;
+import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.index.strtree.ItemBoundable;
 import org.locationtech.jts.index.strtree.ItemDistance;
 
-public class EuclideanItemDistance implements ItemDistance {
+public class EuclideanItemDistance implements ItemDistance, EnvelopeDistance {
 
   public EuclideanItemDistance() {}
 
@@ -43,5 +45,11 @@ public class EuclideanItemDistance implements ItemDistance {
     } else {
       return geometry1.distance(geometry2);
     }
+  }
+
+  @Override
+  public double distanceLowerBound(Envelope a, ItemBoundable b) {
+    Geometry g = (Geometry) b.getItem();
+    return a.distance(g.getEnvelopeInternal());
   }
 }
