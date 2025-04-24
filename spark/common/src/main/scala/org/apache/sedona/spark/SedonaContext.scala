@@ -26,6 +26,7 @@ import org.apache.sedona.sql.UDF.Catalog
 import org.apache.sedona.sql.UDT.UdtRegistrator
 import org.apache.spark.SparkConf
 import org.apache.spark.api.java.JavaSparkContext
+import org.apache.spark.api.java.JavaSparkContext.toSparkContext
 import org.apache.spark.deploy.PythonRunner
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.monitoring.ListenerRegistrator
@@ -33,6 +34,7 @@ import org.apache.spark.sql.sedona_sql.optimization._
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
 import org.apache.spark.sql.sedona_sql.strategy.physical.function.EvalPhysicalFunctionStrategy
 import org.apache.spark.sql.{SQLContext, SparkSession}
+import org.apache.spark.sql.sedona_sql.optimization.LogicalRepartitionBeforeExpensiveOperation
 
 import scala.annotation.StaticAnnotation
 import scala.collection.mutable.ListBuffer
@@ -61,7 +63,8 @@ object SedonaContext {
     Seq(
       new SpatialFilterPushDownForGeoParquet(sparkSession),
       new SpatialTemporalFilterPushDownForStacScan(sparkSession),
-      new OptimizeOutDbRasterLoading(sparkSession))
+      new OptimizeOutDbRasterLoading(sparkSession),
+      new LogicalRepartitionBeforeExpensiveOperation(toSparkContext(sparkSession.sparkContext)))
 
   def create(sqlContext: SQLContext): SQLContext = {
     create(sqlContext.sparkSession)
@@ -104,11 +107,6 @@ object SedonaContext {
       if (!sparkSession.experimental.extraOptimizations.contains(opt)) {
         sparkSession.experimental.extraOptimizations ++= Seq(opt)
       }
-    }
-
-    // Support order by optimization
-    if (!sparkSession.experimental.extraOptimizations.contains(OrderByOptimization)) {
-      sparkSession.experimental.extraOptimizations ++= Seq(OrderByOptimization)
     }
 
     addGeoParquetToSupportNestedFilterSources(sparkSession)
@@ -161,6 +159,7 @@ object SedonaContext {
       .builder()
       .config("spark.serializer", classOf[KryoSerializer].getName)
       .config("spark.kryo.registrator", classOf[SedonaKryoRegistrator].getName)
+      .withExtensions(new SedonaSparkSessionExtensions())
   }
 
   private def addGeoParquetToSupportNestedFilterSources(session: SparkSession): Unit = {

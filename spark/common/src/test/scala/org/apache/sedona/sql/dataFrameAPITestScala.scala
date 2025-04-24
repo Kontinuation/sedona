@@ -21,6 +21,7 @@ package org.apache.sedona.sql
 import org.apache.commons.codec.binary.Hex
 import org.apache.sedona.common.geometryObjects.Geography
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, ShuffleQueryStageExec}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.sedona_sql.expressions.InferredExpressionException
 import org.apache.spark.sql.sedona_sql.expressions.st_aggregates._
@@ -714,6 +715,33 @@ class dataFrameAPITestScala extends TestBaseScala {
       val actualResult = df.take(1)(0).get(0).asInstanceOf[Geometry].toText()
       val expectedResult = "POLYGON ((2 8, 8 8, 8 2, 2 2, 2 8))"
       assert(actualResult == expectedResult)
+    }
+
+    it("Passed ST_Intersection with repartition") {
+      val polygonDf = sparkSession.read
+        .format("csv")
+        .option("delimiter", "\t")
+        .option("header", "false")
+        .load(geojsonInputLocation)
+        .select(expr("ST_GeomFromGeoJSON(_c0)").as("a"))
+        .withColumn("b", ST_Envelope("a"))
+        .repartition(20)
+        .checkpoint(true)
+
+      val df = polygonDf.select(ST_Intersection("a", "b"), col("a"))
+      val actualResult = df.take(1)(0).get(0).asInstanceOf[Geometry].toText
+      val expectedResult = df.take(1)(0).get(1).asInstanceOf[Geometry].toText
+      assert(actualResult == expectedResult)
+      assert(df.rdd.getNumPartitions == sparkSession.sparkContext.defaultParallelism * 4)
+
+      assert(
+        df.queryExecution.executedPlan
+          .asInstanceOf[AdaptiveSparkPlanExec]
+          .finalPhysicalPlan
+          .collect { case p: ShuffleQueryStageExec =>
+            p
+          }
+          .size == 1)
     }
 
     it("Passed ST_IsValid") {

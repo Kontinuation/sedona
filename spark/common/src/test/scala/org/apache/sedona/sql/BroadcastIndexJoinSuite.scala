@@ -18,11 +18,11 @@
  */
 package org.apache.sedona.sql
 
-import org.apache.spark.sql.execution.joins.BroadcastNestedLoopJoinExec
-import org.apache.spark.sql.sedona_sql.strategy.join.BroadcastIndexJoinExec
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.sedona_sql.strategy.join.RangeJoinExec
+import org.apache.spark.sql.execution.adaptive.{AdaptiveSparkPlanExec, ShuffleQueryStageExec}
+import org.apache.spark.sql.execution.joins.BroadcastNestedLoopJoinExec
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.sedona_sql.strategy.join.{BroadcastIndexJoinExec, RangeJoinExec}
 
 class BroadcastIndexJoinSuite extends TestBaseScala {
 
@@ -737,6 +737,44 @@ class BroadcastIndexJoinSuite extends TestBaseScala {
         p
       }.size == 1)
       assert(distanceJoinDF.count() == expected)
+    }
+
+    it("Passed has repartitioned stream side") {
+      // the RepartitionBeforeExpensiveOperation rule will trigger only when AQE is enabled
+      sparkSession.conf.set("spark.sql.adaptive.enabled", true)
+      // without repartition AQE won't trigger because the data is so small
+      val polygonDf = buildPolygonDf.repartition(5)
+      val pointDf = buildPointDf
+
+      val broadcastJoinDf = pointDf
+        .alias("pointDf")
+        .join(
+          broadcast(polygonDf).alias("polygonDf"),
+          expr("ST_Contains(polygonDf.polygonshape, pointDf.pointshape)"))
+
+      assert(
+        broadcastJoinDf.rdd.getNumPartitions == sparkSession.sparkContext.defaultParallelism * 4)
+
+      assert(
+        broadcastJoinDf.queryExecution.executedPlan
+          .asInstanceOf[AdaptiveSparkPlanExec]
+          .finalPhysicalPlan
+          .collect { case p: BroadcastIndexJoinExec =>
+            p
+          }
+          .size === 1)
+
+      assert(
+        broadcastJoinDf.queryExecution.executedPlan
+          .asInstanceOf[AdaptiveSparkPlanExec]
+          .finalPhysicalPlan
+          .collect { case p: ShuffleQueryStageExec =>
+            p
+          }
+          .size == 2
+      ) // the explicit one from above and then the one from RepartitionBeforeExpensiveOperation
+
+      sparkSession.conf.set("spark.sql.adaptive.enabled", false)
     }
   }
 
