@@ -39,10 +39,23 @@ object SparkHadoopUtil {
     val hadoopConf = org.apache.spark.deploy.SparkHadoopUtil.get.newConfiguration(sparkConf)
 
     // Add wherobots specific configurations to the Hadoop configuration
+    attachWherobotsHadoopConfigurations(sparkConf, hadoopConf)
+
+    hadoopConf
+  }
+
+  /**
+   * Attach wherobots specific configurations to the given Hadoop configuration.
+   * @param sparkConf
+   *   SparkConf
+   * @param hadoopConf
+   *   Hadoop Configuration
+   */
+  def attachWherobotsHadoopConfigurations(
+      sparkConf: SparkConf,
+      hadoopConf: Configuration): Unit = {
     sparkConf.getAllWithPrefix("spark.wherobots.").foreach { case (key, value) =>
       hadoopConf.set("wherobots." + key, value)
     }
-
-    hadoopConf
   }
 }

@@ -18,6 +18,7 @@
  */
 package org.apache.spark.sql.sedona_sql.io.raster
 
+import org.apache.sedona.common.raster.outdb.ThreadLocalOutDbResourcePool
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.Expression
@@ -32,6 +33,7 @@ import org.apache.spark.sql.execution.datasources.v2.FileScanBuilder
 import org.apache.spark.sql.execution.datasources.FilePartition
 import org.apache.spark.sql.execution.datasources.v2.FileScan
 import org.apache.spark.sql.execution.datasources.v2.TableSampleInfo
+import org.apache.spark.sql.sedona_sql.utils.SparkHadoopUtil
 import org.apache.spark.sql.sources.Filter
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
@@ -219,6 +221,24 @@ case class RasterScan(
 
   override def createReaderFactory(): PartitionReaderFactory = {
     val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(options.asScala.toMap)
+
+    // Attach wherobots-raster specific configurations to the Hadoop configuration
+    SparkHadoopUtil.attachWherobotsHadoopConfigurations(
+      sparkSession.sparkContext.conf,
+      hadoopConf)
+
+    val loadRasterMetadata = this.loadRasterMetadata.getOrElse(false)
+    if (loadRasterMetadata && rasterLoadingParallelism > 0) {
+      // Disable out-db raster pooling when loading raster metadata in parallel, since raster object
+      // pool is thread local, we are loading raster metadata from raster loading worker threads so
+      // these cached raster objects cannot be used by the executor threads, caching them are
+      // simply useless.
+      // Also, there will be lots of worker threads for loading raster metadata, each thread
+      // has its own pool, there will be lots of useless raster objects pooled by the worker
+      // threads, which will even exhaust maximum opened file descriptors or network connections.
+      hadoopConf.set(ThreadLocalOutDbResourcePool.FREE_RESOURCES_POOL_SIZE_CONF_KEY, "0")
+    }
+
     val broadcastedConf =
       sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 
@@ -229,7 +249,7 @@ case class RasterScan(
       readPartitionSchema,
       rasterOptions,
       pushedFilters,
-      loadRasterMetadata.getOrElse(false),
+      loadRasterMetadata,
       rasterLoadingParallelism)
   }
 
