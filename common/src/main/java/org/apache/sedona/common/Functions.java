@@ -1881,6 +1881,9 @@ public class Functions {
   }
 
   public static Geometry[] subDivide(Geometry geometry, int maxVertices) {
+    if (maxVertices < 5) {
+      throw new IllegalArgumentException("ST_Subdivide needs 5 or more max vertices");
+    }
     return GeometrySubDivider.subDivide(geometry, maxVertices);
   }
 
