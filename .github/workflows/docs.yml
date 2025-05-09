@@ -53,7 +53,7 @@ jobs:
       - name: Compile ScalaDoc
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PKG_GITHUB_TOKEN }}
-        run: mvn -q install scala:doc -DskipTests -Dspark=3.4 -Dscala=2.12 && mkdir -p docs/api/scaladoc/wherobots-compute && cp -r spark/common/target/site/scaladocs/* docs/api/scaladoc/wherobots-compute/
+        run: mvn -q install scala:doc -DskipTests -Dspark=3.5 -Dscala=2.12 && mkdir -p docs/api/scaladoc/wherobots-compute && cp -r spark/common/target/site/scaladocs/* docs/api/scaladoc/wherobots-compute/
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
