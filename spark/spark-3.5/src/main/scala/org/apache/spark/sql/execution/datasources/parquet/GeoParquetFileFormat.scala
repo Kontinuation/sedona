@@ -24,11 +24,13 @@ import org.apache.hadoop.mapred.FileSplit
 import org.apache.hadoop.mapreduce._
 import org.apache.hadoop.mapreduce.task.TaskAttemptContextImpl
 import org.apache.parquet.filter2.compat.FilterCompat
-import org.apache.parquet.filter2.predicate.FilterApi
+import org.apache.parquet.filter2.predicate.{FilterApi, FilterPredicate}
 import org.apache.parquet.hadoop.ParquetOutputFormat.JobSummaryLevel
 import org.apache.parquet.hadoop._
 import org.apache.parquet.hadoop.codec.CodecConfig
+import org.apache.parquet.hadoop.metadata.FileMetaData
 import org.apache.parquet.hadoop.util.ContextUtil
+import org.apache.spark.TaskContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.InternalRow
@@ -36,7 +38,7 @@ import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeProjection
 import org.apache.spark.sql.catalyst.parser.LegacyTypeStringParser
 import org.apache.spark.sql.catalyst.types.DataTypeUtils.toAttributes
-import org.apache.spark.sql.catalyst.util.DateTimeUtils
+import org.apache.spark.sql.catalyst.util.{DateTimeUtils, RebaseDateTime}
 import org.apache.spark.sql.execution.datasources._
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat.readParquetFootersInParallel
 import org.apache.spark.sql.internal.SQLConf
@@ -46,8 +48,7 @@ import org.apache.spark.sql.types._
 import org.apache.spark.util.SerializableConfiguration
 
 import scala.collection.JavaConverters._
-import scala.util.Failure
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 class GeoParquetFileFormat(val spatialFilter: Option[GeoParquetSpatialFilter])
     extends ParquetFileFormat
@@ -211,9 +212,8 @@ class GeoParquetFileFormat(val spatialFilter: Option[GeoParquetSpatialFilter])
     // a subset of the types (no complex types).
     val resultSchema = StructType(partitionSchema.fields ++ requiredSchema.fields)
     val sqlConf = sparkSession.sessionState.conf
-    val enableVectorizedReader: Boolean =
-      sqlConf.parquetVectorizedReaderEnabled &&
-        resultSchema.forall(_.dataType.isInstanceOf[AtomicType])
+    val enableVectorizedReader =
+      sqlConf.parquetVectorizedReaderEnabled && !GeoParquetUtils.isLegacyMode(options)
     val enableRecordFilter: Boolean = sqlConf.parquetRecordFilterEnabled
     val timestampConversion: Boolean = sqlConf.isParquetINT96TimestampConversion
     val enableParquetFilterPushDown: Boolean = sqlConf.parquetFilterPushDown
@@ -226,6 +226,8 @@ class GeoParquetFileFormat(val spatialFilter: Option[GeoParquetSpatialFilter])
     val parquetOptions = new ParquetOptions(options, sparkSession.sessionState.conf)
     val datetimeRebaseModeInRead = parquetOptions.datetimeRebaseModeInRead
     val int96RebaseModeInRead = parquetOptions.int96RebaseModeInRead
+    val enableOffHeapColumnVector = sqlConf.offHeapColumnVectorEnabled
+    val batchSize = sqlConf.parquetVectorizedReaderBatchSize
 
     (file: PartitionedFile) => {
       assert(file.partitionValues.numFields == partitionSchema.size)
@@ -300,46 +302,35 @@ class GeoParquetFileFormat(val spatialFilter: Option[GeoParquetSpatialFilter])
         if (pushed.isDefined) {
           ParquetInputFormat.setFilterPredicate(hadoopAttemptContext.getConfiguration, pushed.get)
         }
+
         if (enableVectorizedReader) {
-          logWarning(
-            s"GeoParquet currently does not support vectorized reader. Falling back to parquet-mr")
-        }
-        logDebug(s"Falling back to parquet-mr")
-        // ParquetRecordReader returns InternalRow
-        val readSupport = new GeoParquetReadSupport(
-          convertTz,
-          enableVectorizedReader = false,
-          datetimeRebaseSpec,
-          int96RebaseSpec,
-          options)
-        val reader = if (pushed.isDefined && enableRecordFilter) {
-          val parquetFilter = FilterCompat.get(pushed.get, null)
-          new ParquetRecordReader[InternalRow](readSupport, parquetFilter)
+          createVectorizedReader(
+            file,
+            split,
+            hadoopAttemptContext,
+            footerFileMetaData,
+            convertTz,
+            datetimeRebaseSpec,
+            int96RebaseSpec,
+            requiredSchema,
+            options,
+            partitionSchema,
+            enableOffHeapColumnVector,
+            batchSize)
         } else {
-          new ParquetRecordReader[InternalRow](readSupport)
-        }
-        val readerWithRowIndexes =
-          ParquetRowIndexUtil.addRowIndexToRecordReaderIfNeeded(reader, requiredSchema)
-        val iter = new RecordReaderIterator[InternalRow](readerWithRowIndexes)
-        try {
-          readerWithRowIndexes.initialize(split, hadoopAttemptContext)
-
-          val fullSchema = toAttributes(requiredSchema) ++ toAttributes(partitionSchema)
-          val unsafeProjection = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
-
-          if (partitionSchema.length == 0) {
-            // There is no partition columns
-            iter.map(unsafeProjection)
-          } else {
-            val joinedRow = new JoinedRow()
-            iter.map(d => unsafeProjection(joinedRow(d, file.partitionValues)))
-          }
-        } catch {
-          case e: Throwable =>
-            // SPARK-23457: In case there is an exception in initialization, close the iterator to
-            // avoid leaking resources.
-            iter.close()
-            throw e
+          createSequentialReader(
+            file,
+            split,
+            hadoopAttemptContext,
+            footerFileMetaData,
+            convertTz,
+            datetimeRebaseSpec,
+            int96RebaseSpec,
+            requiredSchema,
+            options,
+            partitionSchema,
+            enableRecordFilter,
+            pushed)
         }
       }
     }
@@ -348,6 +339,102 @@ class GeoParquetFileFormat(val spatialFilter: Option[GeoParquetSpatialFilter])
   override def supportDataType(dataType: DataType): Boolean = super.supportDataType(dataType)
 
   override def supportBatch(sparkSession: SparkSession, schema: StructType): Boolean = false
+
+  private def createVectorizedReader(
+      file: PartitionedFile,
+      split: FileSplit,
+      hadoopAttemptContext: TaskAttemptContext,
+      footerMetaData: FileMetaData,
+      convertTz: Option[java.time.ZoneId],
+      datetimeRebaseSpec: RebaseDateTime.RebaseSpec,
+      int96RebaseSpec: RebaseDateTime.RebaseSpec,
+      requiredSchema: StructType,
+      options: Map[String, String],
+      partitionSchema: StructType,
+      enableOffHeapColumnVector: Boolean,
+      batchSize: Int): Iterator[InternalRow] = {
+
+    val schemaWithGeometry = GeoParquetFileFormat.replaceGeometryColumnWithGeometryUDT(
+      requiredSchema,
+      footerMetaData.getKeyValueMetaData,
+      options)
+
+    val vectorizedReader = new GeoVectorizedParquetRecordReader(
+      schemaWithGeometry,
+      convertTz.orNull,
+      datetimeRebaseSpec.mode.toString,
+      datetimeRebaseSpec.timeZone,
+      int96RebaseSpec.mode.toString,
+      int96RebaseSpec.timeZone,
+      enableOffHeapColumnVector && Option(TaskContext.get()).isDefined,
+      batchSize)
+
+    val iterator = new RecordReaderIterator(vectorizedReader)
+
+    try {
+      vectorizedReader.initialize(split, hadoopAttemptContext)
+      vectorizedReader.initBatch(partitionSchema, file.partitionValues)
+      iterator.asInstanceOf[Iterator[InternalRow]]
+    } catch {
+      case e: Throwable =>
+        iterator.close()
+        throw e
+    }
+  }
+
+  private def createSequentialReader(
+      file: PartitionedFile,
+      split: FileSplit,
+      hadoopAttemptContext: TaskAttemptContext,
+      footerMetaData: FileMetaData,
+      convertTz: Option[java.time.ZoneId],
+      datetimeRebaseSpec: RebaseDateTime.RebaseSpec,
+      int96RebaseSpec: RebaseDateTime.RebaseSpec,
+      requiredSchema: StructType,
+      options: Map[String, String],
+      partitionSchema: StructType,
+      enableRecordFilter: Boolean,
+      pushed: Option[FilterPredicate]): Iterator[InternalRow] = {
+    logDebug(s"Sequential Reader enabled")
+    // ParquetRecordReader returns InternalRow
+    val readSupport = new GeoParquetReadSupport(
+      convertTz,
+      enableVectorizedReader = false,
+      datetimeRebaseSpec,
+      int96RebaseSpec,
+      options)
+    val reader = if (pushed.isDefined && enableRecordFilter) {
+      val parquetFilter = FilterCompat.get(pushed.get, null)
+      new ParquetRecordReader[InternalRow](readSupport, parquetFilter)
+    } else {
+      new ParquetRecordReader[InternalRow](readSupport)
+    }
+    val readerWithRowIndexes =
+      ParquetRowIndexUtil.addRowIndexToRecordReaderIfNeeded(reader, requiredSchema)
+    val iter = new RecordReaderIterator[InternalRow](readerWithRowIndexes)
+    try {
+      readerWithRowIndexes.initialize(split, hadoopAttemptContext)
+
+      val fullSchema = toAttributes(requiredSchema) ++ toAttributes(partitionSchema)
+      val unsafeProjection = GenerateUnsafeProjection.generate(fullSchema, fullSchema)
+
+      if (partitionSchema.length == 0) {
+        // There is no partition columns
+        iter.map(unsafeProjection)
+      } else {
+        val joinedRow = new JoinedRow()
+        iter.map(d => unsafeProjection(joinedRow(d, file.partitionValues)))
+      }
+
+    } catch {
+      case e: Throwable =>
+        // SPARK-23457: In case there is an exception in initialization, close the iterator to
+        // avoid leaking resources.
+        iter.close()
+        throw e
+    }
+  }
+
 }
 
 object GeoParquetFileFormat extends Logging {

@@ -243,6 +243,31 @@ class GeoParquetSpatialFilterPushDownSuite extends TestBaseScala with TableDrive
         assert(getPushedDownSpatialFilter(dfFiltered).isEmpty)
       }
     }
+
+    it("Validate with Sequential Reads - Push down ST_Contains") {
+      /* All tests run with vectorized reader on by default.  Checking
+       * validating that the sequential read path works as expected
+       * by disabling the vectorized reader.
+       */
+      withConf(Map("spark.sql.parquet.enableVectorizedReader" -> "false")) {
+        testFilter(
+          "ST_Contains(ST_GeomFromText('POLYGON ((0 0, 0 10, 10 10, 10 0, 0 0))'), geom)",
+          Seq(1))
+        testFilter(
+          "ST_Contains(ST_GeomFromText('POLYGON ((-16 14, -16 16, -14 16, -14 14, -16 14))'), geom)",
+          Seq(0))
+        testFilter(
+          "ST_Contains(ST_GeomFromText('POLYGON ((0 0, 0 1, 1 1, 1 0, 0 0))'), geom)",
+          Seq.empty)
+        testFilter("ST_Contains(geom, ST_GeomFromText('POINT (15 -15)'))", Seq(3))
+        testFilter(
+          "ST_Contains(geom, ST_GeomFromText('POLYGON ((4 -5, 5 -5, 5 -4, 4 -4, 4 -5))'))",
+          Seq(3))
+        testFilter(
+          "ST_Contains(geom, ST_GeomFromText('POLYGON ((1 -5, 5 -5, 5 -1, 1 -1, 1 -5))'))",
+          Seq.empty)
+      }
+    }
   }
 
   /**
