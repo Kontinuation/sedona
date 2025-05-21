@@ -609,14 +609,18 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
     this.spatialPartitionedRDD = partition(partitioner, conf);
   }
 
-  /** @deprecated Use spatialPartitioning(SpatialPartitioner partitioner) */
+  /**
+   * @deprecated Use spatialPartitioning(SpatialPartitioner partitioner)
+   */
   public boolean spatialPartitioning(final List<Envelope> otherGrids) throws Exception {
     this.partitioner = new IndexedGridPartitioner(otherGrids);
     this.spatialPartitionedRDD = partition(partitioner);
     return true;
   }
 
-  /** @deprecated Use spatialPartitioning(SpatialPartitioner partitioner) */
+  /**
+   * @deprecated Use spatialPartitioning(SpatialPartitioner partitioner)
+   */
   public boolean spatialPartitioning(final StandardQuadTree partitionTree) throws Exception {
     this.partitioner = new QuadTreePartitioner(partitionTree);
     this.spatialPartitionedRDD = partition(partitioner);

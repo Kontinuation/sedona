@@ -39,7 +39,9 @@ public class DynamicIndexLookupJudgement<T extends Geometry, U extends Geometry>
     implements FlatMapFunction2<Iterator<U>, Iterator<T>, Pair<U, T>>, Serializable {
   private final IndexType indexType;
 
-  /** @see JudgementBase */
+  /**
+   * @see JudgementBase
+   */
   public DynamicIndexLookupJudgement(
       SpatialPredicate spatialPredicate,
       IndexType indexType,
