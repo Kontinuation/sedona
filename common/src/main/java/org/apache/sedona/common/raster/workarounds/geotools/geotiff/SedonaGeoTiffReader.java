@@ -582,7 +582,9 @@ public class SedonaGeoTiffReader extends AbstractGridCoverage2DReader
     }
   }
 
-  /** @see org.opengis.coverage.grid.GridCoverageReader#getFormat() */
+  /**
+   * @see org.opengis.coverage.grid.GridCoverageReader#getFormat()
+   */
   @Override
   public Format getFormat() {
     return new GeoTiffFormat();
@@ -1027,7 +1029,9 @@ public class SedonaGeoTiffReader extends AbstractGridCoverage2DReader
     return crs;
   }
 
-  /** @throws IOException */
+  /**
+   * @throws IOException
+   */
   static MathTransform parseWorldFile(Object source) throws IOException {
     MathTransform raster2Model = null;
 
@@ -1066,7 +1070,9 @@ public class SedonaGeoTiffReader extends AbstractGridCoverage2DReader
     return raster2Model;
   }
 
-  /** @throws IOException */
+  /**
+   * @throws IOException
+   */
   static MapInfoFileReader parseMapInfoFile(Object source) throws IOException {
     if (source instanceof File) {
       final File sourceFile = ((File) source);

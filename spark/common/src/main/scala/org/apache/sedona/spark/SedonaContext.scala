@@ -42,8 +42,8 @@ import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
 class InternalApi(
-                   description: String = "This method is for internal use only and may change without notice.")
-  extends StaticAnnotation
+    description: String = "This method is for internal use only and may change without notice.")
+    extends StaticAnnotation
 
 object SedonaContext {
   val logger: Logger = Logger.getLogger("SedonaContext")
@@ -90,7 +90,7 @@ object SedonaContext {
     }
 
     if (!sparkSession.experimental.extraStrategies.exists(
-      _.isInstanceOf[EvalPhysicalFunctionStrategy])) {
+        _.isInstanceOf[EvalPhysicalFunctionStrategy])) {
       sparkSession.experimental.extraStrategies ++= Seq(
         new EvalPhysicalFunctionStrategy(sparkSession))
     }
@@ -119,9 +119,9 @@ object SedonaContext {
 
     customOptimizationsWithSession(sparkSession).foreach { opt =>
       if (!sparkSession.experimental.extraOptimizations.exists {
-        case _: opt.type => true
-        case _ => false
-      }) {
+          case _: opt.type => true
+          case _ => false
+        }) {
         sparkSession.experimental.extraOptimizations ++= Seq(opt)
       }
     }

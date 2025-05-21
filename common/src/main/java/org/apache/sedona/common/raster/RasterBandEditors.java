@@ -18,6 +18,12 @@
  */
 package org.apache.sedona.common.raster;
 
+import java.awt.geom.Point2D;
+import java.awt.image.Raster;
+import java.awt.image.RenderedImage;
+import java.awt.image.WritableRaster;
+import java.util.Collections;
+import javax.media.jai.RasterFactory;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.common.Functions;
@@ -40,14 +46,6 @@ import org.opengis.parameter.ParameterValueGroup;
 import org.opengis.referencing.FactoryException;
 import org.opengis.referencing.datum.PixelInCell;
 import org.opengis.referencing.operation.TransformException;
-
-import javax.media.jai.RasterFactory;
-
-import java.awt.geom.Point2D;
-import java.awt.image.Raster;
-import java.awt.image.RenderedImage;
-import java.awt.image.WritableRaster;
-import java.util.Collections;
 
 public class RasterBandEditors {
   /**
