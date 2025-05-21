@@ -18,15 +18,11 @@
  */
 package org.apache.sedona.sql
 
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.types.StringType
-import org.apache.spark.sql.types.StructField
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.Row
+import org.apache.sedona.core.utils.ExecutorResourceUtils
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
-import org.locationtech.jts.geom.Coordinate
-import org.locationtech.jts.geom.Envelope
-import org.locationtech.jts.geom.GeometryFactory
+import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.locationtech.jts.geom.{Coordinate, Envelope, GeometryFactory}
 
 class AdaptiveBroadcastIndexJoinSuite extends TestBaseScala {
 
@@ -58,6 +54,20 @@ class AdaptiveBroadcastIndexJoinSuite extends TestBaseScala {
       prepareTempViewsForTestData(df2PartitionSizes)
       verifyQuery("SELECT df1.id, df2.id FROM df1 JOIN df2 ON ST_Intersects(df1.geom, df2.geom)")
       verifyQuery("SELECT df2.id, df1.id FROM df2 JOIN df1 ON ST_Intersects(df2.geom, df1.geom)")
+    }
+
+    it("should re-balance the stream side when the stream side is underpartitioned") {
+      val partitionSize = 150000L
+      val df2PartitionSizes = Seq(partitionSize)
+      prepareTempViewsForTestData(df2PartitionSizes)
+      verifyQuery(
+        "SELECT df1.id, df2.id FROM df1 JOIN df2 ON ST_Intersects(df1.geom, df2.geom)",
+        None,
+        Some(partitionSize))
+      verifyQuery(
+        "SELECT df2.id, df1.id FROM df2 JOIN df1 ON ST_Intersects(df2.geom, df1.geom)",
+        None,
+        Some(partitionSize))
     }
   }
 
@@ -96,7 +106,8 @@ class AdaptiveBroadcastIndexJoinSuite extends TestBaseScala {
 
   private def verifyQuery(
       query: String,
-      expectedPartitionSizes: Option[Seq[Long]] = None): Unit = {
+      expectedPartitionSizes: Option[Seq[Long]] = None,
+      expectedPartitionCount: Option[Long] = None): Unit = {
     val result = sparkSession.sql(query)
     val expected = withConf(Map("sedona.join.optimizationmode" -> "none")) {
       sparkSession.sql(query)
@@ -117,6 +128,14 @@ class AdaptiveBroadcastIndexJoinSuite extends TestBaseScala {
         val minSize = partitionSizes.min()
         val meanSize = partitionSizes.mean()
         assert(maxSize - minSize <= 0.01 * meanSize)
+    }
+
+    if (expectedPartitionCount.nonEmpty) {
+      assert(
+        ExecutorResourceUtils.getTargetPartitionCount(
+          sparkSession.sparkContext,
+          10000,
+          expectedPartitionCount.get) == result.rdd.getNumPartitions)
     }
   }
 }

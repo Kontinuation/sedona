@@ -18,6 +18,7 @@
  */
 package org.apache.spark.sql.sedona_sql.optimization
 
+import org.apache.sedona.core.utils.ExecutorResourceUtils.getTargetPartitionCount
 import org.apache.spark.SparkContext
 import org.apache.spark.sql.catalyst.plans.QueryPlan
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Repartition}
@@ -27,7 +28,7 @@ import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.adaptive.ShuffleQueryStageExec
 import org.apache.spark.sql.execution.exchange.ShuffleExchangeExec
 import org.apache.spark.sql.sedona_sql.expressions.ST_Intersection
-import org.apache.spark.sql.sedona_sql.optimization.RepartitionBeforeExpensiveOperation.{containsExpensiveFunctionCall, getTargetPartitionCount}
+import org.apache.spark.sql.sedona_sql.optimization.RepartitionBeforeExpensiveOperation.containsExpensiveFunctionCall
 import org.apache.spark.sql.sedona_sql.strategy.join.{BroadcastIndexJoinExec, LeftSide}
 
 /**
@@ -133,15 +134,6 @@ class PhysicalRepartitionBeforeExpensiveOperation(context: SparkContext) extends
 }
 
 private[optimization] object RepartitionBeforeExpensiveOperation {
-  def getTargetPartitionCount(context: SparkContext): Int = {
-    // When core count is fixed, use some multiple of the number of cores
-    if (!context.getConf.get("spark.dynamicAllocation.enabled", "false").toBoolean) {
-      4 * context.defaultParallelism
-    } else
-      // Otherwise we can't assume we should use all currently
-      // available cores or only currently  available cores
-      context.getConf.get("spark.sql.shuffle.partitions", "200").toInt
-  }
 
   def containsExpensiveFunctionCall(plan: QueryPlan[_]): Boolean =
     plan.expressions.exists(e =>

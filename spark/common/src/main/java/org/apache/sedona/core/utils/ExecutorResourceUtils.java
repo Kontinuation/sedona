@@ -48,4 +48,16 @@ public class ExecutorResourceUtils {
     }
     return Math.max(context.defaultParallelism(), executorInstances * executorCores);
   }
+
+  public static int getTargetPartitionCount(SparkContext context) {
+    return 4 * ExecutorResourceUtils.inferParallelism(context);
+  }
+
+  public static int getTargetPartitionCount(
+      SparkContext context, long idealRecordsPerPartition, long numberRows) {
+    return (int)
+        Math.min(
+            Math.max(1, numberRows / idealRecordsPerPartition),
+            4L * ExecutorResourceUtils.inferParallelism(context));
+  }
 }

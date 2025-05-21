@@ -19,50 +19,33 @@
 package org.apache.spark.sql.sedona_sql.strategy.join
 
 import org.apache.sedona.common.subDivide.SubdivideOptions
-import org.apache.sedona.core.enums.{IndexType, JoinSubdivideMode}
-import org.apache.sedona.core.enums.ExecutionMode
+import org.apache.sedona.core.enums.{ExecutionMode, IndexType, JoinSubdivideMode}
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
-import org.apache.sedona.core.spatialOperator.Subdivide.{isSubdivideAccurate, SubdividedPart, SubdivideRDDOptions}
+import org.apache.sedona.core.spatialOperator.Subdivide.{SubdivideRDDOptions, SubdividedPart, isSubdivideAccurate}
 import org.apache.sedona.core.spatialOperator.{JoinQuery, SpatialPredicate, Subdivide}
-import org.apache.sedona.core.spatialPartitioning.BroadcastedSpatialPartitioner
-import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner
 import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner.OuterJoinUserData
-import org.apache.sedona.core.spatialPartitioning.SpatialPartitioner
-import org.apache.sedona.core.spatialPartitioning.SpatialPartitioningMetrics
+import org.apache.sedona.core.spatialPartitioning.{BroadcastedSpatialPartitioner, OuterJoinSpatialPartitioner, SpatialPartitioner, SpatialPartitioningMetrics}
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector
-import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector.PerPartitionStats
-import org.apache.sedona.core.utils.ExecutorResourceUtils
-import org.apache.sedona.core.utils.SedonaConf
+import org.apache.sedona.core.utils.{ExecutorResourceUtils, SedonaConf}
+import org.apache.spark.HashPartitioner
+import org.apache.spark.api.java.function.{Function0 => JavaFunction0, Function2 => JavaFunction2}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, Predicate, UnsafeRow}
-import org.apache.spark.sql.catalyst.expressions.GenericInternalRow
-import org.apache.spark.sql.catalyst.expressions.UnsafeProjection
-import org.apache.spark.sql.catalyst.plans.FullOuter
-import org.apache.spark.sql.catalyst.plans.Inner
-import org.apache.spark.sql.catalyst.plans.InnerLike
-import org.apache.spark.sql.catalyst.plans.JoinType
-import org.apache.spark.sql.catalyst.plans.LeftOuter
-import org.apache.spark.sql.catalyst.plans.RightOuter
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, GenericInternalRow, Predicate, UnsafeProjection, UnsafeRow}
+import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.{SparkPlan, SQLExecution}
-import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.createUnsafeRowProjector
-import org.locationtech.jts.geom.Geometry
+import org.apache.spark.sql.execution.{SQLExecution, SparkPlan}
 import org.apache.spark.sql.sedona_sql.expressions.implicits._
-import org.apache.spark.sql.sedona_sql.utils.UnsafeRowRDDSorter.sortUnsafeRowRDD
-import org.apache.spark.HashPartitioner
-import org.apache.spark.sql.sedona_sql.utils.JoinedUnsafeRowRDDSorter
-import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
-import org.apache.spark.api.java.function.{Function0 => JavaFunction0, Function2 => JavaFunction2}
 import org.apache.spark.sql.sedona_sql.optimization.ExpressionUtils.matchDistanceExpressionToJoinSide
-import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.getNullUnsafeRow
-import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.getUnsafeRowFromUserData
-import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.joinTypeOf
-import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.UnsafeRowWithId
-import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec.UnsafeRowWithKeyIdAndOtherId
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec._
+import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.createUnsafeRowProjector
+import org.apache.spark.sql.sedona_sql.utils.JoinedUnsafeRowRDDSorter
+import org.apache.spark.sql.sedona_sql.utils.UnsafeRowRDDSorter.sortUnsafeRowRDD
+import org.locationtech.jts.geom.Geometry
+import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
 
 import scala.collection.JavaConverters._
 
@@ -1086,37 +1069,35 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
     val partitionSizesMessage = partitionSizes.mkString(", ")
     log.info(s"Partition sizes of the stream side: $partitionSizesMessage")
 
-    val mean = partitionSizes.sum.toDouble / partitionSizes.length
-    val score = if (partitionSizes.nonEmpty && mean > 0) {
+    val meanPartitionSize = partitionSizes.sum.toDouble / partitionSizes.length
+    val skewnessScore = if (partitionSizes.nonEmpty && meanPartitionSize > 0) {
       // We only look at the largest partition to determine the skew score, since the straggler
       // is the reason why we need to repartition.
-      partitionSizes.max / mean
+      partitionSizes.max / meanPartitionSize
     } else {
       0.0
     }
+    val skewnessThreshold = sedonaConf.getStreamSideSkewScoreThreshold
 
-    // If the skew score is smaller than a threshold, we should not repartition
-    val threshold = sedonaConf.getStreamSideSkewScoreThreshold
-    if (score < threshold) {
+    // Compute the under-partitioning score
+    val targetPartitionCount =
+      ExecutorResourceUtils.getTargetPartitionCount(
+        sparkContext,
+        sedonaConf.getStreamSideIdealPartitionSize,
+        stats.getCount.toInt)
+    val underpartitioningScore = stats.getPerPartitionStats.size / targetPartitionCount.toDouble
+    val underpartitioningThreshold = sedonaConf.getStreamSideUnderPartitioningThreshold
+
+    if (skewnessScore < skewnessThreshold && underpartitioningScore >= underpartitioningThreshold) {
       log.info(
-        s"Skew score ($score) is smaller than the threshold ($threshold). Skip repartitioning.")
+        s"Skew score ($skewnessScore) is smaller than the threshold ($skewnessThreshold) and under-partitioning score ($underpartitioningScore) is greater than or equal to the threshold ($underpartitioningThreshold). Skip repartitioning.")
+
       return None
     }
 
-    // Otherwise, we should repartition. The number of partitions cannot be larger than twice the
-    // number of partitions of the original spatial RDD.
-    val rowsPerPartition = 1000000
-    val targetParallelism = Math
-      .max(
-        ExecutorResourceUtils.inferParallelism(sparkContext),
-        stats.getCount / rowsPerPartition)
-      .toInt
-    val numPartitions =
-      Math.max(partitionSizes.length, Math.min(targetParallelism, partitionSizes.length * 2))
-
     log.info(
-      s"Skew score ($score) exceeds the threshold ($threshold), repartition to $numPartitions partitions.")
-    Some(numPartitions)
+      s"Repartitioning triggered because either skew score (current: $skewnessScore vs. threshold: $skewnessThreshold) or under-partitioning score (current: $underpartitioningScore vs. threshold: $underpartitioningThreshold) did not meet the desired criteria. Repartitioning to $targetPartitionCount partitions.")
+    Some(targetPartitionCount)
   }
 }
 

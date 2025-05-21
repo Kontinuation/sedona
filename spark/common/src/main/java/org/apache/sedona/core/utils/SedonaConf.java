@@ -130,6 +130,8 @@ public class SedonaConf implements Serializable {
   private boolean allowPlanBroadcastJoin;
   private boolean autoReBalanceStreamSide;
   private double streamSideSkewScoreThreshold;
+  private double streamSideUnderPartitioningThreshold;
+  private long streamSideIdealPartitionSize;
 
   // Parameters for raster loading
   private boolean enableRasterLoadAutoRepartition;
@@ -345,10 +347,10 @@ public class SedonaConf implements Serializable {
         Boolean.parseBoolean(runtimeConfig.get("spark.sedona.join.allowPlanBroadcastJoin", "true"));
 
     // When the spatial join physical executor determines to use broadcast index join at query
-    // running time after analyzing joined datasets, we can choose to re-balance the stream side
-    // if it is skewed. This is useful when joining very unbalanced data with a small dataset.
-    // This configuration is disabled by default since it may introduce performance regression
-    // to existing workload when enabled.
+    // running time after analyzing joined datasets, we can choose to repartition the stream side
+    // if it is skewed or underpartitioned. This is useful when joining very unbalanced data with
+    // a small dataset. This configuration is disabled by default since it may introduce performance
+    // regression to existing workload when enabled.
     this.autoReBalanceStreamSide =
         Boolean.parseBoolean(
             runtimeConfig.get("spark.sedona.join.autoReBalanceStreamSide", "false"));
@@ -360,6 +362,25 @@ public class SedonaConf implements Serializable {
     this.streamSideSkewScoreThreshold =
         Double.parseDouble(
             runtimeConfig.get("spark.sedona.join.streamSideSkewScoreThreshold", "2.0"));
+
+    // When the spatial join physical executor determines to use broadcast index join at query
+    // running time after analyzing joined datasets, we can choose to repartition the stream side
+    // if it is underpartitioned relative to the cluster parallelism. This threshold determines how
+    // underpartitioned the data needs to be to trigger automatic repartitioning.
+    // The value is a ratio of the number of partitions in the stream side to the value returned by
+    // org.apache.sedona.core.utils.ExecutorResourceUtils.inferParallelism
+    this.streamSideUnderPartitioningThreshold =
+        Double.parseDouble(
+            runtimeConfig.get("spark.sedona.join.streamSideUnderPartitioningThreshold", "0.25"));
+
+    // When the spatial join physical executor determines to use broadcast index join at query
+    // running time after analyzing joined datasets, we can choose to repartition the stream side
+    // if it is underpartitioned relative to the cluster parallelism. This value is used to
+    // calculate the ideal (minimum) number of records per partition. This prevents
+    // over-partitioning the stream side when the data size is small.
+    this.streamSideIdealPartitionSize =
+        Long.parseLong(
+            runtimeConfig.get("spark.sedona.join.streamSideIdealPartitionSize", "10000"));
 
     // Parameters for raster loading
 
@@ -723,6 +744,14 @@ public class SedonaConf implements Serializable {
 
   public double getStreamSideSkewScoreThreshold() {
     return streamSideSkewScoreThreshold;
+  }
+
+  public double getStreamSideUnderPartitioningThreshold() {
+    return streamSideUnderPartitioningThreshold;
+  }
+
+  public long getStreamSideIdealPartitionSize() {
+    return streamSideIdealPartitionSize;
   }
 
   public int getRasterLoadingParallelism() {

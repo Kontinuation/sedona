@@ -55,7 +55,6 @@ case class JoinQueryDetection(
  * Plans `BroadcastIndexJoinExec` for inner joins on spatial relationships with a broadcast hint.
  */
 class JoinQueryDetector(sparkSession: SparkSession) extends Strategy {
-
   private def getJoinDetection(
       left: LogicalPlan,
       right: LogicalPlan,
