@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-site_name: "wherobots"
+site_name: 'wherobots'
 
 docs_dir: docs
 
@@ -32,7 +32,7 @@ plugins:
       handlers:
         python:
           options:
-            docstring_style: "google"
+            docstring_style: 'google'
             show_inheritance_diagram: True
             show_source: False
           paths: [../sedona/stats/]

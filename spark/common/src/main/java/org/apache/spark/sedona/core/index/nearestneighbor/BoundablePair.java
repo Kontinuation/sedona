@@ -140,8 +140,8 @@ public class BoundablePair implements Comparable<BoundablePair> {
 
   /** Compares two pairs based on their minimum distances */
   @Override
-  public int compareTo(BoundablePair nd) {
-    return Double.compare(distance, nd.distance);
+  public int compareTo(BoundablePair boundablePair) {
+    return Double.compare(distance, boundablePair.distance);
   }
 
   /**

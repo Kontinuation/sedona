@@ -28,7 +28,6 @@ on:
 
   workflow_call:
 
-
 env:
   MAVEN_OPTS: -Dmaven.wagon.httpconnectionManager.ttlSeconds=60
 

@@ -211,7 +211,7 @@ def _read_data_buffer(bio: BytesIO) -> DataBuffer:
         elif data_type == DataBuffer.TYPE_DOUBLE:
             np_array = np.frombuffer(bio.read(8 * bank_size), dtype=np.float64)
         else:
-            raise ValueError("unknown data_type {}".format(data_type))
+            raise ValueError(f"unknown data_type {data_type}")
 
         banks.append(np_array)
 

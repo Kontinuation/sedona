@@ -20,7 +20,7 @@ import os
 from sedona import version
 from setuptools import Extension, find_packages, setup
 
-with open("README.md", "r") as fh:
+with open("README.md") as fh:
     long_description = fh.read()
 
 extension_args = {}
