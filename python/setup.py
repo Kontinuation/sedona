@@ -1,24 +1,25 @@
-#  Licensed to the Apache Software Foundation (ASF) under one
-#  or more contributor license agreements.  See the NOTICE file
-#  distributed with this work for additional information
-#  regarding copyright ownership.  The ASF licenses this file
-#  to you under the Apache License, Version 2.0 (the
-#  "License"); you may not use this file except in compliance
-#  with the License.  You may obtain a copy of the License at
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
 #
-#    http://www.apache.org/licenses/LICENSE-2.0
+#   http://www.apache.org/licenses/LICENSE-2.0
 #
-#  Unless required by applicable law or agreed to in writing,
-#  software distributed under the License is distributed on an
-#  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-#  KIND, either express or implied.  See the License for the
-#  specific language governing permissions and limitations
-#  under the License.
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
 
 import os
 
-from sedona import version
 from setuptools import Extension, find_packages, setup
+
+from sedona import version
 
 with open("README.md") as fh:
     long_description = fh.read()
@@ -62,19 +63,18 @@ setup(
         "spark": ["pyspark>=2.3.0"],
         "pydeck-map": ["geopandas", "pydeck==0.8.0"],
         "kepler-map": ["geopandas", "keplergl==0.3.2"],
-        "stats": ["kneed<=0.8.5"],
+        "flink": ["apache-flink>=1.19.0"],
         "all": [
             "pyspark>=2.3.0",
             "geopandas",
             "pydeck==0.8.0",
             "keplergl==0.3.2",
-            "kneed<=0.8.5",
             "rasterio>=1.2.10",
         ],
     },
     project_urls={
         "Documentation": "https://sedona.apache.org",
-        "Source code": "https://github.com/apache/incubator-sedona",
+        "Source code": "https://github.com/apache/sedona",
         "Bug Reports": "https://issues.apache.org/jira/projects/SEDONA",
     },
     classifiers=[
