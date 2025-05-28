@@ -22,7 +22,7 @@
     <parent>
         <artifactId>sedona-parent</artifactId>
         <groupId>com.wherobots</groupId>
-        <version>1.7.5</version>
+        <version>1.7.6</version>
     </parent>
     <artifactId>sedona-flink-shaded_${scala.compat.version}</artifactId>
 
