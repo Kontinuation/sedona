@@ -253,7 +253,7 @@ public class GeoVectorizedParquetRecordReader extends VectorizedParquetRecordRea
     for (int i = 0; i < columnVectors.length; i++) {
       Object defaultValue = null;
       if (sparkRequestedSchema != null) {
-        defaultValue = ResolveDefaultColumns.getExistenceDefaultValues(sparkRequestedSchema);
+        defaultValue = ResolveDefaultColumns.getExistenceDefaultValues(sparkRequestedSchema)[i];
       }
       columnVectors[i] =
           new ParquetColumnVector(

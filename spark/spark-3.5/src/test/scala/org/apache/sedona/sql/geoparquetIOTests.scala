@@ -25,27 +25,23 @@ import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.spark.SparkException
 import org.apache.spark.scheduler.{SparkListener, SparkListenerTaskEnd}
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.SaveMode
+import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.execution.datasources.parquet.{Covering, GeoParquetMetaData, ParquetReadSupport}
 import org.apache.spark.sql.functions.{col, expr}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.sedona_sql.expressions.st_constructors.{ST_Point, ST_PolygonFromEnvelope}
 import org.apache.spark.sql.sedona_sql.expressions.st_predicates.ST_Intersects
-import org.apache.spark.sql.types.IntegerType
-import org.apache.spark.sql.types.StructField
-import org.apache.spark.sql.types.StructType
-import org.apache.spark.sql.types.TimestampNTZType
+import org.apache.spark.sql.types._
 import org.json4s.jackson.parseJson
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.io.WKTReader
 import org.scalatest.BeforeAndAfterAll
 
 import java.io.File
-import java.util.Collections
-import java.util.concurrent.atomic.AtomicLong
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.Collections
+import java.util.concurrent.atomic.AtomicLong
 import scala.collection.JavaConverters._
 
 class geoparquetIOTests extends TestBaseScala with BeforeAndAfterAll {
@@ -779,6 +775,53 @@ class geoparquetIOTests extends TestBaseScala with BeforeAndAfterAll {
       df.where(ST_Intersects(ST_Point(35.174722, -6.552465), col("geometry"))).collect()
     assert(rows.length == 1)
     assert(rows(0).getAs[String]("name") == "Tanzania")
+  }
+
+  describe("user specified schema") {
+    it("should not fail when user specifies schema with GeometryUDT") {
+      val simpleSchema = StructType(Array(StructField("geometry", GeometryUDT, true)))
+
+      val numberOfRecords = sparkSession.read
+        .format("geoparquet")
+        .schema(simpleSchema)
+        .load(overtureBBOX)
+        .where("ST_Intersects(geometry, ST_PolygonFromEnvelope(0, 0, 1, 1))")
+        .count()
+
+      assert(numberOfRecords == 9)
+    }
+
+    it("should not fail when user specifies schema with new null column") {
+      val simpleSchema = StructType(
+        Array(
+          StructField("geometry", GeometryUDT, true),
+          StructField("nonexistantcolumn", StringType, true)))
+
+      val numberOfRecords = sparkSession.read
+        .format("geoparquet")
+        .schema(simpleSchema)
+        .load(overtureBBOX)
+        .where("ST_Intersects(geometry, ST_PolygonFromEnvelope(0, 0, 1, 1))")
+        .count()
+
+      assert(numberOfRecords == 9)
+    }
+
+    it("should not fail when user specifies schema with new null geo column") {
+      val simpleSchema = StructType(
+        Array(
+          StructField("geometry", GeometryUDT, true),
+          StructField("nonexistantgeocolumn", GeometryUDT, true)))
+
+      val numberOfRecords = sparkSession.read
+        .format("geoparquet")
+        .schema(simpleSchema)
+        .load(overtureBBOX)
+        .where("ST_Intersects(geometry, ST_PolygonFromEnvelope(0, 0, 1, 1))")
+        .count()
+
+      assert(numberOfRecords == 9)
+    }
   }
 
   def validateGeoParquetMetadata(path: String)(body: org.json4s.JValue => Unit): Unit = {
