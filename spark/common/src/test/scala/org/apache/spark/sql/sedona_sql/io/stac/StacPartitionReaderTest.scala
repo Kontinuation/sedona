@@ -23,7 +23,10 @@ import org.apache.sedona.sql.TestBaseScala
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.util.SerializableConfiguration
 
-import scala.jdk.CollectionConverters.mapAsJavaMapConverter
+// For Scala 2.12 and 2.13 compatibility
+import scala.collection.JavaConverters._
+import scala.collection.convert.ImplicitConversions._
+import scala.jdk.CollectionConverters._ // For Scala 2.13, will be ignored in 2.12
 
 class StacPartitionReaderTest extends TestBaseScala {
 
@@ -39,7 +42,7 @@ class StacPartitionReaderTest extends TestBaseScala {
   it("StacPartitionReader should read feature files from local files") {
     val jsonFiles =
       Seq(JSON_STAC_ITEM_SIMPLE, JSON_STAC_ITEM_CORE, JSON_STAC_ITEM_EXTENDED).toArray
-    val partition = StacPartition(0, jsonFiles, Map.empty[String, String].asJava)
+    val partition = StacPartition(0, jsonFiles, Map.empty[String, String])
     val reader =
       new StacPartitionReader(
         sparkSession.sparkContext.broadcast(new SerializableConfiguration(new Configuration())),
@@ -61,7 +64,7 @@ class StacPartitionReaderTest extends TestBaseScala {
 
   it("StacPartitionReader should read features collection file from local files") {
     val jsonFiles = Seq(JSON_STAC_ITEM_FEATURES).toArray
-    val partition = StacPartition(0, jsonFiles, Map.empty[String, String].asJava)
+    val partition = StacPartition(0, jsonFiles, Map.empty[String, String])
     val reader =
       new StacPartitionReader(
         sparkSession.sparkContext.broadcast(new SerializableConfiguration(new Configuration())),
@@ -83,7 +86,7 @@ class StacPartitionReaderTest extends TestBaseScala {
 
   it("StacPartitionReader should read features collection file from https endpoint") {
     val jsonFiles = Seq(HTTPS_STAC_ITEM_FEATURES).toArray
-    val partition = StacPartition(0, jsonFiles, Map.empty[String, String].asJava)
+    val partition = StacPartition(0, jsonFiles, Map.empty[String, String])
     val reader =
       new StacPartitionReader(
         sparkSession.sparkContext.broadcast(new SerializableConfiguration(new Configuration())),

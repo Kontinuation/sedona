@@ -18,13 +18,13 @@
  */
 package org.apache.spark.sql.sedona_sql.io.stac
 
-import StacUtils.{inferStacSchema, updatePropertiesPromotedSchema, updateRasterAddedSchema}
 import org.apache.sedona.core.utils.ExecutorResourceUtils
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.connector.catalog.{Table, TableProvider}
 import org.apache.spark.sql.connector.expressions.Transform
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.sedona_sql.io.geojson.GeoJSONUtils
+import org.apache.spark.sql.sedona_sql.io.stac.StacUtils.{inferStacSchema, updatePropertiesPromotedSchema, updateRasterAddedSchema}
 import org.apache.spark.sql.sources.DataSourceRegister
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.util.CaseInsensitiveStringMap
@@ -32,7 +32,11 @@ import org.apache.spark.util.SerializableConfiguration
 
 import java.util
 import java.util.concurrent.ConcurrentHashMap
-import scala.jdk.CollectionConverters.mapAsScalaMapConverter
+
+// For Scala 2.12 and 2.13 compatibility
+import scala.collection.JavaConverters._
+import scala.collection.convert.ImplicitConversions._
+import scala.jdk.CollectionConverters._ // For Scala 2.13, will be ignored in 2.12
 
 /**
  * The `StacDataSource` class is responsible for enabling the reading of SpatioTemporal Asset
@@ -72,7 +76,7 @@ class StacDataSource() extends TableProvider with DataSourceRegister {
    *   If neither 'url' nor 'service' are provided.
    */
   override def inferSchema(opts: CaseInsensitiveStringMap): StructType = {
-    val optsMap = opts.asCaseSensitiveMap().asScala.toMap
+    val optsMap = opts.asCaseSensitiveMap().toMap
 
     // Check if the schema is already cached
     val fullSchema = schemaCache.computeIfAbsent(optsMap, _ => inferStacSchema(optsMap))
@@ -105,7 +109,7 @@ class StacDataSource() extends TableProvider with DataSourceRegister {
     val opts = new CaseInsensitiveStringMap(properties)
     val sparkSession = SparkSession.active
 
-    val optsMap: Map[String, String] = opts.asCaseSensitiveMap().asScala.toMap ++ Map(
+    val optsMap: Map[String, String] = opts.asCaseSensitiveMap().toMap ++ Map(
       "sessionLocalTimeZone" -> sparkSession.sessionState.conf.sessionLocalTimeZone,
       "columnNameOfCorruptRecord" -> sparkSession.sessionState.conf.columnNameOfCorruptRecord,
       "defaultParallelism" -> ExecutorResourceUtils
@@ -117,13 +121,12 @@ class StacDataSource() extends TableProvider with DataSourceRegister {
         .get("spark.sedona.stac.load.numPartitions", "-1"),
       "itemsLimitMax" -> opts
         .asCaseSensitiveMap()
-        .asScala
         .toMap
         .getOrElse(
           "itemsLimitMax",
           sparkSession.conf.get("spark.sedona.stac.load.itemsLimitMax", "-1")))
     val stacCollectionJsonString = StacUtils.loadStacCollectionToJson(optsMap)
-    val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(opts.asScala.toMap)
+    val hadoopConf = sparkSession.sessionState.newHadoopConfWithOptions(opts.toMap)
     val broadcastedConf =
       sparkSession.sparkContext.broadcast(new SerializableConfiguration(hadoopConf))
 

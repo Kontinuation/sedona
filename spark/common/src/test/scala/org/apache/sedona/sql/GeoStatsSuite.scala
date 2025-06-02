@@ -31,6 +31,9 @@ class GeoStatsSuite extends TestBaseScala {
 
   case class Record(id: Int, x: Double, y: Double)
 
+  override def defaultSparkConfig: Map[String, String] =
+    super.defaultSparkConfig ++ Map("spark.sql.adaptive.enabled" -> "false")
+
   def getData: DataFrame = {
     spark
       .createDataFrame(

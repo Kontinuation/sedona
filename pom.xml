@@ -111,6 +111,7 @@
             --add-opens=java.base/sun.nio.cs=ALL-UNNAMED
             --add-opens=java.base/sun.security.action=ALL-UNNAMED
             --add-opens=java.base/sun.util.calendar=ALL-UNNAMED
+            --add-opens=java.desktop/sun.awt.image=ALL-UNNAMED
             -Djdk.reflect.useDirectMethodHandle=false
         </extraJavaTestArgs>
     </properties>
@@ -754,7 +755,7 @@
                 <activeByDefault>true</activeByDefault>
             </activation>
             <properties>
-                <spark.version>3.5.0</spark.version>
+                <spark.version>3.5.5</spark.version>
                 <spark.compat.version>3.5</spark.compat.version>
                 <log4j.version>2.20.0</log4j.version>
                 <graphframe.version>0.8.3-spark3.5</graphframe.version>

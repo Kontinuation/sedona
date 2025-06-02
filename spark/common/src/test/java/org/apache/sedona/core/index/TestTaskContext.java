@@ -59,6 +59,12 @@ public class TestTaskContext extends TaskContext {
     return false;
   }
 
+  public boolean isFailed() {
+    // This method is not present in Spark 3.5.0, but it is in Spark 3.5.1. We don't annotate it
+    // with @Override since it's not present in Spark 3.5.0.
+    return false;
+  }
+
   @Override
   public TaskContext addTaskCompletionListener(TaskCompletionListener listener) {
     taskCompletionListeners.add(listener);

@@ -30,7 +30,7 @@ import org.apache.spark.sql.execution.datasource.stac.TemporalFilter
 import org.apache.spark.sql.execution.datasources.parquet.GeoParquetSpatialFilter
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
 import org.apache.spark.sql.sedona_sql.io.stac.StacAssetType._
-import org.apache.spark.sql.types.{MapType, MetadataBuilder, StringType, StructField, StructType}
+import org.apache.spark.sql.types._
 import org.locationtech.jts.geom.Envelope
 
 import java.net.URI
@@ -38,6 +38,10 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import scala.io.Source
 import scala.util.Try
+
+// For Scala 2.12 and 2.13 compatibility
+import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 object StacUtils {
 
@@ -219,7 +223,7 @@ object StacUtils {
       case (field, index) if field.name == "properties" =>
         propertiesStruct.fields.zipWithIndex.map { case (propField, propIndex) =>
           propertiesRow.get(propIndex, propField.dataType)
-        }
+        }.toSeq
       case (_, index) => Seq(row.get(index, schema(index).dataType))
     }
 
@@ -235,11 +239,10 @@ object StacUtils {
    *   The updated schema.
    */
   def updatePropertiesPromotedSchema(schema: StructType): StructType = {
-    val propertiesIndex = schema.fieldIndex("properties")
     val propertiesStruct = schema("properties").dataType.asInstanceOf[StructType]
 
     val newFields = schema.fields.flatMap {
-      case StructField("properties", _, _, _) => propertiesStruct.fields
+      case StructField("properties", _, _, _) => propertiesStruct.fields.toSeq
       case other => Seq(other)
     }
 

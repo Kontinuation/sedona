@@ -32,9 +32,13 @@ import java.net.URLEncoder
 import java.time.format.{DateTimeFormatter, DateTimeFormatterBuilder}
 import java.time.temporal.ChronoField
 import java.time.{LocalDate, LocalDateTime, ZoneOffset}
-import scala.jdk.CollectionConverters.asScalaIteratorConverter
 import scala.util.Random
 import scala.util.control.Breaks.breakable
+
+// For Scala 2.12 and 2.13 compatibility
+import scala.collection.JavaConverters._
+import scala.collection.convert.ImplicitConversions._
+//import scala.jdk.CollectionConverters._ // For Scala 2.13, will be ignored in 2.12
 
 /**
  * The `StacBatch` class represents a batch of partitions for reading data in the SpatioTemporal
@@ -368,7 +372,6 @@ case class StacBatch(
         } else {
           val bbox = extentNode
             .elements()
-            .asScala
             .map { bboxNode =>
               val minX = bboxNode.get(0).asDouble()
               val minY = bboxNode.get(1).asDouble()
@@ -414,7 +417,6 @@ case class StacBatch(
 
           val intervals = extentNode
             .elements()
-            .asScala
             .map { intervalNode =>
               val start = LocalDateTime.parse(intervalNode.get(0).asText(), formatter)
               val end = LocalDateTime.parse(intervalNode.get(1).asText(), formatter)

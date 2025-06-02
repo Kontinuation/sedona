@@ -33,7 +33,11 @@ import org.scalatest.funsuite.AnyFunSuite
 import java.io.{File, PrintWriter}
 import java.time.LocalDateTime
 import scala.io.Source
-import scala.jdk.CollectionConverters.asScalaIteratorConverter
+
+// For Scala 2.12 and 2.13 compatibility
+import scala.collection.JavaConverters._
+import scala.collection.convert.ImplicitConversions._
+import scala.jdk.CollectionConverters._ // For Scala 2.13, will be ignored in 2.12
 
 class StacUtilsTest extends AnyFunSuite {
 
@@ -563,7 +567,7 @@ class StacUtilsTest extends AnyFunSuite {
     val collection: JsonNode = mapper.readTree(stacCollectionJson)
 
     // Extract item and items links
-    val itemLinks = collection.get("links").elements().asScala.filter { link =>
+    val itemLinks = collection.get("links").elements().filter { link =>
       val rel = link.get("rel").asText()
       rel == "item" || rel == "items"
     }
@@ -585,7 +589,7 @@ class StacUtilsTest extends AnyFunSuite {
         // Check if the link is of type "items"
         if (link.get("rel").asText() == "items") {
           // Iterate over each feature in the item collection
-          val features = itemCollection.get("features").elements().asScala
+          val features = itemCollection.get("features").elements()
           features.foreach { feature =>
             // Write each feature JSON as a single line in the output file
             writer.println(mapper.writeValueAsString(feature))
