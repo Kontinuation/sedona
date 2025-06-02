@@ -353,7 +353,7 @@ public class SedonaConf implements Serializable {
     // regression to existing workload when enabled.
     this.autoReBalanceStreamSide =
         Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.join.autoReBalanceStreamSide", "false"));
+            runtimeConfig.get("spark.sedona.join.autoReBalanceStreamSide", "true"));
 
     // When the spatial join physical executor determines to use broadcast index join at query
     // running time after analyzing joined datasets, we can choose to re-balance the stream side

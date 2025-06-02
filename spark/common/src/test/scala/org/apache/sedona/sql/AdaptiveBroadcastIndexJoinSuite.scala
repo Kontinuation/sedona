@@ -31,7 +31,6 @@ class AdaptiveBroadcastIndexJoinSuite extends TestBaseScala {
       "spark.sedona.join.advanced" -> "true",
       "sedona.join.autoBroadcastJoinThreshold" -> "100m",
       "spark.sedona.join.allowPlanBroadcastJoin" -> "false",
-      "spark.sedona.join.autoReBalanceStreamSide" -> "true",
       "spark.sedona.join.streamSideSkewScoreThreshold" -> "2.0")
 
   private val schema = StructType(
