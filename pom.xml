@@ -20,7 +20,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.wherobots</groupId>
     <artifactId>sedona-parent</artifactId>
-    <version>1.7.6</version>
+    <version>1.8.0</version>
     <packaging>pom</packaging>
     <name>sedona-parent</name>
     <url>http://sedona.apache.org/</url>
@@ -775,8 +775,7 @@
                 <scala.version>2.13.12</scala.version>
                 <scala.compat.version>2.13</scala.compat.version>
                 <scaladoc.arg>-no-java-comments</scaladoc.arg>
-                <!-- Skip deploying parent module for Scala 2.13 profile, it will be deployed with 2.12 -->
-                <skip.deploy.common.modules>true</skip.deploy.common.modules>
+                <skip.deploy.common.modules>false</skip.deploy.common.modules>
             </properties>
             <modules>
                 <module>common</module>

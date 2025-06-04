@@ -22,7 +22,7 @@
     <parent>
         <groupId>com.wherobots</groupId>
         <artifactId>sedona-parent</artifactId>
-        <version>1.7.6</version>
+        <version>1.8.0</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
 	<artifactId>sedona-spark-parent-${spark.compat.version}_${scala.compat.version}</artifactId>
