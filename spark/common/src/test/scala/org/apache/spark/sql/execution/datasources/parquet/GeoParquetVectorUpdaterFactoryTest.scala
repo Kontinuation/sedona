@@ -38,6 +38,7 @@ import java.time.ZoneId
 class GeoParquetVectorUpdaterFactoryTest {
   val GEO_COLUMN = "geo_col": String
   val BINARY_COLUMN = "binary_col": String
+  val NULL_COLUMN = "null_col": String
   val BUFFER_SIZE = 1024
 
   val geoSparkSchema = StructType(
@@ -52,6 +53,12 @@ class GeoParquetVectorUpdaterFactoryTest {
   val geoColDesc = new ColumnDescriptor(
     Array(GEO_COLUMN),
     new PrimitiveType(Type.Repetition.OPTIONAL, PrimitiveTypeName.BINARY, GEO_COLUMN),
+    0,
+    1000)
+
+  val nullColDesc = new ColumnDescriptor(
+    Array(NULL_COLUMN),
+    new PrimitiveType(Type.Repetition.OPTIONAL, PrimitiveTypeName.INT32, NULL_COLUMN),
     0,
     1000)
 
@@ -72,6 +79,8 @@ class GeoParquetVectorUpdaterFactoryTest {
 
   val binaryVals: Array[Array[Byte]] =
     Array(Array[Byte](1, 2, 3), Array[Byte](4, 5, 6), Array[Byte](7, 8, 9))
+
+  val nulVals: Array[Int] = Array(0, 0, 0)
 
   @Test
   def getUpdaterWithGeoColumn() {
@@ -136,6 +145,45 @@ class GeoParquetVectorUpdaterFactoryTest {
     compareBytes(actual, expected)
   }
 
+  @Test
+  def getUpdaterWithNullColumn() {
+    val geoUpdater = updaterFactory.getUpdater(nullColDesc, StringType, StringType)
+    assertTrue(geoUpdater.isInstanceOf[GeoParquetVectorUpdaterFactory#NullConverter])
+
+    val nonGeoUpdater = updaterFactory.getUpdater(nullColDesc, IntegerType, IntegerType)
+    assertFalse(nonGeoUpdater.isInstanceOf[GeoParquetVectorUpdaterFactory#NullConverter])
+  }
+
+  @Test
+  def readValueNullFromColumn() {
+    val updater = updaterFactory.getUpdater(nullColDesc, StringType, StringType)
+
+    val reader = getMockValuesReader(IntegerType, true)
+    val actual = new OnHeapColumnVector(BUFFER_SIZE, StringType)
+    updater.readValue(0, actual, reader)
+
+    val expected = getExpectedVector(1, StringType)
+    compareBytes(actual, expected)
+  }
+
+  @Test
+  def readValueNullFromDictionary() {
+    val updater = updaterFactory.getUpdater(nullColDesc, StringType, StringType)
+
+    val dictionaryIds = new OnHeapColumnVector(BUFFER_SIZE, IntegerType)
+    val dictionary = getMockDictionary(IntegerType, true)
+    val actual = new OnHeapColumnVector(BUFFER_SIZE, StringType)
+
+    for (i <- 0 until 3) {
+      dictionaryIds.putInt(i, 0)
+    }
+
+    updater.decodeSingleDictionaryId(0, actual, dictionaryIds, dictionary)
+
+    val expected = getExpectedVector(1, StringType)
+    compareBytes(actual, expected)
+  }
+
   def getExpectedVector(n: Int, t: DataType): WritableColumnVector = {
     getExpectedVector(n, 0, t)
   }
@@ -149,12 +197,14 @@ class GeoParquetVectorUpdaterFactoryTest {
         case GeometryUDT =>
           val geometry = geoVals(i)
           values.putByteArray(i, GeometryUDT.serialize(geometry))
+        case StringType =>
+          values.putNull(i)
       }
     }
     values
   }
 
-  def getMockBuffer(t: DataType, includeLength: Boolean): ByteBuffer = {
+  def getMockBuffer(t: DataType, includeLength: Boolean, allNulls: Boolean): ByteBuffer = {
     val wkbWriter = new WKBWriter()
     val mockBuffer = ByteBuffer.allocate(BUFFER_SIZE).order(ByteOrder.LITTLE_ENDIAN)
     for (i <- 0 until 3) {
@@ -170,6 +220,8 @@ class GeoParquetVectorUpdaterFactoryTest {
             mockBuffer.putInt(geoBytes.length)
           }
           mockBuffer.put(geoBytes)
+        case IntegerType if allNulls =>
+          mockBuffer.putInt(nulVals(i))
       }
     }
 
@@ -178,9 +230,13 @@ class GeoParquetVectorUpdaterFactoryTest {
   }
 
   def getMockValuesReader(t: DataType): VectorizedValuesReader = {
+    getMockValuesReader(t, false)
+  }
+
+  def getMockValuesReader(t: DataType, allNull: Boolean): VectorizedValuesReader = {
     // Create three different geometries
 
-    val mockBuffer = getMockBuffer(t, true)
+    val mockBuffer = getMockBuffer(t, true, allNull)
     val reader = new VectorizedPlainValuesReader()
 
     val in = ByteBufferInputStream.wrap(mockBuffer)
@@ -190,7 +246,11 @@ class GeoParquetVectorUpdaterFactoryTest {
   }
 
   def getMockDictionary(t: DataType): Dictionary = {
-    val mockBuffer = getMockBuffer(t, true)
+    getMockDictionary(t, false)
+  }
+
+  def getMockDictionary(t: DataType, allNull: Boolean): Dictionary = {
+    val mockBuffer = getMockBuffer(t, true, allNull)
     val dictionary = new PlainBinaryDictionary(
       new DictionaryPage(
         BytesInput.from(mockBuffer),

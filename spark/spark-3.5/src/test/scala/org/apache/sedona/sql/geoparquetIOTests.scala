@@ -25,13 +25,13 @@ import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.spark.SparkException
 import org.apache.spark.scheduler.{SparkListener, SparkListenerTaskEnd}
-import org.apache.spark.sql.{Row, SaveMode}
 import org.apache.spark.sql.execution.datasources.parquet.{Covering, GeoParquetMetaData, ParquetReadSupport}
 import org.apache.spark.sql.functions.{col, expr}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.sedona_sql.expressions.st_constructors.{ST_Point, ST_PolygonFromEnvelope}
 import org.apache.spark.sql.sedona_sql.expressions.st_predicates.ST_Intersects
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{Row, SaveMode}
 import org.json4s.jackson.parseJson
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.io.WKTReader
@@ -821,6 +821,102 @@ class geoparquetIOTests extends TestBaseScala with BeforeAndAfterAll {
         .count()
 
       assert(numberOfRecords == 9)
+    }
+  }
+
+  it("should not fail when new columns are added or removed to the schema") {
+    val wktReader = new WKTReader()
+    val data1 = Seq(Row(wktReader.read("POINT (1 2)"), 1), Row(wktReader.read("POINT (3 4)"), 2))
+
+    val schema1 = StructType(
+      Array(StructField("geometry", GeometryUDT, true), StructField("int1", IntegerType, true)))
+
+    val data2 =
+      Seq(Row(wktReader.read("POINT (5 6)"), 3, 100), Row(wktReader.read("POINT (7 8)"), 4, 101))
+
+    val schema2 = StructType(
+      Array(
+        StructField("geometry", GeometryUDT, true),
+        StructField("int1", IntegerType, true),
+        StructField("int2", IntegerType, true)))
+
+    val expected = Seq(
+      Row(wktReader.read("POINT (1 2)"), 1, null),
+      Row(wktReader.read("POINT (3 4)"), 2, null),
+      Row(wktReader.read("POINT (5 6)"), 3, 100),
+      Row(wktReader.read("POINT (7 8)"), 4, 101))
+
+    // Note: runs both ways, adding and dropping columns
+    runSchemaChangeTest(schema1, data1, schema2, data2, schema2, expected, 2)
+  }
+
+  it("should not fail when a null column is read into a string column") {
+    // When a file has a column of all nulls the type can default to int32
+    // Check that we can read that column into a string column
+    val wktReader = new WKTReader()
+    val data1 = Seq(
+      Row(wktReader.read("POINT (1 2)"), "Remark 1"),
+      Row(wktReader.read("POINT (3 4)"), "Remark 2"))
+
+    val schema1 = StructType(
+      Array(StructField("geometry", GeometryUDT, true), StructField("remarks", StringType, true)))
+
+    val data2 =
+      Seq(Row(wktReader.read("POINT (5 6)"), null), Row(wktReader.read("POINT (7 8)"), null))
+
+    val schema2 = StructType(
+      Array(
+        StructField("geometry", GeometryUDT, true),
+        StructField("remarks", IntegerType, true)))
+
+    val expected = Seq(
+      Row(wktReader.read("POINT (1 2)"), "Remark 1"),
+      Row(wktReader.read("POINT (3 4)"), "Remark 2"),
+      Row(wktReader.read("POINT (5 6)"), null),
+      Row(wktReader.read("POINT (7 8)"), null))
+
+    runSchemaChangeTest(schema1, data1, schema2, data2, schema1, expected, 2)
+  }
+
+  def runSchemaChangeTest(
+      schema1: StructType,
+      data1: Seq[Row],
+      schema2: StructType,
+      data2: Seq[Row],
+      commonSchema: StructType,
+      expected: Seq[Row],
+      waysToWrite: Int = 1): Unit = {
+    val outputdir: String = resourceFolder + "geoparquet/singletest/"
+
+    val df1 = sparkSession.createDataFrame(data1.asJava, schema1)
+    df1.write
+      .format("geoparquet")
+      .mode(SaveMode.Append)
+      .save(outputdir)
+
+    val df2 = sparkSession.createDataFrame(data2.asJava, schema2)
+    df2.write
+      .format("geoparquet")
+      .mode(SaveMode.Append)
+      .save(outputdir)
+
+    val readDf = sparkSession.read.schema(commonSchema).format("geoparquet").load(outputdir)
+    val rows = readDf.collect()
+
+    FileUtils.deleteDirectory(new File(outputdir))
+
+    assert(rows.length == expected.length)
+    for (j <- expected.indices) {
+      var found = false
+      for (i <- rows.indices) {
+        found |= rows(i).equals(expected(j))
+      }
+      assert(found)
+    }
+
+    if (waysToWrite > 1) {
+      // Re-run evolution in the opposite order
+      runSchemaChangeTest(schema2, data2, schema1, data1, commonSchema, expected, waysToWrite - 1)
     }
   }
 

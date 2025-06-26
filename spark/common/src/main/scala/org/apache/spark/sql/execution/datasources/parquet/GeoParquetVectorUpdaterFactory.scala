@@ -20,6 +20,7 @@ package org.apache.spark.sql.execution.datasources.parquet
 
 import org.apache.parquet.column.{ColumnDescriptor, Dictionary}
 import org.apache.parquet.schema.LogicalTypeAnnotation
+import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName
 import org.apache.spark.sql.execution.vectorized.WritableColumnVector
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.types._
@@ -43,6 +44,12 @@ class GeoParquetVectorUpdaterFactory(
       int96RebaseTz) {
 
   /**
+   * Default Parquet type for NULL columns. When the type is not known for an all null column the
+   * writer uses int32 as the default type.
+   */
+  final val NULL_COLUMN_TYPE = PrimitiveTypeName.INT32;
+
+  /**
    * Returns a ParquetVectorUpdater for the given column descriptor and spark type.
    * @param descriptor
    *   The column descriptor
@@ -58,9 +65,13 @@ class GeoParquetVectorUpdaterFactory(
       sparkType: DataType,
       primitiveSparkType: DataType): ParquetVectorUpdater = {
 
+    val typeName = descriptor.getPrimitiveType().getPrimitiveTypeName();
+
     sparkType match {
       case GeometryUDT =>
         new BinaryToGeoConverter()
+      case StringType if typeName == NULL_COLUMN_TYPE =>
+        new NullConverter()
       case _ =>
         super.getUpdater(descriptor, primitiveSparkType)
     }
@@ -116,4 +127,36 @@ class GeoParquetVectorUpdaterFactory(
     }
   }
 
+  class NullConverter extends ParquetVectorUpdater {
+    override def readValues(
+        total: Int,
+        offset: Int,
+        values: WritableColumnVector,
+        valuesReader: VectorizedValuesReader): Unit = {
+      for (i <- 0 until total) {
+        readValue(offset + i, values, valuesReader)
+      }
+    }
+
+    override def skipValues(total: Int, valuesReader: VectorizedValuesReader): Unit = {
+      for (_ <- 0 until total) {
+        valuesReader.readInteger()
+      }
+    }
+
+    override def readValue(
+        offset: Int,
+        values: WritableColumnVector,
+        valuesReader: VectorizedValuesReader): Unit = {
+      values.putNull(offset)
+    }
+
+    override def decodeSingleDictionaryId(
+        offset: Int,
+        values: WritableColumnVector,
+        dictionaryIds: WritableColumnVector,
+        dictionary: Dictionary): Unit = {
+      values.putNull(offset)
+    }
+  }
 }
