@@ -418,7 +418,7 @@ public class SedonaConf implements Serializable {
     this.reverseGeocodingTableName =
         runtimeConfig.get(
             "spark.sedona.reverse.geocode.table",
-            "wherobots_open_data.overture_2024_10_23_0.geocodes");
+            "wherobots_open_data.overture_maps_foundation.geocodes");
 
     this.reverseGeocodingDistanceThresholds =
         initializeReverseGeocodingDistanceThresholds(runtimeConfig);
