@@ -15,11 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import geopandas as gpd
+import pytest
 import pandas as pd
-from pandas.testing import assert_series_equal
+import geopandas as gpd
+import sedona.geopandas as sgpd
+from tests.test_base import TestBase
 from shapely import wkt
 from shapely.geometry import Point, LineString, Polygon, GeometryCollection
+from pandas.testing import assert_series_equal
 
 import sedona.geopandas as sgpd
 from tests.test_base import TestBase
@@ -287,3 +290,23 @@ class TestGeoSeries(TestBase):
 
     def test_contains_properly(self):
         pass
+
+    def test_set_crs(self):
+        geo_series = sgpd.GeoSeries(self.geoseries)
+        assert geo_series.crs == None
+        geo_series = geo_series.set_crs(epsg=4326)
+        assert geo_series.crs.to_epsg() == 4326
+
+        with pytest.raises(ValueError):
+            geo_series.set_crs(4328)
+        with pytest.raises(ValueError):
+            geo_series.crs = None
+
+        geo_series = geo_series.set_crs(None, allow_override=True)
+        assert geo_series.crs == None
+
+        geo_series.set_crs(4326, inplace=True)
+        assert geo_series.crs.to_epsg() == 4326
+
+        geo_series = sgpd.GeoSeries(self.geoseries, crs=4326)
+        assert geo_series.crs.to_epsg() == 4326
