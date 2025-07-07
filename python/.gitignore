@@ -26,3 +26,4 @@
 Pipfile.lock
 /wherobots_sedona.egg-info/
 __pycache__
+/sedona/doc/_build/
