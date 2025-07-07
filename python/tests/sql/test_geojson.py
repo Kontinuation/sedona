@@ -26,7 +26,7 @@ from tests.test_base import TestBase
 class TestGeoJSON(TestBase):
     def test_interoperability_with_geopandas(self, tmp_path):
         df = (
-            self.spark.range(0, 10)
+            self.spark.range(0, 10, numPartitions=1)
             .toDF("id")
             .withColumn("geom", expr("ST_Point(id, id)"))
             .withColumn("text", expr("concat('test', id)"))

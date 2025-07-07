@@ -52,7 +52,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: depot-ubuntu-22.04-16
     strategy:
       matrix:
         include:

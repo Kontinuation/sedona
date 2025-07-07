@@ -32,7 +32,7 @@ permissions:
 
 jobs:
   check-scala-java:
-    runs-on: ubuntu-22.04
+    runs-on: depot-ubuntu-22.04
     strategy:
       fail-fast: true
       matrix:
@@ -105,7 +105,7 @@ jobs:
           path: staging
 
   check-python:
-    runs-on: ubuntu-22.04
+    runs-on: depot-ubuntu-22.04
     strategy:
       matrix:
         include:
