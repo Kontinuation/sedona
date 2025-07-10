@@ -1530,7 +1530,9 @@ public class SedonaTIFFImageReader extends TIFFImageReader {
     return new TIFFRenderedImage(this, imageIndex, imageReadParam, width, height);
   }
 
-  private void decodeTile(int ti, int tj, int band) throws IOException {
+  private void decodeTile(
+      BufferedImage theImage, TIFFDecompressor decompressor, int ti, int tj, int band)
+      throws IOException {
     if (DEBUG) {
       System.out.println("decodeTile(" + ti + "," + tj + "," + band + ")");
     }
@@ -1647,7 +1649,7 @@ public class SedonaTIFFImageReader extends TIFFImageReader {
     stream.reset();
   }
 
-  private void reportProgress() {
+  private void reportProgress(BufferedImage theImage) throws IOException {
     // Report image progress/update to listeners after each tile
     pixelsRead += dstWidth * dstHeight;
     processImageProgress(100.0f * pixelsRead / pixelsToRead);
@@ -1658,7 +1660,8 @@ public class SedonaTIFFImageReader extends TIFFImageReader {
     prepareRead(imageIndex, param);
 
     // prepare for reading
-    this.theImage = getDestination(param, getImageTypes(imageIndex), width, height, noData);
+    BufferedImage theImage =
+        getDestination(param, getImageTypes(imageIndex), width, height, noData);
 
     srcXSubsampling = imageReadParam.getSourceXSubsampling();
     srcYSubsampling = imageReadParam.getSourceYSubsampling();
@@ -1886,12 +1889,12 @@ public class SedonaTIFFImageReader extends TIFFImageReader {
               break;
             }
 
-            decodeTile(ti, tj, sb[0]);
+            decodeTile(theImage, decompressor, ti, tj, sb[0]);
           }
 
           if (isAbortRequested) break;
 
-          reportProgress();
+          reportProgress(theImage);
         }
 
         if (isAbortRequested) break;
@@ -1909,9 +1912,9 @@ public class SedonaTIFFImageReader extends TIFFImageReader {
             break;
           }
 
-          decodeTile(ti, tj, -1);
+          decodeTile(theImage, decompressor, ti, tj, -1);
 
-          reportProgress();
+          reportProgress(theImage);
         }
 
         if (isAbortRequested) break;
@@ -2027,10 +2030,6 @@ public class SedonaTIFFImageReader extends TIFFImageReader {
       this.decompressor.dispose();
     }
     this.layout = null;
-    if (this.theImage != null) {
-      this.theImage.flush();
-    }
-    this.theImage = null;
     this.imageStartPosition = null;
     this.imageMetadata = null;
     this.imageReadParam = null;

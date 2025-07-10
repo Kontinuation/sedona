@@ -29,23 +29,24 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.sedona.common.Functions;
 import org.apache.sedona.common.raster.outdb.OutDbGridCoverage2D;
 import org.apache.sedona.common.utils.RasterUtils;
+import org.geotools.api.geometry.BoundingBox;
+import org.geotools.api.metadata.spatial.PixelOrientation;
+import org.geotools.api.parameter.ParameterValueGroup;
+import org.geotools.api.referencing.FactoryException;
+import org.geotools.api.referencing.datum.PixelInCell;
+import org.geotools.api.referencing.operation.TransformException;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
 import org.geotools.coverage.processing.CannotCropException;
 import org.geotools.coverage.processing.operation.Crop;
-import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
+import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
+import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
-import org.opengis.geometry.BoundingBox;
-import org.opengis.metadata.spatial.PixelOrientation;
-import org.opengis.parameter.ParameterValueGroup;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.datum.PixelInCell;
-import org.opengis.referencing.operation.TransformException;
 
 public class RasterBandEditors {
   /**
@@ -362,7 +363,7 @@ public class RasterBandEditors {
 
     // Use rasterizeGeomExtent for AOI geometries smaller than a pixel
     double[] metadata = RasterAccessors.metadata(singleBandRaster);
-    Envelope2D geomEnvelope =
+    ReferencedEnvelope geomEnvelope =
         Rasterization.rasterizeGeomExtent(geometry, singleBandRaster, metadata, allTouched);
     Geometry geomExtent = JTS.toGeometry((BoundingBox) geomEnvelope);
 
@@ -479,8 +480,12 @@ public class RasterBandEditors {
       double regionWidth,
       double regionHeight,
       boolean lenient) {
-    Envelope2D rasterEnvelope = raster.getEnvelope2D();
-    if (!rasterEnvelope.intersects(x0, y0 - regionHeight, regionWidth, regionHeight)) {
+    ReferencedEnvelope rasterEnvelope = raster.getEnvelope2D();
+    Coordinate cMin = new Coordinate(rasterEnvelope.getMinX(), rasterEnvelope.getMinY());
+    Coordinate cMax = new Coordinate(rasterEnvelope.getMaxX(), rasterEnvelope.getMaxY());
+    Coordinate xMin = new Coordinate(x0, y0);
+    Coordinate xMax = new Coordinate(x0 + regionWidth, y0 + regionHeight);
+    if (!ReferencedEnvelope.intersects(cMin, cMax, xMin, xMax)) {
       if (lenient) {
         return null;
       } else {

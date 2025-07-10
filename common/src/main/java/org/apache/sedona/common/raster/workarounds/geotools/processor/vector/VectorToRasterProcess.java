@@ -34,12 +34,17 @@ import java.awt.image.WritableRaster;
 import java.util.List;
 import javax.media.jai.RasterFactory;
 import javax.media.jai.TiledImage;
+import org.geotools.api.geometry.Bounds;
+import org.geotools.api.geometry.MismatchedDimensionException;
+import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
+import org.geotools.api.referencing.operation.MathTransform;
+import org.geotools.api.referencing.operation.TransformException;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
-import org.geotools.geometry.DirectPosition2D;
+import org.geotools.geometry.Position2D;
 import org.geotools.geometry.jts.Geometries;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
@@ -52,11 +57,6 @@ import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
-import org.opengis.geometry.Envelope;
-import org.opengis.geometry.MismatchedDimensionException;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opengis.referencing.operation.MathTransform;
-import org.opengis.referencing.operation.TransformException;
 
 /**
  * This is a modified version of the {@link org.geotools.process.vector.VectorToRasterProcess} class
@@ -133,7 +133,7 @@ public class VectorToRasterProcess implements VectorProcess {
       List<Feature> features,
       CoordinateReferenceSystem crs,
       Dimension gridDim,
-      Envelope bounds,
+      Bounds bounds,
       TransferType transferType,
       String covName)
       throws VectorToRasterException {
@@ -179,7 +179,7 @@ public class VectorToRasterProcess implements VectorProcess {
               description = "Bounding box of the area to rasterize",
               min = 0,
               max = 1)
-          Envelope bounds) {
+          Bounds bounds) {
 
     return convert(
         features, crs, new Dimension(rasterWidth, rasterHeight), bounds, transferType, title);
@@ -224,7 +224,7 @@ public class VectorToRasterProcess implements VectorProcess {
       List<Feature> features,
       CoordinateReferenceSystem crs,
       Dimension gridDim,
-      Envelope bounds,
+      Bounds bounds,
       TransferType transferType,
       String covName)
       throws VectorToRasterException {
@@ -247,7 +247,7 @@ public class VectorToRasterProcess implements VectorProcess {
   }
 
   private void initialize(
-      List<Feature> features, CoordinateReferenceSystem crs, Envelope bounds, Dimension gridDim)
+      List<Feature> features, CoordinateReferenceSystem crs, Bounds bounds, Dimension gridDim)
       throws VectorToRasterException {
 
     try {
@@ -265,7 +265,7 @@ public class VectorToRasterProcess implements VectorProcess {
    * Sets the output coverage bounds and checks whether features need to be transformed into the
    * output CRS.
    */
-  private void setBounds(List<Feature> features, CoordinateReferenceSystem crs, Envelope bounds)
+  private void setBounds(List<Feature> features, CoordinateReferenceSystem crs, Bounds bounds)
       throws TransformException {
 
     ReferencedEnvelope featureBounds = calculateBounds(features, crs);
@@ -467,7 +467,7 @@ public class VectorToRasterProcess implements VectorProcess {
     }
 
     // Go through coordinate array in order received
-    DirectPosition2D worldPos = new DirectPosition2D();
+    Position2D worldPos = new Position2D();
     for (int n = 0; n < coords.length; n++) {
       worldPos.setLocation(coords[n].x, coords[n].y);
       GridCoordinates2D gridPos = gridGeom.worldToGrid(worldPos);

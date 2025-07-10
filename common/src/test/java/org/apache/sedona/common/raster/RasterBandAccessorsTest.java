@@ -26,11 +26,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.Constructors;
 import org.apache.sedona.common.raster.outdb.LazyLoadOutDbGridCoverage2D;
+import org.geotools.api.referencing.FactoryException;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.junit.Test;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.io.ParseException;
-import org.opengis.referencing.FactoryException;
 
 public class RasterBandAccessorsTest extends RasterTestBase {
 

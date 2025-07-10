@@ -22,12 +22,11 @@ import org.apache.sedona.common.raster.MapAlgebra
 import org.apache.sedona.common.raster.outdb.{LazyLoadOutDbGridCoverage2D, OutDbGridCoverage2D}
 import org.apache.sedona.common.utils.RasterUtils
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.{DataFrame, Row, SaveMode}
-import org.apache.spark.sql.functions.{col, collect_list, expr, lit, row_number}
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DoubleType, IntegerType, StructField, StructType}
-import org.geotools.coverage.grid.GridCoordinates2D
-import org.geotools.coverage.grid.GridCoverage2D
-import org.junit.Assert.{assertEquals, assertFalse, assertNotNull, assertNull, assertTrue}
+import org.apache.spark.sql.{DataFrame, Row, SaveMode}
+import org.geotools.coverage.grid.{GridCoordinates2D, GridCoverage2D}
+import org.junit.Assert._
 import org.locationtech.jts.geom.{Coordinate, Geometry}
 import org.scalatest.{BeforeAndAfter, GivenWhenThen}
 
@@ -1196,7 +1195,7 @@ class rasteralgebraTest extends TestBaseScala with BeforeAndAfter with GivenWhen
       // Test with a polygon that does not intersect the raster in lenient mode
       val actual = df
         .selectExpr(
-          "RS_Clip(raster, 1, ST_GeomFromWKT('POLYGON((274157 4174899,263510 4174947,269859 4183348,274157 4174899))'))")
+          "RS_Clip(raster, 1, ST_GeomFromWKT('POLYGON((274157 4174899,263510 4174947,269859 4183348,274157 4174899))', 26918))")
         .first()
         .get(0)
       assertNull(actual)

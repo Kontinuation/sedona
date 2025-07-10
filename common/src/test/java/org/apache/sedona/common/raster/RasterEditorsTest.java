@@ -26,21 +26,21 @@ import java.io.IOException;
 import java.util.Arrays;
 import org.apache.sedona.common.raster.TileGenerator.TileIterator;
 import org.apache.sedona.common.utils.RasterUtils;
+import org.geotools.api.geometry.Bounds;
+import org.geotools.api.geometry.Position;
+import org.geotools.api.referencing.FactoryException;
+import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
+import org.geotools.api.referencing.operation.MathTransform;
+import org.geotools.api.referencing.operation.MathTransform2D;
+import org.geotools.api.referencing.operation.TransformException;
 import org.geotools.coverage.grid.GridCoordinates2D;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
-import org.geotools.geometry.DirectPosition2D;
+import org.geotools.geometry.Position2D;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.junit.Assert;
 import org.junit.Test;
-import org.opengis.geometry.DirectPosition;
-import org.opengis.geometry.Envelope;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opengis.referencing.operation.MathTransform;
-import org.opengis.referencing.operation.MathTransform2D;
-import org.opengis.referencing.operation.TransformException;
 
 public class RasterEditorsTest extends RasterTestBase {
 
@@ -4142,9 +4142,9 @@ public class RasterEditorsTest extends RasterTestBase {
       GridCoverage2D source, GridCoverage2D target, GridCoverage2D transformed)
       throws TransformException, FactoryException {
     // Check the envelope and CRS
-    Envelope expectedEnvelope = target.getEnvelope();
-    Envelope actualEnvelope = transformed.getEnvelope();
-    assertSameEnvelope(expectedEnvelope, actualEnvelope, 1e-6);
+    Bounds expectedBounds = target.getEnvelope();
+    Bounds actualBounds = transformed.getEnvelope();
+    assertSameBounds(expectedBounds, actualBounds, 1e-6);
     CoordinateReferenceSystem expectedCrs = target.getCoordinateReferenceSystem();
     CoordinateReferenceSystem actualCrs = transformed.getCoordinateReferenceSystem();
     Assert.assertTrue(CRS.equalsIgnoreMetadata(expectedCrs, actualCrs));
@@ -4169,14 +4169,14 @@ public class RasterEditorsTest extends RasterTestBase {
     double ipY = affine.getTranslateY();
     MathTransform crsTrans =
         CRS.findMathTransform(actualCrs, source.getCoordinateReferenceSystem());
-    for (double worldY = ipY; worldY > expectedEnvelope.getMinimum(1); worldY += scaleY) {
-      for (double worldX = ipX; worldX < expectedEnvelope.getMaximum(0); worldX += scaleX) {
+    for (double worldY = ipY; worldY > expectedBounds.getMinimum(1); worldY += scaleY) {
+      for (double worldX = ipX; worldX < expectedBounds.getMaximum(0); worldX += scaleX) {
         // Fetch the pixel values from the transformed raster
-        DirectPosition worldPos = new DirectPosition2D(worldX, worldY);
+        Position worldPos = new Position2D(worldX, worldY);
         transformed.evaluate(worldPos, values);
 
         // Find the corresponding grid coordinates on the source raster
-        DirectPosition srcWorldPos = crsTrans.transform(worldPos, null);
+        Position srcWorldPos = crsTrans.transform(worldPos, null);
         GridCoordinates2D sourceGridPos = source.getGridGeometry().worldToGrid(srcWorldPos);
         GridEnvelope2D sourceGridRange = source.getGridGeometry().getGridRange2D();
 
@@ -4264,8 +4264,7 @@ public class RasterEditorsTest extends RasterTestBase {
         stacked.evaluate(new GridCoordinates2D(x, y), values);
 
         // Convert grid coordinates to world coordinates
-        DirectPosition worldPos =
-            stacked.getGridGeometry().gridToWorld(new GridCoordinates2D(x, y));
+        Position worldPos = stacked.getGridGeometry().gridToWorld(new GridCoordinates2D(x, y));
 
         // Verify the pixel values
         for (int b = 0; b < 7; b++) {

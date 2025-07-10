@@ -25,15 +25,15 @@ import java.util.*;
 import javax.media.jai.RasterFactory;
 import org.apache.sedona.common.Functions;
 import org.apache.sedona.common.utils.RasterUtils;
+import org.geotools.api.geometry.BoundingBox;
+import org.geotools.api.referencing.FactoryException;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
-import org.geotools.geometry.Envelope2D;
 import org.geotools.geometry.jts.JTS;
+import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.prep.PreparedGeometry;
 import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
-import org.opengis.geometry.BoundingBox;
-import org.opengis.referencing.FactoryException;
 
 public class Rasterization {
   protected static List<Object> rasterize(
@@ -52,9 +52,9 @@ public class Rasterization {
       throw new IllegalArgumentException("Geometry does not intersect Raster.");
     }
 
-    Envelope2D rasterExtent = raster.getEnvelope2D();
+    ReferencedEnvelope rasterExtent = raster.getEnvelope2D();
 
-    Envelope2D geomExtent = rasterizeGeomExtent(geom, raster, metadata, allTouched);
+    ReferencedEnvelope geomExtent = rasterizeGeomExtent(geom, raster, metadata, allTouched);
 
     RasterizationParams params =
         calculateRasterizationParams(raster, useGeometryExtent, metadata, geomExtent, pixelType);
@@ -84,7 +84,7 @@ public class Rasterization {
       double[] metadata,
       Geometry geom,
       RasterizationParams params,
-      Envelope2D geomExtent,
+      ReferencedEnvelope geomExtent,
       double value,
       boolean allTouched)
       throws FactoryException {
@@ -120,13 +120,13 @@ public class Rasterization {
 
     for (int i = 0; i < geom.getNumGeometries(); i++) {
       Geometry subGeom = geom.getGeometryN(i);
-      Envelope2D subGeomExtent = rasterizeGeomExtent(subGeom, raster, metadata, allTouched);
+      ReferencedEnvelope subGeomExtent = rasterizeGeomExtent(subGeom, raster, metadata, allTouched);
       rasterizeGeometry(raster, metadata, subGeom, params, subGeomExtent, value, allTouched);
     }
   }
 
   private static void rasterizePoint(
-      Geometry geom, RasterizationParams params, Envelope2D geomExtent, double value) {
+      Geometry geom, RasterizationParams params, ReferencedEnvelope geomExtent, double value) {
 
     int startX = (int) Math.round(((geomExtent.getMinX() - params.upperLeftX) / params.scaleX));
     int startY = (int) Math.round(((geomExtent.getMinY() - params.upperLeftY) / params.scaleY));
@@ -161,7 +161,7 @@ public class Rasterization {
   }
 
   private static void rasterizeLineString(
-      Geometry geom, RasterizationParams params, double value, Envelope2D geomExtent) {
+      Geometry geom, RasterizationParams params, double value, ReferencedEnvelope geomExtent) {
     for (int i = 0; i < geom.getNumGeometries(); i++) {
       LineString line = (LineString) geom.getGeometryN(i);
       Coordinate[] coords = line.getCoordinates();
@@ -235,7 +235,7 @@ public class Rasterization {
   }
 
   private static LineSegment clipSegmentToRasterBounds(
-      Coordinate p1, Coordinate p2, Envelope2D geomExtent) {
+      Coordinate p1, Coordinate p2, ReferencedEnvelope geomExtent) {
     double minX = geomExtent.getMinX();
     double maxX = geomExtent.getMaxX();
     double minY = geomExtent.getMinY();
@@ -307,7 +307,7 @@ public class Rasterization {
     return x >= minX && x <= maxX && y >= minY && y <= maxY;
   }
 
-  protected static Envelope2D rasterizeGeomExtent(
+  protected static ReferencedEnvelope rasterizeGeomExtent(
       Geometry geom, GridCoverage2D raster, double[] metadata, boolean allTouched) {
 
     if (Objects.equals(geom.getGeometryType(), "MultiLineString")) {
@@ -317,8 +317,8 @@ public class Rasterization {
       allTouched = true;
     }
 
-    Envelope2D rasterExtent =
-        JTS.getEnvelope2D(geom.getEnvelopeInternal(), raster.getCoordinateReferenceSystem2D());
+    ReferencedEnvelope rasterExtent =
+        new ReferencedEnvelope(geom.getEnvelopeInternal(), raster.getCoordinateReferenceSystem2D());
 
     // Using BigDecimal to avoid floating point errors
     BigDecimal upperLeftX = BigDecimal.valueOf(metadata[0]);
@@ -391,13 +391,13 @@ public class Rasterization {
     alignedMaxY = Math.min(alignedMaxY, originalMaxY);
 
     // Create the aligned raster extent
-    Envelope2D alignedRasterExtent =
-        new Envelope2D(
-            rasterExtent.getCoordinateReferenceSystem(),
+    ReferencedEnvelope alignedRasterExtent =
+        new ReferencedEnvelope(
             alignedMinX,
+            alignedMaxX,
             alignedMinY,
-            alignedMaxX - alignedMinX,
-            alignedMaxY - alignedMinY);
+            alignedMaxY,
+            rasterExtent.getCoordinateReferenceSystem());
 
     return alignedRasterExtent;
   }
@@ -406,7 +406,7 @@ public class Rasterization {
       GridCoverage2D raster,
       boolean useGeometryExtent,
       double[] metadata,
-      Envelope2D geomExtent,
+      ReferencedEnvelope geomExtent,
       String pixelType) {
 
     double upperLeftX = 0;
@@ -478,7 +478,7 @@ public class Rasterization {
   public static void rasterizePolygon(
       Geometry geom,
       RasterizationParams params,
-      Envelope2D geomExtent,
+      ReferencedEnvelope geomExtent,
       double value,
       boolean allTouched) {
     if (!(geom instanceof Polygon)) {
@@ -516,7 +516,7 @@ public class Rasterization {
       Polygon polygon,
       RasterizationParams params,
       double value,
-      Envelope2D geomExtent,
+      ReferencedEnvelope geomExtent,
       boolean allTouched) {
 
     Map<Double, TreeSet<Double>> scanlineIntersections = new HashMap<>();

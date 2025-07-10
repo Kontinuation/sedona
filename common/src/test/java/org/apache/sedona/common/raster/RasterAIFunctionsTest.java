@@ -25,12 +25,12 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.List;
 import org.apache.sedona.common.utils.RasterUtils;
+import org.geotools.api.referencing.FactoryException;
+import org.geotools.api.referencing.operation.TransformException;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.junit.Test;
 import org.locationtech.jts.io.ParseException;
 import org.locationtech.jts.io.WKTReader;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.operation.TransformException;
 
 public class RasterAIFunctionsTest extends RasterTestBase {
   private static final WKTReader wktReader = new WKTReader();

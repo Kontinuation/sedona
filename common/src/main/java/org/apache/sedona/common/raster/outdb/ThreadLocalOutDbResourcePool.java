@@ -25,14 +25,14 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
 import org.apache.sedona.common.raster.workarounds.RuntimePatches;
+import org.geotools.api.data.DataSourceException;
+import org.geotools.api.parameter.GeneralParameterValue;
+import org.geotools.api.parameter.ParameterValue;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.io.AbstractGridFormat;
-import org.geotools.data.DataSourceException;
 import org.geotools.gce.arcgrid.ArcGridFormat;
 import org.geotools.gce.geotiff.GeoTiffFormat;
 import org.geotools.util.factory.Hints;
-import org.opengis.parameter.GeneralParameterValue;
-import org.opengis.parameter.ParameterValue;
 
 /** A factory class for instantiating thread local {@link OutDbResourcePool} objects. */
 public class ThreadLocalOutDbResourcePool {

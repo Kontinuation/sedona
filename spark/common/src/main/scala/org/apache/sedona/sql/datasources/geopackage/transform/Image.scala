@@ -22,7 +22,7 @@ import org.apache.sedona.sql.datasources.geopackage.model.ImageFileFormat.ImageF
 import org.apache.sedona.sql.datasources.geopackage.model.{ImageFileFormat, TileMetadata, TileRowMetadata}
 import org.geotools.coverage.grid.{GridCoverage2D, GridCoverageFactory}
 import org.geotools.gce.geotiff.GeoTiffReader
-import org.geotools.geometry.GeneralEnvelope
+import org.geotools.geometry.GeneralBounds
 
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
@@ -92,9 +92,8 @@ object Image {
       tileRowMetadata: TileRowMetadata): GridCoverage2D = {
     val envelope = tileMetadata.getEnvelope(tileRowMetadata)
 
-    val genevelope = new GeneralEnvelope(
-      Array(envelope.minX, envelope.minY),
-      Array(envelope.maxX, envelope.maxY))
+    val genevelope =
+      new GeneralBounds(Array(envelope.minX, envelope.minY), Array(envelope.maxX, envelope.maxY))
 
     genevelope.setCoordinateReferenceSystem(tileMetadata.getSRID())
     val coverageFactory = new GridCoverageFactory()

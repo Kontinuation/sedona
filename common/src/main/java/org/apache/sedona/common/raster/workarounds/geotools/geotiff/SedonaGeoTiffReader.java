@@ -66,6 +66,20 @@ import javax.media.jai.PlanarImage;
 import javax.media.jai.ROI;
 import javax.media.jai.RenderedOp;
 import org.apache.sedona.common.raster.workarounds.imageioext.tiff.SedonaTIFFImageReaderSpi;
+import org.geotools.api.coverage.ColorInterpretation;
+import org.geotools.api.coverage.grid.Format;
+import org.geotools.api.coverage.grid.GridCoverage;
+import org.geotools.api.coverage.grid.GridEnvelope;
+import org.geotools.api.data.DataSourceException;
+import org.geotools.api.data.FileGroupProvider.FileGroup;
+import org.geotools.api.geometry.Bounds;
+import org.geotools.api.parameter.GeneralParameterValue;
+import org.geotools.api.parameter.ParameterValue;
+import org.geotools.api.referencing.FactoryException;
+import org.geotools.api.referencing.ReferenceIdentifier;
+import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
+import org.geotools.api.referencing.operation.MathTransform;
+import org.geotools.api.referencing.operation.TransformException;
 import org.geotools.coverage.Category;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.TypeMap;
@@ -83,13 +97,11 @@ import org.geotools.coverage.grid.io.imageio.geotiff.GeoTiffIIOMetadataDecoder;
 import org.geotools.coverage.grid.io.imageio.geotiff.GeoTiffMetadata2CRSAdapter;
 import org.geotools.coverage.grid.io.imageio.geotiff.TiePoint;
 import org.geotools.coverage.util.CoverageUtilities;
-import org.geotools.data.DataSourceException;
-import org.geotools.data.FileGroupProvider.FileGroup;
 import org.geotools.data.MapInfoFileReader;
 import org.geotools.data.PrjFileReader;
 import org.geotools.data.WorldFileReader;
 import org.geotools.gce.geotiff.GeoTiffFormat;
-import org.geotools.geometry.GeneralEnvelope;
+import org.geotools.geometry.GeneralBounds;
 import org.geotools.image.ImageWorker;
 import org.geotools.image.io.ImageIOExt;
 import org.geotools.image.util.ImageUtilities;
@@ -102,18 +114,6 @@ import org.geotools.util.NumberRange;
 import org.geotools.util.URLs;
 import org.geotools.util.Utilities;
 import org.geotools.util.factory.Hints;
-import org.opengis.coverage.ColorInterpretation;
-import org.opengis.coverage.grid.Format;
-import org.opengis.coverage.grid.GridCoverage;
-import org.opengis.coverage.grid.GridEnvelope;
-import org.opengis.geometry.Envelope;
-import org.opengis.parameter.GeneralParameterValue;
-import org.opengis.parameter.ParameterValue;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.ReferenceIdentifier;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opengis.referencing.operation.MathTransform;
-import org.opengis.referencing.operation.TransformException;
 
 /**
  * this class is responsible for exposing the data and the Georeferencing metadata available to the
@@ -487,7 +487,7 @@ public class SedonaGeoTiffReader extends AbstractGridCoverage2DReader
       final AffineTransform tempTransform = new AffineTransform((AffineTransform) raster2Model);
       tempTransform.concatenate(CoverageUtilities.CENTER_TO_CORNER);
       originalEnvelope =
-          CRS.transform(ProjectiveTransform.create(tempTransform), new GeneralEnvelope(actualDim));
+          CRS.transform(ProjectiveTransform.create(tempTransform), new GeneralBounds(actualDim));
       originalEnvelope.setCoordinateReferenceSystem(crs);
 
       // ///
@@ -600,7 +600,7 @@ public class SedonaGeoTiffReader extends AbstractGridCoverage2DReader
    */
   @Override
   public GridCoverage2D read(GeneralParameterValue[] params) throws IOException {
-    GeneralEnvelope requestedEnvelope = null;
+    GeneralBounds requestedEnvelope = null;
     Rectangle dim = null;
     Color inputTransparentColor = null;
     OverviewPolicy overviewPolicy = null;
@@ -617,7 +617,7 @@ public class SedonaGeoTiffReader extends AbstractGridCoverage2DReader
         final ReferenceIdentifier name = param.getDescriptor().getName();
         if (name.equals(AbstractGridFormat.READ_GRIDGEOMETRY2D.getName())) {
           final GridGeometry2D gg = (GridGeometry2D) param.getValue();
-          requestedEnvelope = new GeneralEnvelope((Envelope) gg.getEnvelope2D());
+          requestedEnvelope = new GeneralBounds((Bounds) gg.getEnvelope2D());
           dim = gg.getGridRange2D().getBounds();
           continue;
         }
@@ -985,7 +985,7 @@ public class SedonaGeoTiffReader extends AbstractGridCoverage2DReader
           coverageName, image, crs, raster2Model, bands, null, properties);
     }
     return coverageFactory.create(
-        coverageName, image, new GeneralEnvelope(originalEnvelope), bands, null, properties);
+        coverageName, image, new GeneralBounds(originalEnvelope), bands, null, properties);
   }
 
   private CoordinateReferenceSystem getCRS(Object source) {

@@ -39,6 +39,11 @@ import org.apache.sedona.common.raster.serde.GridSampleDimensionSerializer;
 import org.apache.sedona.common.raster.serde.KryoUtil;
 import org.apache.sedona.common.utils.ImageUtils;
 import org.apache.sedona.common.utils.RasterUtils;
+import org.geotools.api.coverage.CannotEvaluateException;
+import org.geotools.api.data.DataSourceException;
+import org.geotools.api.geometry.Position;
+import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
+import org.geotools.api.referencing.operation.MathTransform;
 import org.geotools.coverage.GridSampleDimension;
 import org.geotools.coverage.TypeMap;
 import org.geotools.coverage.grid.GridCoordinates2D;
@@ -46,15 +51,10 @@ import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridCoverageFactory;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.coverage.grid.GridGeometry2D;
-import org.geotools.data.DataSourceException;
-import org.geotools.geometry.Envelope2D;
+import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.CRS;
 import org.geotools.referencing.crs.DefaultEngineeringCRS;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
-import org.opengis.coverage.CannotEvaluateException;
-import org.opengis.geometry.DirectPosition;
-import org.opengis.referencing.crs.CoordinateReferenceSystem;
-import org.opengis.referencing.operation.MathTransform;
 
 /**
  * A grid coverage referencing raster images stored in cloud storages. The grid coverage may only
@@ -129,7 +129,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
         factory.create(
             "__dummy_static__",
             matrix,
-            new Envelope2D(DefaultEngineeringCRS.GENERIC_2D, 0, 0, 1, 1));
+            new ReferencedEnvelope(0, 1, 0, 1, DefaultEngineeringCRS.GENERIC_2D));
   }
 
   /**
@@ -179,7 +179,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
   }
 
   @Override
-  public Object evaluate(final DirectPosition point) throws CannotEvaluateException {
+  public Object evaluate(final Position point) throws CannotEvaluateException {
     replacePlaceHolderImage();
     return super.evaluate(point);
   }
@@ -222,7 +222,7 @@ public class OutDbGridCoverage2D extends GridCoverage2D {
   }
 
   @Override
-  public synchronized String getDebugString(final DirectPosition coord) {
+  public synchronized String getDebugString(final Position coord) {
     replacePlaceHolderImage();
     return super.getDebugString(coord);
   }

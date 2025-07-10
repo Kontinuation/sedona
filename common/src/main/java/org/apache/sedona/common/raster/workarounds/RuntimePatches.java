@@ -23,8 +23,8 @@ import it.geosolutions.jaiext.JAIExt;
 import javax.media.jai.registry.RenderedRegistryMode;
 import org.apache.sedona.common.raster.workarounds.geotools.geotiff.SedonaGeoTiffReader;
 import org.apache.sedona.common.raster.workarounds.jaiext.SedonaBandMergeCRIF;
+import org.geotools.api.data.DataSourceException;
 import org.geotools.coverage.grid.io.AbstractGridCoverage2DReader;
-import org.geotools.data.DataSourceException;
 import org.geotools.util.factory.Hints;
 
 public class RuntimePatches {

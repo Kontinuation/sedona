@@ -24,6 +24,9 @@ import org.apache.sedona.common.Functions;
 import org.apache.sedona.common.utils.RasterPolygonEnumerator;
 import org.apache.sedona.common.utils.RasterPolygonizer;
 import org.apache.sedona.common.utils.RasterUtils;
+import org.geotools.api.referencing.FactoryException;
+import org.geotools.api.referencing.operation.MathTransform;
+import org.geotools.api.referencing.operation.TransformException;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.coverage.grid.GridEnvelope2D;
 import org.geotools.geometry.jts.JTS;
@@ -33,9 +36,6 @@ import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Polygon;
-import org.opengis.referencing.FactoryException;
-import org.opengis.referencing.operation.MathTransform;
-import org.opengis.referencing.operation.TransformException;
 
 /** Functions for WherobotsAI */
 public class RasterAIFunctions {
