@@ -23,6 +23,12 @@ import org.apache.spark.sql.sedona_sql.expressions.collect.ST_Collect
 import org.locationtech.jts.operation.buffer.BufferParameters
 
 object st_functions extends DataFrameAPI {
+  def ExpandAddress(address: Column): Column = wrapExpression[ExpandAddress](address)
+  def ExpandAddress(address: String): Column = wrapExpression[ExpandAddress](address)
+
+  def ParseAddress(address: Column): Column = wrapExpression[ParseAddress](address)
+  def ParseAddress(address: String): Column = wrapExpression[ParseAddress](address)
+
   def GeometryType(geometry: Column): Column = wrapExpression[GeometryType](geometry)
   def GeometryType(geometry: String): Column = wrapExpression[GeometryType](geometry)
 

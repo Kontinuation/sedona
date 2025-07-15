@@ -20,6 +20,7 @@ package org.apache.sedona.core.utils;
 
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.nio.file.Paths;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -33,11 +34,12 @@ import org.apache.sedona.core.enums.SpatialJoinOptimizationMode;
 import org.apache.sedona.core.spatialOperator.Subdivide;
 import org.apache.sedona.core.spatialPartitioning.SpatialPartitionerBuilder.SpatialPartitionBuildingStrategy;
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector;
+import org.apache.spark.SparkConf;
+import org.apache.spark.SparkEnv;
 import org.apache.spark.sql.RuntimeConfig;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.Utils;
 import org.locationtech.jts.geom.Envelope;
-import scala.collection.JavaConverters;
 
 public class SedonaConf implements Serializable {
   private final String REVERSE_GEOCODE_DISTANCE_PREFIX = "spark.sedona.reverse.geocode.distance.";
@@ -139,17 +141,88 @@ public class SedonaConf implements Serializable {
   private long rasterLoadPerPartitionSize;
   private int rasterLoadingParallelism;
 
+  // Parameters for libpostal integration
+  private String libPostalDataDir;
+  private Boolean libPostalUseSenzing = false;
+
   public static SedonaConf fromActiveSession() {
     return new SedonaConf(SparkSession.active().conf());
   }
 
+  public static SedonaConf fromSparkEnv() {
+    return new SedonaConf(SparkEnv.get().conf());
+  }
+
+  private interface ConfGetter {
+    String get(String key, String defaultValue);
+
+    String get(String key);
+
+    boolean contains(String key);
+
+    java.util.Map<String, String> getAll();
+  }
+
+  public SedonaConf(SparkConf sparkConf) {
+    this(
+        new ConfGetter() {
+          @Override
+          public String get(String key, String defaultValue) {
+            return sparkConf.get(key, defaultValue);
+          }
+
+          @Override
+          public String get(String key) {
+            return sparkConf.get(key, null);
+          }
+
+          public boolean contains(String key) {
+            return sparkConf.contains(key);
+          }
+
+          @Override
+          public java.util.Map<String, String> getAll() {
+            java.util.Map<String, String> map = new java.util.HashMap<>();
+            for (scala.Tuple2<String, String> t : sparkConf.getAll()) {
+              map.put(t._1(), t._2());
+            }
+            return map;
+          }
+        });
+  }
+
   public SedonaConf(RuntimeConfig runtimeConfig) {
-    this.useIndex = Boolean.parseBoolean(getConfigValue(runtimeConfig, "global.index", "true"));
+    this(
+        new ConfGetter() {
+          @Override
+          public String get(String key, String defaultValue) {
+            return runtimeConfig.get(key, defaultValue);
+          }
+
+          @Override
+          public String get(String key) {
+            return runtimeConfig.get(key, null);
+          }
+
+          @Override
+          public boolean contains(String key) {
+            return runtimeConfig.contains(key);
+          }
+
+          @Override
+          public java.util.Map<String, String> getAll() {
+            return scala.collection.JavaConverters.mapAsJavaMap(runtimeConfig.getAll());
+          }
+        });
+  }
+
+  private SedonaConf(ConfGetter confGetter) {
+    this.useIndex = Boolean.parseBoolean(getConfigValue(confGetter, "global.index", "true"));
     this.indexType =
-        IndexType.getIndexType(getConfigValue(runtimeConfig, "global.indextype", "rtree"));
+        IndexType.getIndexType(getConfigValue(confGetter, "global.indextype", "rtree"));
     this.joinApproximateTotalCount =
-        Long.parseLong(getConfigValue(runtimeConfig, "join.approxcount", "-1"));
-    String[] boundaryString = getConfigValue(runtimeConfig, "join.boundary", "0,0,0,0").split(",");
+        Long.parseLong(getConfigValue(confGetter, "join.approxcount", "-1"));
+    String[] boundaryString = getConfigValue(confGetter, "join.boundary", "0,0,0,0").split(",");
     this.datasetBoundary =
         new Envelope(
             Double.parseDouble(boundaryString[0]),
@@ -157,33 +230,32 @@ public class SedonaConf implements Serializable {
             Double.parseDouble(boundaryString[2]),
             Double.parseDouble(boundaryString[3]));
     this.joinGridType =
-        GridType.getGridType(getConfigValue(runtimeConfig, "join.gridtype", "kdbtree"));
+        GridType.getGridType(getConfigValue(confGetter, "join.gridtype", "kdbtree"));
     this.joinBuildSide =
-        JoinBuildSide.getBuildSide(getConfigValue(runtimeConfig, "join.indexbuildside", "left"));
+        JoinBuildSide.getBuildSide(getConfigValue(confGetter, "join.indexbuildside", "left"));
     this.joinSparitionDominantSide =
         JoinSpartitionDominantSide.getJoinSparitionDominantSide(
-            getConfigValue(runtimeConfig, "join.spatitionside", "left"));
+            getConfigValue(confGetter, "join.spatitionside", "left"));
     this.fallbackPartitionNum =
-        Integer.parseInt(getConfigValue(runtimeConfig, "join.numpartition", "-1"));
+        Integer.parseInt(getConfigValue(confGetter, "join.numpartition", "-1"));
     String joinThreshold =
         getConfigValue(
-            runtimeConfig,
+            confGetter,
             "join.autoBroadcastJoinThreshold",
-            runtimeConfig.get("spark.sql.autoBroadcastJoinThreshold"));
+            confGetter.get("spark.sql.autoBroadcastJoinThreshold"));
     this.autoBroadcastJoinThreshold = bytesFromString(joinThreshold);
     this.adaptiveAutoBroadcastJoinThreshold =
         bytesFromString(
-            getConfigValue(
-                runtimeConfig, "join.adaptiveAutoBroadcastJoinThreshold", joinThreshold));
+            getConfigValue(confGetter, "join.adaptiveAutoBroadcastJoinThreshold", joinThreshold));
     this.spatialJoinOptimizationMode =
         SpatialJoinOptimizationMode.getSpatialJoinOptimizationMode(
-            getConfigValue(runtimeConfig, "join.optimizationmode", "nonequi"));
+            getConfigValue(confGetter, "join.optimizationmode", "nonequi"));
 
     // Above are Apache Sedona parameters.
     // Everything below are Wherobots-DB parameters
 
     this.useAdvancedSpatialJoin =
-        Boolean.parseBoolean(runtimeConfig.get("spark.sedona.join.advanced", "true"));
+        Boolean.parseBoolean(confGetter.get("spark.sedona.join.advanced", "true"));
     if (this.useAdvancedSpatialJoin) {
       // Always use R-Tree index for advanced spatial join, even for broadcast indexed join.
       this.useIndex = true;
@@ -194,148 +266,142 @@ public class SedonaConf implements Serializable {
     // need to tune these parameters.
     this.maxSamplesForSpatialPartitioning =
         Long.parseLong(
-            runtimeConfig.get(
+            confGetter.get(
                 "spark.sedona.join.maxSamplesForSpatialPartitioning",
                 Long.toString(AdvancedStatCollector.DEFAULT_MAX_SAMPLES)));
     this.minSamplesForSpatialPartitioning =
         Long.parseLong(
-            runtimeConfig.get("spark.sedona.join.minSamplesForSpatialPartitioning", "10000"));
+            confGetter.get("spark.sedona.join.minSamplesForSpatialPartitioning", "10000"));
     this.minSamplingRate =
         Double.parseDouble(
-            runtimeConfig.get(
+            confGetter.get(
                 "spark.sedona.join.minSamplingRate",
                 Double.toString(AdvancedStatCollector.DEFAULT_MIN_SAMPLING_RATE)));
     this.sizeEstimationSampleGrowthRate =
         Double.parseDouble(
-            runtimeConfig.get(
+            confGetter.get(
                 "spark.sedona.join.sizeEstimationSampleGrowthRate",
                 Double.toString(AdvancedStatCollector.DEFAULT_SIZE_ESTIMATION_SAMPLE_GROWTH_RATE)));
     this.considerTopKLargestGeometries =
         Integer.parseInt(
-            runtimeConfig.get(
+            confGetter.get(
                 "spark.sedona.join.subdivide.considerTopKLargestGeometries",
                 Integer.toString(AdvancedStatCollector.DEFAULT_TOP_K_LARGEST_GEOMETRIES)));
     this.expectedPerPartitionCount =
-        Long.parseLong(
-            runtimeConfig.get("spark.sedona.join.expectedPerPartitionCount", "10000000"));
+        Long.parseLong(confGetter.get("spark.sedona.join.expectedPerPartitionCount", "10000000"));
     this.maxGuessedPartitionNumber =
-        Integer.parseInt(runtimeConfig.get("spark.sedona.join.maxGuessedPartitionNumber", "-1"));
+        Integer.parseInt(confGetter.get("spark.sedona.join.maxGuessedPartitionNumber", "-1"));
     if (this.maxGuessedPartitionNumber == -1) {
       // If maxGuessedPartitionNumber is not set, we use 10 times the total number of executor cores
       // as the default value.
       int totalExecutorCores =
-          Integer.parseInt(runtimeConfig.get("spark.executor.instances", "1"))
-              * Integer.parseInt(runtimeConfig.get("spark.executor.cores", "1"));
+          Integer.parseInt(confGetter.get("spark.executor.instances", "1"))
+              * Integer.parseInt(confGetter.get("spark.executor.cores", "1"));
       this.maxGuessedPartitionNumber = Math.max(10 * totalExecutorCores, 10000);
     }
     this.spatialPartitionBuildingStrategy =
         SpatialPartitionBuildingStrategy.valueOf(
-            runtimeConfig
+            confGetter
                 .get("spark.sedona.join.spatialPartitionBuildingStrategy", "subsampling")
                 .toUpperCase(Locale.ROOT));
     this.maxSamplesForAdaptiveBroadcastJoinExecutionMode =
         Integer.parseInt(
-            runtimeConfig.get(
+            confGetter.get(
                 "spark.sedona.join.maxSamplesForAdaptiveBroadcastJoinExecutionMode", "10"));
 
     // Parameters for setting external (spill-able) spatial index
     this.useExternalSpatialIndex =
-        Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.join.useExternalSpatialIndex", "true"));
+        Boolean.parseBoolean(confGetter.get("spark.sedona.join.useExternalSpatialIndex", "true"));
     this.externalSpatialIndexLeafPageCapacity =
         Integer.parseInt(
-            runtimeConfig.get("spark.sedona.join.externalSpatialIndexLeafPageCapacity", "100"));
+            confGetter.get("spark.sedona.join.externalSpatialIndexLeafPageCapacity", "100"));
     this.externalSpatialIndexInternalNodeCapacity =
         Integer.parseInt(
-            runtimeConfig.get("spark.sedona.join.externalSpatialIndexInternalNodeCapacity", "10"));
+            confGetter.get("spark.sedona.join.externalSpatialIndexInternalNodeCapacity", "10"));
     this.forceSpillExternalSpatialIndex =
         Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.join.forceSpillExternalSpatialIndex", "false"));
+            confGetter.get("spark.sedona.join.forceSpillExternalSpatialIndex", "false"));
 
     // Parameters for enabling auto-subdividing when running spatial joins
     this.spatialJoinSubdivideLeft =
         JoinSubdivideMode.getJoinSubdivideMode(
-            runtimeConfig.get("spark.sedona.join.subdivideLeft", "auto"));
+            confGetter.get("spark.sedona.join.subdivideLeft", "auto"));
     boolean keepRowData =
         Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.join.subdivideLeft.keepRowData", "false"));
+            confGetter.get("spark.sedona.join.subdivideLeft.keepRowData", "false"));
     // Options for pre-spatial-partitioning subdivide
-    SubdivideOptions options =
-        readSubdivideOptions(runtimeConfig, "spark.sedona.join.subdivideLeft");
+    SubdivideOptions options = readSubdivideOptions(confGetter, "spark.sedona.join.subdivideLeft");
     this.leftSubdivideRDDOptions = new Subdivide.SubdivideRDDOptions(options, false, keepRowData);
     // Options for local join subdivide
     this.localJoinSubdivideLeft =
         JoinSubdivideMode.getJoinSubdivideMode(
-            runtimeConfig.get("spark.sedona.join.subdivideLeftInLocalJoin", "auto"));
+            confGetter.get("spark.sedona.join.subdivideLeftInLocalJoin", "auto"));
     this.leftLocalJoinSubdivideOptions =
-        readSubdivideOptions(runtimeConfig, "spark.sedona.join.subdivideLeftInLocalJoin");
+        readSubdivideOptions(confGetter, "spark.sedona.join.subdivideLeftInLocalJoin");
 
     this.spatialJoinSubdivideRight =
         JoinSubdivideMode.getJoinSubdivideMode(
-            runtimeConfig.get("spark.sedona.join.subdivideRight", "auto"));
+            confGetter.get("spark.sedona.join.subdivideRight", "auto"));
     keepRowData =
         Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.join.subdivideRight.keepRowData", "false"));
+            confGetter.get("spark.sedona.join.subdivideRight.keepRowData", "false"));
     // Options for pre-spatial-partitioning subdivide
-    options = readSubdivideOptions(runtimeConfig, "spark.sedona.join.subdivideRight");
+    options = readSubdivideOptions(confGetter, "spark.sedona.join.subdivideRight");
     this.rightSubdivideRDDOptions = new Subdivide.SubdivideRDDOptions(options, false, keepRowData);
     // Options for local join subdivide
     this.localJoinSubdivideRight =
         JoinSubdivideMode.getJoinSubdivideMode(
-            runtimeConfig.get("spark.sedona.join.subdivideRightInLocalJoin", "auto"));
+            confGetter.get("spark.sedona.join.subdivideRightInLocalJoin", "auto"));
     this.rightLocalJoinSubdivideOptions =
-        readSubdivideOptions(runtimeConfig, "spark.sedona.join.subdivideRightInLocalJoin");
+        readSubdivideOptions(confGetter, "spark.sedona.join.subdivideRightInLocalJoin");
 
     // Internal parameters for automatic subdivide parameter tuning
     this.subdivideDuplicationFactorThreshold =
         Integer.parseInt(
-            runtimeConfig.get("spark.sedona.join.subdivideDuplicationFactorThreshold", "5"));
+            confGetter.get("spark.sedona.join.subdivideDuplicationFactorThreshold", "5"));
     this.perPartitionShuffleWriteSizeThreshold =
         bytesFromString(
-            runtimeConfig.get(
+            confGetter.get(
                 "spark.sedona.join.subdividePerPartitionShuffleWriteSizeThreshold", "20gb"));
     this.subdivideNumPointsThreshold =
-        Integer.parseInt(runtimeConfig.get("spark.sedona.join.subdivideNumPointsThreshold", "100"));
+        Integer.parseInt(confGetter.get("spark.sedona.join.subdivideNumPointsThreshold", "100"));
     this.subdivideCollisionFactorThreshold =
         Double.parseDouble(
-            runtimeConfig.get("spark.sedona.join.localSubdivideCollisionFactorThreshold", "5"));
+            confGetter.get("spark.sedona.join.localSubdivideCollisionFactorThreshold", "5"));
     this.subdivideNonPolygonalCollisionFactorThreshold =
         Double.parseDouble(
-            runtimeConfig.get(
+            confGetter.get(
                 "spark.sedona.join.localSubdivideNonPolygonalCollisionFactorThreshold", "0.5"));
     this.subdivideExtentSizeRatioThreshold =
         Double.parseDouble(
-            runtimeConfig.get("spark.sedona.join.localSubdivideExtentSizeRatioThreshold", "0"));
+            confGetter.get("spark.sedona.join.localSubdivideExtentSizeRatioThreshold", "0"));
 
     // Parameters for debugging
     this.enableMetricsForSpatialPartitioning =
         Boolean.parseBoolean(
-            runtimeConfig.get(
-                "spark.sedona.join.debug.enableMetricsForSpatialPartitioning", "false"));
+            confGetter.get("spark.sedona.join.debug.enableMetricsForSpatialPartitioning", "false"));
     this.spatialPartitionerSavePath =
-        runtimeConfig.get("spark.sedona.join.debug.spatialPartitionerSavePath", "");
+        confGetter.get("spark.sedona.join.debug.spatialPartitionerSavePath", "");
 
     // Parameters for knn joins
     this.includeTieBreakersInKNNJoins =
-        Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.join.knn.includeTieBreakers", "false"));
+        Boolean.parseBoolean(confGetter.get("spark.sedona.join.knn.includeTieBreakers", "false"));
 
     this.skewnessCutoffRatioInKNNJoins =
-        Double.parseDouble(runtimeConfig.get("spark.sedona.join.knn.skewnessCutoffRatio", "1.0"));
+        Double.parseDouble(confGetter.get("spark.sedona.join.knn.skewnessCutoffRatio", "1.0"));
 
     this.skewnessMinimumMBRCountInKNNJoins =
-        Integer.parseInt(runtimeConfig.get("spark.sedona.join.knn.skewnessMinimumMBRCount", "100"));
+        Integer.parseInt(confGetter.get("spark.sedona.join.knn.skewnessMinimumMBRCount", "100"));
 
     this.skewnessMaximumMBRDividesInKNNJoins =
-        Integer.parseInt(
-            runtimeConfig.get("spark.sedona.join.knn.skewnessMaximumMBRDivides", "100"));
+        Integer.parseInt(confGetter.get("spark.sedona.join.knn.skewnessMaximumMBRDivides", "100"));
 
     this.enableParallelPartitioningInKNNJoins =
         Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.join.knn.enableParallelPartitioning", "true"));
+            confGetter.get("spark.sedona.join.knn.enableParallelPartitioning", "true"));
 
     this.maxRowsPerPartitionInKNNJoins =
-        Integer.parseInt(runtimeConfig.get("spark.sedona.join.knn.maxRowsPerPartition", "524288"));
+        Integer.parseInt(confGetter.get("spark.sedona.join.knn.maxRowsPerPartition", "524288"));
 
     // If this is disabled, we will never generate broadcast index join plan for spatial join.
     // This does not completely disable broadcast index join. If the statistics retrieved in the
@@ -344,7 +410,7 @@ public class SedonaConf implements Serializable {
     // at query running time. This also allow us to automatically repartition the stream relation
     // if skew is detected by the analyze phase.
     this.allowPlanBroadcastJoin =
-        Boolean.parseBoolean(runtimeConfig.get("spark.sedona.join.allowPlanBroadcastJoin", "true"));
+        Boolean.parseBoolean(confGetter.get("spark.sedona.join.allowPlanBroadcastJoin", "true"));
 
     // When the spatial join physical executor determines to use broadcast index join at query
     // running time after analyzing joined datasets, we can choose to repartition the stream side
@@ -352,16 +418,14 @@ public class SedonaConf implements Serializable {
     // a small dataset. This configuration is disabled by default since it may introduce performance
     // regression to existing workload when enabled.
     this.autoReBalanceStreamSide =
-        Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.join.autoReBalanceStreamSide", "true"));
+        Boolean.parseBoolean(confGetter.get("spark.sedona.join.autoReBalanceStreamSide", "true"));
 
     // When the spatial join physical executor determines to use broadcast index join at query
     // running time after analyzing joined datasets, we can choose to re-balance the stream side
     // if it is skewed. This threshold determines how skewed the data needs to be to trigger
     // automatic repartitioning.
     this.streamSideSkewScoreThreshold =
-        Double.parseDouble(
-            runtimeConfig.get("spark.sedona.join.streamSideSkewScoreThreshold", "2.0"));
+        Double.parseDouble(confGetter.get("spark.sedona.join.streamSideSkewScoreThreshold", "2.0"));
 
     // When the spatial join physical executor determines to use broadcast index join at query
     // running time after analyzing joined datasets, we can choose to repartition the stream side
@@ -371,7 +435,7 @@ public class SedonaConf implements Serializable {
     // org.apache.sedona.core.utils.ExecutorResourceUtils.inferParallelism
     this.streamSideUnderPartitioningThreshold =
         Double.parseDouble(
-            runtimeConfig.get("spark.sedona.join.streamSideUnderPartitioningThreshold", "0.25"));
+            confGetter.get("spark.sedona.join.streamSideUnderPartitioningThreshold", "0.25"));
 
     // When the spatial join physical executor determines to use broadcast index join at query
     // running time after analyzing joined datasets, we can choose to repartition the stream side
@@ -379,8 +443,7 @@ public class SedonaConf implements Serializable {
     // calculate the ideal (minimum) number of records per partition. This prevents
     // over-partitioning the stream side when the data size is small.
     this.streamSideIdealPartitionSize =
-        Long.parseLong(
-            runtimeConfig.get("spark.sedona.join.streamSideIdealPartitionSize", "10000"));
+        Long.parseLong(confGetter.get("spark.sedona.join.streamSideIdealPartitionSize", "10000"));
 
     // Parameters for raster loading
 
@@ -388,7 +451,7 @@ public class SedonaConf implements Serializable {
     // spark.read.format("raster").load(...)
     // to load rasters. This is for re-balancing the tiles evenly to multiple executor cores.
     this.enableRasterLoadAutoRepartition =
-        Boolean.parseBoolean(runtimeConfig.get("spark.sedona.raster.load.autoRepartition", "true"));
+        Boolean.parseBoolean(confGetter.get("spark.sedona.raster.load.autoRepartition", "true"));
 
     // The number of partitions to repartition the DataFrame loaded by
     // spark.read.format("raster").load(...). This is only effective when
@@ -396,13 +459,13 @@ public class SedonaConf implements Serializable {
     // means that the number of partitions will be determined on the fly based on the size of
     // the DataFrame and the number of available cores.
     this.rasterLoadNumPartitions =
-        Integer.parseInt(runtimeConfig.get("spark.sedona.raster.load.numPartitions", "0"));
+        Integer.parseInt(confGetter.get("spark.sedona.raster.load.numPartitions", "0"));
 
     // The size of each partition when repartitioning the DataFrame loaded by
     // spark.read.format("raster").load(...). This is only effective when
     // spark.sedona.raster.load.autoRepartition is true and Spark dynamic allocation is enabled.
     this.rasterLoadPerPartitionSize =
-        bytesFromString(runtimeConfig.get("spark.sedona.raster.load.perPartitionSize", "500mb"));
+        bytesFromString(confGetter.get("spark.sedona.raster.load.perPartitionSize", "500mb"));
 
     // The number of threads used to load the metadata of out-db rasters in parallel when using
     // spark.read.format("raster").load(...). This is only effective when retile is true, or
@@ -411,33 +474,46 @@ public class SedonaConf implements Serializable {
     int defaultRasterLoadingParallelism = Runtime.getRuntime().availableProcessors() * 4;
     this.rasterLoadingParallelism =
         Integer.parseInt(
-            runtimeConfig.get(
+            confGetter.get(
                 "spark.sedona.raster.load.parallelism",
                 Integer.toString(defaultRasterLoadingParallelism)));
 
     this.reverseGeocodingTableName =
-        runtimeConfig.get(
+        confGetter.get(
             "spark.sedona.reverse.geocode.table",
             "wherobots_open_data.overture_maps_foundation.geocodes");
 
     this.reverseGeocodingDistanceThresholds =
-        initializeReverseGeocodingDistanceThresholds(runtimeConfig);
+        initializeReverseGeocodingDistanceThresholds(confGetter);
 
     this.reverseGeocodingAssertLayerExists =
-        Boolean.parseBoolean(
-            runtimeConfig.get("spark.sedona.reverse.geocode.assert.layers", "true"));
+        Boolean.parseBoolean(confGetter.get("spark.sedona.reverse.geocode.assert.layers", "true"));
 
     this.DBSCANIncludeOutliers =
-        Boolean.parseBoolean(runtimeConfig.get("spark.sedona.dbscan.includeOutliers", "true"));
+        Boolean.parseBoolean(confGetter.get("spark.sedona.dbscan.includeOutliers", "true"));
 
     this.LOFApproximateKNN =
-        Boolean.parseBoolean(runtimeConfig.get("spark.sedona.lof.approximateKNN", "false"));
+        Boolean.parseBoolean(confGetter.get("spark.sedona.lof.approximateKNN", "false"));
+
+    // Parameters for libpostal integration
+    String libPostalDataDir =
+        confGetter.get(
+            "spark.sedona.libpostal.dataDir",
+            Paths.get(System.getProperty("java.io.tmpdir"))
+                .resolve(Paths.get("libpostal"))
+                .toString());
+    if (!libPostalDataDir.isEmpty() && !libPostalDataDir.endsWith("/")) {
+      libPostalDataDir = libPostalDataDir + "/";
+    }
+    this.libPostalDataDir = libPostalDataDir;
+
+    this.libPostalUseSenzing =
+        Boolean.parseBoolean(confGetter.get("spark.sedona.libpostal.useSenzing", "true"));
   }
 
-  private Map<String, Double> initializeReverseGeocodingDistanceThresholds(
-      RuntimeConfig runtimeConfig) {
+  private Map<String, Double> initializeReverseGeocodingDistanceThresholds(ConfGetter confGetter) {
     Map<String, Double> reverseGeocodingDistanceThresholds =
-        JavaConverters.mapAsJavaMap(runtimeConfig.getAll()).entrySet().stream()
+        confGetter.getAll().entrySet().stream()
             .filter(entry -> entry.getKey().startsWith(REVERSE_GEOCODE_DISTANCE_PREFIX))
             .collect(
                 Collectors.toMap(
@@ -457,26 +533,22 @@ public class SedonaConf implements Serializable {
     return reverseGeocodingDistanceThresholds;
   }
 
-  private SubdivideOptions readSubdivideOptions(RuntimeConfig runtimeConfig, String prefix) {
-    int maxCoordinates = Integer.parseInt(runtimeConfig.get(prefix + ".maxCoordinates", "1000"));
-    double maxWidth = Double.parseDouble(runtimeConfig.get(prefix + ".maxWidth", "0.1"));
-    double maxHeight = Double.parseDouble(runtimeConfig.get(prefix + ".maxHeight", "0.1"));
-    int maxDepth = Integer.parseInt(runtimeConfig.get(prefix + ".maxDepth", "50"));
+  private SubdivideOptions readSubdivideOptions(ConfGetter confGetter, String prefix) {
+    int maxCoordinates = Integer.parseInt(confGetter.get(prefix + ".maxCoordinates", "1000"));
+    double maxWidth = Double.parseDouble(confGetter.get(prefix + ".maxWidth", "0.1"));
+    double maxHeight = Double.parseDouble(confGetter.get(prefix + ".maxHeight", "0.1"));
+    int maxDepth = Integer.parseInt(confGetter.get(prefix + ".maxDepth", "50"));
     SubdivideOptions.MultiPointSubDivider multiPointSubDivider =
         SubdivideOptions.MultiPointSubDivider.valueOf(
-            runtimeConfig
-                .get(prefix + ".multiPointSubDivider", "decompose")
-                .toUpperCase(Locale.ROOT));
+            confGetter.get(prefix + ".multiPointSubDivider", "decompose").toUpperCase(Locale.ROOT));
     SubdivideOptions.LineStringSubDivider lineStringSubDivider =
         SubdivideOptions.LineStringSubDivider.valueOf(
-            runtimeConfig
+            confGetter
                 .get(prefix + ".lineStringSubDivider", "cut_segments")
                 .toUpperCase(Locale.ROOT));
     SubdivideOptions.PolygonSubDivider polygonSubDivider =
         SubdivideOptions.PolygonSubDivider.valueOf(
-            runtimeConfig
-                .get(prefix + ".polygonSubDivider", "box_approx")
-                .toUpperCase(Locale.ROOT));
+            confGetter.get(prefix + ".polygonSubDivider", "box_approx").toUpperCase(Locale.ROOT));
     return new SubdivideOptions(
         maxCoordinates,
         maxWidth,
@@ -488,15 +560,14 @@ public class SedonaConf implements Serializable {
   }
 
   // Helper method to prioritize `sedona.*` over `spark.sedona.*`
-  private String getConfigValue(
-      RuntimeConfig runtimeConfig, String keySuffix, String defaultValue) {
+  private String getConfigValue(ConfGetter confGetter, String keySuffix, String defaultValue) {
     String sedonaKey = "sedona." + keySuffix;
     String sparkSedonaKey = "spark.sedona." + keySuffix;
 
-    if (runtimeConfig.contains(sedonaKey)) {
-      return runtimeConfig.get(sedonaKey, defaultValue);
+    if (confGetter.contains(sedonaKey)) {
+      return confGetter.get(sedonaKey, defaultValue);
     } else {
-      return runtimeConfig.get(sparkSedonaKey, defaultValue);
+      return confGetter.get(sparkSedonaKey, defaultValue);
     }
   }
 
@@ -559,6 +630,9 @@ public class SedonaConf implements Serializable {
   }
 
   static long bytesFromString(String str) {
+    if (str == null || str.isEmpty()) {
+      return 0;
+    }
     if (str.startsWith("-")) {
       return -1 * Utils.byteStringAsBytes(str.substring(1));
     } else {
@@ -768,5 +842,13 @@ public class SedonaConf implements Serializable {
 
   public boolean isEnableRasterLoadAutoRepartition() {
     return enableRasterLoadAutoRepartition;
+  }
+
+  public String getLibPostalDataDir() {
+    return libPostalDataDir;
+  }
+
+  public Boolean getLibPostalUseSenzing() {
+    return libPostalUseSenzing;
   }
 }
