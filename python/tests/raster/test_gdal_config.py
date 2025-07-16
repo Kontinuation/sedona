@@ -15,7 +15,10 @@
 #  specific language governing permissions and limitations
 #  under the License.
 
+from datetime import datetime, timedelta
+
 import pytest
+
 from sedona.raster import gdal_conf
 
 
@@ -100,3 +103,66 @@ class TestGdalConfig:
             assert session.unsigned
         finally:
             gdal_conf.clear_gdal_conf_from_env()
+
+    def test_assumed_role(self):
+        gdal_conf._set_spark_conf_in_test(
+            {
+                "spark.hadoop.fs.s3a.bucket.pub-bucket.aws.credentials.provider": "org.apache.hadoop.fs.s3a.auth.AssumedRoleCredentialProvider",
+                "spark.hadoop.fs.s3a.bucket.pub-bucket.assumed.role.arn": "arn:aws:iam::123456789012:role/test-access-s3-role",
+                "spark.hadoop.fs.s3a.bucket.pub-bucket.assumed.role.session.name": "test-session",
+                "spark.hadoop.fs.s3a.bucket.pub-bucket2.aws.credentials.provider": "org.apache.hadoop.fs.s3a.auth.AssumedRoleCredentialProvider",
+                "spark.hadoop.fs.s3a.bucket.pub-bucket2.assumed.role.arn": "arn:aws:iam::123456789012:role/test-access-s3-role-2",
+                "spark.hadoop.fs.s3a.bucket.pub-bucket2.assumed.role.session.name": "test-session-2",
+            }
+        )
+
+        class MockBoto3:
+            def client(self, *args, **kwargs):
+                return MockStsClient()
+
+        class MockStsClient:
+            def __init__(self):
+                self.count = 0
+
+            def assume_role(self, *args, **kwargs):
+                self.count += 1
+                return {
+                    "Credentials": {
+                        "AccessKeyId": f"test_temp_access_key_{self.count}",
+                        "SecretAccessKey": f"test_temp_secret_key_{self.count}",
+                        "SessionToken": f"test_temp_token_{self.count}",
+                        "Expiration": datetime.now() + timedelta(hours=1),
+                    }
+                }
+
+        old_boto3 = gdal_conf.boto3
+        try:
+            gdal_conf.boto3 = MockBoto3()
+
+            config = gdal_conf.get_gdal_conf_for_s3_bucket("pub-bucket")
+            assert config["AWS_NO_SIGN_REQUEST"] == "NO"
+            assert config["AWS_ACCESS_KEY_ID"] == "test_temp_access_key_1"
+            assert config["AWS_SECRET_ACCESS_KEY"] == "test_temp_secret_key_1"
+            assert config["AWS_SESSION_TOKEN"] == "test_temp_token_1"
+
+            session = gdal_conf.get_rasterio_aws_session("s3://pub-bucket/test/path")
+            assert session.credentials["aws_access_key_id"] == "test_temp_access_key_1"
+            assert (
+                session.credentials["aws_secret_access_key"] == "test_temp_secret_key_1"
+            )
+            assert session.credentials["aws_session_token"] == "test_temp_token_1"
+
+            config = gdal_conf.get_gdal_conf_for_s3_bucket("pub-bucket2")
+            assert config["AWS_NO_SIGN_REQUEST"] == "NO"
+            assert config["AWS_ACCESS_KEY_ID"] == "test_temp_access_key_2"
+            assert config["AWS_SECRET_ACCESS_KEY"] == "test_temp_secret_key_2"
+            assert config["AWS_SESSION_TOKEN"] == "test_temp_token_2"
+
+            session = gdal_conf.get_rasterio_aws_session("s3://pub-bucket2/test/path")
+            assert session.credentials["aws_access_key_id"] == "test_temp_access_key_2"
+            assert (
+                session.credentials["aws_secret_access_key"] == "test_temp_secret_key_2"
+            )
+            assert session.credentials["aws_session_token"] == "test_temp_token_2"
+        finally:
+            gdal_conf.boto3 = old_boto3

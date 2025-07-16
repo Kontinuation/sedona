@@ -18,6 +18,7 @@
 import json
 import os
 import re
+from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
 from rasterio.session import AWSSession  # type: ignore
@@ -50,12 +51,21 @@ S3A_CONFIG_TO_GDAL_CONFIG_MAP = {
 
 def get_gdal_conf_for_s3_bucket(bucket_name: str) -> Dict[str, str]:
     _load_gdal_conf()
+    gdal_conf = {}
     if _base_gdal_conf is None or _per_bucket_gdal_conf is None:
         return {}
     if bucket_name in _per_bucket_gdal_conf:
-        return _per_bucket_gdal_conf[bucket_name]
+        gdal_conf = _per_bucket_gdal_conf[bucket_name]
     else:
-        return _base_gdal_conf
+        gdal_conf = _base_gdal_conf
+    if "__assumed_role_arn__" in gdal_conf:
+        role_arn, session_name = gdal_conf["__assumed_role_arn__"]
+        cred = _get_session_credentials_for_assumed_role(role_arn, session_name)
+        gdal_conf["AWS_ACCESS_KEY_ID"] = cred.access_key
+        gdal_conf["AWS_SECRET_ACCESS_KEY"] = cred.secret_key
+        gdal_conf["AWS_SESSION_TOKEN"] = cred.token
+        del gdal_conf["__assumed_role_arn__"]
+    return gdal_conf
 
 
 def get_gdal_conf(path: str) -> Dict[str, str]:
@@ -104,6 +114,12 @@ def get_rasterio_aws_session(path: str) -> Optional[AWSSession]:
         args["aws_unsigned"] = conf["AWS_NO_SIGN_REQUEST"] == "YES"
     if "AWS_REQUEST_PAYER" in conf:
         args["requester_pays"] = conf["AWS_REQUEST_PAYER"] == "requester"
+    if "__assumed_role_arn__" in conf:
+        role_arn, session_name = conf["__assumed_role_arn__"]
+        cred = _get_session_credentials_for_assumed_role(role_arn, session_name)
+        args["aws_access_key_id"] = cred.access_key
+        args["aws_secret_access_key"] = cred.secret_key
+        args["aws_session_token"] = cred.token
     return AWSSession(**args)
 
 
@@ -167,8 +183,17 @@ def _convert_s3a_configs_to_gdal_configs(s3a_config: Dict[str, str]) -> Dict[str
         if key in S3A_CONFIG_TO_GDAL_CONFIG_MAP:
             gdal_configs[S3A_CONFIG_TO_GDAL_CONFIG_MAP[key]] = value
         elif key == "aws.credentials.provider":
-            if "AnonymousAWSCredentialsProvider" in value:
+            if "Anonymous" in value:
                 gdal_configs["AWS_NO_SIGN_REQUEST"] = "YES"
+            elif "AssumedRole" in value:
+                role_arn = s3a_config["assumed.role.arn"]
+                session_name = s3a_config.get(
+                    "assumed.role.session.name", "pyspark-sedona-raster"
+                )
+                gdal_configs["AWS_NO_SIGN_REQUEST"] = "NO"
+                # This special configuration will be processed specially when creating rasterio session
+                # or boto3 config.
+                gdal_configs["__assumed_role_arn__"] = (role_arn, session_name)
             else:
                 gdal_configs["AWS_NO_SIGN_REQUEST"] = "NO"
                 if "RequestPayer" in value:
@@ -213,3 +238,81 @@ def _load_gdal_conf():
     for bucket, confs in _per_bucket_s3a_conf.items():
         gdal_confs = _convert_s3a_configs_to_gdal_configs(confs)
         _per_bucket_gdal_conf[bucket] = gdal_confs
+
+
+class AssumedRoleCredentials:
+    """Simple credentials object for assumed role credentials."""
+
+    def __init__(self, access_key: str, secret_key: str, token: str):
+        self.access_key = access_key
+        self.secret_key = secret_key
+        self.token = token
+
+
+# Cache for assumed role credentials: (role_arn, session_name) -> (credentials, expiration_time)
+_assumed_role_credentials_cache: Dict[
+    Tuple[str, str], Tuple[AssumedRoleCredentials, datetime]
+] = {}
+
+# Cached STS client for role assumption
+_sts_client: Optional[Any] = None
+
+
+def _get_session_credentials_for_assumed_role(
+    role_arn: str, session_name: str
+) -> AssumedRoleCredentials:
+    """
+    Get AWS credentials for an assumed role with caching.
+
+    Args:
+        role_arn: The ARN of the role to assume
+        session_name: The session name for the assumed role
+
+    Returns:
+        Credentials object with access_key, secret_key, and token attributes
+
+    Raises:
+        Exception: If boto3 is not available or role assumption fails
+    """
+    if boto3 is None:
+        raise Exception("boto3 is required for assuming roles")
+
+    cache_key = (role_arn, session_name)
+    current_time = datetime.utcnow()
+
+    # Check if we have cached credentials that are still valid (more than 5 minutes remaining)
+    if cache_key in _assumed_role_credentials_cache:
+        cached_credentials, expiration_time = _assumed_role_credentials_cache[cache_key]
+        time_remaining = expiration_time - current_time
+
+        # If credentials expire in more than 5 minutes, use them
+        if time_remaining > timedelta(minutes=5):
+            return cached_credentials
+
+    # Need to get new credentials
+    try:
+        global _sts_client
+        if _sts_client is None:
+            _sts_client = boto3.client("sts")
+
+        response = _sts_client.assume_role(
+            RoleArn=role_arn, RoleSessionName=session_name
+        )
+
+        credentials = response["Credentials"]
+        expiration_time = credentials["Expiration"]
+
+        # Create a credentials object
+        cred_obj = AssumedRoleCredentials(
+            access_key=credentials["AccessKeyId"],
+            secret_key=credentials["SecretAccessKey"],
+            token=credentials["SessionToken"],
+        )
+
+        # Cache the credentials
+        _assumed_role_credentials_cache[cache_key] = (cred_obj, expiration_time)
+
+        return cred_obj
+
+    except Exception as e:
+        raise Exception(f"Failed to assume role {role_arn}: {str(e)}")
