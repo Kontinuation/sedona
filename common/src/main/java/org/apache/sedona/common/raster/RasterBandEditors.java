@@ -44,7 +44,6 @@ import org.geotools.coverage.processing.operation.Crop;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
-import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 
@@ -330,13 +329,9 @@ public class RasterBandEditors {
       if (!specifiedNoDataValue && geometryIsRectangle && isNoSkew) {
         // We can create a clipped out-db raster, without even touching the pixel data.
         Envelope env = geometry.getEnvelopeInternal();
-        double x0 = env.getMinX();
-        double y0 = env.getMaxY();
-        double regionWidth = env.getWidth();
-        double regionHeight = env.getHeight();
+
         int[] bands = {band};
-        return clipOutDb(
-            (OutDbGridCoverage2D) raster, bands, x0, y0, regionWidth, regionHeight, lenient);
+        return clipOutDb((OutDbGridCoverage2D) raster, bands, env, lenient);
       }
     }
     return clipInDB(raster, band, geometry, allTouched, noDataValue, crop, lenient);
@@ -473,19 +468,9 @@ public class RasterBandEditors {
   }
 
   public static GridCoverage2D clipOutDb(
-      OutDbGridCoverage2D raster,
-      int[] bandIndices,
-      double x0,
-      double y0,
-      double regionWidth,
-      double regionHeight,
-      boolean lenient) {
+      OutDbGridCoverage2D raster, int[] bandIndices, Envelope roi, boolean lenient) {
     ReferencedEnvelope rasterEnvelope = raster.getEnvelope2D();
-    Coordinate cMin = new Coordinate(rasterEnvelope.getMinX(), rasterEnvelope.getMinY());
-    Coordinate cMax = new Coordinate(rasterEnvelope.getMaxX(), rasterEnvelope.getMaxY());
-    Coordinate xMin = new Coordinate(x0, y0);
-    Coordinate xMax = new Coordinate(x0 + regionWidth, y0 + regionHeight);
-    if (!ReferencedEnvelope.intersects(cMin, cMax, xMin, xMax)) {
+    if (!rasterEnvelope.intersects(roi)) {
       if (lenient) {
         return null;
       } else {
@@ -509,6 +494,10 @@ public class RasterBandEditors {
     double scaleY = affine.getScaleY();
     double ipX = affine.getTranslateX();
     double ipY = affine.getTranslateY();
+    double x0 = roi.getMinX();
+    double y0 = roi.getMaxY();
+    double regionWidth = roi.getWidth();
+    double regionHeight = roi.getHeight();
 
     // Derive affine transformation and crop region of the cropped out-db raster
     int endpointX0 = (int) ((x0 - (ipX - 0.5 * scaleX)) / scaleX);

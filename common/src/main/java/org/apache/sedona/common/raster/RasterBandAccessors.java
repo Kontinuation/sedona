@@ -416,7 +416,9 @@ public class RasterBandAccessors {
         try {
           return getStatObjectsInternal(clippedRaster, roi, 1, allTouched, excludeNoData);
         } finally {
-          clippedRaster.dispose(true);
+          if (clippedRaster != null) {
+            clippedRaster.dispose(true);
+          }
         }
       }
     }
