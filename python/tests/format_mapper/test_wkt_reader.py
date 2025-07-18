@@ -17,9 +17,10 @@
 
 import os
 
-from sedona.core.formatMapper import WktReader
+from tests import tests_resource
 from tests.test_base import TestBase
-from tests.tools import tests_resource
+
+from sedona.spark.core.formatMapper import WktReader
 
 
 class TestWktReader(TestBase):

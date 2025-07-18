@@ -16,11 +16,14 @@
 #  under the License.
 
 import numpy as np
+import pytest
 import rasterio
 from pyspark.sql.functions import expr
 from tests import world_map_raster_input_location
 from tests import usgs_13_clip
 from tests.test_base import TestBase
+
+from sedona.spark.sql.types import RasterType
 
 
 class TestRasterSerde(TestBase):

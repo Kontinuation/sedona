@@ -17,10 +17,11 @@
 
 import pytest
 import shapely
-from sedona.core.geom.circle import Circle
-from sedona.core.geom.envelope import Envelope
 from shapely import wkt
 from shapely.geometry import Point
+
+from sedona.spark.core.geom.circle import Circle
+from sedona.spark.core.geom.envelope import Envelope
 
 
 class TestCircle:

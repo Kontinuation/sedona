@@ -18,10 +18,10 @@
 import math
 from typing import List
 
+import pytest
 from pyspark.sql import DataFrame, Row
 from pyspark.sql.functions import col, explode, expr
 from pyspark.sql.types import IntegerType, StructField, StructType
-from sedona.sql.types import GeometryType
 from shapely import wkt
 from shapely.wkt import loads
 from tests import mixed_wkt_geometry_input_location
@@ -33,6 +33,8 @@ from tests.sql.resource.sample_data import (
     create_simple_polygons_df,
 )
 from tests.test_base import TestBase
+
+from sedona.spark.sql.types import GeometryType
 
 
 class TestPredicateJoin(TestBase):
@@ -445,7 +447,7 @@ class TestPredicateJoin(TestBase):
         self.assert_geometry_almost_equal(
             "POINT (61.64205411585366 104.55256764481707)", actual.nearest
         )
-        self.assert_almost_equal(45.18896951053177, actual.radius)
+        assert actual.radius == pytest.approx(45.18896951053177, 1e-6)
 
     def test_st_is_valid_detail(self):
         baseDf = self.spark.sql(

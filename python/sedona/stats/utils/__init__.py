@@ -16,7 +16,7 @@
 #  under the License.
 
 from pyspark.sql import Column, DataFrame, SparkSession
-from sedona.sql.types import GeometryType
+from sedona.spark.sql.types import GeometryType
 
 
 def get_geometry_column_name(df: DataFrame) -> Column:

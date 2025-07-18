@@ -21,14 +21,6 @@ import pyspark
 import pytest
 from pyspark.sql import DataFrame
 from pyspark.sql.functions import col, expr
-from sedona import version
-from sedona.core.enums import FileDataSplitter, GridType, IndexType
-from sedona.core.formatMapper.shapefileParser.shape_file_reader import ShapefileReader
-from sedona.core.geom.envelope import Envelope
-from sedona.core.jvm.config import is_greater_or_equal_version
-from sedona.core.spatialOperator import JoinQuery
-from sedona.core.SpatialRDD import CircleRDD, PolygonRDD
-from sedona.utils.adapter import Adapter
 from tests import (
     area_lm_point_input_location,
     geojson_id_input_location,
@@ -38,6 +30,17 @@ from tests import (
     shape_file_with_missing_trailing_input_location,
 )
 from tests.test_base import TestBase
+
+from sedona import version
+from sedona.spark.core.enums import FileDataSplitter, GridType, IndexType
+from sedona.spark.core.formatMapper.shapefileParser.shape_file_reader import (
+    ShapefileReader,
+)
+from sedona.spark.core.geom.envelope import Envelope
+from sedona.spark.core.jvm.config import is_greater_or_equal_version
+from sedona.spark.core.spatialOperator import JoinQuery
+from sedona.spark.core.SpatialRDD import CircleRDD, PolygonRDD
+from sedona.spark import Adapter
 
 
 class TestAdapter(TestBase):
@@ -353,7 +356,7 @@ class TestAdapter(TestBase):
         )
 
     @pytest.mark.skipif(
-        is_greater_or_equal_version(version, "0.9.9"), reason="Deprecated in Sedona"
+        is_greater_or_equal_version(version, "1.0.0"), reason="Deprecated in Sedona"
     )
     def test_to_spatial_rdd_df_geom_column_id(self):
         df = (

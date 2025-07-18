@@ -19,7 +19,7 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from sedona.raster import gdal_conf
+from sedona.spark.raster import gdal_conf
 
 
 class TestGdalConfig:

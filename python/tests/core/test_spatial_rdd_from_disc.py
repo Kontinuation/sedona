@@ -19,16 +19,17 @@ import os
 import shutil
 
 import pytest
-from sedona.core.enums import GridType, IndexType
-from sedona.core.formatMapper.disc_utils import (
+from tests.test_base import TestBase
+from tests.tools import tests_resource
+
+from sedona.spark.core.enums import GridType, IndexType
+from sedona.spark.core.formatMapper.disc_utils import (
     GeoType,
     load_spatial_index_rdd_from_disc,
     load_spatial_rdd_from_disc,
 )
-from sedona.core.spatialOperator import JoinQuery
-from sedona.core.SpatialRDD import LineStringRDD, PointRDD, PolygonRDD
-from tests.test_base import TestBase
-from tests.tools import tests_resource
+from sedona.spark.core.spatialOperator import JoinQuery
+from sedona.spark.core.SpatialRDD import LineStringRDD, PointRDD, PolygonRDD
 
 
 def remove_directory(path: str) -> bool:

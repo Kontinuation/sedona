@@ -17,11 +17,12 @@
 
 import pyspark.sql.functions as f
 import pytest
-from sedona.sql.st_constructors import ST_MakePoint
-from sedona.sql.st_functions import ST_Buffer
-from sedona.stats.clustering.dbscan import dbscan
 from sklearn.cluster import DBSCAN as sklearnDBSCAN
 from tests.test_base import TestBase
+
+from sedona.spark.sql.st_constructors import ST_MakePoint
+from sedona.spark.sql.st_functions import ST_Buffer
+from sedona.spark.stats import dbscan
 
 
 class TestDBScan(TestBase):
@@ -77,6 +78,8 @@ class TestDBScan(TestBase):
         result = dbscan(
             input_data, epsilon, min_pts, geometry, include_outliers=include_outliers
         )
+
+        result.show()
 
         id = id or "id"
         clusters_members = [

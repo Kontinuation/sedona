@@ -16,12 +16,13 @@
 #  under the License.
 
 import pyspark.sql.functions as f
-from sedona.sql.st_constructors import ST_MakePoint
-from sedona.stats.weighting import (
+from tests.test_base import TestBase
+
+from sedona.spark.sql.st_constructors import ST_MakePoint
+from sedona.spark.stats.weighting import (
     add_binary_distance_band_column,
     add_distance_band_column,
 )
-from tests.test_base import TestBase
 
 
 class TestWeighting(TestBase):
