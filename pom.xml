@@ -711,24 +711,6 @@
             </repositories>
         </profile>
         <profile>
-            <!-- This profile works for Spark 3.3 -->
-            <id>sedona-spark-3.3</id>
-            <activation>
-                <property>
-                    <name>spark</name>
-                    <value>3.3</value>
-                </property>
-            </activation>
-            <properties>
-                <spark.version>3.3.0</spark.version>
-                <spark.compat.version>3.3</spark.compat.version>
-                <log4j.version>2.17.2</log4j.version>
-                <graphframe.version>0.8.3-spark3.4</graphframe.version>
-                <!-- Skip deploying parent module. it will be deployed with sedona-spark-3.5 -->
-                <skip.deploy.common.modules>true</skip.deploy.common.modules>
-            </properties>
-        </profile>
-        <profile>
             <id>sedona-spark-3.4</id>
             <activation>
                 <property>
