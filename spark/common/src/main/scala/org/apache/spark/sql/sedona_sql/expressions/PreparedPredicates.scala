@@ -21,7 +21,7 @@ package org.apache.spark.sql.sedona_sql.expressions
 import org.apache.sedona.sql.utils.GeometrySerializer
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, Literal, NullIntolerant, ScalarSubquery}
+import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, Literal, ScalarSubquery}
 import org.apache.spark.sql.execution.{ScalarSubquery => ExecutionScalarSubquery}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.types.{AbstractDataType, BooleanType, DataType}
@@ -42,7 +42,7 @@ abstract class ST_PreparedPredicate
     extends Expression
     with FoldableExpression
     with ExpectsInputTypes
-    with NullIntolerant {
+    with NullIntolerantShim {
   def left: Expression
   def right: Expression
 

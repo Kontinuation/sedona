@@ -23,7 +23,8 @@ import org.apache.spark.sql.catalyst.encoders.{ExpressionEncoder, RowEncoder}
 import org.apache.spark.sql.expressions.Aggregator
 import org.apache.spark.sql.sedona_sql.utils.SparkCompatUtil
 import org.apache.spark.sql.types.{DoubleType, LongType, StructField, StructType}
-import org.apache.spark.sql.{Encoder, Encoders, Row}
+import org.apache.spark.sql.{Encoder, Row}
+import org.apache.spark.sql.sedona_sql.EncodersShim
 import org.locationtech.jts.geom.{Coordinate, Geometry, GeometryFactory}
 import org.locationtech.jts.operation.overlayng.OverlayNGRobust
 
@@ -240,7 +241,8 @@ class ST_Analyze_Aggr extends Aggregator[Geometry, AdvancedStatCollector, Row] {
     stat.getMeanEnvelopeArea)
 
   override def bufferEncoder: Encoder[AdvancedStatCollector] =
-    Encoders.kryo[AdvancedStatCollector]
+//    Encoders.kryo[AdvancedStatCollector]
+    EncodersShim.kryo[AdvancedStatCollector]
 
   override def outputEncoder: Encoder[Row] = SparkCompatUtil.rowEncoderFor(
     StructType(

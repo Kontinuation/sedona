@@ -20,6 +20,7 @@ import threading
 import concurrent.futures
 from typing import Callable, Tuple
 
+import pyspark
 import pytest
 from pyspark.sql import Row
 from pyspark.sql import functions as f
@@ -1879,6 +1880,9 @@ class TestDataFrameAPI(TestBase):
     @pytest.mark.skipif(
         os.getenv("SPARK_REMOTE") is not None,
         reason="Checkpoint dir is not available in Spark Connect",
+    )
+    @pytest.mark.skipif(
+        pyspark.__version__ >= "4", reason="DBSCAN is not supported yet on Spark 4"
     )
     def test_dbscan(self):
         df = self.spark.createDataFrame([{"id": 1, "x": 2, "y": 3}]).withColumn(

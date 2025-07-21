@@ -22,7 +22,9 @@ import org.apache.spark.sql.Column
 import org.apache.spark.sql.sedona_sql.expressions.collect.ST_Collect
 import org.locationtech.jts.operation.buffer.BufferParameters
 
-object st_functions extends DataFrameAPI {
+import org.apache.spark.sql.sedona_sql.DataFrameShims._
+
+object st_functions {
   def ExpandAddress(address: Column): Column = wrapExpression[ExpandAddress](address)
   def ExpandAddress(address: String): Column = wrapExpression[ExpandAddress](address)
 

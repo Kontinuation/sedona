@@ -32,10 +32,11 @@ import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.monitoring.ListenerRegistrator
+import org.apache.spark.sql.execution.SparkStrategy
 import org.apache.spark.sql.sedona_sql.optimization._
 import org.apache.spark.sql.sedona_sql.strategy.join.JoinQueryDetector
 import org.apache.spark.sql.sedona_sql.strategy.physical.function.EvalPhysicalFunctionStrategy
-import org.apache.spark.sql.{SQLContext, SparkSession, Strategy}
+import org.apache.spark.sql.{SQLContext, SparkSession}
 
 import scala.annotation.StaticAnnotation
 import scala.collection.mutable.ListBuffer
@@ -57,8 +58,7 @@ object SedonaContext {
     UsePreparedPredicate,
     GetReverseGeocodeLayersFunction,
     ReverseGeocodingFunction,
-    ExtractPhysicalFunctions,
-    OrderByOptimization)
+    ExtractPhysicalFunctions)
 
   private def customOptimizationsWithSession(sparkSession: SparkSession) =
     Seq(
@@ -100,7 +100,7 @@ object SedonaContext {
         .forName("org.apache.spark.sql.udf.SedonaArrowStrategy")
         .getDeclaredConstructor()
         .newInstance()
-        .asInstanceOf[Strategy])
+        .asInstanceOf[SparkStrategy])
 
     val extractSedonaUDFRule =
       Try(
@@ -115,6 +115,19 @@ object SedonaContext {
         sparkSession.experimental.extraStrategies :+ sedonaArrowStrategy.get
       sparkSession.experimental.extraOptimizations =
         sparkSession.experimental.extraOptimizations :+ extractSedonaUDFRule.get
+    }
+
+    val orderByOptimization =
+      Try(
+        Class
+          .forName("org.apache.spark.sql.sedona_sql.optimization.OrderByOptimization")
+          .getDeclaredConstructor()
+          .newInstance()
+          .asInstanceOf[Rule[LogicalPlan]])
+
+    if (orderByOptimization.isSuccess) {
+      sparkSession.experimental.extraOptimizations =
+        sparkSession.experimental.extraOptimizations :+ orderByOptimization.get
     }
 
     customOptimizationsWithSession(sparkSession).foreach { opt =>

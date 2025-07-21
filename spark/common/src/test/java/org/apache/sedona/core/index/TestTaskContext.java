@@ -18,6 +18,7 @@
  */
 package org.apache.sedona.core.index;
 
+import java.io.Closeable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -31,6 +32,7 @@ import org.apache.spark.shuffle.FetchFailedException;
 import org.apache.spark.util.AccumulatorV2;
 import org.apache.spark.util.TaskCompletionListener;
 import org.apache.spark.util.TaskFailureListener;
+import scala.Function0;
 import scala.Option;
 import scala.collection.immutable.Map;
 import scala.collection.immutable.Seq;
@@ -180,6 +182,22 @@ public class TestTaskContext extends TaskContext {
 
   @Override
   public Properties getLocalProperties() {
+    return null;
+  }
+
+  // Override method in Spark 4
+  // Deliberately not annotating it with @Override to be compatible with Spark 3
+  public boolean interruptible() {
+    return false;
+  }
+
+  // Override method in Spark 4
+  // Deliberately not annotating it with @Override to be compatible with Spark 3
+  public void pendingInterrupt(Option<Thread> threadToInterrupt, String reason) {}
+
+  // Override method in Spark 4
+  // Deliberately not annotating it with @Override to be compatible with Spark 3
+  public <T extends Closeable> T createResourceUninterruptibly(Function0<T> resourceBuilder) {
     return null;
   }
 }

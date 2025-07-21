@@ -22,7 +22,8 @@ import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions.{lit, rank}
 import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_GetReverseGeocodingLayers, ST_ReverseGeocode}
 import org.apache.spark.sql.{DataFrame, functions => f}
-import org.apache.spark.{SparkException, sql}
+import org.apache.spark.sql
+import org.apache.spark.SparkThrowable
 import org.scalatest.BeforeAndAfterAll
 
 case class Geocode(layer: String, location: String, x: Double, y: Double)
@@ -360,7 +361,7 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
   }
 
   it("test throws exception when SRID is not 4326") {
-    assertThrows[SparkException] {
+    assertThrows[SparkThrowable] {
       spark
         .sql("select ST_ReverseGeocode(ST_GeomFromText('POINT (-80.176474 25.784764)', 3857), ST_GetReverseGeocodingLayers()[0])")
         .collect()
@@ -374,7 +375,7 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
   }
 
   it("test throws when layer doesn't exist") {
-    assertThrows[SparkException] {
+    assertThrows[SparkThrowable] {
       spark
         .sql("select ST_ReverseGeocode(ST_GeomFromText('POINT (-80.176474 25.784764)'), 'iDontExist')")
         .collect()

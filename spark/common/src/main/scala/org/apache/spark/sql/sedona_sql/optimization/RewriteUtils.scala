@@ -22,6 +22,7 @@ import org.apache.sedona.core.utils.SedonaConf
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.{Alias, Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
+import org.apache.spark.sql.sedona_sql.DataFrameShims
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.types.StringType
 
@@ -103,8 +104,9 @@ object RewriteUtils {
    */
   def retrieveGeocodeTablePlan(): LogicalPlan = {
     val geocodeTableName = SedonaConf.fromActiveSession().getReverseGeocodingTableName
-    val geocodePlan =
-      SparkSession.getActiveSession.get.table(geocodeTableName).logicalPlan
+    val geocodeDf = SparkSession.getActiveSession.get.table(geocodeTableName)
+//    val geocodePlan = geocodeDf.asInstanceOf[ClassicDataFrame].logicalPlan
+    val geocodePlan = DataFrameShims.getLogicalPlan(geocodeDf)
 
     assertGeocodeTableWellFormed(geocodeTableName)
 

@@ -30,7 +30,8 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, Predicate, UnsafeRow}
 import org.apache.spark.sql.catalyst.plans.JoinType
-import org.apache.spark.sql.execution.{SQLExecution, SparkPlan}
+import org.apache.spark.sql.execution.{SparkPlan, SQLExecution}
+import org.apache.spark.sql.sedona_sql.SQLExecutionShims
 import org.locationtech.jts.geom.Geometry
 
 import java.io.PrintWriter
@@ -221,13 +222,13 @@ trait TraitJoinQueryExec extends TraitJoinQueryBase {
     // Run left and right side analysis in parallel
     val executionContext = ExecutionContext.global
     val analyzeLeftFuture = Future {
-      SQLExecution.withExecutionId(session, executionId) {
+      SQLExecutionShims.withExecutionId(session, executionId) {
         sparkContext.setJobGroup(jobGroupName, s"$descPrefix left shapes")
         leftShapes.advancedAnalyze()
       }
     }(executionContext)
     val analyzeRightFuture = Future {
-      SQLExecution.withExecutionId(session, executionId) {
+      SQLExecutionShims.withExecutionId(session, executionId) {
         sparkContext.setJobGroup(jobGroupName, s"$descPrefix right shapes")
         rightShapes.advancedAnalyze()
       }
