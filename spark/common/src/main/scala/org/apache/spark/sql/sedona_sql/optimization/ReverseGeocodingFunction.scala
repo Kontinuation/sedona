@@ -25,12 +25,12 @@ import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.sedona_sql.expressions.{ST_Distance, ST_GetReverseGeocodingLayers, ST_ReverseGeocode, ST_SRID}
 import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.{aliasOf, matchOrderToOriginalProjectList, retrieveGeocodeTablePlan}
 
-import scala.collection.convert.ImplicitConversions.`map AsScala`
+import scala.jdk.CollectionConverters._
 
 object ReverseGeocodingFunction extends RewriteLogicalPlan[ST_ReverseGeocode] {
 
   private def getDistanceJoinDistanceThreshold(layerName: Expression): CaseWhen = {
-    val thresholds = SedonaConf.fromActiveSession.getReverseGeocodingDistanceThresholds
+    val thresholds = SedonaConf.fromActiveSession.getReverseGeocodingDistanceThresholds.asScala
     val cases = thresholds
       .filter(_._1 != "default")
       .map { case (layer, distance) =>

@@ -2538,6 +2538,18 @@ def ST_ReverseGeocode(
 
 
 @validate_argument_types
+def ST_Geocode(location: ColumnOrName) -> Column:
+    """Return a geocode result for the given location string.
+
+    @param location: Location string to geocode
+    :type location: ColumnOrName
+    @return: A  geometry representing the input location
+    """
+
+    return _call_st_function("ST_Geocode", location)
+
+
+@validate_argument_types
 def ST_GetReverseGeocodingLayers() -> Column:
     """Return the Array of available geocode layer values.
     @return: the Array of available geocode layer values.

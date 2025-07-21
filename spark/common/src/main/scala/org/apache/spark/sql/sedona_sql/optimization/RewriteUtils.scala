@@ -55,7 +55,7 @@ object RewriteUtils {
    *   The name of the geocode table to check
    */
   def assertGeocodeTableWellFormed(geocodeTableName: String): Unit = {
-    val baseMessage = f"spark.sedona.reverse.geocode.table set to $geocodeTableName."
+    val baseMessage = f"spark.sedona.geocode.table set to $geocodeTableName."
     val geocodePlan =
       SparkSession.getActiveSession.get.table(geocodeTableName).queryExecution.optimizedPlan
 
@@ -103,7 +103,7 @@ object RewriteUtils {
    *   The optimized LogicalPlan for the geocode table
    */
   def retrieveGeocodeTablePlan(): LogicalPlan = {
-    val geocodeTableName = SedonaConf.fromActiveSession().getReverseGeocodingTableName
+    val geocodeTableName = SedonaConf.fromActiveSession().getGeocodingTableName
     val geocodeDf = SparkSession.getActiveSession.get.table(geocodeTableName)
 //    val geocodePlan = geocodeDf.asInstanceOf[ClassicDataFrame].logicalPlan
     val geocodePlan = DataFrameShims.getLogicalPlan(geocodeDf)

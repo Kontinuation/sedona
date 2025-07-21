@@ -1840,7 +1840,7 @@ class TestDataFrameAPI(TestBase):
 
         self.spark.conf.set("spark.sedona.reverse.geocode.distance.address", "0.0003")
         self.spark.conf.set("spark.sedona.reverse.geocode.distance.poi", "0.0006")
-        self.spark.conf.set("spark.sedona.reverse.geocode.table", "geocodeTest")
+        self.spark.conf.set("spark.sedona.geocode.table", "geocodeTest")
 
     def test_reverse_geocode_function_allows_layer_literals(self):
         self.create_geocoding_df()

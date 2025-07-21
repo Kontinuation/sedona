@@ -348,7 +348,8 @@ object Catalog extends AbstractCatalog {
     function[RS_StackTileExplode](false, Double.NaN),
     // Expression for raster AI
     function[RS_SEGMENT_TO_GEOMS](),
-    // Expression for ReverseGeocode
+    // Expression for Geocoding
+    function[ST_Geocode](),
     function[ST_ReverseGeocode](),
     function[ST_GetReverseGeocodingLayers](),
     // geostats functions

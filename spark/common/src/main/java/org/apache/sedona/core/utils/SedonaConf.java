@@ -40,9 +40,15 @@ import org.apache.spark.sql.RuntimeConfig;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.util.Utils;
 import org.locationtech.jts.geom.Envelope;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class SedonaConf implements Serializable {
+  static final Logger logger = LoggerFactory.getLogger(SedonaConf.class);
+
   private final String REVERSE_GEOCODE_DISTANCE_PREFIX = "spark.sedona.reverse.geocode.distance.";
+
+  static boolean geocodingConfigWarningPrinted = false;
 
   // Global parameters of Sedona. All these parameters can be initialized through SparkConf.
 
@@ -120,7 +126,8 @@ public class SedonaConf implements Serializable {
   private int maxRowsPerPartitionInKNNJoins = 524288;
 
   // Parameters for geocoding
-  private String reverseGeocodingTableName;
+  private String geocodingTableName;
+  private String geocodingIndexTableName;
   private Map<String, Double> reverseGeocodingDistanceThresholds;
   private Boolean reverseGeocodingAssertLayerExists;
 
@@ -478,10 +485,32 @@ public class SedonaConf implements Serializable {
                 "spark.sedona.raster.load.parallelism",
                 Integer.toString(defaultRasterLoadingParallelism)));
 
-    this.reverseGeocodingTableName =
+    String geocodingTableName =
         confGetter.get(
-            "spark.sedona.reverse.geocode.table",
-            "wherobots_open_data.overture_maps_foundation.geocodes");
+            "spark.sedona.geocode.table", "wherobots_open_data.overture_maps_foundation.geocodes");
+    String geocodingIndexTableName =
+        confGetter.get(
+            "spark.sedona.geocode.index.table",
+            "wherobots_open_data.overture_maps_foundation.geocodeIndex");
+    String reverseGeocodingTableName = confGetter.get("spark.sedona.reverse.geocode.table", "");
+
+    if (!reverseGeocodingTableName.isEmpty() && !geocodingConfigWarningPrinted) {
+      geocodingConfigWarningPrinted = true;
+      logger.warn(
+          "spark.sedona.reverse.geocode.table is deprecated. Use spark.sedona.geocode.table instead.");
+      if (!geocodingTableName.isEmpty()) {
+        logger.warn(
+            "Both spark.sedona.geocode.table and spark.sedona.reverse.geocode.table are set. Using spark.sedona.geocode.table: {}",
+            geocodingTableName);
+      }
+    }
+
+    this.geocodingTableName =
+        !geocodingTableName.isEmpty() ? geocodingTableName : reverseGeocodingTableName;
+    this.geocodingIndexTableName =
+        confGetter.get(
+            "spark.sedona.geocode.index.table",
+            "wherobots_open_data.overture_maps_foundation.geocode_index");
 
     this.reverseGeocodingDistanceThresholds =
         initializeReverseGeocodingDistanceThresholds(confGetter);
@@ -780,8 +809,12 @@ public class SedonaConf implements Serializable {
     return autoReBalanceStreamSide;
   }
 
-  public String getReverseGeocodingTableName() {
-    return reverseGeocodingTableName;
+  public String getGeocodingTableName() {
+    return geocodingTableName;
+  }
+
+  public String getGeocodingIndexTableName() {
+    return geocodingIndexTableName;
   }
 
   public Map<String, Double> getReverseGeocodingDistanceThresholds() {

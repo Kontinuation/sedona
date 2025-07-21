@@ -22,8 +22,10 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, AttributeReference, Expression, ImplicitCastInputTypes, Literal, ScalarSubquery, Unevaluable}
 import org.apache.spark.sql.execution.{LogicalRDD, SparkPlan}
+import org.apache.spark.sql.functions.{col, lit}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Dataset, SparkSession}
+import org.apache.spark.unsafe.types.UTF8String
 
 import org.apache.spark.sql.sedona_sql.DataFrameShims
 
@@ -98,6 +100,18 @@ trait PhysicalFunction
  * input dataframe, except for the resultAttrs which should be added to the output dataframe.
  */
 trait DataframePhysicalFunction extends PhysicalFunction {
+
+  protected def getInputColumn(i: Int, fieldName: String): Column = children(i) match {
+    case ref: AttributeReference => col(ref.name)
+    case _ @Literal(value, _) => {
+      if (value.isInstanceOf[UTF8String]) {
+        lit(value.toString)
+      } else lit(value)
+    }
+    case _ =>
+      throw new IllegalArgumentException(
+        f"$fieldName argument must be a named reference to an existing column")
+  }
 
   protected def transformDataframe(dataframe: DataFrame, resultAttrs: Seq[Attribute]): DataFrame
 

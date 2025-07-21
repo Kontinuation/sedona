@@ -982,6 +982,9 @@ object st_functions {
 
   def ST_IsCollection(geometry: String): Column = wrapExpression[ST_IsCollection](geometry)
 
+  def ST_Geocode(location: Column): Column =
+    wrapExpression[ST_Geocode](location)
+
   def ST_ReverseGeocode(geometry: Column, layers: Column): Column =
     wrapExpression[ST_ReverseGeocode](geometry, layers)
 

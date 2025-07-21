@@ -18,58 +18,14 @@
  */
 package org.apache.sedona.sql
 
+import org.apache.spark.{SparkThrowable, sql}
 import org.apache.spark.sql.expressions.Window
-import org.apache.spark.sql.functions.{lit, rank}
 import org.apache.spark.sql.sedona_sql.expressions.st_functions.{ST_GetReverseGeocodingLayers, ST_ReverseGeocode}
 import org.apache.spark.sql.{DataFrame, functions => f}
-import org.apache.spark.sql
-import org.apache.spark.SparkThrowable
-import org.scalatest.BeforeAndAfterAll
-
-case class Geocode(layer: String, location: String, x: Double, y: Double)
 
 case class Query(id: Int, x: Double, y: Double, layer: String)
 
-class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
-
-  private lazy val spark = sparkSession
-
-  override def beforeAll(): Unit = {
-    super.beforeAll()
-    create_geocode_table()
-
-    // defaults are set for overture so we set these for our custom test layer names
-    spark.conf.set("spark.sedona.reverse.geocode.distance.address", "0.0003")
-    spark.conf.set("spark.sedona.reverse.geocode.distance.poi", "0.0006")
-
-  }
-
-  override def afterAll(): Unit = {
-    spark.catalog.dropTempView("geocodeTest")
-    super.afterAll()
-  }
-
-  private def create_geocode_table(): Unit = {
-    val geocode_df = spark
-      .createDataFrame(
-        Seq(
-          Geocode(
-            "address",
-            "1600 Amphitheatre Parkway, Mountain View, CA",
-            -122.084068,
-            37.422408),
-          Geocode(
-            "address",
-            "1620 Amphitheatre Parkway, Mountain View, CA",
-            -122.080068,
-            37.442408),
-          Geocode("poi", "Google", -122.084068, 37.422408)))
-      .withColumn("geometry", f.expr("ST_Point(x, y)"))
-      .drop("x", "y")
-
-    geocode_df.createOrReplaceTempView("geocodeTest")
-    spark.conf.set("spark.sedona.reverse.geocode.table", "geocodeTest")
-  }
+class ReverseGeocodeSuite extends AbstractGeocodingSuite {
 
   private def get_input_data(): DataFrame = {
     spark
@@ -229,7 +185,7 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
     val df = get_input_data()
 
     val geocodedDf = df
-      .withColumn("myMap", f.map(lit("key"), lit("value")))
+      .withColumn("myMap", f.map(f.lit("key"), f.lit("value")))
       .withColumn("reverse_geocoded", ST_ReverseGeocode(f.col("geometry"), f.lit("address")))
 
     geocodedDf.collect()
@@ -240,21 +196,23 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
     val geocode_df = spark
       .createDataFrame(Seq(
         Geocode(
+          1,
           "address",
           "1600 Amphitheatre Parkway, Mountain View, CA",
           37.422408,
           -122.084068),
         Geocode(
+          4,
           "address",
           "1620 Amphitheatre Parkway, Mountain View, CA",
           37.442408,
           -122.080068),
-        Geocode("poi", "Google", 37.422408, -122.084068)))
+        Geocode(2, "poi", "Google", 37.422408, -122.084068)))
       .withColumn("geometry", f.expr("ST_Point(x, y)"))
       .drop("x", "y", "layer")
 
     geocode_df.createOrReplaceTempView("badGeocodeTest")
-    spark.conf.set("spark.sedona.reverse.geocode.table", "badGeocodeTest")
+    spark.conf.set("spark.sedona.geocode.table", "badGeocodeTest")
     try {
       val df = get_input_data()
 
@@ -264,9 +222,9 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
       }
 
       assert(
-        exception.getMessage == "requirement failed: spark.sedona.reverse.geocode.table set to badGeocodeTest. badGeocodeTest does not have a layer column")
+        exception.getMessage == "requirement failed: spark.sedona.geocode.table set to badGeocodeTest. badGeocodeTest does not have a layer column")
     } finally { // always set this back for other tests
-      spark.conf.set("spark.sedona.reverse.geocode.table", "geocodeTest")
+      spark.conf.set("spark.sedona.geocode.table", "geocodeTest")
     }
   }
 
@@ -317,13 +275,13 @@ class ReverseGeocodeSuite extends TestBaseScala with BeforeAndAfterAll {
     get_input_data()
       .select(
         f.col("*"),
-        rank().over(Window.partitionBy(ST_GetReverseGeocodingLayers()).orderBy(f.col("id"))))
+        f.rank().over(Window.partitionBy(ST_GetReverseGeocodingLayers()).orderBy(f.col("id"))))
       .collect()
 
     get_input_data()
       .select(
         f.col("*"),
-        rank().over(Window.partitionBy("layer").orderBy(ST_GetReverseGeocodingLayers())))
+        f.rank().over(Window.partitionBy("layer").orderBy(ST_GetReverseGeocodingLayers())))
       .collect()
   }
 
