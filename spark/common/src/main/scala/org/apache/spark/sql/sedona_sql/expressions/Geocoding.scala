@@ -116,8 +116,8 @@ case class ST_Geocode(children: Seq[Expression]) extends DataframePhysicalFuncti
       .join(
         df2.alias("r"),
         f.col("l.token_phrase") === f.col("r.token_phrase") &&
-          f.col("l.frequency") <= 100 &&
-          f.col("r.frequency") <= 100,
+          f.col("l.frequency") <= 1000 &&
+          f.col("r.frequency") <= 1000,
         "inner")
       .select(
         f.col("l.token_phrase"),
@@ -150,7 +150,9 @@ case class ST_Geocode(children: Seq[Expression]) extends DataframePhysicalFuncti
         referenceDf.alias("reference"),
         f.col("matches.address_id_2") === f.col("reference.id"),
         "left")
-      .withColumn("score", f.levenshtein(f.col("input.location"), f.col("reference.location")))
+      .withColumn(
+        "score",
+        f.levenshtein(f.lower(f.col("input.location")), f.lower(f.col("reference.location"))))
       .withColumn("rank", f.row_number().over(window))
       .filter(f.col("rank") === 1)
 

@@ -510,7 +510,7 @@ public class SedonaConf implements Serializable {
     this.geocodingIndexTableName =
         confGetter.get(
             "spark.sedona.geocode.index.table",
-            "wherobots_open_data.overture_maps_foundation.geocode_index");
+            "wherobots_open_data.overture_maps_foundation.geocodes_index");
 
     this.reverseGeocodingDistanceThresholds =
         initializeReverseGeocodingDistanceThresholds(confGetter);
