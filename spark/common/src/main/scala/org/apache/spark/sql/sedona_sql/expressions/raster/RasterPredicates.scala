@@ -115,7 +115,7 @@ abstract class RS_Predicate
   def evalRasters(leftRaster: GridCoverage2D, rightRaster: GridCoverage2D): Boolean
 }
 
-case class RS_Intersects(inputExpressions: Seq[Expression])
+private[apache] case class RS_Intersects(inputExpressions: Seq[Expression])
     extends RS_Predicate
     with CodegenFallback {
 
@@ -134,7 +134,7 @@ case class RS_Intersects(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_Contains(inputExpressions: Seq[Expression])
+private[apache] case class RS_Contains(inputExpressions: Seq[Expression])
     extends RS_Predicate
     with CodegenFallback {
 
@@ -153,7 +153,7 @@ case class RS_Contains(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_Within(inputExpressions: Seq[Expression])
+private[apache] case class RS_Within(inputExpressions: Seq[Expression])
     extends RS_Predicate
     with CodegenFallback {
 

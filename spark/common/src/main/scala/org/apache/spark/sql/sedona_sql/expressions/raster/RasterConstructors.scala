@@ -27,9 +27,8 @@ import org.apache.spark.sql.catalyst.util.ArrayData
 import org.apache.spark.sql.sedona_sql.UDT.RasterUDT
 import org.apache.spark.sql.sedona_sql.expressions.InferrableFunctionConverter._
 import org.apache.spark.sql.sedona_sql.expressions.InferrableRasterTypes._
-import org.apache.spark.sql.sedona_sql.expressions.InferredExpression
-import org.apache.spark.sql.sedona_sql.expressions.raster.implicits.{RasterEnhancer, RasterInputExpressionEnhancer}
 import org.apache.spark.sql.sedona_sql.expressions.{InferredExpression, SerdeAware}
+import org.apache.spark.sql.sedona_sql.expressions.raster.implicits.{RasterEnhancer, RasterInputExpressionEnhancer}
 import org.apache.spark.sql.types._
 import org.apache.spark.unsafe.types.UTF8String
 import org.geotools.coverage.grid.GridCoverage2D
@@ -37,7 +36,7 @@ import org.geotools.coverage.grid.GridCoverage2D
 import java.util
 import scala.collection.JavaConverters._
 
-case class RS_FromArcInfoAsciiGrid(inputExpressions: Seq[Expression])
+private[apache] case class RS_FromArcInfoAsciiGrid(inputExpressions: Seq[Expression])
     extends InferredExpression(RasterConstructors.fromArcInfoAsciiGrid _) {
   override def foldable: Boolean = false
 
@@ -46,7 +45,7 @@ case class RS_FromArcInfoAsciiGrid(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_AsRaster(inputExpressions: Seq[Expression])
+private[apache] case class RS_AsRaster(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction3(RasterConstructors.asRaster),
       inferrableFunction4(RasterConstructors.asRaster),
@@ -58,7 +57,7 @@ case class RS_AsRaster(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_FromGeoTiff(inputExpressions: Seq[Expression])
+private[apache] case class RS_FromGeoTiff(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction1(RasterConstructors.fromGeoTiff),
       inferrableFunction2(RasterConstructors.fromGeoTiff)) {
@@ -70,7 +69,7 @@ case class RS_FromGeoTiff(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_FromPath(inputExpressions: Seq[Expression])
+private[apache] case class RS_FromPath(inputExpressions: Seq[Expression])
     extends Expression
     with CodegenFallback
     with ExpectsInputTypes
@@ -121,7 +120,7 @@ case class RS_FromPath(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_MakeEmptyRaster(inputExpressions: Seq[Expression])
+private[apache] case class RS_MakeEmptyRaster(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction6(RasterConstructors.makeEmptyRaster),
       inferrableFunction7(RasterConstructors.makeEmptyRaster),
@@ -135,21 +134,21 @@ case class RS_MakeEmptyRaster(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_MakeRasterForTesting(inputExpressions: Seq[Expression])
+private[apache] case class RS_MakeRasterForTesting(inputExpressions: Seq[Expression])
     extends InferredExpression(RasterConstructorsForTesting.makeRasterForTesting _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
   }
 }
 
-case class RS_MakeRaster(inputExpressions: Seq[Expression])
+private[apache] case class RS_MakeRaster(inputExpressions: Seq[Expression])
     extends InferredExpression(inferrableFunction3(RasterConstructors.makeNonEmptyRaster)) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
   }
 }
 
-case class RS_Tile(inputExpressions: Seq[Expression])
+private[apache] case class RS_Tile(inputExpressions: Seq[Expression])
     extends InferredExpression(
       nullTolerantInferrableFunction3(RasterConstructors.rsTile),
       nullTolerantInferrableFunction4(RasterConstructors.rsTile),
@@ -160,7 +159,7 @@ case class RS_Tile(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_AsInDb(inputExpressions: Seq[Expression])
+private[apache] case class RS_AsInDb(inputExpressions: Seq[Expression])
     extends InferredExpression(RasterConstructors.asInDbRaster _) {
   override def foldable: Boolean = false
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
@@ -168,7 +167,7 @@ case class RS_AsInDb(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_TileExplode(children: Seq[Expression]) extends Generator with CodegenFallback {
+private[apache] case class RS_TileExplode(children: Seq[Expression]) extends Generator with CodegenFallback {
   private val arguments = RS_TileExplode.arguments(children)
 
   override def eval(input: InternalRow): TraversableOnce[InternalRow] = {
@@ -278,7 +277,7 @@ object RS_TileExplode {
   }
 }
 
-case class RS_FromNetCDF(inputExpressions: Seq[Expression])
+private[apache] case class RS_FromNetCDF(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(RasterConstructors.fromNetCDF),
       inferrableFunction4(RasterConstructors.fromNetCDF)) {
@@ -289,7 +288,7 @@ case class RS_FromNetCDF(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_NetCDFInfo(inputExpressions: Seq[Expression])
+private[apache] case class RS_NetCDFInfo(inputExpressions: Seq[Expression])
     extends InferredExpression(RasterConstructors.getRecordInfo _) {
 
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {

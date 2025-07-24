@@ -39,14 +39,14 @@ import org.apache.spark.sql.types.IntegerType
 import org.apache.spark.sql.types.StructType
 import org.geotools.coverage.grid.GridCoverage2D
 
-case class RS_SetSRID(inputExpressions: Seq[Expression])
+private[apache] case class RS_SetSRID(inputExpressions: Seq[Expression])
     extends InferredExpression(RasterEditors.setSrid _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
   }
 }
 
-case class RS_SetGeoReference(inputExpressions: Seq[Expression])
+private[apache] case class RS_SetGeoReference(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(RasterEditors.setGeoReference),
       inferrableFunction3(RasterEditors.setGeoReference),
@@ -56,14 +56,14 @@ case class RS_SetGeoReference(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_SetPixelType(inputExpressions: Seq[Expression])
+private[apache] case class RS_SetPixelType(inputExpressions: Seq[Expression])
     extends InferredExpression(RasterEditors.setPixelType _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
   }
 }
 
-case class RS_Resample(inputExpressions: Seq[Expression])
+private[apache] case class RS_Resample(inputExpressions: Seq[Expression])
     extends InferredExpression(
       nullTolerantInferrableFunction4(RasterEditors.resample),
       nullTolerantInferrableFunction5(RasterEditors.resample),
@@ -73,7 +73,7 @@ case class RS_Resample(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_NormalizeAll(inputExpressions: Seq[Expression])
+private[apache] case class RS_NormalizeAll(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction1(RasterEditors.normalizeAll),
       inferrableFunction3(RasterEditors.normalizeAll),
@@ -86,14 +86,14 @@ case class RS_NormalizeAll(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_ReprojectMatch(inputExpressions: Seq[Expression])
+private[apache] case class RS_ReprojectMatch(inputExpressions: Seq[Expression])
     extends InferredExpression(RasterEditors.reprojectMatch _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
   }
 }
 
-case class RS_Interpolate(inputExpressions: Seq[Expression])
+private[apache] case class RS_Interpolate(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction1(RasterEditors.interpolate),
       inferrableFunction2(RasterEditors.interpolate),
@@ -106,7 +106,7 @@ case class RS_Interpolate(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_StackTileExplode(children: Seq[Expression])
+private[apache] case class RS_StackTileExplode(children: Seq[Expression])
     extends Generator
     with ImplicitCastInputTypes
     with CodegenFallback {

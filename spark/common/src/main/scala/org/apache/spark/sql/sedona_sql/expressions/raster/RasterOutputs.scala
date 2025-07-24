@@ -24,7 +24,7 @@ import org.apache.spark.sql.sedona_sql.expressions.InferrableFunctionConverter._
 import org.apache.spark.sql.sedona_sql.expressions.InferrableRasterTypes._
 import org.apache.spark.sql.sedona_sql.expressions.InferredExpression
 
-case class RS_AsGeoTiff(inputExpressions: Seq[Expression])
+private[apache] case class RS_AsGeoTiff(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction5(RasterOutputs.asGeoTiff),
       inferrableFunction4(RasterOutputs.asGeoTiff),
@@ -36,7 +36,7 @@ case class RS_AsGeoTiff(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_AsArcGrid(inputExpressions: Seq[Expression])
+private[apache] case class RS_AsArcGrid(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(RasterOutputs.asArcGrid),
       inferrableFunction1(RasterOutputs.asArcGrid)) {
@@ -45,7 +45,7 @@ case class RS_AsArcGrid(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_AsPNG(inputExpressions: Seq[Expression])
+private[apache] case class RS_AsPNG(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction1(RasterOutputs.asPNG),
       inferrableFunction2(RasterOutputs.asPNG)) {
@@ -54,7 +54,7 @@ case class RS_AsPNG(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_AsBase64(inputExpressions: Seq[Expression])
+private[apache] case class RS_AsBase64(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction1(RasterOutputs.asBase64),
       inferrableFunction2(RasterOutputs.asBase64)) {
@@ -63,7 +63,7 @@ case class RS_AsBase64(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_AsMatrix(inputExpressions: Seq[Expression])
+private[apache] case class RS_AsMatrix(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction3(RasterOutputs.asMatrix),
       inferrableFunction2(RasterOutputs.asMatrix),
@@ -73,7 +73,7 @@ case class RS_AsMatrix(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_AsImage(inputExpressions: Seq[Expression])
+private[apache] case class RS_AsImage(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(RasterOutputs.createHTMLString),
       inferrableFunction1(RasterOutputs.createHTMLString)) {

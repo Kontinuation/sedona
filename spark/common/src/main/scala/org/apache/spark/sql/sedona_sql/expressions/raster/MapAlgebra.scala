@@ -30,7 +30,7 @@ import org.apache.spark.sql.sedona_sql.expressions.InferrableFunction
 import org.geotools.coverage.grid.GridCoverage2D
 
 /// Calculate Normalized Difference between two bands
-case class RS_NormalizedDifference(inputExpressions: Seq[Expression])
+private[apache] case class RS_NormalizedDifference(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.normalizedDifference _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -38,7 +38,7 @@ case class RS_NormalizedDifference(inputExpressions: Seq[Expression])
 }
 
 // Calculate mean value for a particular band
-case class RS_Mean(inputExpressions: Seq[Expression])
+private[apache] case class RS_Mean(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.mean _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -46,7 +46,7 @@ case class RS_Mean(inputExpressions: Seq[Expression])
 }
 
 // Calculate mode of a particular band
-case class RS_Mode(inputExpressions: Seq[Expression])
+private[apache] case class RS_Mode(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.mode _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -54,7 +54,7 @@ case class RS_Mode(inputExpressions: Seq[Expression])
 }
 
 // fetch a particular region from a raster image given particular indexes(Array[minx...maxX][minY...maxY])
-case class RS_FetchRegion(inputExpressions: Seq[Expression])
+private[apache] case class RS_FetchRegion(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.fetchRegion _) {
 
   override def eval(inputRow: InternalRow): Any = {
@@ -70,7 +70,7 @@ case class RS_FetchRegion(inputExpressions: Seq[Expression])
 }
 
 // Mark all the band values with 1 which are greater than a particular threshold
-case class RS_GreaterThan(inputExpressions: Seq[Expression])
+private[apache] case class RS_GreaterThan(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.greaterThan _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -78,7 +78,7 @@ case class RS_GreaterThan(inputExpressions: Seq[Expression])
 }
 
 // Mark all the band values with 1 which are greater than or equal to a particular threshold
-case class RS_GreaterThanEqual(inputExpressions: Seq[Expression])
+private[apache] case class RS_GreaterThanEqual(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.greaterThanEqual _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -86,7 +86,7 @@ case class RS_GreaterThanEqual(inputExpressions: Seq[Expression])
 }
 
 // Mark all the band values with 1 which are less than a particular threshold
-case class RS_LessThan(inputExpressions: Seq[Expression])
+private[apache] case class RS_LessThan(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.lessThan _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -94,7 +94,7 @@ case class RS_LessThan(inputExpressions: Seq[Expression])
 }
 
 // Mark all the band values with 1 which are less than or equal to a particular threshold
-case class RS_LessThanEqual(inputExpressions: Seq[Expression])
+private[apache] case class RS_LessThanEqual(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.lessThanEqual _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -102,7 +102,7 @@ case class RS_LessThanEqual(inputExpressions: Seq[Expression])
 }
 
 // Count number of occurrences of a particular value in a band
-case class RS_CountValue(inputExpressions: Seq[Expression])
+private[apache] case class RS_CountValue(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.countValue _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -110,7 +110,7 @@ case class RS_CountValue(inputExpressions: Seq[Expression])
 }
 
 // Multiply a factor to all values of a band
-case class RS_MultiplyFactor(inputExpressions: Seq[Expression])
+private[apache] case class RS_MultiplyFactor(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.multiplyFactor _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -118,7 +118,7 @@ case class RS_MultiplyFactor(inputExpressions: Seq[Expression])
 }
 
 // Add two bands
-case class RS_Add(inputExpressions: Seq[Expression])
+private[apache] case class RS_Add(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.add _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -126,7 +126,7 @@ case class RS_Add(inputExpressions: Seq[Expression])
 }
 
 // Subtract two bands
-case class RS_Subtract(inputExpressions: Seq[Expression])
+private[apache] case class RS_Subtract(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.subtract _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -134,7 +134,7 @@ case class RS_Subtract(inputExpressions: Seq[Expression])
 }
 
 // Multiple two bands
-case class RS_Multiply(inputExpressions: Seq[Expression])
+private[apache] case class RS_Multiply(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.multiply _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -142,7 +142,7 @@ case class RS_Multiply(inputExpressions: Seq[Expression])
 }
 
 // Divide two bands
-case class RS_Divide(inputExpressions: Seq[Expression])
+private[apache] case class RS_Divide(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.divide _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -150,7 +150,7 @@ case class RS_Divide(inputExpressions: Seq[Expression])
 }
 
 // Modulo of a band
-case class RS_Modulo(inputExpressions: Seq[Expression])
+private[apache] case class RS_Modulo(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.modulo _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -158,7 +158,7 @@ case class RS_Modulo(inputExpressions: Seq[Expression])
 }
 
 // Square root of values in a band
-case class RS_SquareRoot(inputExpressions: Seq[Expression])
+private[apache] case class RS_SquareRoot(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.squareRoot _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -166,7 +166,7 @@ case class RS_SquareRoot(inputExpressions: Seq[Expression])
 }
 
 // Bitwise AND between two bands
-case class RS_BitwiseAnd(inputExpressions: Seq[Expression])
+private[apache] case class RS_BitwiseAnd(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.bitwiseAnd _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -174,7 +174,7 @@ case class RS_BitwiseAnd(inputExpressions: Seq[Expression])
 }
 
 // Bitwise OR between two bands
-case class RS_BitwiseOr(inputExpressions: Seq[Expression])
+private[apache] case class RS_BitwiseOr(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.bitwiseOr _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
@@ -182,7 +182,7 @@ case class RS_BitwiseOr(inputExpressions: Seq[Expression])
 }
 
 // if a value in band1 and band2 are different,value from band1 ins returned else return 0
-case class RS_LogicalDifference(inputExpressions: Seq[Expression])
+private[apache] case class RS_LogicalDifference(inputExpressions: Seq[Expression])
     extends InferredExpression(MapAlgebra.logicalDifference _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)

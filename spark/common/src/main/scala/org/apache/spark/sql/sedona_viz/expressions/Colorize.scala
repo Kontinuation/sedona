@@ -27,7 +27,7 @@ import org.apache.spark.sql.types.{DataType, IntegerType}
 import org.apache.spark.unsafe.types.UTF8String
 import org.beryx.awt.color.ColorFactory
 
-case class ST_Colorize(inputExpressions: Seq[Expression])
+private[apache] case class ST_Colorize(inputExpressions: Seq[Expression])
     extends Expression
     with CodegenFallback
     with Logging {

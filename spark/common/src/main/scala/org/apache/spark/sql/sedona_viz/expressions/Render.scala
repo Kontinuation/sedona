@@ -27,7 +27,7 @@ import org.apache.spark.sql.expressions.{MutableAggregationBuffer, UserDefinedAg
 import org.apache.spark.sql.sedona_viz.UDT.{ImageWrapperUDT, PixelUDT}
 import org.apache.spark.sql.types.{ArrayType, DataType, IntegerType, StructType}
 
-case class ST_Render() extends UserDefinedAggregateFunction with Logging {
+private[apache] case class ST_Render() extends UserDefinedAggregateFunction with Logging {
   // This is the input fields for your aggregate function.
   override def inputSchema: org.apache.spark.sql.types.StructType = new StructType()
     .add("Pixel", new PixelUDT)

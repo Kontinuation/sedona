@@ -35,7 +35,7 @@ import org.locationtech.jts.geom._
 
 import scala.jdk.CollectionConverters._
 
-case class ST_Pixelize(inputExpressions: Seq[Expression])
+private[apache] case class ST_Pixelize(inputExpressions: Seq[Expression])
     extends Expression
     with CodegenFallback
     with Logging {

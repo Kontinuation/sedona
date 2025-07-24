@@ -24,7 +24,7 @@ import org.apache.spark.sql.sedona_sql.expressions.InferrableFunctionConverter._
 import org.apache.spark.sql.sedona_sql.expressions.InferrableRasterTypes._
 import org.apache.spark.sql.sedona_sql.expressions.InferredExpression
 
-case class RS_BandNoDataValue(inputExpressions: Seq[Expression])
+private[apache] case class RS_BandNoDataValue(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(RasterBandAccessors.getBandNoDataValue),
       inferrableFunction1(RasterBandAccessors.getBandNoDataValue)) {
@@ -33,7 +33,7 @@ case class RS_BandNoDataValue(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_Count(inputExpressions: Seq[Expression])
+private[apache] case class RS_Count(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(RasterBandAccessors.getCount),
       inferrableFunction1(RasterBandAccessors.getCount),
@@ -43,7 +43,7 @@ case class RS_Count(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_ZonalStats(inputExpressions: Seq[Expression])
+private[apache] case class RS_ZonalStats(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction7(RasterBandAccessors.getZonalStats),
       inferrableFunction6(RasterBandAccessors.getZonalStats),
@@ -55,7 +55,7 @@ case class RS_ZonalStats(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_SummaryStats(inputExpressions: Seq[Expression])
+private[apache] case class RS_SummaryStats(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(RasterBandAccessors.getSummaryStats),
       inferrableFunction3(RasterBandAccessors.getSummaryStats),
@@ -65,14 +65,14 @@ case class RS_SummaryStats(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_Band(inputExpressions: Seq[Expression])
+private[apache] case class RS_Band(inputExpressions: Seq[Expression])
     extends InferredExpression(RasterBandAccessors.getBand _) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
   }
 }
 
-case class RS_BandPixelType(inputExpressions: Seq[Expression])
+private[apache] case class RS_BandPixelType(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(RasterBandAccessors.getBandType),
       inferrableFunction1(RasterBandAccessors.getBandType)) {
@@ -81,7 +81,7 @@ case class RS_BandPixelType(inputExpressions: Seq[Expression])
   }
 }
 
-case class RS_BandIsNoData(inputExpressions: Seq[Expression])
+private[apache] case class RS_BandIsNoData(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(RasterBandAccessors.bandIsNoData),
       inferrableFunction1(RasterBandAccessors.bandIsNoData)) {

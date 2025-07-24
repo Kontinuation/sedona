@@ -35,7 +35,7 @@ import scala.collection.JavaConverters._
  * Convert raster imagery segmentation results to geometries
  * @param inputExpressions
  */
-case class RS_SEGMENT_TO_GEOMS(inputExpressions: Seq[Expression])
+private[apache] case class RS_SEGMENT_TO_GEOMS(inputExpressions: Seq[Expression])
     extends Expression
     with CodegenFallback
     with ImplicitCastInputTypes {
