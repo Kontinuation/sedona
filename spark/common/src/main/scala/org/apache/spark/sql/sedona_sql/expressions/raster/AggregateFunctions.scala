@@ -30,7 +30,11 @@ import java.awt.image.WritableRaster
 import javax.media.jai.RasterFactory
 import scala.collection.mutable.ArrayBuffer
 
-private[apache] case class BandData(index: Int, width: Int, height: Int, serializedRaster: Array[Byte])
+private[apache] case class BandData(
+    index: Int,
+    width: Int,
+    height: Int,
+    serializedRaster: Array[Byte])
 
 /**
  * Return a raster containing bands at given indexes from all rasters in a given column

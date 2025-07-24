@@ -167,7 +167,9 @@ private[apache] case class RS_AsInDb(inputExpressions: Seq[Expression])
   }
 }
 
-private[apache] case class RS_TileExplode(children: Seq[Expression]) extends Generator with CodegenFallback {
+private[apache] case class RS_TileExplode(children: Seq[Expression])
+    extends Generator
+    with CodegenFallback {
   private val arguments = RS_TileExplode.arguments(children)
 
   override def eval(input: InternalRow): TraversableOnce[InternalRow] = {
