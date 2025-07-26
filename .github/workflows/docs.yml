@@ -48,7 +48,7 @@ jobs:
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+          restore-keys: ${{ runner.os }}-m2-wherobots-compute
       - name: Compile ScalaDoc
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PKG_GITHUB_TOKEN }}

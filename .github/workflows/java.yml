@@ -83,7 +83,7 @@ jobs:
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+          restore-keys: ${{ runner.os }}-m2-wherobots-compute
       - run: sudo apt-get -y install python3-pip python-dev-is-python3
       - env:
           SPARK_VERSION: ${{ matrix.spark }}

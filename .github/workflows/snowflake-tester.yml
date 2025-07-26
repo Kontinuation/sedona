@@ -48,7 +48,7 @@ jobs:
         with:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+          restore-keys: ${{ runner.os }}-m2-wherobots-compute
       - run: mkdir snowflake-tester/tmp
       - run: sudo apt-get update && sudo apt-get -y install wget
       - run: wget https://repo1.maven.org/maven2/org/datasyslab/geotools-wrapper/${SNOWFLAKE_GEOTOOLS_VERSION}/geotools-wrapper-${SNOWFLAKE_GEOTOOLS_VERSION}.jar -O snowflake-tester/tmp/geotools-wrapper-${SNOWFLAKE_GEOTOOLS_VERSION}.jar
