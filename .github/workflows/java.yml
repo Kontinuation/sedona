@@ -47,6 +47,7 @@ env:
   MAVEN_OPTS: -Dmaven.wagon.httpconnectionManager.ttlSeconds=60
   DO_NOT_TRACK: true
   SPARK_LOCAL_IP: 127.0.0.1
+  GITHUB_TOKEN: ${{ secrets.GH_PKG_GITHUB_TOKEN }}
 
 permissions:
   contents: read

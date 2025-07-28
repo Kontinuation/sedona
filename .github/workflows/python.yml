@@ -46,6 +46,7 @@ env:
   JAI_IMAGEIO_VERSION: '1.1'
   DO_NOT_TRACK: true
   SPARK_LOCAL_IP: 127.0.0.1
+  GITHUB_TOKEN: ${{ secrets.GH_PKG_GITHUB_TOKEN }}
 
 permissions:
   contents: read

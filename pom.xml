@@ -438,6 +438,11 @@
             <id>Spark Packages</id>
             <url>https://repos.spark-packages.org/</url>
         </repository>
+        <repository>
+            <id>github</id>
+            <name>Wherobots Apache Maven Packages on GitHub</name>
+            <url>https://maven.pkg.github.com/wherobots/packages</url>
+        </repository>
     </repositories>
     <build>
         <pluginManagement>

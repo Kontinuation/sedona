@@ -52,3 +52,21 @@ Scala 2.13, Spark 3.4+
 ```
 mvn clean deploy -DskipTests -Dscala=2.13 -Dspark=3.4
 ```
+
+## Local development environment
+
+To build the Wherobots project locally, please add the following in your local `~/.m2/settings.xml` . You should give your `YOUR_GITHUB_PERSIONAL_ACCESS_TOKEN` permission to read the organization package.
+
+```
+<settings>
+  <servers>
+    <server>
+      <id>github</id>
+      <username>YOUR_GITHUB_USERNAME</username>
+      <password>YOUR_GITHUB_PERSIONAL_ACCESS_TOKEN</password>
+    </server>
+  </servers>
+</settings>
+```
+
+To release and publish this project, `YOUR_GITHUB_PERSIONAL_ACCESS_TOKEN` in `~/.m2/settings.xml` should have permission to write to the organization package.
