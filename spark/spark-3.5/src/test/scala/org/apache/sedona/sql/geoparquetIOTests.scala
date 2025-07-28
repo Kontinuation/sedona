@@ -25,23 +25,25 @@ import org.apache.parquet.hadoop.ParquetFileReader
 import org.apache.parquet.hadoop.util.HadoopInputFile
 import org.apache.spark.SparkException
 import org.apache.spark.scheduler.{SparkListener, SparkListenerTaskEnd}
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.SaveMode
 import org.apache.spark.sql.execution.datasources.parquet.{Covering, GeoParquetMetaData, ParquetReadSupport}
 import org.apache.spark.sql.functions.{col, expr}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.sedona_sql.expressions.st_constructors.{ST_Point, ST_PolygonFromEnvelope}
 import org.apache.spark.sql.sedona_sql.expressions.st_predicates.ST_Intersects
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Row, SaveMode}
+import org.apache.spark.sql.types.{IntegerType, StringType, StructField, StructType, TimestampNTZType}
 import org.json4s.jackson.parseJson
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.io.WKTReader
 import org.scalatest.BeforeAndAfterAll
 
 import java.io.File
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
+import java.nio.ByteOrder
 import java.util.Collections
 import java.util.concurrent.atomic.AtomicLong
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import scala.collection.JavaConverters._
 
 class geoparquetIOTests extends TestBaseScala with BeforeAndAfterAll {
@@ -81,6 +83,15 @@ class geoparquetIOTests extends TestBaseScala with BeforeAndAfterAll {
         newrows
           .getAs[Geometry]("geometry")
           .toString == "MULTIPOLYGON (((180 -16.067132663642447, 180 -16.555216566639196, 179.36414266196414 -16.801354076946883, 178.72505936299711 -17.01204167436804, 178.59683859511713 -16.639150000000004, 179.0966093629971 -16.433984277547403, 179.4135093629971 -16.379054277547404, 180 -16.067132663642447)), ((178.12557 -17.50481, 178.3736 -17.33992, 178.71806 -17.62846, 178.55271 -18.15059, 177.93266000000003 -18.28799, 177.38146 -18.16432, 177.28504 -17.72465, 177.67087 -17.381140000000002, 178.12557 -17.50481)), ((-179.79332010904864 -16.020882256741224, -179.9173693847653 -16.501783135649397, -180 -16.555216566639196, -180 -16.067132663642447, -179.79332010904864 -16.020882256741224)))")
+      // The endianness of the WKB should be system native.
+      val df2Binary = sparkSession.read.parquet(geoparquetoutputlocation + "/gp_sample1.parquet")
+      df2Binary.collect().foreach { row =>
+        val wkb = row.getAs[Array[Byte]]("geometry")
+        wkb(0) match {
+          case 0x00 => assert(ByteOrder.nativeOrder() == ByteOrder.BIG_ENDIAN)
+          case 0x01 => assert(ByteOrder.nativeOrder() == ByteOrder.LITTLE_ENDIAN)
+        }
+      }
     }
     it("GEOPARQUET Test example2 i.e. naturalearth_citie dataset's Read and Write") {
       val df = sparkSession.read.format("geoparquet").load(geoparquetdatalocation2)
