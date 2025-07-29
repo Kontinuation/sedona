@@ -20,7 +20,7 @@ name: Python build
 on:
   push:
     branches:
-      - master
+      - '*'
     paths:
       - 'common/**'
       - 'spark/**'
