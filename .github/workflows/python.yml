@@ -160,6 +160,8 @@ jobs:
       - env:
           PYTHON_VERSION: ${{ matrix.python }}
         run: find spark-shaded/target -name sedona-*.jar -exec cp {} ${VENV_PATH}/lib/python${PYTHON_VERSION}/site-packages/pyspark/jars/ \;
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
       - name: Run tests
         env:
           PYTHON_VERSION: ${{ matrix.python }}
