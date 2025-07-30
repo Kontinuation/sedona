@@ -174,6 +174,7 @@ object Catalog extends AbstractCatalog {
     function[ST_SubDivide](),
     function[ST_ExtentBasedSubDivideExplode](),
     function[ST_ExtentBasedSubDivide](),
+    function[ST_Segmentize](),
     function[ST_MakeLine](),
     function[ST_Polygon](),
     function[ST_Polygonize](),

@@ -1088,6 +1088,14 @@ private[apache] case class ST_ExtentBasedSubDivideExplode(children: Seq[Expressi
   }
 }
 
+private[apache] case class ST_Segmentize(inputExpressions: Seq[Expression])
+    extends InferredExpression(Functions.segmentize _) {
+
+  protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
+    copy(inputExpressions = newChildren)
+  }
+}
+
 private[apache] case class ST_MakeLine(inputExpressions: Seq[Expression])
     extends InferredExpression(
       inferrableFunction2(Functions.makeLine),

@@ -44,6 +44,7 @@ import org.locationtech.jts.algorithm.Orientation;
 import org.locationtech.jts.algorithm.construct.LargestEmptyCircle;
 import org.locationtech.jts.algorithm.construct.MaximumInscribedCircle;
 import org.locationtech.jts.algorithm.hull.ConcaveHull;
+import org.locationtech.jts.densify.Densifier;
 import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.Polygon;
@@ -1944,6 +1945,13 @@ public class Functions {
     ExtentBasedGeometrySubDivider subDivider = new ExtentBasedGeometrySubDivider(options);
     Iterator<Geometry> subdivided = subDivider.subdivide(geometry);
     return (Geometry[]) IteratorUtils.toArray(subdivided, Geometry.class);
+  }
+
+  public static Geometry segmentize(Geometry geometry, double maxSegmentLength) {
+    if (maxSegmentLength <= 0) {
+      throw new IllegalArgumentException("maxSegmentLength must be greater than 0");
+    }
+    return Densifier.densify(geometry, maxSegmentLength);
   }
 
   public static Geometry snap(Geometry input, Geometry reference, double tolerance) {

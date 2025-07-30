@@ -4500,4 +4500,42 @@ public class FunctionsTest extends TestBase {
         assertThrows(IllegalArgumentException.class, () -> Functions.subDivide(lineString, 4));
     assertEquals("ST_Subdivide needs 5 or more max vertices", e.getMessage());
   }
+
+  @Test
+  public void segmentize() {
+    LineString emptyLineString = GEOMETRY_FACTORY.createLineString();
+    Geometry actual = Functions.segmentize(emptyLineString, 0.5);
+    Geometry expected = emptyLineString;
+    assertEquals(actual, expected);
+
+    MultiLineString multiLineString =
+        GEOMETRY_FACTORY.createMultiLineString(
+            new LineString[] {
+              GEOMETRY_FACTORY.createLineString(coordArray(0, 0, 0, 1, 0, 9)),
+              GEOMETRY_FACTORY.createLineString(coordArray(1, 10, 1, 18))
+            });
+    actual = Functions.segmentize(multiLineString, 5);
+    expected =
+        GEOMETRY_FACTORY.createMultiLineString(
+            new LineString[] {
+              GEOMETRY_FACTORY.createLineString(coordArray(0, 0, 0, 1, 0, 5, 0, 9)),
+              GEOMETRY_FACTORY.createLineString(coordArray(1, 10, 1, 14, 1, 18))
+            });
+    assertEquals(expected, actual);
+
+    Polygon polygon = GEOMETRY_FACTORY.createPolygon(coordArray(0, 0, 0, 8, 30, 0, 0, 0));
+    actual = Functions.segmentize(polygon, 10);
+    expected =
+        GEOMETRY_FACTORY.createPolygon(
+            coordArray(0, 0, 0, 8, 7.5, 6, 15, 4, 22.5, 2, 30, 0, 20, 0, 10, 0, 0, 0));
+    assertEquals(expected, actual);
+  }
+
+  @Test
+  public void segmentizeInvalidDistance() {
+    LineString lineString = GEOMETRY_FACTORY.createLineString(coordArray(0, 0, 99, 99));
+    IllegalArgumentException e =
+        assertThrows(IllegalArgumentException.class, () -> Functions.segmentize(lineString, 0));
+    assertEquals("maxSegmentLength must be greater than 0", e.getMessage());
+  }
 }
