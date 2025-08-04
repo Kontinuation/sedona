@@ -4662,6 +4662,10 @@ PROJCS["WGS 84 / Pseudo-Mercator",
 !!!note
     By default, ==ST_Transform== follows the `lenient` mode which tries to fix issues by itself. You can append a boolean value at the end to enable the `strict` mode. In `strict` mode, ==ST_Transform== will throw an error if it finds any issue.
 
+**Area of Interest (AOI)**
+
+[Experimental] An area of interest allows a better EPSG transform to be selected in some cases. It should be specified in order longitude latitude, with longitude in range [-180,180] and latitude in range [-90,90].
+
 Format:
 
 ```
@@ -4674,6 +4678,10 @@ ST_Transform (A: Geometry, SourceCRS: String, TargetCRS: String)
 
 ```
 ST_Transform (A: Geometry, TargetCRS: String)
+```
+
+```
+ST_Transform (A: Geometry, SourceCRS: String, TargetCRS: String, AOI: Geometry, lenientMode: Boolean)
 ```
 
 Since: `v1.2.0`

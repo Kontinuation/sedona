@@ -395,6 +395,15 @@ class functionTestScala
         .first()
         .get(0)
       assertEquals("POINT (11131949.08 4865942.28)", result)
+
+      point = "POINT (-120 48)"
+      val result_aoi = sparkSession
+        .sql(s"""SELECT
+         |ST_AsText(ST_ReducePrecision(ST_Transform(ST_GeomFromWKT('$point'), 'EPSG:4326', 'EPSG:4269', ST_GeomFromWKT('$point'), true), 2))""".stripMargin)
+        .first()
+        .get(0)
+
+      assertEquals("POINT (-120 48)", result_aoi)
     }
 
     it("Passed ST_transform WKT version") {

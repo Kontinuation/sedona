@@ -37,6 +37,7 @@
 __pycache__
 dependency-reduced-pom.xml
 target
+common/derby.log
 # Dev testing scripts
 wherobots-notebook
 wherobots-notebook/*

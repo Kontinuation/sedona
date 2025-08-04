@@ -22,7 +22,7 @@ import com.mapzen.jpostal.{AddressExpander, AddressParser}
 import org.apache.sedona.common.geometryObjects.Geography
 import org.apache.sedona.common.sphere.{Haversine, Spheroid}
 import org.apache.sedona.common.utils.{InscribedCircle, ValidDetail}
-import org.apache.sedona.common.{Functions, FunctionsGeoTools}
+import org.apache.sedona.common.{Functions, FunctionsApacheSIS, FunctionsGeoTools}
 import org.apache.sedona.core.utils.SedonaConf
 import org.apache.sedona.sql.utils.GeometrySerializer
 import org.apache.spark.sql.catalyst.InternalRow
@@ -294,6 +294,7 @@ private[apache] case class ST_Centroid(inputExpressions: Seq[Expression])
  */
 private[apache] case class ST_Transform(inputExpressions: Seq[Expression])
     extends InferredExpression(
+      inferrableFunction5(FunctionsApacheSIS.transform),
       inferrableFunction4(FunctionsGeoTools.transform),
       inferrableFunction3(FunctionsGeoTools.transform),
       inferrableFunction2(FunctionsGeoTools.transform)) {

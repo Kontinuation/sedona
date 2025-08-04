@@ -90,6 +90,7 @@
         <scala-collection-compat.version>2.5.0</scala-collection-compat.version>
         <geoglib.version>1.52</geoglib.version>
         <caffeine.version>2.9.2</caffeine.version>
+        <sis.version>1.4.1-SNAPSHOT</sis.version>
 
         <geotools.scope>provided</geotools.scope>
         <!-- Because it's not in Maven central, make it provided by default -->
@@ -279,6 +280,25 @@
                 <artifactId>gt-coverage</artifactId>
                 <version>${geotools.version}</version>
                 <scope>${geotools.scope}</scope>
+            </dependency>
+            <!-- for CRS high precision CRS transform -->
+            <dependency>
+                <!-- using internal package while waiting on 1.5 -->
+                <groupId>com.wherobots.sis.core</groupId>
+                <artifactId>sis-referencing</artifactId>
+                <version>1.4.1-SNAPSHOT</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.sis.non-free</groupId>
+                <artifactId>sis-epsg</artifactId>
+                <version>1.4</version>
+                <scope>runtime</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.derby</groupId>
+                <artifactId>derby</artifactId>
+                <version>10.14.2.0</version>
+                <scope>runtime</scope>
             </dependency>
             <dependency>
                 <groupId>it.geosolutions.jaiext.jiffle</groupId>
