@@ -80,7 +80,9 @@ The options for the `raster` loader are as follows:
 The `raster` loader also works with Spark generic file source options, such as `option("pathGlobFilter", "*.tif*")` and `option("recursiveFileLookup", "true")`. For instance, you can load all the `.tif` files recursively in a directory using
 
 ```python
-sedona.read.format("raster").option("recursiveFileLookup", "true").option("pathGlobFilter", "*.tif*").load(path_to_raster_data_folder)
+sedona.read.format("raster").option("recursiveFileLookup", "true").option(
+    "pathGlobFilter", "*.tif*"
+).load(path_to_raster_data_folder)
 ```
 
 One difference from other file source loaders is that when the loaded path ends with `/`, the `raster` loader will look up raster files in the directory and all its subdirectories recursively. This is equivalent to specifying a path without trailing `/` and setting `option("recursiveFileLookup", "true")`.

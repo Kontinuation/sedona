@@ -673,6 +673,7 @@ you have to export S3 configs to environment variables using `sedona.raster.gdal
 
 ```python
 from sedona.raster import gdal_conf
+
 gdal_conf.export_gdal_conf_to_env()
 
 # ... launch subprocesses and work with out-db rasters
