@@ -32,7 +32,7 @@ This documentation covers the Python API for Apache Sedona, providing comprehens
 
    modules
    sedona.flink
-   sedona.geopandas
+   sedona.spark.geopandas
    sedona.spark
    sedona.stac
    sedona.stats

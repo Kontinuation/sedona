@@ -40,7 +40,7 @@ from pandas.testing import assert_series_equal
 import pytest
 from packaging.version import parse as parse_version
 
-import sedona.geopandas as sgpd
+import sedona.spark.geopandas as sgpd
 from tests.test_base import TestBase
 
 

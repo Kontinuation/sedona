@@ -1,4 +1,4 @@
-sedona.geopandas package
+sedona.spark.geopandas package
 ========================
 
 Subpackages
@@ -7,47 +7,47 @@ Subpackages
 .. toctree::
    :maxdepth: 4
 
-   sedona.geopandas.tools
+   sedona.spark.geopandas.tools
 
 Submodules
 ----------
 
-sedona.geopandas.base module
+sedona.spark.geopandas.base module
 ----------------------------
 
-.. automodule:: sedona.geopandas.base
+.. automodule:: sedona.spark.geopandas.base
    :members:
    :show-inheritance:
    :undoc-members:
 
-sedona.geopandas.geodataframe module
+sedona.spark.geopandas.geodataframe module
 ------------------------------------
 
-.. automodule:: sedona.geopandas.geodataframe
+.. automodule:: sedona.spark.geopandas.geodataframe
    :members:
    :show-inheritance:
    :undoc-members:
 
-sedona.geopandas.geoseries module
+sedona.spark.geopandas.geoseries module
 ---------------------------------
 
-.. automodule:: sedona.geopandas.geoseries
+.. automodule:: sedona.spark.geopandas.geoseries
    :members:
    :show-inheritance:
    :undoc-members:
 
-sedona.geopandas.io module
+sedona.spark.geopandas.io module
 --------------------------
 
-.. automodule:: sedona.geopandas.io
+.. automodule:: sedona.spark.geopandas.io
    :members:
    :show-inheritance:
    :undoc-members:
 
-sedona.geopandas.sindex module
+sedona.spark.geopandas.sindex module
 ------------------------------
 
-.. automodule:: sedona.geopandas.sindex
+.. automodule:: sedona.spark.geopandas.sindex
    :members:
    :show-inheritance:
    :undoc-members:
@@ -55,7 +55,7 @@ sedona.geopandas.sindex module
 Module contents
 ---------------
 
-.. automodule:: sedona.geopandas
+.. automodule:: sedona.spark.geopandas
    :members:
    :show-inheritance:
    :undoc-members:

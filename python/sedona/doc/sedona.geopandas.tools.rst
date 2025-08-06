@@ -1,13 +1,13 @@
-sedona.geopandas.tools package
+sedona.spark.geopandas.tools package
 ==============================
 
 Submodules
 ----------
 
-sedona.geopandas.tools.sjoin module
+sedona.spark.geopandas.tools.sjoin module
 -----------------------------------
 
-.. automodule:: sedona.geopandas.tools.sjoin
+.. automodule:: sedona.spark.geopandas.tools.sjoin
    :members:
    :show-inheritance:
    :undoc-members:
@@ -15,7 +15,7 @@ sedona.geopandas.tools.sjoin module
 Module contents
 ---------------
 
-.. automodule:: sedona.geopandas.tools
+.. automodule:: sedona.spark.geopandas.tools
    :members:
    :show-inheritance:
    :undoc-members:
