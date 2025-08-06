@@ -811,6 +811,7 @@ class TestMatchGeopandasSeries(TestGeopandasBase):
         sgpd_result = GeoSeries(geometries, index1).intersection(
             GeoSeries(geometries, index2), align=False
         )
+        sgpd_result.sort_index(inplace=True)
 
         gpd_result = gpd.GeoSeries(geometries, index1).intersection(
             gpd.GeoSeries(geometries, index2), align=False
@@ -825,6 +826,7 @@ class TestMatchGeopandasSeries(TestGeopandasBase):
             if not gpd_series1.is_valid.all() or not gpd_series2.is_valid.all():
                 continue
             sgpd_result = GeoSeries(geom).intersection(GeoSeries(geom2))
+            sgpd_result.sort_index(inplace=True)
             gpd_result = gpd_series1.intersection(gpd_series2)
             self.check_sgpd_equals_gpd(sgpd_result, gpd_result)
 
@@ -832,6 +834,7 @@ class TestMatchGeopandasSeries(TestGeopandasBase):
                 sgpd_result = GeoSeries(geom).intersection(
                     GeoSeries(geom2), align=False
                 )
+                sgpd_result.sort_index(inplace=True)
                 gpd_result = gpd_series1.intersection(gpd_series2, align=False)
                 self.check_sgpd_equals_gpd(sgpd_result, gpd_result)
 
