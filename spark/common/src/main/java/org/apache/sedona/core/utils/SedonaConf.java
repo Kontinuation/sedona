@@ -485,13 +485,8 @@ public class SedonaConf implements Serializable {
                 "spark.sedona.raster.load.parallelism",
                 Integer.toString(defaultRasterLoadingParallelism)));
 
-    String geocodingTableName =
-        confGetter.get(
-            "spark.sedona.geocode.table", "wherobots_open_data.overture_maps_foundation.geocodes");
-    String geocodingIndexTableName =
-        confGetter.get(
-            "spark.sedona.geocode.index.table",
-            "wherobots_open_data.overture_maps_foundation.geocodeIndex");
+    String geocodingTableName = confGetter.get("spark.sedona.geocode.table", "");
+
     String reverseGeocodingTableName = confGetter.get("spark.sedona.reverse.geocode.table", "");
 
     if (!reverseGeocodingTableName.isEmpty() && !geocodingConfigWarningPrinted) {
@@ -506,7 +501,12 @@ public class SedonaConf implements Serializable {
     }
 
     this.geocodingTableName =
-        !geocodingTableName.isEmpty() ? geocodingTableName : reverseGeocodingTableName;
+        !geocodingTableName.isEmpty()
+            ? geocodingTableName
+            : !reverseGeocodingTableName.isEmpty()
+                ? reverseGeocodingTableName
+                : "wherobots_open_data.overture_maps_foundation.geocodes";
+
     this.geocodingIndexTableName =
         confGetter.get(
             "spark.sedona.geocode.index.table",
