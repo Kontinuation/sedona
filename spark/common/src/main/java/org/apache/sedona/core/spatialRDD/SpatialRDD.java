@@ -30,6 +30,7 @@ import org.apache.commons.collections4.iterators.SingletonIterator;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.FunctionsGeoTools;
+import org.apache.sedona.common.jts2geojson.GeoJSONWriter;
 import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.enums.GridType;
@@ -74,7 +75,6 @@ import org.locationtech.jts.index.strtree.STRtree;
 import org.locationtech.jts.io.WKBWriter;
 import org.locationtech.jts.io.WKTWriter;
 import org.wololo.geojson.Feature;
-import org.wololo.jts2geojson.GeoJSONWriter;
 import scala.Tuple2;
 
 // TODO: Auto-generated Javadoc
