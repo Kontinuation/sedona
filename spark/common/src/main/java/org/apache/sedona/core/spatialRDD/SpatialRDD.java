@@ -27,7 +27,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.commons.collections4.iterators.SingletonIterator;
-import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.log4j.Logger;
 import org.apache.sedona.common.FunctionsGeoTools;
@@ -938,7 +937,7 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
    */
   public void saveAsWKB(String outputLocation) {
     if (this.rawSpatialRDD == null) {
-      throw new NullArgumentException("save as WKB cannot operate on null RDD");
+      throw new IllegalArgumentException("save as WKB cannot operate on null RDD");
     }
     this.rawSpatialRDD
         .mapPartitions(
@@ -967,7 +966,7 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
   /** Save as WKT */
   public void saveAsWKT(String outputLocation) {
     if (this.rawSpatialRDD == null) {
-      throw new NullArgumentException("save as WKT cannot operate on null RDD");
+      throw new IllegalArgumentException("save as WKT cannot operate on null RDD");
     }
     this.rawSpatialRDD
         .mapPartitions(
