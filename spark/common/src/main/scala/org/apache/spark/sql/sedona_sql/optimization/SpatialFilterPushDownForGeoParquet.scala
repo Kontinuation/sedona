@@ -27,8 +27,9 @@ import org.apache.spark.sql.catalyst.plans.logical.{Filter, LogicalPlan}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.connector.catalog.CatalogV2Implicits.parseColumnPath
 import org.apache.spark.sql.execution.datasources._
-import org.apache.spark.sql.execution.datasources.parquet.GeoParquetSpatialFilter.{AndFilter, LeafFilter, OrFilter}
-import org.apache.spark.sql.execution.datasources.parquet.{GeoParquetFileFormatBase, GeoParquetSpatialFilter}
+import org.apache.spark.sql.execution.datasources.geoparquet.GeoParquetFileFormatBase
+import org.apache.spark.sql.execution.datasources.geoparquet.GeoParquetSpatialFilter
+import org.apache.spark.sql.execution.datasources.geoparquet.GeoParquetSpatialFilter.{AndFilter, LeafFilter, OrFilter}
 import org.apache.spark.sql.sedona_sql.UDT.GeometryUDT
 import org.apache.spark.sql.sedona_sql.expressions._
 import org.apache.spark.sql.sedona_sql.optimization.ExpressionUtils.splitConjunctivePredicates
