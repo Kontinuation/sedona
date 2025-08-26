@@ -19,6 +19,7 @@
 package org.apache.spark.sql.sedona_sql.expressions
 
 import com.mapzen.jpostal.{AddressExpander, AddressParser}
+import org.apache.sedona.common.S2Geography.Geography
 import org.apache.sedona.common.sphere.{Haversine, Spheroid}
 import org.apache.sedona.common.utils.{InscribedCircle, ValidDetail}
 import org.apache.sedona.common.{Functions, FunctionsApacheSIS, FunctionsGeoTools}
@@ -1350,8 +1351,9 @@ private[apache] case class ST_Force2D(inputExpressions: Seq[Expression])
  * @param inputExpressions
  */
 private[apache] case class ST_AsEWKT(inputExpressions: Seq[Expression])
-    extends InferredExpression((geom: Geometry) => Functions.asEWKT(geom)) {
-  // (geog: Geography) => Functions.asEWKT(geog)
+    extends InferredExpression(
+      (geom: Geometry) => Functions.asEWKT(geom),
+      (geog: Geography) => org.apache.sedona.common.geography.Functions.asEWKT(geog)) {
   protected def withNewChildrenInternal(newChildren: IndexedSeq[Expression]) = {
     copy(inputExpressions = newChildren)
   }
