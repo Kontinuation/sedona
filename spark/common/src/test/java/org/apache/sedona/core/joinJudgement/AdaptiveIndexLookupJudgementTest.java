@@ -378,7 +378,7 @@ public class AdaptiveIndexLookupJudgementTest extends ExternalIndexTestBase {
         double radius = 0.5 * (width + height);
         geom = factory.createPoint(new Coordinate(centerX, centerY)).buffer(radius, 2);
       }
-      geom.setUserData(new OuterJoinUserData(k, true));
+      geom.setUserData(new OuterJoinUserData(k, true, k));
       geoms.add(geom);
     }
     return geoms;

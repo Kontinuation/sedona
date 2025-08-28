@@ -35,7 +35,6 @@ import org.apache.sedona.common.utils.GeomUtils;
 import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.enums.GridType;
 import org.apache.sedona.core.enums.IndexType;
-import org.apache.sedona.core.monitoring.JavaMetrics;
 import org.apache.sedona.core.serde.ShuffledGeometrySerializer;
 import org.apache.sedona.core.spatialPartitioning.GenericUniquePartitioner;
 import org.apache.sedona.core.spatialPartitioning.IndexedGridPartitioner;
@@ -47,7 +46,6 @@ import org.apache.sedona.core.spatialPartitioning.SpatialPartitioningMetrics;
 import org.apache.sedona.core.spatialPartitioning.quadtree.StandardQuadTree;
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector;
 import org.apache.sedona.core.spatialRddTool.IndexBuilder;
-import org.apache.sedona.core.spatialRddTool.PlaceGeometryWithMetricsIterator;
 import org.apache.sedona.core.spatialRddTool.StatCalculator;
 import org.apache.sedona.core.utils.ExecutorResourceUtils;
 import org.apache.sedona.core.utils.RDDSampleUtils;
@@ -62,7 +60,6 @@ import org.apache.spark.rdd.ShuffledRDD;
 import org.apache.spark.serializer.Serializer;
 import org.apache.spark.sql.types.StructType;
 import org.apache.spark.storage.StorageLevel;
-import org.apache.spark.util.LongAccumulator;
 import org.apache.spark.util.random.SamplingUtils;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
@@ -631,23 +628,10 @@ public class SpatialRDD<T extends Geometry> implements Serializable {
   }
 
   protected JavaRDD<T> partition(final SpatialPartitioner partitioner, SedonaConf conf) {
-    JavaPairRDD<Integer, T> geometryWithPartId;
-    if (conf != null && conf.metricsForSpatialPartitioningEnabled()) {
-      // Update metrics when iterating over partitioned geometries
-      SparkContext sc = rawSpatialRDD.context();
-      LongAccumulator accInputCount = JavaMetrics.createMetric(sc, "inputCount");
-      LongAccumulator accOutputCount = JavaMetrics.createMetric(sc, "outputCount");
-      LongAccumulator accMaxDuplicates = JavaMetrics.createMetric(sc, "maxDuplicates");
-      geometryWithPartId =
-          this.rawSpatialRDD.mapPartitionsToPair(
-              (iterator) ->
-                  new PlaceGeometryWithMetricsIterator<>(
-                      iterator, partitioner, accInputCount, accOutputCount, accMaxDuplicates));
-    } else {
-      geometryWithPartId = this.rawSpatialRDD.flatMapToPair(partitioner::placeObject);
-    }
-
-    JavaPairRDD<Integer, T> partitionedRdd = geometryWithPartId.partitionBy(partitioner);
+    boolean metricsForSpatialPartitioning =
+        (conf != null && conf.metricsForSpatialPartitioningEnabled());
+    JavaPairRDD<Integer, T> partitionedRdd =
+        partitioner.partitionRDD(this.rawSpatialRDD, metricsForSpatialPartitioning);
 
     // Use a more efficient serializer for shuffle write and read of spatial partitioned
     // <int, geometry> pairs.

@@ -28,6 +28,7 @@ import java.util.stream.Collectors;
 import org.apache.sedona.common.subDivide.SubdivideOptions;
 import org.apache.sedona.core.TestBase;
 import org.apache.sedona.core.spatialRDD.SpatialRDD;
+import org.apache.sedona.core.utils.UniqueIDUtils;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.junit.AfterClass;
@@ -128,7 +129,7 @@ public class SubdivideTest extends TestBase {
       testData.add(String.format("test-data-%06d", k));
     }
     JavaRDD<String> rdd = sc.parallelize(testData, 10);
-    JavaRDD<Tuple2<Long, String>> resultRdd = Subdivide.attachId(rdd);
+    JavaRDD<Tuple2<Long, String>> resultRdd = UniqueIDUtils.attachId(rdd);
 
     // Assigned unique IDs should be distinct
     assertEquals(1000, resultRdd.map(Tuple2::_1).distinct().count());
@@ -153,7 +154,7 @@ public class SubdivideTest extends TestBase {
     spatialRDD.setRawSpatialRDD(rawSpatialRDD);
 
     SpatialRDD<Geometry> resultRDD = Subdivide.noOpSubdivideSpatialRDD(spatialRDD);
-    JavaRDD<Tuple2<Long, Geometry>> rawSpatialRDDWithId = Subdivide.attachId(rawSpatialRDD);
+    JavaRDD<Tuple2<Long, Geometry>> rawSpatialRDDWithId = UniqueIDUtils.attachId(rawSpatialRDD);
 
     // The two RDDs should be able to be joined properly
     JavaPairRDD<Long, Geometry> keyedResultRDD =

@@ -21,14 +21,14 @@ package org.apache.spark.sql.sedona_sql.strategy.join
 import org.apache.sedona.common.subDivide.SubdivideOptions
 import org.apache.sedona.core.enums.{ExecutionMode, IndexType, JoinSubdivideMode}
 import org.apache.sedona.core.spatialOperator.JoinQuery.JoinParams
-import org.apache.sedona.core.spatialOperator.Subdivide.{SubdivideRDDOptions, SubdividedPart, isSubdivideAccurate}
+import org.apache.sedona.core.spatialOperator.Subdivide.{isSubdivideAccurate, SubdividedPart, SubdivideRDDOptions}
 import org.apache.sedona.core.spatialOperator.{JoinQuery, SpatialPredicate, Subdivide}
 import org.apache.sedona.core.spatialPartitioning.OuterJoinSpatialPartitioner.OuterJoinUserData
 import org.apache.sedona.core.spatialPartitioning.{BroadcastedSpatialPartitioner, OuterJoinSpatialPartitioner, SpatialPartitioner, SpatialPartitioningMetrics}
 import org.apache.sedona.core.spatialRDD.SpatialRDD
 import org.apache.sedona.core.spatialRddTool.AdvancedStatCollector
 import org.apache.sedona.core.utils.{ExecutorResourceUtils, SedonaConf}
-import org.apache.spark.HashPartitioner
+import org.apache.sedona.core.utils.UniqueIDUtils
 import org.apache.spark.api.java.function.{Function0 => JavaFunction0, Function2 => JavaFunction2}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
@@ -37,13 +37,13 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, GenericInternalRow, Predicate, UnsafeProjection, UnsafeRow}
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.execution.metric.{SQLMetric, SQLMetrics}
-import org.apache.spark.sql.execution.{SQLExecution, SparkPlan}
+import org.apache.spark.sql.execution.{SparkPlan, SQLExecution}
 import org.apache.spark.sql.sedona_sql.expressions.implicits._
 import org.apache.spark.sql.sedona_sql.optimization.ExpressionUtils.matchDistanceExpressionToJoinSide
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitAdvancedJoinQueryExec._
 import org.apache.spark.sql.sedona_sql.strategy.join.TraitJoinQueryBase.createUnsafeRowProjector
-import org.apache.spark.sql.sedona_sql.utils.JoinedUnsafeRowRDDSorter
 import org.apache.spark.sql.sedona_sql.utils.UnsafeRowRDDSorter.sortUnsafeRowRDD
+import org.apache.spark.Partitioner
 import org.locationtech.jts.geom.Geometry
 import org.locationtech.jts.geom.prep.{PreparedGeometry, PreparedGeometryFactory}
 
@@ -740,7 +740,9 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       case LeftOuter =>
         val rightNullRow = getNullUnsafeRow(right.output)
         val originalRowWithId =
-          Subdivide.attachId(sortedLeftResultsRaw).rdd.map { case (id, row) => (id.toLong, row) }
+          UniqueIDUtils.attachId(sortedLeftResultsRaw).rdd.map { case (id, row) =>
+            (id.toLong, row)
+          }
         originalRowWithId.leftOuterJoin(joinedRowsWithKeys).mapPartitions { iter =>
           val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
           val leftRowProjector =
@@ -758,7 +760,9 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       case RightOuter =>
         val leftNullRow = getNullUnsafeRow(left.output)
         val originalRowWithId =
-          Subdivide.attachId(sortedRightResultsRaw).rdd.map { case (id, row) => (id.toLong, row) }
+          UniqueIDUtils.attachId(sortedRightResultsRaw).rdd.map { case (id, row) =>
+            (id.toLong, row)
+          }
         joinedRowsWithKeys.rightOuterJoin(originalRowWithId).mapPartitions { iter =>
           val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
           val leftRowProjector =
@@ -786,7 +790,7 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       throw new IllegalStateException("No active SparkSession"))
     import session.implicits._
 
-    val rddUnsafeRowWithId = Subdivide.attachId(originalRdd).rdd.map { case (id, row) =>
+    val rddUnsafeRowWithId = UniqueIDUtils.attachId(originalRdd).rdd.map { case (id, row) =>
       UnsafeRowWithId(id, row.getBytes)
     }
     val dsUnsafeRowWithId = session.createDataset(rddUnsafeRowWithId)
@@ -945,10 +949,7 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
           spatialRDD
         }
       case None =>
-        // We need the original row to remove extra rows with null on the non-outer side
-        // when running outer joins (see outerJoinedRddToRowRdd), so this optimization is only
-        // correct when running inner joins.
-        if (joinType != Inner || unneededAttributes.isEmpty) spatialRDD
+        if (unneededAttributes.isEmpty) spatialRDD
         else {
           log.info(
             s"Discard unneeded attributes on $side: $unneededAttributes, projection: $projectionExpr")
@@ -992,48 +993,78 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
   }
 
   private def outerJoinedRddToRowRdd(joinedRdd: RDD[(Geometry, Geometry)]): RDD[InternalRow] = {
-    val leftNullUnsafeRow = getNullUnsafeRow(left.output)
-    val rightNullUnsafeRow = getNullUnsafeRow(right.output)
-    val joinedRowsWithKeysRdd = joinedRdd.mapPartitions { iter =>
-      val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
-      iter.flatMap { case (l, r) =>
-        val leftRow = if (l != null) getUnsafeRowFromUserData(l) else leftNullUnsafeRow
-        val rightRow = if (r != null) getUnsafeRowFromUserData(r) else rightNullUnsafeRow
-        val joinedRow = joiner.join(leftRow, rightRow)
-        val key = joinType match {
-          case LeftOuter => leftRow.hashCode()
-          case RightOuter => rightRow.hashCode()
-        }
-        Some((key, joinedRow))
+    val joinType = this.joinType
+
+    val joinedRowsWithKeysRdd = joinedRdd.map { case (left, right) =>
+      val (uniqueId, leftUnsafeRow, rightUnsafeRow, isOtherSideNull) = joinType match {
+        case LeftOuter =>
+          val leftOuterJoinUserData = left.getUserData.asInstanceOf[OuterJoinUserData]
+          val leftUnsafeRow = leftOuterJoinUserData.userData.asInstanceOf[UnsafeRow]
+          val rightUnsafeRow = if (right != null) {
+            right.getUserData.asInstanceOf[OuterJoinUserData].userData.asInstanceOf[UnsafeRow]
+          } else {
+            null
+          }
+          (leftOuterJoinUserData.uniqueId, leftUnsafeRow, rightUnsafeRow, rightUnsafeRow == null)
+        case RightOuter =>
+          val rightOuterJoinUserData = right.getUserData.asInstanceOf[OuterJoinUserData]
+          val rightUnsafeRow = rightOuterJoinUserData.userData.asInstanceOf[UnsafeRow]
+          val leftUnsafeRow = if (left != null) {
+            left.getUserData.asInstanceOf[OuterJoinUserData].userData.asInstanceOf[UnsafeRow]
+          } else {
+            null
+          }
+          (rightOuterJoinUserData.uniqueId, leftUnsafeRow, rightUnsafeRow, leftUnsafeRow == null)
       }
+
+      // Use a composite key to order records with null non-outer side last, so that we can
+      // remove redundant records with null non-outer side later by scanning the sorted records.
+      // If we've observed a non-null record for the outer side, we can skip all subsequent
+      // records with null non-outer side.
+      val key = (uniqueId << 1) | (if (isOtherSideNull) 1 else 0)
+      (key, (leftUnsafeRow, rightUnsafeRow))
     }
 
+    // Repartition and sort within partitions to group records with the same uniqueId together,
+    // while also making sure that records with null non-outer side come after records with non-null
+    // non-outer side.
+    val numParts = joinedRowsWithKeysRdd.getNumPartitions
+    val perPartitionSortedJoinedRowsRdd =
+      joinedRowsWithKeysRdd.repartitionAndSortWithinPartitions(new Partitioner() {
+        override def numPartitions: Int = numParts
+        override def getPartition(key: Any): Int = {
+          val uniqueId = key.asInstanceOf[Long] >> 1
+          uniqueId.hashCode() % numParts
+        }
+      })
+
     // Remove joined rows that are all null on the other side when there are non-null rows present.
-    // We have to colocate rows with the same outer-side together by doing a partitionBy.
-    val repartitionedJoinedRowsRdd =
-      joinedRowsWithKeysRdd.partitionBy(new HashPartitioner(joinedRdd.getNumPartitions)).map(_._2)
-    val perPartitionSortedJoinedRowsRdd = JoinedUnsafeRowRDDSorter.sortJoinedUnsafeRowRDD(
-      repartitionedJoinedRowsRdd,
-      joinType,
-      schema,
-      output,
-      left.output,
-      right.output)
+    val leftNullUnsafeRow = getNullUnsafeRow(left.output)
+    val rightNullUnsafeRow = getNullUnsafeRow(right.output)
+    val leftSchema = left.schema
+    val rightSchema = right.schema
     perPartitionSortedJoinedRowsRdd.mapPartitions { iter =>
-      val (outerProjection, otherProjection) =
-        JoinedUnsafeRowRDDSorter.createProjections(joinType, output, left.output, right.output)
-      var currentKeyRow: UnsafeRow = null
+      val joiner = GenerateUnsafeRowJoiner.create(leftSchema, rightSchema)
+      var currentUniqueId: Long = -1
       var seenNonNullRows = false
-      iter.flatMap { joinedRow =>
-        val keyRow = outerProjection(joinedRow)
-        val otherRow = otherProjection(joinedRow)
-        if (keyRow != currentKeyRow) {
-          currentKeyRow = keyRow.copy()
+
+      iter.flatMap { case (key, (leftUnsafeRow, rightUnsafeRow)) =>
+        val uniqueId = key >> 1
+        if (uniqueId != currentUniqueId) {
+          currentUniqueId = uniqueId
           seenNonNullRows = false
         }
-        if (JoinedUnsafeRowRDDSorter.isAllNull(otherRow)) {
+        val otherRowIsNull = joinType match {
+          case LeftOuter => rightUnsafeRow == null
+          case RightOuter => leftUnsafeRow == null
+        }
+        if (otherRowIsNull) {
+          val joinedRow = joiner.join(
+            if (leftUnsafeRow != null) leftUnsafeRow else leftNullUnsafeRow,
+            if (rightUnsafeRow != null) rightUnsafeRow else rightNullUnsafeRow)
           if (seenNonNullRows) None else Some(joinedRow)
         } else {
+          val joinedRow = joiner.join(leftUnsafeRow, rightUnsafeRow)
           seenNonNullRows = true
           Some(joinedRow)
         }

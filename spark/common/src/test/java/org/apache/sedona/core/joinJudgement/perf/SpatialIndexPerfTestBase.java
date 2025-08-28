@@ -63,7 +63,7 @@ public class SpatialIndexPerfTestBase extends ExternalIndexTestBase {
       double height = random.nextDouble() * objSize;
       Envelope env = new Envelope(minX, minX + width, minY, minY + height);
       Geometry geom = factory.toGeometry(env);
-      geom.setUserData(new OuterJoinUserData(k, true));
+      geom.setUserData(new OuterJoinUserData(k, true, k));
       geometries.add(geom);
     }
     return geometries;
@@ -79,7 +79,7 @@ public class SpatialIndexPerfTestBase extends ExternalIndexTestBase {
       double radius = 0.5 * objSize * random.nextDouble();
       Geometry geom =
           factory.createPoint(new Coordinate(centerX, centerY)).buffer(radius, segments / 4);
-      geom.setUserData(new OuterJoinUserData(k, true));
+      geom.setUserData(new OuterJoinUserData(k, true, k));
       geometries.add(geom);
     }
     return geometries;
@@ -92,7 +92,7 @@ public class SpatialIndexPerfTestBase extends ExternalIndexTestBase {
       double x = random.nextDouble() * 100;
       double y = random.nextDouble() * 100;
       Geometry geom = factory.createPoint(new Coordinate(x, y));
-      geom.setUserData(new OuterJoinUserData(k, true));
+      geom.setUserData(new OuterJoinUserData(k, true, k));
       geometries.add(geom);
     }
     return geometries;

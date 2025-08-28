@@ -29,6 +29,8 @@ import java.util.List;
 import org.apache.commons.collections.iterators.SingletonIterator;
 import org.apache.sedona.common.geometryObjects.NullGeometry;
 import org.apache.sedona.core.joinJudgement.DedupParams;
+import org.apache.sedona.core.utils.UniqueIDUtils;
+import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.sql.catalyst.expressions.UnsafeRow;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -75,10 +77,18 @@ public class OuterJoinSpatialPartitioner extends SpatialPartitioner {
       int hashCode = spatialObject.hashCode();
       int partitionId =
           (hashCode & Integer.MAX_VALUE) % numOutOfBoundPartitions + baseOutOfBoundPartitionId;
-      Geometry newSpatialObject = spatialObject.copy();
-      newSpatialObject.setUserData(new OuterJoinUserData(spatialObject.getUserData(), true));
-      return (Iterator<Tuple2<Integer, T>>)
-          new SingletonIterator(new Tuple2<>(partitionId, (T) newSpatialObject));
+      Object userData = spatialObject.getUserData();
+      if (userData instanceof OuterJoinUserData) {
+        Geometry newSpatialObject = spatialObject.copy();
+        OuterJoinUserData outerJoinUserData = (OuterJoinUserData) userData;
+        newSpatialObject.setUserData(
+            new OuterJoinUserData(outerJoinUserData.userData, true, outerJoinUserData.uniqueId));
+        return (Iterator<Tuple2<Integer, T>>)
+            new SingletonIterator(new Tuple2<>(partitionId, (T) newSpatialObject));
+      } else {
+        return (Iterator<Tuple2<Integer, T>>)
+            new SingletonIterator(new Tuple2<>(partitionId, spatialObject));
+      }
     } else {
       return Collections.emptyIterator();
     }
@@ -119,14 +129,16 @@ public class OuterJoinSpatialPartitioner extends SpatialPartitioner {
   public static class OuterJoinUserData implements KryoSerializable, Serializable {
     public Object userData;
     public boolean isPrimary;
+    public long uniqueId;
 
-    public OuterJoinUserData(Object userData, boolean isPrimary) {
+    public OuterJoinUserData(Object userData, boolean isPrimary, long uniqueId) {
       this.userData = userData;
       this.isPrimary = isPrimary;
+      this.uniqueId = uniqueId;
     }
 
     public OuterJoinUserData() {
-      this(null, false);
+      this(null, false, 0);
     }
 
     @Override
@@ -140,6 +152,7 @@ public class OuterJoinSpatialPartitioner extends SpatialPartitioner {
         kryo.writeClassAndObject(output, userData);
       }
       output.writeBoolean(isPrimary);
+      output.writeLong(uniqueId);
     }
 
     @Override
@@ -152,6 +165,7 @@ public class OuterJoinSpatialPartitioner extends SpatialPartitioner {
         userData = kryo.readClassAndObject(input);
       }
       isPrimary = input.readBoolean();
+      uniqueId = input.readLong();
     }
   }
 
@@ -179,11 +193,46 @@ public class OuterJoinSpatialPartitioner extends SpatialPartitioner {
     @Override
     public Tuple2<Integer, T> next() {
       Tuple2<Integer, T> next = iterator.next();
-      Geometry geom = next._2.copy();
+      T geom = next._2;
       Object userData = geom.getUserData();
-      geom.setUserData(new OuterJoinUserData(userData, isFirst));
-      isFirst = false;
-      return new Tuple2<>(next._1, (T) geom);
+      if (userData instanceof OuterJoinUserData) {
+        Geometry newGeom = next._2.copy();
+        OuterJoinUserData outerJoinUserData = (OuterJoinUserData) userData;
+        newGeom.setUserData(
+            new OuterJoinUserData(outerJoinUserData.userData, isFirst, outerJoinUserData.uniqueId));
+        isFirst = false;
+        return new Tuple2<>(next._1, (T) newGeom);
+      } else {
+        return next;
+      }
     }
+  }
+
+  /**
+   * Prepare a Geometry RDD for spatial partitioning with OuterJoinSpatialPartitioner. The userData
+   * of each geometry will be wrapped in an OuterJoinUserData object, with uniqueId set to a
+   * universally identify a record. This is useful when we remove the redundant pairs with null as
+   * the non-outer side produced by each partition during the local join.
+   *
+   * @param rdd the input Geometry RDD
+   * @return the prepared Geometry RDD
+   * @param <T> the type of Geometry
+   */
+  @SuppressWarnings("unchecked")
+  @Override
+  protected <T extends Geometry> JavaRDD<T> prepareRDDForPartitioning(JavaRDD<T> rdd) {
+    JavaRDD<Tuple2<Long, T>> rddWithId = UniqueIDUtils.attachId(rdd);
+    return rddWithId.map(
+        (tuple) -> {
+          long uniqueId = tuple._1;
+          T geom = tuple._2;
+          if (geom.getUserData() instanceof OuterJoinUserData) {
+            return geom;
+          } else {
+            Geometry newGeom = geom.copy();
+            newGeom.setUserData(new OuterJoinUserData(geom.getUserData(), false, uniqueId));
+            return (T) newGeom;
+          }
+        });
   }
 }
