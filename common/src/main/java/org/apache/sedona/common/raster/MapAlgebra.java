@@ -18,6 +18,8 @@
  */
 package org.apache.sedona.common.raster;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import com.sun.media.imageioimpl.common.BogusColorSpace;
 import it.geosolutions.jaiext.jiffle.JiffleBuilder;
 import it.geosolutions.jaiext.jiffle.runtime.JiffleDirectRuntime;
@@ -119,8 +121,9 @@ public class MapAlgebra {
     return addBandFromArray(rasterGeom, bandValues, rasterGeom.getNumSampleDimensions() + 1);
   }
 
-  private static final ThreadLocal<String> previousScript = new ThreadLocal<>();
-  private static final ThreadLocal<JiffleDirectRuntime> previousRuntime = new ThreadLocal<>();
+  private static final ThreadLocal<Cache<String, JiffleDirectRuntime>>
+      threadLocalJiffleRuntimeCache =
+          ThreadLocal.withInitial(() -> Caffeine.newBuilder().maximumSize(10).build());
 
   /**
    * Applies a map algebra script to the given raster.
@@ -159,12 +162,9 @@ public class MapAlgebra {
     ColorModel cm = fetchColorModel(renderedImage.getColorModel(), resultRaster);
     WritableRenderedImage resultImage = new BufferedImage(cm, resultRaster, false, null);
     try {
-      String prevScript = previousScript.get();
-      JiffleDirectRuntime prevRuntime = previousRuntime.get();
-      JiffleDirectRuntime runtime;
-      if (prevRuntime != null && script.equals(prevScript)) {
-        // Reuse the runtime to avoid recompiling the script
-        runtime = prevRuntime;
+      Cache<String, JiffleDirectRuntime> jiffleRuntimeCache = threadLocalJiffleRuntimeCache.get();
+      JiffleDirectRuntime runtime = jiffleRuntimeCache.getIfPresent(script);
+      if (runtime != null) {
         runtime.setSourceImage("rast", renderedImage);
         runtime.setDestinationImage("out", resultImage);
         runtime.setDefaultBounds();
@@ -176,8 +176,7 @@ public class MapAlgebra {
                 .source("rast", renderedImage)
                 .dest("out", resultImage)
                 .getRuntime();
-        previousScript.set(script);
-        previousRuntime.set(runtime);
+        jiffleRuntimeCache.put(script, runtime);
       }
 
       runtime.evaluateAll(null);
@@ -263,12 +262,10 @@ public class MapAlgebra {
 
     WritableRenderedImage resultImage = new BufferedImage(cmRast0, resultRaster, false, null);
     try {
-      String prevScript = previousScript.get();
-      JiffleDirectRuntime prevRuntime = previousRuntime.get();
-      JiffleDirectRuntime runtime;
-      if (prevRuntime != null && script.equals(prevScript)) {
-        // Reuse the runtime to avoid recompiling the script
-        runtime = prevRuntime;
+      Cache<String, JiffleDirectRuntime> jiffleRuntimeCache = threadLocalJiffleRuntimeCache.get();
+      JiffleDirectRuntime runtime = jiffleRuntimeCache.getIfPresent(script);
+      if (runtime != null) {
+        // Reuse the cached runtime to avoid recompiling the script
         runtime.setSourceImage("rast0", renderedImageRast0);
         runtime.setSourceImage("rast1", renderedImageRast1);
         runtime.setDestinationImage("out", resultImage);
@@ -282,8 +279,7 @@ public class MapAlgebra {
                 .source("rast1", renderedImageRast1)
                 .dest("out", resultImage)
                 .getRuntime();
-        previousScript.set(script);
-        previousRuntime.set(runtime);
+        jiffleRuntimeCache.put(script, runtime);
       }
 
       runtime.evaluateAll(null);
