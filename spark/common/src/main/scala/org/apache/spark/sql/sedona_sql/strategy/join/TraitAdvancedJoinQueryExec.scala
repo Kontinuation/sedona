@@ -1115,7 +1115,8 @@ trait TraitAdvancedJoinQueryExec extends TraitJoinQueryExec {
       ExecutorResourceUtils.getTargetPartitionCount(
         sparkContext,
         sedonaConf.getStreamSideIdealPartitionSize,
-        stats.getCount.toInt)
+        stats.getCount.toInt,
+        partitionSizes.length)
     val underpartitioningScore = stats.getPerPartitionStats.size / targetPartitionCount.toDouble
     val underpartitioningThreshold = sedonaConf.getStreamSideUnderPartitioningThreshold
 

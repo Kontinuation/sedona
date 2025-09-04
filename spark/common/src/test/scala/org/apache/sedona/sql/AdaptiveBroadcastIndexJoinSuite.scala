@@ -62,11 +62,13 @@ class AdaptiveBroadcastIndexJoinSuite extends TestBaseScala {
       verifyQuery(
         "SELECT df1.id, df2.id FROM df1 JOIN df2 ON ST_Intersects(df1.geom, df2.geom)",
         None,
-        Some(partitionSize))
+        Some(partitionSize),
+        Some(df2PartitionSizes.length))
       verifyQuery(
         "SELECT df2.id, df1.id FROM df2 JOIN df1 ON ST_Intersects(df2.geom, df1.geom)",
         None,
-        Some(partitionSize))
+        Some(partitionSize),
+        Some(df2PartitionSizes.length))
     }
   }
 
@@ -106,7 +108,8 @@ class AdaptiveBroadcastIndexJoinSuite extends TestBaseScala {
   private def verifyQuery(
       query: String,
       expectedPartitionSizes: Option[Seq[Long]] = None,
-      expectedPartitionCount: Option[Long] = None): Unit = {
+      expectedPartitionCount: Option[Long] = None,
+      originalNumPartitions: Option[Int] = None): Unit = {
     val result = sparkSession.sql(query)
     val expected = withConf(Map("sedona.join.optimizationmode" -> "none")) {
       sparkSession.sql(query)
@@ -134,7 +137,8 @@ class AdaptiveBroadcastIndexJoinSuite extends TestBaseScala {
         ExecutorResourceUtils.getTargetPartitionCount(
           sparkSession.sparkContext,
           10000,
-          expectedPartitionCount.get) == result.rdd.getNumPartitions)
+          expectedPartitionCount.get,
+          originalNumPartitions.get) == result.rdd.getNumPartitions)
     }
   }
 }

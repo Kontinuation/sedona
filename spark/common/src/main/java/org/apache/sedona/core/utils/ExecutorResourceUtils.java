@@ -54,10 +54,18 @@ public class ExecutorResourceUtils {
   }
 
   public static int getTargetPartitionCount(
-      SparkContext context, long idealRecordsPerPartition, long numberRows) {
-    return (int)
-        Math.min(
-            Math.max(1, numberRows / idealRecordsPerPartition),
-            4L * ExecutorResourceUtils.inferParallelism(context));
+      SparkContext context,
+      long idealRecordsPerPartition,
+      long numberRows,
+      int originalNumPartitions) {
+    int targetParallelism =
+        (int)
+            Math.min(
+                Math.max(1, numberRows / idealRecordsPerPartition),
+                4L * ExecutorResourceUtils.inferParallelism(context));
+    // We'd better get rid of shrinking the number of partitions. The size of each record could be
+    // super large (especially when processing raster data), shrinking the number of partitions
+    // may result in poor performance or even OOM.
+    return Math.max(targetParallelism, originalNumPartitions);
   }
 }
