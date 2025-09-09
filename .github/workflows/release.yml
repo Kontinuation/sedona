@@ -97,7 +97,7 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '11'
+          java-version: '17'
           distribution: 'zulu'
       - name: Cache Maven packages
         uses: actions/cache@v4
@@ -114,6 +114,7 @@ jobs:
           find . -name pom.xml -execdir sh -c 'echo "$(mvn help:evaluate -Dexpression=project.artifactId -Dscala=2.13 -Dspark=3.3 -q -DforceStdout)"' \; > artifact-list.txt
           find . -name pom.xml -execdir sh -c 'echo "$(mvn help:evaluate -Dexpression=project.artifactId -Dscala=2.13 -Dspark=3.4 -q -DforceStdout)"' \; >> artifact-list.txt
           find . -name pom.xml -execdir sh -c 'echo "$(mvn help:evaluate -Dexpression=project.artifactId -Dscala=2.13 -Dspark=3.5 -q -DforceStdout)"' \; >> artifact-list.txt
+          find . -name pom.xml -execdir sh -c 'echo "$(mvn help:evaluate -Dexpression=project.artifactId -Dscala=2.13 -Dspark=4.0 -q -DforceStdout)"' \; >> artifact-list.txt
           sort artifact-list.txt | uniq | sed "s/^/${GROUP_ID}./" > package-list.txt
           echo "Packages to be deleted:"
           cat package-list.txt
@@ -132,8 +133,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GH_PKG_WRITE_TOKEN }}
         run: |
           mkdir -p artifacts/jars
+          # Build and deploy for Spark 3.5
           mvn --batch-mode clean deploy -DskipTests -Dscala=2.13 -Dspark=3.5
-          cp spark-shaded/target/sedona-*.jar artifacts/jars
+          cp spark-shaded/target/sedona-*.jar artifacts/jars/
+          # Build and deploy for Spark 4.0
+          mvn --batch-mode clean deploy -DskipTests -Dscala=2.13 -Dspark=4.0
+          cp spark-shaded/target/sedona-*.jar artifacts/jars/
       - uses: actions/upload-artifact@v4
         with:
           name: jars
