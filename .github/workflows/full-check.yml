@@ -44,26 +44,18 @@ jobs:
             skipTests: ''
           - spark: 3.5.0
             scala: 2.13.8
-            jdk: '8'
-            skipTests: ''
-          - spark: 3.5.0
-            scala: 2.12.15
-            jdk: '8'
+            jdk: '11'
             skipTests: ''
           - spark: 3.5.0
             scala: 2.12.15
             jdk: '11'
             skipTests: ''
           - spark: 3.4.0
+            scala: 2.12.15
+            jdk: '11'
+            skipTests: ''
+          - spark: 3.4.0
             scala: 2.13.8
-            jdk: '8'
-            skipTests: ''
-          - spark: 3.4.0
-            scala: 2.12.15
-            jdk: '8'
-            skipTests: ''
-          - spark: 3.4.0
-            scala: 2.12.15
             jdk: '11'
             skipTests: ''
     steps:
@@ -148,7 +140,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
-          java-version: ${{ matrix.spark == '4.0.0' && '17' || '8' }}
+          java-version: ${{ matrix.spark == '4.0.0' && '17' || '11' }}
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}

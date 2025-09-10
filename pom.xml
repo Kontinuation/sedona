@@ -808,7 +808,6 @@
                 <scala.version>2.13.12</scala.version>
                 <scala.compat.version>2.13</scala.compat.version>
                 <scaladoc.arg>-no-java-comments</scaladoc.arg>
-                <skip.deploy.common.modules>false</skip.deploy.common.modules>
             </properties>
             <modules>
                 <module>common</module>
