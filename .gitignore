@@ -44,3 +44,14 @@ wherobots-notebook/*
 wherobots-spark
 wherobots-spark/*
 deploy-dockers-to-aws.sh
+
+# Windows WSL Images copy
+.Identifier
+*:Zone.Identifier
+*.Identifier
+
+# Ignore minified files and source maps
+*.min.css
+*.min.css.map
+*.min.js
+*.min.js.map
