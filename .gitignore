@@ -55,3 +55,6 @@ deploy-dockers-to-aws.sh
 *.min.css.map
 *.min.js
 *.min.js.map
+
+# Ignore node_modules in docs-overrides
+docs-overrides/node_modules/
