@@ -51,6 +51,8 @@ import org.apache.spark.sedona.core.index.dataformat.GeometryDataItem;
 import org.apache.spark.sedona.core.index.dataformat.GeometryDataItemFormat;
 import org.apache.spark.storage.BlockManager;
 import org.locationtech.jts.geom.Geometry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The actual heavy lifting of the local spatial join is done by this iterator. It spills data to
@@ -62,6 +64,7 @@ import org.locationtech.jts.geom.Geometry;
 public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
     implements Iterator<Pair<U, T>>, AutoCloseable {
 
+  private static final Logger log = LoggerFactory.getLogger(ExternalSpatialJoinIterator.class);
   private final LocalJoinType localJoinType;
   private Iterator<T> streamIterator;
   private final SpatialPredicateEvaluator spatialPredicateEvaluator;
@@ -71,7 +74,7 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
   private Iterator<DataObjectWithId<GeometryDataItem>> queryResultIterator;
   private T currentStreamGeometry;
   private boolean populatedIndexOuterBatch = false;
-  private boolean isStreamSideSorted = false;
+  private boolean triedSortingStreamSide = false;
 
   // For testing purposes
   private boolean validateEqualityInExternalSort = false;
@@ -267,19 +270,27 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
         // If the external spatial index is spilled, we'll sort the stream side to improve
         // the locality of the query windows, thus improve the I/O efficiency and cache hit rate
         // of the index.
-        if (!isStreamSideSorted && externalSpatialIndex.hasSpilled()) {
-          try {
-            streamIterator =
-                SortedGeometryIterator.sortGeometryIterator(
-                    streamIterator,
-                    sparkEnv,
-                    taskContext,
-                    externalSpatialIndex,
-                    validateEqualityInExternalSort);
-            isStreamSideSorted = true;
-          } catch (IOException e) {
-            throw new RuntimeException(e);
+        if (!triedSortingStreamSide && externalSpatialIndex.hasSpilled()) {
+          if (SortedGeometryIterator.hasEnoughMemoryForSorting(
+              externalSpatialIndex.getSpatialIndex())) {
+            try {
+              streamIterator =
+                  SortedGeometryIterator.sortGeometryIterator(
+                      streamIterator,
+                      sparkEnv,
+                      taskContext,
+                      externalSpatialIndex,
+                      validateEqualityInExternalSort);
+            } catch (IOException e) {
+              throw new RuntimeException(e);
+            }
+          } else {
+            log.warn(
+                "Failed to sort the stream side geometries, will fallback to run external spatial join with unsorted probe side");
           }
+
+          // No matter if sorting the stream side succeeds or fails, we won't try it again.
+          triedSortingStreamSide = true;
         }
 
         currentStreamGeometry = streamIterator.next();
@@ -351,5 +362,8 @@ public class ExternalSpatialJoinIterator<U extends Geometry, T extends Geometry>
   @Override
   public void close() {
     externalSpatialIndex.close();
+    if (streamIterator instanceof SortedGeometryIterator) {
+      ((SortedGeometryIterator<T>) streamIterator).cleanUpResources();
+    }
   }
 }

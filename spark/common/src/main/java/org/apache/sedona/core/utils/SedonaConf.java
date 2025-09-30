@@ -369,7 +369,7 @@ public class SedonaConf implements Serializable {
     this.perPartitionShuffleWriteSizeThreshold =
         bytesFromString(
             confGetter.get(
-                "spark.sedona.join.subdividePerPartitionShuffleWriteSizeThreshold", "20gb"));
+                "spark.sedona.join.subdividePerPartitionShuffleWriteSizeThreshold", "100gb"));
     this.subdivideNumPointsThreshold =
         Integer.parseInt(confGetter.get("spark.sedona.join.subdivideNumPointsThreshold", "100"));
     this.subdivideCollisionFactorThreshold =

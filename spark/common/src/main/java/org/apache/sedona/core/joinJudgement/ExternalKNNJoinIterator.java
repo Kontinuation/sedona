@@ -46,9 +46,12 @@ import org.apache.spark.util.LongAccumulator;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.index.strtree.ItemDistance;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ExternalKNNJoinIterator<T extends Geometry, U extends Geometry>
     implements Iterator<Pair<T, U>>, AutoCloseable {
+  private static final Logger log = LoggerFactory.getLogger(ExternalKNNJoinIterator.class);
   private Iterator<T> querySideIterator;
   private final ExternalSpatialIndexWithRefinement<GeometryDataItem> externalSpatialIndex;
 
@@ -67,7 +70,7 @@ public class ExternalKNNJoinIterator<T extends Geometry, U extends Geometry>
   private final TaskContext taskContext;
   private final SparkEnv sparkEnv;
 
-  private boolean isQuerySideSorted = false;
+  private boolean triedSortingQuerySide = false;
 
   public ExternalKNNJoinIterator(
       Iterator<T> querySideIterator,
@@ -197,18 +200,27 @@ public class ExternalKNNJoinIterator<T extends Geometry, U extends Geometry>
     // If the external spatial index is spilled, we'll sort the query side to improve
     // the locality of the query windows, thus improve the I/O efficiency and cache hit rate
     // of the index.
-    if (!isQuerySideSorted && externalSpatialIndex.hasSpilled()) {
-      try {
-        querySideIterator =
-            SortedGeometryIterator.sortGeometryIterator(
-                querySideIterator, sparkEnv, taskContext, externalSpatialIndex, false);
-        isQuerySideSorted = true;
-      } catch (IOException e) {
-        throw new RuntimeException(e);
+    if (!triedSortingQuerySide && externalSpatialIndex.hasSpilled()) {
+      if (SortedGeometryIterator.hasEnoughMemoryForSorting(
+          externalSpatialIndex.getSpatialIndex())) {
+        try {
+          querySideIterator =
+              SortedGeometryIterator.sortGeometryIterator(
+                  querySideIterator, sparkEnv, taskContext, externalSpatialIndex, false);
+        } catch (IOException e) {
+          throw new RuntimeException(e);
+        }
+      } else {
+        log.warn(
+            "Failed to sort the query side geometries, will fallback to run external KNN join with unsorted query side");
       }
+
+      // No matter if sorting the query side succeeds or fails, we won't try it again.
+      triedSortingQuerySide = true;
     }
 
     T queryItem = querySideIterator.next();
+
     Geometry queryGeom;
     if (queryItem instanceof UniqueGeometry) {
       queryGeom = (Geometry) ((UniqueGeometry<?>) queryItem).getOriginalGeometry();
@@ -284,6 +296,9 @@ public class ExternalKNNJoinIterator<T extends Geometry, U extends Geometry>
   @Override
   public void close() {
     externalSpatialIndex.close();
+    if (querySideIterator instanceof SortedGeometryIterator) {
+      ((SortedGeometryIterator<T>) querySideIterator).cleanUpResources();
+    }
   }
 
   /** For testing purposes */

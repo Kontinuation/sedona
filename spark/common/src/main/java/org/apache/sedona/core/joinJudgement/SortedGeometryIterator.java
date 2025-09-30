@@ -22,12 +22,14 @@ import java.io.IOException;
 import java.util.Iterator;
 import org.apache.spark.SparkEnv;
 import org.apache.spark.TaskContext;
+import org.apache.spark.memory.MemoryConsumer;
 import org.apache.spark.memory.TaskMemoryManager;
 import org.apache.spark.sedona.core.index.ExternalSpatialIndexWithRefinement;
 import org.apache.spark.sedona.core.index.dataformat.GeometryDataItem;
 import org.apache.spark.sedona.core.index.dataformat.GeometryDataItemFormat;
 import org.apache.spark.storage.BlockManager;
 import org.apache.spark.unsafe.Platform;
+import org.apache.spark.unsafe.array.LongArray;
 import org.apache.spark.util.collection.unsafe.sort.PrefixComparators;
 import org.apache.spark.util.collection.unsafe.sort.RecordComparator;
 import org.apache.spark.util.collection.unsafe.sort.UnsafeExternalSorter;
@@ -53,12 +55,18 @@ public class SortedGeometryIterator<T> implements Iterator<T> {
     this.format = format;
   }
 
+  public void cleanUpResources() {
+    if (sorter != null) {
+      sorter.cleanupResources();
+      sorter = null;
+    }
+  }
+
   @Override
   public boolean hasNext() {
     boolean hasNext = unsafeSorterIterator.hasNext();
-    if (!hasNext && sorter != null) {
-      sorter.cleanupResources();
-      sorter = null;
+    if (!hasNext) {
+      cleanUpResources();
     }
     return hasNext;
   }
@@ -95,7 +103,7 @@ public class SortedGeometryIterator<T> implements Iterator<T> {
    * @param <T> the type of the geometries
    * @throws IOException if an I/O error occurs
    */
-  public static <T extends Geometry> Iterator<T> sortGeometryIterator(
+  public static <T extends Geometry> SortedGeometryIterator<T> sortGeometryIterator(
       Iterator<T> iterator,
       SparkEnv sparkEnv,
       TaskContext taskContext,
@@ -155,6 +163,25 @@ public class SortedGeometryIterator<T> implements Iterator<T> {
     // geometries in
     // the iterator should be the same as the initial iterator before sorting.
     return new SortedGeometryIterator<>(sorter, format, bufferLength);
+  }
+
+  private static final long MIN_MEMORY_REQUIRED_FOR_SORTING = 100 * 1024 * 1024; // 100MB
+
+  /**
+   * Check if there is enough memory for sorting. This is a best-effort check, the sorting may still
+   * fail even though this test passes.
+   *
+   * @param consumer the memory consumer
+   * @return true if there is enough memory for sorting, false otherwise
+   */
+  public static boolean hasEnoughMemoryForSorting(MemoryConsumer consumer) {
+    try {
+      LongArray allocated = consumer.allocateArray(MIN_MEMORY_REQUIRED_FOR_SORTING);
+      consumer.freeArray(allocated);
+      return true;
+    } catch (OutOfMemoryError e) {
+      return false;
+    }
   }
 
   private static class FirstLeafPageVisitor implements ItemVisitor {
