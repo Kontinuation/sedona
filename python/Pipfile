@@ -46,4 +46,4 @@ scipy = "<=1.10.0" # prevent incompatibility with pysal 4.7.0, which is what is 
 typing-extensions = "*"
 
 [requires]
-python_version = "3.7"
+python_version = "3.8"
