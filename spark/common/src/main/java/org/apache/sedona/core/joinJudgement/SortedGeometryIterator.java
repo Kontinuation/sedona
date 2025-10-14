@@ -176,7 +176,7 @@ public class SortedGeometryIterator<T> implements Iterator<T> {
    */
   public static boolean hasEnoughMemoryForSorting(MemoryConsumer consumer) {
     try {
-      LongArray allocated = consumer.allocateArray(MIN_MEMORY_REQUIRED_FOR_SORTING);
+      LongArray allocated = consumer.allocateArray(MIN_MEMORY_REQUIRED_FOR_SORTING / 8);
       consumer.freeArray(allocated);
       return true;
     } catch (OutOfMemoryError e) {
