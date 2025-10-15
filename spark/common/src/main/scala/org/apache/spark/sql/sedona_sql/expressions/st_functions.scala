@@ -1052,4 +1052,13 @@ object st_functions {
 
   def ST_XZ2(geometry: Column, precision: Column): Column =
     wrapExpression[ST_XZ2](geometry, precision)
+
+  def barrier(expression: Column, args: Column*): Column = {
+    val allArgs = expression +: args
+    wrapExpression[Barrier](allArgs: _*)
+  }
+  def barrier(expression: String, args: Any*): Column = {
+    val allArgs = expression +: args
+    wrapExpression[Barrier](allArgs: _*)
+  }
 }

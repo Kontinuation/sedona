@@ -1245,6 +1245,20 @@ class JoinQueryDetector(sparkSession: SparkSession) extends SparkStrategy {
   }
 
   /**
+   * Check if the object side plan has filter pushdown and log a warning if it does.
+   * @param plan
+   *   logical plan for the object side
+   */
+  private def checkObjectPlanFilterPushdown(plan: LogicalPlan): Unit = {
+    if (containPlanFilterPushdown(plan)) {
+      logWarning(
+        "Filter pushdown detected on the object side of a KNN join. " +
+          "This may cause the KNN join to return incorrect results. " +
+          "Consider materializing the object side before the join to prevent filter pushdown.")
+    }
+  }
+
+  /**
    * Check if the given logic plan has a filter that can be pushed down to the data source.
    * @param plan
    * @return
@@ -1268,37 +1282,6 @@ class JoinQueryDetector(sparkSession: SparkSession) extends SparkStrategy {
 
       // Default case to check other children
       case other => other.children.exists(containPlanFilterPushdown)
-    }
-  }
-
-  /**
-   * Check if the given plan has a filter that can be pushed down to the object side of the KNN
-   * join. Print a warning if a filter pushdown is detected.
-   * @param objectSidePlan
-   */
-  private def checkObjectPlanFilterPushdown(objectSidePlan: LogicalPlan): Unit = {
-    if (containPlanFilterPushdown(objectSidePlan)) {
-      val warnings = Seq(
-        "Warning: One or more filter pushdowns have been detected on the object side of the KNN join. \n" +
-          "These filters will be applied to the object side reader before the KNN join is executed. \n" +
-          "If you intend to apply the filters after the KNN join, please ensure that you materialize the KNN join results before applying the filters. \n" +
-          "For example, you can use the following approach:\n\n" +
-
-          // Scala Example
-          "Scala Example:\n" +
-          "val knnResult = knnJoinDF.cache()\n" +
-          "val filteredResult = knnResult.filter(condition)\n\n" +
-
-          // SQL Example
-          "SQL Example:\n" +
-          "CREATE OR REPLACE TEMP VIEW knnResult AS\n" +
-          "SELECT * FROM (\n" +
-          "  -- Your KNN join SQL here\n" +
-          ") AS knnView\n" +
-          "CACHE TABLE knnResult;\n" +
-          "SELECT * FROM knnResult WHERE condition;")
-      logWarning(warnings.mkString("\n"))
-      println(warnings.mkString("\n"))
     }
   }
 }
