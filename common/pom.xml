@@ -74,7 +74,7 @@
             <artifactId>gt-process-feature</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.wherobots.sis.core</groupId>
+            <groupId>org.apache.sis.core</groupId>
             <artifactId>sis-referencing</artifactId>
         </dependency>
         <dependency>

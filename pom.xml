@@ -90,7 +90,7 @@
         <scala-collection-compat.version>2.5.0</scala-collection-compat.version>
         <geoglib.version>1.52</geoglib.version>
         <caffeine.version>2.9.2</caffeine.version>
-        <sis.version>1.4.1</sis.version>
+        <sis.version>1.5</sis.version>
 
         <geotools.scope>provided</geotools.scope>
         <!-- Because it's not in Maven central, make it provided by default -->
@@ -284,14 +284,14 @@
             <!-- for CRS high precision CRS transform -->
             <dependency>
                 <!-- using internal package while waiting on 1.5 -->
-                <groupId>com.wherobots.sis.core</groupId>
+                <groupId>org.apache.sis.core</groupId>
                 <artifactId>sis-referencing</artifactId>
                 <version>${sis.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.sis.non-free</groupId>
                 <artifactId>sis-epsg</artifactId>
-                <version>1.4</version>
+                <version>${sis.version}</version>
                 <scope>runtime</scope>
             </dependency>
             <dependency>
