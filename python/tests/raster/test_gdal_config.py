@@ -137,6 +137,8 @@ class TestGdalConfig:
 
         old_boto3 = gdal_conf.boto3
         try:
+            gdal_conf._sts_client = None
+            gdal_conf._sts_client_default_profile = None
             gdal_conf.boto3 = MockBoto3()
 
             config = gdal_conf.get_gdal_conf_for_s3_bucket("pub-bucket")
@@ -166,3 +168,168 @@ class TestGdalConfig:
             assert session.credentials["aws_session_token"] == "test_temp_token_2"
         finally:
             gdal_conf.boto3 = old_boto3
+
+    def test_wherobots_stint_role(self, monkeypatch):
+        # Configure buckets with WherobotsStIntCredentialsProvider and ensure credentials are injected
+        spark_conf = {
+            # Bucket that authenticates using default profile
+            "spark.hadoop.fs.s3a.bucket.stint-bucket.aws.credentials.provider": "com.wherobots.fs.s3a.WherobotsStIntCredentialsProvider",
+            "spark.hadoop.fs.s3a.bucket.stint-bucket.assumed.role.arn": "arn:aws:iam::123456789012:role/test-stint-role",
+            "spark.hadoop.fs.s3a.bucket.stint-bucket.assumed.role.session.name": "stint-session",
+            "spark.hadoop.fs.s3a.bucket.stint-bucket.assumed.role.external.id": "external-123",
+            # Bucket that authenticates using the fallback standard chain (usually web identity token in WBC)
+            "spark.hadoop.fs.s3a.bucket.stint-fallback-bucket.aws.credentials.provider": "com.wherobots.fs.s3a.WherobotsStIntCredentialsProvider",
+            "spark.hadoop.fs.s3a.bucket.stint-fallback-bucket.assumed.role.arn": "arn:aws:iam::123456789012:role/test-stint-fallback-role",
+            "spark.hadoop.fs.s3a.bucket.stint-fallback-bucket.assumed.role.session.name": "stint-session",
+            "spark.hadoop.fs.s3a.bucket.stint-fallback-bucket.assumed.role.external.id": "external-123",
+        }
+        gdal_conf._set_spark_conf_in_test(spark_conf)
+
+        class MockBoto3:
+            def client(self, *args, **kwargs):
+                return MockStsClient()
+
+        class MockBoto3SessionModule:
+            class SessionClass:
+                def client(self, *args, **kwargs):
+                    return MockStsSessionClient()
+
+            @staticmethod
+            def Session(*args, **kwargs):
+                return MockBoto3SessionModule.SessionClass()
+
+        class MockStsSessionClient:
+            def __init__(self):
+                self.count = 0
+
+            def assume_role(self, *args, **kwargs):
+                if "test-stint-role" in kwargs["RoleArn"]:
+                    self.count += 1
+                    return {
+                        "Credentials": {
+                            "AccessKeyId": f"test_stint_access_key_{self.count}",
+                            "SecretAccessKey": f"test_stint_secret_key_{self.count}",
+                            "SessionToken": f"test_stint_token_{self.count}",
+                            "Expiration": datetime.now() + timedelta(hours=1),
+                        }
+                    }
+                else:
+                    raise RuntimeError("Simulated failure for fallback role")
+
+        class MockStsClient:
+            def __init__(self):
+                self.count = 0
+
+            def assume_role(self, *args, **kwargs):
+                self.count += 1
+                return {
+                    "Credentials": {
+                        "AccessKeyId": f"test_stint_fallback_access_key_{self.count}",
+                        "SecretAccessKey": f"test_stint_fallback_secret_key_{self.count}",
+                        "SessionToken": f"test_stint_fallback_token_{self.count}",
+                        "Expiration": datetime.now() + timedelta(hours=1),
+                    }
+                }
+
+        old_boto3 = gdal_conf.boto3
+        old_boto3_session = gdal_conf.boto3_session
+        try:
+            gdal_conf._sts_client = None
+            gdal_conf._sts_client_default_profile = None
+            gdal_conf.boto3 = MockBoto3()
+            gdal_conf.boto3_session = MockBoto3SessionModule()
+
+            config = gdal_conf.get_gdal_conf_for_s3_bucket("stint-bucket")
+            assert config["AWS_NO_SIGN_REQUEST"] == "NO"
+            assert config["AWS_ACCESS_KEY_ID"] == "test_stint_access_key_1"
+            assert config["AWS_SECRET_ACCESS_KEY"] == "test_stint_secret_key_1"
+            assert config["AWS_SESSION_TOKEN"] == "test_stint_token_1"
+
+            session = gdal_conf.get_rasterio_aws_session("s3://stint-bucket/test/path")
+            assert session.credentials["aws_access_key_id"] == "test_stint_access_key_1"
+            assert (
+                session.credentials["aws_secret_access_key"]
+                == "test_stint_secret_key_1"
+            )
+            assert session.credentials["aws_session_token"] == "test_stint_token_1"
+
+            config = gdal_conf.get_gdal_conf_for_s3_bucket("stint-fallback-bucket")
+            assert config["AWS_NO_SIGN_REQUEST"] == "NO"
+            assert config["AWS_ACCESS_KEY_ID"] == "test_stint_fallback_access_key_1"
+            assert config["AWS_SECRET_ACCESS_KEY"] == "test_stint_fallback_secret_key_1"
+            assert config["AWS_SESSION_TOKEN"] == "test_stint_fallback_token_1"
+
+            session = gdal_conf.get_rasterio_aws_session(
+                "s3://stint-fallback-bucket/test/path"
+            )
+            assert (
+                session.credentials["aws_access_key_id"]
+                == "test_stint_fallback_access_key_1"
+            )
+            assert (
+                session.credentials["aws_secret_access_key"]
+                == "test_stint_fallback_secret_key_1"
+            )
+            assert (
+                session.credentials["aws_session_token"]
+                == "test_stint_fallback_token_1"
+            )
+        finally:
+            gdal_conf.boto3 = old_boto3
+            gdal_conf.boto3_session = old_boto3_session
+
+    def test_wherobots_default_profile(self, monkeypatch):
+        gdal_conf._set_spark_conf_in_test(
+            {
+                "spark.hadoop.fs.s3a.bucket.test-default-profile-bucket.aws.credentials.provider": "com.wherobots.fs.s3a.WherobotsProfileCredentialsProvider",
+            }
+        )
+
+        class MockCredential:
+            def __init__(self):
+                self.access_key = "test_default_profile_access_key"  # nosec: B015
+                self.secret_key = "test_default_profile_secret_key"  # nosec: B015
+                self.token = "test_default_profile_token"  # nosec: B015
+
+            def get_frozen_credentials(self):
+                return self
+
+        class MockBoto3SessionModule:
+            class SessionClass:
+                def get_credentials(self, *args, **kwargs):
+                    return MockCredential()
+
+            @staticmethod
+            def Session(*args, **kwargs):
+                return MockBoto3SessionModule.SessionClass()
+
+        old_boto3_session = gdal_conf.boto3_session
+        try:
+            gdal_conf._sts_client = None
+            gdal_conf._sts_client_default_profile = None
+            gdal_conf.boto3_session = MockBoto3SessionModule()
+
+            config = gdal_conf.get_gdal_conf_for_s3_bucket(
+                "test-default-profile-bucket"
+            )
+            assert config["AWS_NO_SIGN_REQUEST"] == "NO"
+            assert config["AWS_ACCESS_KEY_ID"] == "test_default_profile_access_key"
+            assert config["AWS_SECRET_ACCESS_KEY"] == "test_default_profile_secret_key"
+            assert config["AWS_SESSION_TOKEN"] == "test_default_profile_token"
+
+            session = gdal_conf.get_rasterio_aws_session(
+                "s3://test-default-profile-bucket/test/path"
+            )
+            assert (
+                session.credentials["aws_access_key_id"]
+                == "test_default_profile_access_key"
+            )
+            assert (
+                session.credentials["aws_secret_access_key"]
+                == "test_default_profile_secret_key"
+            )
+            assert (
+                session.credentials["aws_session_token"] == "test_default_profile_token"
+            )
+        finally:
+            gdal_conf.boto3_session = old_boto3_session

@@ -25,8 +25,10 @@ from rasterio.session import AWSSession  # type: ignore
 
 try:
     import boto3  # type: ignore
+    from boto3 import session as boto3_session  # type: ignore
 except ImportError:
     boto3 = None
+    boto3_session = None
 
 # The spark config inferred from SparkContext on driver or TaskContext on executor
 _spark_conf: Optional[Dict[str, str]] = None
@@ -58,13 +60,26 @@ def get_gdal_conf_for_s3_bucket(bucket_name: str) -> Dict[str, str]:
         gdal_conf = _per_bucket_gdal_conf[bucket_name]
     else:
         gdal_conf = _base_gdal_conf
-    if "__assumed_role_arn__" in gdal_conf:
+    if "__stint_role_cfg__" in gdal_conf:
+        role_cfg = gdal_conf["__stint_role_cfg__"].copy()
+        cred = _get_session_credentials_for_stint_role(role_cfg)
+        gdal_conf["AWS_ACCESS_KEY_ID"] = cred.access_key
+        gdal_conf["AWS_SECRET_ACCESS_KEY"] = cred.secret_key
+        gdal_conf["AWS_SESSION_TOKEN"] = cred.token
+        del gdal_conf["__stint_role_cfg__"]
+    elif "__assumed_role_arn__" in gdal_conf:
         role_arn, session_name = gdal_conf["__assumed_role_arn__"]
         cred = _get_session_credentials_for_assumed_role(role_arn, session_name)
         gdal_conf["AWS_ACCESS_KEY_ID"] = cred.access_key
         gdal_conf["AWS_SECRET_ACCESS_KEY"] = cred.secret_key
         gdal_conf["AWS_SESSION_TOKEN"] = cred.token
         del gdal_conf["__assumed_role_arn__"]
+    elif "__use_default_profile__" in gdal_conf:
+        cred = _get_cred_from_default_profile()
+        gdal_conf["AWS_ACCESS_KEY_ID"] = cred.access_key
+        gdal_conf["AWS_SECRET_ACCESS_KEY"] = cred.secret_key
+        gdal_conf["AWS_SESSION_TOKEN"] = cred.token
+        del gdal_conf["__use_default_profile__"]
     return gdal_conf
 
 
@@ -114,9 +129,20 @@ def get_rasterio_aws_session(path: str) -> Optional[AWSSession]:
         args["aws_unsigned"] = conf["AWS_NO_SIGN_REQUEST"] == "YES"
     if "AWS_REQUEST_PAYER" in conf:
         args["requester_pays"] = conf["AWS_REQUEST_PAYER"] == "requester"
-    if "__assumed_role_arn__" in conf:
+    if "__stint_role_cfg__" in conf:
+        role_cfg = conf["__stint_role_cfg__"].copy()
+        cred = _get_session_credentials_for_stint_role(role_cfg)
+        args["aws_access_key_id"] = cred.access_key
+        args["aws_secret_access_key"] = cred.secret_key
+        args["aws_session_token"] = cred.token
+    elif "__assumed_role_arn__" in conf:
         role_arn, session_name = conf["__assumed_role_arn__"]
         cred = _get_session_credentials_for_assumed_role(role_arn, session_name)
+        args["aws_access_key_id"] = cred.access_key
+        args["aws_secret_access_key"] = cred.secret_key
+        args["aws_session_token"] = cred.token
+    elif "__use_default_profile__" in conf:
+        cred = _get_cred_from_default_profile()
         args["aws_access_key_id"] = cred.access_key
         args["aws_secret_access_key"] = cred.secret_key
         args["aws_session_token"] = cred.token
@@ -194,6 +220,24 @@ def _convert_s3a_configs_to_gdal_configs(s3a_config: Dict[str, str]) -> Dict[str
                 # This special configuration will be processed specially when creating rasterio session
                 # or boto3 config.
                 gdal_configs["__assumed_role_arn__"] = (role_arn, session_name)
+            elif "WherobotsStIntCredentialsProvider" in value:
+                role_arn = s3a_config.get("assumed.role.arn")
+                if role_arn:
+                    session_name = s3a_config.get(
+                        "assumed.role.session.name", "pyspark-sedona-raster"
+                    )
+                    external_id = s3a_config.get("assumed.role.external.id")
+                    policy = s3a_config.get("assumed.role.policy")
+                    gdal_configs["AWS_NO_SIGN_REQUEST"] = "NO"
+                    gdal_configs["__stint_role_cfg__"] = {
+                        "role_arn": role_arn,
+                        "session_name": session_name,
+                        "external_id": external_id,
+                        "policy": policy,
+                    }
+            elif "WherobotsProfileCredentialsProvider" in value:
+                gdal_configs["AWS_NO_SIGN_REQUEST"] = "NO"
+                gdal_configs["__use_default_profile__"] = {}
             else:
                 gdal_configs["AWS_NO_SIGN_REQUEST"] = "NO"
                 if "RequestPayer" in value:
@@ -240,8 +284,8 @@ def _load_gdal_conf():
         _per_bucket_gdal_conf[bucket] = gdal_confs
 
 
-class AssumedRoleCredentials:
-    """Simple credentials object for assumed role credentials."""
+class AWSSessionCredential:
+    """Simple credentials object for AWS session credentials."""
 
     def __init__(self, access_key: str, secret_key: str, token: str):
         self.access_key = access_key
@@ -251,7 +295,7 @@ class AssumedRoleCredentials:
 
 # Cache for assumed role credentials: (role_arn, session_name) -> (credentials, expiration_time)
 _assumed_role_credentials_cache: Dict[
-    Tuple[str, str], Tuple[AssumedRoleCredentials, datetime]
+    Tuple[str, str], Tuple[AWSSessionCredential, datetime]
 ] = {}
 
 # Cached STS client for role assumption
@@ -260,59 +304,146 @@ _sts_client: Optional[Any] = None
 
 def _get_session_credentials_for_assumed_role(
     role_arn: str, session_name: str
-) -> AssumedRoleCredentials:
-    """
-    Get AWS credentials for an assumed role with caching.
-
-    Args:
-        role_arn: The ARN of the role to assume
-        session_name: The session name for the assumed role
-
-    Returns:
-        Credentials object with access_key, secret_key, and token attributes
-
-    Raises:
-        Exception: If boto3 is not available or role assumption fails
-    """
+) -> AWSSessionCredential:
+    """Get AWS credentials for an assumed role with caching (single-hop)."""
     if boto3 is None:
         raise Exception("boto3 is required for assuming roles")
 
     cache_key = (role_arn, session_name)
     current_time = datetime.utcnow()
-
-    # Check if we have cached credentials that are still valid (more than 5 minutes remaining)
     if cache_key in _assumed_role_credentials_cache:
         cached_credentials, expiration_time = _assumed_role_credentials_cache[cache_key]
-        time_remaining = expiration_time - current_time
-
-        # If credentials expire in more than 5 minutes, use them
-        if time_remaining > timedelta(minutes=5):
+        if expiration_time - current_time > timedelta(minutes=5):
             return cached_credentials
 
-    # Need to get new credentials
     try:
         global _sts_client
         if _sts_client is None:
             _sts_client = boto3.client("sts")
-
-        response = _sts_client.assume_role(
-            RoleArn=role_arn, RoleSessionName=session_name
+        cred_obj, expiration_time = _assume_role_with_client(
+            _sts_client, role_arn, session_name
         )
-
-        credentials = response["Credentials"]
-        expiration_time = credentials["Expiration"]
-
-        # Create a credentials object
-        cred_obj = AssumedRoleCredentials(
-            access_key=credentials["AccessKeyId"],
-            secret_key=credentials["SecretAccessKey"],
-            token=credentials["SessionToken"],
-        )
-
-        # Cache the credentials
         _assumed_role_credentials_cache[cache_key] = (cred_obj, expiration_time)
-
         return cred_obj
-
     except Exception as e:
         raise Exception(f"Failed to assume role {role_arn}: {str(e)}")
+
+
+# Cache for stint role credentials: (role_arn, session_name, external_id or "") -> (credentials, expiration_time)
+_stint_role_credentials_cache: Dict[
+    Tuple[str, str, str], Tuple[AWSSessionCredential, datetime]
+] = {}
+
+# Cached STS client for role assumption using default profile
+_sts_client_default_profile: Optional[Any] = None
+
+
+def _get_session_credentials_for_stint_role(
+    role_cfg: Dict[str, Any],
+) -> AWSSessionCredential:
+    """Dual-hop assume role with fallback, preserving external_id.
+
+    Primary path: standard assume_role using default profile.
+    On failure, fallback to standard chain (which may use web identity if configured).
+    """
+    if boto3 is None or boto3_session is None:
+        raise Exception("boto3 is required for WherobotsStIntCredentialsProvider")
+
+    role_arn = role_cfg["role_arn"]
+    session_name = role_cfg.get("session_name", "pyspark-sedona-raster")
+    external_id = role_cfg.get("external_id")
+    policy = role_cfg.get("policy")
+
+    cache_key = (role_arn, session_name, external_id or "")
+    current_time = datetime.utcnow()
+    if cache_key in _stint_role_credentials_cache:
+        cached_credentials, expiration_time = _stint_role_credentials_cache[cache_key]
+        if expiration_time - current_time > timedelta(minutes=5):
+            return cached_credentials
+
+    # Primary assume attempt using the default profile
+    primary_exception: Optional[Exception] = None
+    try:
+        global _sts_client_default_profile
+        if _sts_client_default_profile is None:
+            profile_session = boto3_session.Session(profile_name="default")
+            sts_client = profile_session.client("sts")
+            _sts_client_default_profile = sts_client
+        cred, expiration_time = _assume_role_with_client(
+            _sts_client_default_profile,
+            role_arn=role_arn,
+            session_name=session_name,
+            external_id=external_id,
+            policy=policy,
+        )
+        _stint_role_credentials_cache[cache_key] = (cred, expiration_time)
+        return cred
+    except Exception as e:  # capture for fallback
+        primary_exception = e
+
+    # Fallback to standard chain if profile initialization fails (may use web identity)
+    try:
+        global _sts_client
+        if _sts_client is None:
+            _sts_client = boto3.client("sts")
+        second_cred, second_exp = _assume_role_with_client(
+            _sts_client,
+            role_arn=role_arn,
+            session_name=session_name,
+            external_id=external_id,
+            policy=policy,
+        )
+        _stint_role_credentials_cache[cache_key] = (second_cred, second_exp)
+        return second_cred
+    except Exception as fe:
+        raise Exception(
+            f"Primary STS assume failed: {primary_exception}; fallback also failed: {fe}"
+        )
+
+
+def _assume_role_with_client(
+    sts_client: Any,
+    role_arn: str,
+    session_name: str,
+    external_id: Optional[str] = None,
+    policy: Optional[str] = None,
+) -> Tuple[AWSSessionCredential, datetime]:
+    args: Dict[str, Any] = {"RoleArn": role_arn, "RoleSessionName": session_name}
+    if external_id:
+        args["ExternalId"] = external_id
+    if policy:
+        args["Policy"] = policy
+    resp = sts_client.assume_role(**args)
+    c = resp["Credentials"]
+    cred = AWSSessionCredential(
+        access_key=c["AccessKeyId"],
+        secret_key=c["SecretAccessKey"],
+        token=c["SessionToken"],
+    )
+    expiration_time = c["Expiration"]
+    return cred, expiration_time
+
+
+# The default authentication method may involve loading the aws config,
+# and possibly run the command for retrieving credential when credential_process
+# was configured. This could be painfully slow. We want to create the credential
+# object once and reuse it. The credential object could refresh itself using
+# a background thread.
+_default_profile_credential = None
+
+
+def _get_cred_from_default_profile() -> AWSSessionCredential:
+    if boto3 is None or boto3_session is None:
+        raise Exception("boto3 is required for WherobotsProfileCredentialsProvider")
+
+    global _default_profile_credential
+    if _default_profile_credential is None:
+        profile_session = boto3_session.Session(profile_name="default")
+        # The credential we get here could automatically refresh itself.
+        # It creates a thread for refreshing under the hood.
+        _default_profile_credential = profile_session.get_credentials()
+
+    frozen_cred = _default_profile_credential.get_frozen_credentials()
+    return AWSSessionCredential(
+        frozen_cred.access_key, frozen_cred.secret_key, frozen_cred.token
+    )
