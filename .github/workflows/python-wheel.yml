@@ -44,7 +44,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: ['depot-ubuntu-24.04-16', 'windows-latest', 'macos-latest']
+        os: ['depot-ubuntu-24.04-8', 'depot-windows-2022-8', 'depot-macos-15']
 
     runs-on: ${{ matrix.os }}
     defaults:
