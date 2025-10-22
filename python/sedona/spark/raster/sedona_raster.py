@@ -18,7 +18,7 @@
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional, Tuple
 import json
-from xml.etree.ElementTree import Element, SubElement, tostring
+from xml.etree.ElementTree import Element, SubElement, tostring  # nosec B405
 
 import numpy as np
 import rasterio  # type: ignore
