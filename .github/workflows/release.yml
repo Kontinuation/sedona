@@ -202,8 +202,12 @@ jobs:
           generate_release_notes: true
           files: |
             artifacts/jars/*
-            artifacts/wheels/cibw-wheels-macos-*/*
-            artifacts/wheels/cibw-wheels-depot-ubuntu-*/*
-            artifacts/wheels/cibw-wheels-windows-*/*
+            artifacts/wheels/cibw-wheels-depot-macos-15-*/*
+            artifacts/wheels/cibw-wheels-depot-ubuntu-24.04-8-*/*
+            artifacts/wheels/cibw-wheels-depot-windows-2022-8-*/*
             artifacts/docs/*
             LICENSE
+
+      - name: Setup tmate session
+        uses: mxschmitt/action-tmate@v3
+        if: failure()
