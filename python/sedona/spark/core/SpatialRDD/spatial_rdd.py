@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-import pickle
 from typing import List, Optional, Union
 
 import attr
