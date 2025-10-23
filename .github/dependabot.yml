@@ -21,8 +21,16 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    groups:
+      github-dependencies:
+        patterns:
+          - '*'
 
   - package-ecosystem: pip
     directory: /docker/sedona-spark-jupyterlab
     schedule:
       interval: monthly
+    groups:
+      github-dependencies:
+        patterns:
+          - '*'
