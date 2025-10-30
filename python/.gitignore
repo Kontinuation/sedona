@@ -17,8 +17,10 @@
 
 /.idea/
 /venv/
+/.venv/
 /.ipynb_checkpoints/
 /.pytest_cache/
+/.hypothesis/
 /apache_sedona.egg-info/
 /build/
 /dist/
@@ -27,3 +29,5 @@ Pipfile.lock
 /wherobots_sedona.egg-info/
 __pycache__
 /sedona/doc/_build/
+geomserde_speedup.cpython-*.so
+uv.lock

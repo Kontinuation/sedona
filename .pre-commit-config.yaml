@@ -291,7 +291,6 @@ repos:
               python/tests/streaming/spark/cases_builder\.py|
               python/tests/tools\.py
           )$
-      - id: requirements-txt-fixer
       - id: trailing-whitespace
         args: [--markdown-linebreak-ext=md]
         exclude: ^docs-overrides/main\.html$|\.Rd$|common/derby\.log

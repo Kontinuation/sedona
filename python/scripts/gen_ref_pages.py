@@ -33,6 +33,10 @@ for path in sorted(src.rglob("*.py")):
 
     parts = tuple(module_path.parts)
 
+    # Only gen docs for sedona modules
+    if parts[0] != "sedona":
+        continue
+
     # Only gen docs for stats features
     if (
         len(

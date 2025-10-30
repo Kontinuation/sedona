@@ -57,15 +57,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Install pipenv
-        run: pip install -U pipenv
-      - name: Install dependencies
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+      - name: Sync doc environment
         run: |
           cd python
-          pipenv --python "3.10"
-          pipenv install --dev
+          uv sync --group docs --no-dev
       - name: run mkdocstrings
-        run: cd python && pipenv run mkdocs build && mkdir -p ../docs/api/pythondoc/wherobots-compute && cp -r site/* ../docs/api/pythondoc/wherobots-compute/
+        run: |
+          cd python
+          uv run mkdocs build
+          mkdir -p ../docs/api/pythondoc/wherobots-compute
+          cp -r site/* ../docs/api/pythondoc/wherobots-compute/
       - name: zip docs
         run: zip -r docs.zip docs
       - uses: actions/upload-artifact@v4
