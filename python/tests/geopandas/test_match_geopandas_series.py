@@ -23,7 +23,6 @@ import pandas as pd
 import geopandas as gpd
 import pyspark.pandas as ps
 import pyspark
-from pandas.testing import assert_series_equal
 import shapely
 from shapely.geometry import (
     Point,
