@@ -20,12 +20,11 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "apache-sedona"
-version = "1.10.2"
-description = "Apache Sedona is a cluster computing system for processing large-scale spatial data"
+name = "wherobots-sedona"
+version = "1.10.3"
+description = "Wherobots Compute is a cluster computing system for processing large-scale spatial data"
 readme = "README.md"
-license = { text = "Apache-2.0" }
-authors = [ { name = "Apache Sedona", email = "dev@sedona.apache.org" } ]
+authors = [ { name = "Wherobots", email = "support@wherobots.com" } ]
 requires-python = ">=3.8"
 classifiers = [
   "Programming Language :: Python :: 3",
