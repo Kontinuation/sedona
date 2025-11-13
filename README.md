@@ -1,17 +1,3 @@
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
-**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
-
-- [Sedona enterprise](#sedona-enterprise)
-  - [Compile](#compile)
-  - [Develop](#develop)
-  - [Release](#release)
-  - [Local development environment](#local-development-environment)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
- TODO: This license is not consistent with the license used in the project.
-       Delete the inconsistent license and above line and rerun pre-commit to insert a good license.
-
 <!--
  Licensed to the Apache Software Foundation (ASF) under one
  or more contributor license agreements.  See the NOTICE file
@@ -30,6 +16,18 @@
  specific language governing permissions and limitations
  under the License.
  -->
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Sedona enterprise](#sedona-enterprise)
+  - [Compile](#compile)
+  - [Develop](#develop)
+  - [Release](#release)
+  - [Local development environment](#local-development-environment)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 # Sedona enterprise
 

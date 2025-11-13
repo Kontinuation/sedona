@@ -350,10 +350,6 @@ repos:
               python/tests/streaming/spark/cases_builder\.py|
               python/tests/tools\.py
           )$
-      - id: requirements-txt-fixer
-        name: run requirements-txt-fixer
-        description: sorts entries in the Python requirements files and removes incorrect entry for pkg-resources==0.0.0
-        files: ^docker/requirements\.txt$
       - id: trailing-whitespace
         name: run trailing-whitespace
         description: trims trailing whitespace
