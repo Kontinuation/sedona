@@ -21,7 +21,7 @@ package org.apache.sedona.common.geometryObjects;
 import org.apache.commons.lang3.NotImplementedException;
 import org.locationtech.jts.geom.*;
 
-public class UniqueGeometry<T> extends Geometry {
+public class UniqueGeometry<T extends Geometry> extends Geometry {
   private final T originalGeometry;
   private final long uniqueId;
 
@@ -144,7 +144,7 @@ public class UniqueGeometry<T> extends Geometry {
 
   @Override
   protected Envelope computeEnvelopeInternal() {
-    throw new NotImplementedException("computeEnvelopeInternal is not implemented.");
+    return originalGeometry.getEnvelopeInternal();
   }
 
   @Override

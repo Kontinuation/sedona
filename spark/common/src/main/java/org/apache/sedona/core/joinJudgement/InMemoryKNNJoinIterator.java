@@ -103,7 +103,7 @@ public class InMemoryKNNJoinIterator<T extends Geometry, U extends Geometry>
     T queryItem = querySideIterator.next();
     Geometry queryGeom;
     if (queryItem instanceof UniqueGeometry) {
-      queryGeom = (Geometry) ((UniqueGeometry<?>) queryItem).getOriginalGeometry();
+      queryGeom = ((UniqueGeometry<?>) queryItem).getOriginalGeometry();
     } else {
       queryGeom = queryItem;
     }

@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Random;
 import org.apache.commons.collections4.iterators.SingletonIterator;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.sedona.common.geometryObjects.UniqueGeometry;
 import org.apache.sedona.core.enums.DistanceMetric;
 import org.apache.sedona.core.index.ExternalIndexTestBase;
 import org.apache.sedona.core.utils.SedonaConf;
@@ -272,6 +273,45 @@ public class KnnJoinIndexJudgementTest extends ExternalIndexTestBase {
     List<Geometry> testPoints = new ArrayList<>();
     for (int k = 0; k < 10; k++) {
       testPoints.add(testPoint);
+    }
+
+    // Perform a KNN search using the test point
+    Iterator<Pair<Geometry, Geometry>> resultIterator =
+        thisJudgement.call(testPoints.iterator(), testObjects.iterator());
+    ((ExternalKNNJoinIterator<Geometry, Geometry>) resultIterator).forceSpill();
+
+    // Assert that the results are correct
+    int count = 0;
+    while (resultIterator.hasNext()) {
+      resultIterator.next();
+      count++;
+    }
+    // with search radius 1.4, the result should be 3
+    assertEquals(30, count);
+  }
+
+  @Test
+  public void testSpillWithUniqueQueryGeometry() throws Exception {
+    if (!useExternalSpatialIndex) {
+      return;
+    }
+
+    KnnJoinIndexJudgement<Geometry, Geometry> thisJudgement =
+        createTestJudgement(4, 1.4, DistanceMetric.EUCLIDEAN, false);
+
+    // Points forming a grid
+    List<Geometry> testObjects = new ArrayList<>();
+    for (int i = 0; i <= 7; i++) {
+      for (int j = 0; j <= 4; j++) {
+        testObjects.add(factory.createPoint(new Coordinate(i, j)));
+      }
+    }
+
+    // Create test points as UniqueGeometry
+    Geometry testPoint = factory.createPoint(new Coordinate(3.3, 4.4));
+    List<Geometry> testPoints = new ArrayList<>();
+    for (int k = 0; k < 10; k++) {
+      testPoints.add(new UniqueGeometry<>(k, testPoint));
     }
 
     // Perform a KNN search using the test point

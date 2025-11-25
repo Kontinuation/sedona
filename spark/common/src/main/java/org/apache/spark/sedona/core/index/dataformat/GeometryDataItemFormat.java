@@ -67,7 +67,7 @@ public class GeometryDataItemFormat implements DataItemFormat<GeometryDataItem> 
       out.writeByte((byte) Type.UNIQUE_GEOMETRY.id);
       UniqueGeometry<?> uniqueGeometry = (UniqueGeometry<?>) geometry;
       out.writeLong(uniqueGeometry.getUniqueId());
-      byte[] data = GeometrySerializer.serialize((Geometry) uniqueGeometry.getOriginalGeometry());
+      byte[] data = GeometrySerializer.serialize(uniqueGeometry.getOriginalGeometry());
       out.writeInt(data.length);
       out.write(data, 0, data.length);
     } else if (geometry instanceof Circle) {

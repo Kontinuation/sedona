@@ -74,7 +74,7 @@ public class GeometrySerde extends Serializer implements Serializable {
       writeType(out, Type.UNIQUE_GEOMETRY);
       UniqueGeometry<?> uniqueGeometry = (UniqueGeometry<?>) object;
       out.writeLong(uniqueGeometry.getUniqueId());
-      writeGeometry(kryo, out, (Geometry) uniqueGeometry.getOriginalGeometry());
+      writeGeometry(kryo, out, uniqueGeometry.getOriginalGeometry());
     } else if (object instanceof Geography) {
       writeType(out, Type.GEOGRAPHY);
       try {
