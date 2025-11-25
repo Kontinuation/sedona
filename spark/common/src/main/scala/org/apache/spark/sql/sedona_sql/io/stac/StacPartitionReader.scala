@@ -50,6 +50,7 @@ class StacPartitionReader(
   private var currentFile: File = _
   private var featureIterator: Iterator[InternalRow] = Iterator.empty
   private val mapper = new ObjectMapper()
+  private val headers = StacUtils.parseHeaders(opts)
   private val generateOutDBRaster = opts.getOrElse("generateOutDBRaster", "true").toBoolean
   private val enableConvertHttpToS3 = opts.getOrElse("convertHttpToS3", "false").toBoolean
 
@@ -194,7 +195,39 @@ class StacPartitionReader(
 
     while (attempt < maxRetries && !success) {
       try {
-        fileContent = Source.fromURL(url).mkString
+        if (headers.isEmpty) {
+          fileContent = Source.fromURL(url).mkString
+        } else {
+          val connection = url.openConnection()
+          var inputStream: java.io.InputStream = null
+          var source: Source = null
+
+          try {
+            headers.foreach { case (key, value) =>
+              connection.setRequestProperty(key, value)
+            }
+            inputStream = connection.getInputStream
+            source = Source.fromInputStream(inputStream)
+            fileContent = source.mkString
+          } finally {
+            // Close resources in reverse order
+            if (source != null) {
+              try source.close()
+              catch { case _: Throwable => }
+            }
+            if (inputStream != null) {
+              try inputStream.close()
+              catch { case _: Throwable => }
+            }
+            // Disconnect HTTP connection if applicable
+            connection match {
+              case httpConn: java.net.HttpURLConnection =>
+                try httpConn.disconnect()
+                catch { case _: Throwable => }
+              case _ =>
+            }
+          }
+        }
         success = true
       } catch {
         case e: Exception =>
