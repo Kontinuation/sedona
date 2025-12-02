@@ -35,6 +35,7 @@ import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.geometry.Position2D;
 import org.geotools.referencing.operation.transform.AffineTransform2D;
 import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.impl.PackedCoordinateSequenceFactory;
 
 public class PixelFunctions {
   private static GeometryFactory GEOMETRY_FACTORY = new GeometryFactory();
@@ -99,14 +100,19 @@ public class PixelFunctions {
         srid != 0 ? new GeometryFactory(new PrecisionModel(), srid) : GEOMETRY_FACTORY;
 
     Point2D upperLeft = RasterUtils.getWorldCornerCoordinates(rasterGeom, 1, 1);
-    List<PixelRecord> pixelRecords = new ArrayList<>();
+
+    double upperLeftX = upperLeft.getX();
+    double upperLeftY = upperLeft.getY();
+
+    List<PixelRecord> pixelRecords = new ArrayList<>(width * height);
+    PackedCoordinateSequenceFactory csFactory = new PackedCoordinateSequenceFactory();
 
     for (int y = 1; y <= height; y++) {
       for (int x = 1; x <= width; x++) {
         double pixelValue = pixels[(y - 1) * width + (x - 1)];
 
-        double worldX1 = upperLeft.getX() + (x - 1) * cellSizeX + (y - 1) * shearX;
-        double worldY1 = upperLeft.getY() + (y - 1) * cellSizeY + (x - 1) * shearY;
+        double worldX1 = upperLeftX + (x - 1) * cellSizeX + (y - 1) * shearX;
+        double worldY1 = upperLeftY + (y - 1) * cellSizeY + (x - 1) * shearY;
         double worldX2 = worldX1 + cellSizeX;
         double worldY2 = worldY1 + shearY;
         double worldX3 = worldX2 + shearX;
@@ -114,16 +120,18 @@ public class PixelFunctions {
         double worldX4 = worldX1 + shearX;
         double worldY4 = worldY1 + cellSizeY;
 
-        Coordinate[] coordinates =
-            new Coordinate[] {
-              new Coordinate(worldX1, worldY1),
-              new Coordinate(worldX2, worldY2),
-              new Coordinate(worldX3, worldY3),
-              new Coordinate(worldX4, worldY4),
-              new Coordinate(worldX1, worldY1)
+        double[] coordsArray =
+            new double[] {
+              worldX1, worldY1,
+              worldX2, worldY2,
+              worldX3, worldY3,
+              worldX4, worldY4,
+              worldX1, worldY1 // Close the ring
             };
 
-        Geometry polygon = geometryFactory.createPolygon(coordinates);
+        CoordinateSequence seq = csFactory.create(coordsArray, 2);
+        LinearRing shell = geometryFactory.createLinearRing(seq);
+        Polygon polygon = geometryFactory.createPolygon(shell);
         pixelRecords.add(new PixelRecord(polygon, pixelValue, x, y));
       }
     }
