@@ -21,8 +21,6 @@ import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
 
-from rasterio.session import AWSSession  # type: ignore
-
 try:
     import boto3  # type: ignore
     from boto3 import session as boto3_session  # type: ignore
@@ -111,7 +109,9 @@ def clear_gdal_conf_from_env():
     del os.environ[PER_BUCKET_GDAL_CONF_ENV_KEY]
 
 
-def get_rasterio_aws_session(path: str) -> Optional[AWSSession]:
+def get_rasterio_aws_session(path: str) -> Optional["AWSSession"]:
+    from rasterio.session import AWSSession  # type: ignore
+
     conf = get_gdal_conf(path)
     if not conf:
         return None
