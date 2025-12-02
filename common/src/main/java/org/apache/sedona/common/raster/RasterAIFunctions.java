@@ -70,7 +70,7 @@ public class RasterAIFunctions {
     GeometryFactory factory = new GeometryFactory();
     List<ExtractedRegionInfo> results = new ArrayList<>();
 
-    int[] grid = new int[width * height];
+    double[] grid = new double[width * height];
     double[] sumScores = new double[numClasses];
     double[] averageScores = new double[numClasses];
     int[] numCells = new int[numClasses];
@@ -104,7 +104,8 @@ public class RasterAIFunctions {
 
     // Detect polygons in the grid
     List<RasterPolygonizer.PolygonWithValue> polygonsWithValues =
-        RasterPolygonizer.polygonize(grid, width, 4, affine);
+        RasterPolygonizer.polygonize(
+            grid, width, 4, affine, RasterPolygonEnumerator.GP_NODATA_MARKER);
 
     // Collect polygons for each class
     ArrayList<ArrayList<Polygon>> polygonsByLabel = new ArrayList<>(numClasses);
@@ -113,7 +114,7 @@ public class RasterAIFunctions {
     }
     for (RasterPolygonizer.PolygonWithValue polygonWithValue : polygonsWithValues) {
       Polygon polygon = polygonWithValue.polygon;
-      int labelIndex = polygonWithValue.value;
+      int labelIndex = (int) polygonWithValue.value;
       if (polygonsByLabel.get(labelIndex) == null) {
         polygonsByLabel.set(labelIndex, new ArrayList<>());
       }

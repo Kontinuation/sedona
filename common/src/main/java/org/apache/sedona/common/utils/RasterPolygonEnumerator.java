@@ -26,24 +26,75 @@ public class RasterPolygonEnumerator {
 
   public static final int GP_NODATA_MARKER = -51502112;
 
+  /**
+   * Maximum number of Units in the Last Place (ULPs) for floating point comparison. This follows
+   * GDAL's implementation for raster polygonization.
+   */
+  private static final int MAX_ULPS = 2;
+
   private static final Logger logger = LoggerFactory.getLogger(RasterPolygonEnumerator.class);
 
+  /**
+   * Compare two double values for equality using ULP-based comparison. This is a Java equivalent of
+   * GDAL's GDALFloatEquals function, adapted for doubles. This function will allow (maxUlps-1)
+   * representable doubles between A and B.
+   *
+   * @param a first double value
+   * @param b second double value
+   * @return true if the values are equal within MAX_ULPS tolerance
+   */
+  static boolean doubleEquals(double a, double b) {
+    // Handle exact equality (also handles infinities)
+    if (a == b) {
+      return true;
+    }
+
+    // Handle NaN
+    if (Double.isNaN(a) || Double.isNaN(b)) {
+      return false;
+    }
+
+    // Convert doubles to long bit representations
+    long aAsLong = Double.doubleToRawLongBits(a);
+    long bAsLong = Double.doubleToRawLongBits(b);
+
+    // Use lexicographically ordered
+    if (aAsLong < 0) {
+      aAsLong = Long.MIN_VALUE - aAsLong;
+    }
+
+    if (bAsLong < 0) {
+      bAsLong = Long.MIN_VALUE - bAsLong;
+    }
+
+    long longDiff = Math.abs(aAsLong - bAsLong);
+
+    return longDiff <= MAX_ULPS;
+  }
+
   public int[] polyIdMap = new int[0];
-  public int[] polyValue = new int[0];
+  public double[] polyValue = new double[0];
 
   private int nextPolygonId = 0;
   private int polyAlloc = 0;
 
   private int connectedness = 0;
+  private double nodataValue = GP_NODATA_MARKER;
 
   public RasterPolygonEnumerator(int connectedness) {
     assert connectedness == 4 || connectedness == 8;
     this.connectedness = connectedness;
   }
 
+  public RasterPolygonEnumerator(int connectedness, double nodataValue) {
+    assert connectedness == 4 || connectedness == 8;
+    this.connectedness = connectedness;
+    this.nodataValue = nodataValue;
+  }
+
   public void clear() {
     polyIdMap = new int[0];
-    polyValue = new int[0];
+    polyValue = new double[0];
 
     nextPolygonId = 0;
     polyAlloc = 0;
@@ -73,7 +124,7 @@ public class RasterPolygonEnumerator {
   }
 
   /** Allocate a new polygon id, and reallocate the polygon maps if needed */
-  private int newPolygon(int value) {
+  private int newPolygon(double value) {
     if (nextPolygonId == Integer.MAX_VALUE) {
       throw new IllegalArgumentException("maximum number of polygons reached");
     }
@@ -132,7 +183,7 @@ public class RasterPolygonEnumerator {
 
   /** Assign ids to polygons, one line at a time. */
   public boolean processLine(
-      int[] lastLineVal, int[] thisLineVal, int[] lastLineId, int[] thisLineId) {
+      double[] lastLineVal, double[] thisLineVal, int[] lastLineId, int[] thisLineId) {
     int nXSize = thisLineVal.length;
 
     /* -------------------------------------------------------------------- */
@@ -140,9 +191,9 @@ public class RasterPolygonEnumerator {
     /* -------------------------------------------------------------------- */
     if (lastLineVal == null) {
       for (int i = 0; i < nXSize; i++) {
-        if (thisLineVal[i] == GP_NODATA_MARKER) {
+        if (doubleEquals(thisLineVal[i], nodataValue)) {
           thisLineId[i] = -1;
-        } else if (i == 0 || thisLineVal[i] != thisLineVal[i - 1]) {
+        } else if (i == 0 || !doubleEquals(thisLineVal[i], thisLineVal[i - 1])) {
           thisLineId[i] = newPolygon(thisLineVal[i]);
           if (thisLineId[i] < 0) {
             return false;
@@ -159,39 +210,41 @@ public class RasterPolygonEnumerator {
     /*      the last line.                                                  */
     /* -------------------------------------------------------------------- */
     for (int i = 0; i < nXSize; i++) {
-      if (thisLineVal[i] == GP_NODATA_MARKER) {
+      if (doubleEquals(thisLineVal[i], nodataValue)) {
         thisLineId[i] = -1;
-      } else if (i > 0 && thisLineVal[i] == thisLineVal[i - 1]) {
+      } else if (i > 0 && doubleEquals(thisLineVal[i], thisLineVal[i - 1])) {
         thisLineId[i] = thisLineId[i - 1];
 
-        if (lastLineVal[i] == thisLineVal[i]
+        if (doubleEquals(lastLineVal[i], thisLineVal[i])
             && polyIdMap[lastLineId[i]] != polyIdMap[thisLineId[i]]) {
           mergePolygon(lastLineId[i], thisLineId[i]);
         }
 
         if (connectedness == 8
-            && lastLineVal[i - 1] == thisLineVal[i]
+            && doubleEquals(lastLineVal[i - 1], thisLineVal[i])
             && polyIdMap[lastLineId[i - 1]] != polyIdMap[thisLineId[i]]) {
           mergePolygon(lastLineId[i - 1], thisLineId[i]);
         }
 
         if (connectedness == 8
             && i < nXSize - 1
-            && lastLineVal[i + 1] == thisLineVal[i]
+            && doubleEquals(lastLineVal[i + 1], thisLineVal[i])
             && polyIdMap[lastLineId[i + 1]] != polyIdMap[thisLineId[i]]) {
           mergePolygon(lastLineId[i + 1], thisLineId[i]);
         }
-      } else if (lastLineVal[i] == thisLineVal[i]) {
+      } else if (doubleEquals(lastLineVal[i], thisLineVal[i])) {
         thisLineId[i] = lastLineId[i];
-      } else if (i > 0 && connectedness == 8 && lastLineVal[i - 1] == thisLineVal[i]) {
+      } else if (i > 0 && connectedness == 8 && doubleEquals(lastLineVal[i - 1], thisLineVal[i])) {
         thisLineId[i] = lastLineId[i - 1];
 
         if (i < nXSize - 1
-            && lastLineVal[i + 1] == thisLineVal[i]
+            && doubleEquals(lastLineVal[i + 1], thisLineVal[i])
             && polyIdMap[lastLineId[i + 1]] != polyIdMap[thisLineId[i]]) {
           mergePolygon(lastLineId[i + 1], thisLineId[i]);
         }
-      } else if (i < nXSize - 1 && connectedness == 8 && lastLineVal[i + 1] == thisLineVal[i]) {
+      } else if (i < nXSize - 1
+          && connectedness == 8
+          && doubleEquals(lastLineVal[i + 1], thisLineVal[i])) {
         thisLineId[i] = lastLineId[i + 1];
       } else {
         thisLineId[i] = newPolygon(thisLineVal[i]);

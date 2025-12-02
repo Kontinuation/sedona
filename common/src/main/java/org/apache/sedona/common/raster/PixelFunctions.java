@@ -24,6 +24,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.sedona.common.utils.RasterPolygonizer;
 import org.apache.sedona.common.utils.RasterUtils;
 import org.geotools.api.coverage.PointOutsideCoverageException;
 import org.geotools.api.geometry.Position;
@@ -134,6 +135,19 @@ public class PixelFunctions {
       throws FactoryException, TransformException {
     Geometry polygon = PixelFunctions.getPixelAsPolygon(raster, colX, rowY);
     return polygon.getCentroid();
+  }
+
+  public static List<RasterPolygonizer.PolygonWithValue> getPolygonize(
+      GridCoverage2D rasterGeom, int band) {
+    RasterUtils.ensureBand(rasterGeom, band);
+    int width = RasterAccessors.getWidth(rasterGeom);
+    int height = RasterAccessors.getHeight(rasterGeom);
+    int nConnectedness = 4;
+    Raster raster = RasterUtils.getRaster(rasterGeom.getRenderedImage());
+    AffineTransform2D affine = RasterUtils.getGDALAffineTransform(rasterGeom);
+    double[] grid = raster.getSamples(0, 0, width, height, band - 1, (double[]) null);
+    double noDataValue = RasterUtils.getNoDataValue(rasterGeom.getSampleDimension(band - 1));
+    return RasterPolygonizer.polygonize(grid, width, nConnectedness, affine, noDataValue);
   }
 
   public static List<PixelRecord> getPixelAsCentroids(GridCoverage2D rasterGeom, int band)

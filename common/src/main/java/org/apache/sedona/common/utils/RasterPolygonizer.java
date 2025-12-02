@@ -37,16 +37,16 @@ public class RasterPolygonizer {
 
   public static class PolygonWithValue {
     public Polygon polygon;
-    public int value;
+    public double value;
 
-    public PolygonWithValue(Polygon polygon, int value) {
+    public PolygonWithValue(Polygon polygon, double value) {
       this.polygon = polygon;
       this.value = value;
     }
   }
 
   public static List<PolygonWithValue> polygonize(
-      int[] grid, int width, int nConnectedness, AffineTransform2D affine) {
+      double[] grid, int width, int nConnectedness, AffineTransform2D affine, double nodataValue) {
     if (nConnectedness != 4 && nConnectedness != 8) {
       throw new IllegalArgumentException("Connectedness must be 4 or 8");
     }
@@ -56,8 +56,8 @@ public class RasterPolygonizer {
     /* -------------------------------------------------------------------- */
     /*      Allocate working buffers.                                       */
     /* -------------------------------------------------------------------- */
-    int[] thisLineVal = new int[nXSize];
-    int[] lastLineVal = new int[nXSize];
+    double[] thisLineVal = new double[nXSize];
+    double[] lastLineVal = new double[nXSize];
     int[] thisLineId = new int[nXSize];
     int[] lastLineId = new int[nXSize];
 
@@ -66,7 +66,7 @@ public class RasterPolygonizer {
     /*      polygon id map so we will know in advance what polygons are     */
     /*      what on the second pass.                                        */
     /* -------------------------------------------------------------------- */
-    RasterPolygonEnumerator firstEnum = new RasterPolygonEnumerator(nConnectedness);
+    RasterPolygonEnumerator firstEnum = new RasterPolygonEnumerator(nConnectedness, nodataValue);
     for (int iY = 0; iY < nYSize; iY++) {
       System.arraycopy(grid, iY * nXSize, thisLineVal, 0, nXSize);
       if (iY == 0) {
@@ -76,7 +76,7 @@ public class RasterPolygonizer {
       }
 
       // Swap lines
-      int[] tmpLineVal = lastLineVal;
+      double[] tmpLineVal = lastLineVal;
       lastLineVal = thisLineVal;
       thisLineVal = tmpLineVal;
       int[] tmpLineId = lastLineId;
@@ -95,7 +95,7 @@ public class RasterPolygonizer {
     /*      We will use a new enumerator for the second pass primarily      */
     /*      so we can preserve the first pass map.                          */
     /* -------------------------------------------------------------------- */
-    RasterPolygonEnumerator secondEnum = new RasterPolygonEnumerator(nConnectedness);
+    RasterPolygonEnumerator secondEnum = new RasterPolygonEnumerator(nConnectedness, nodataValue);
 
     double[] geoTransform = new double[6];
     geoTransform[0] = affine.getTranslateX();
@@ -161,7 +161,7 @@ public class RasterPolygonizer {
       /*      Swap pixel value, and polygon id lines to be ready for the     */
       /*      next line.                                                     */
       /* --------------------------------------------------------------------*/
-      int[] tmpLineVal = lastLineVal;
+      double[] tmpLineVal = lastLineVal;
       lastLineVal = thisLineVal;
       thisLineVal = tmpLineVal;
       int[] tmpLineId = lastLineId;
@@ -251,7 +251,7 @@ public class RasterPolygonizer {
   }
 
   interface PolygonReceiver {
-    void receive(RPolygon polygon, int value);
+    void receive(RPolygon polygon, double value);
   }
 
   static class Polygonizer {
@@ -292,7 +292,7 @@ public class RasterPolygonizer {
 
     void processLine(
         int[] thisLineId,
-        int[] lastLineVal,
+        double[] lastLineVal,
         TwoArm[] thisLineArm,
         TwoArm[] lastLineArm,
         int nCurrentRow,
@@ -576,7 +576,7 @@ public class RasterPolygonizer {
     }
 
     @Override
-    public void receive(RPolygon polygon, int value) {
+    public void receive(RPolygon polygon, double value) {
       boolean[] accessedArc = new boolean[polygon.arcConnections.size()];
       Arrays.fill(accessedArc, false);
 

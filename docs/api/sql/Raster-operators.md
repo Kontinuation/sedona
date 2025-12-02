@@ -251,6 +251,50 @@ Output:
 +--------------------+-----+---+---+
 ```
 
+### RS_Polygonize
+
+Introduction: Returns a list of the polygons for all connected regions of pixels with the same value in the specified band.
+
+Format: `RS_Polygonize(raster: Raster, band: Integer)`
+
+Since: `v1.13.0`
+
+SQL Example
+
+```sql
+SELECT ST_AsText(polygon_and_value.polygon), polygon_and_value.value
+FROM rasters
+LATERAL VIEW explode(RS_Polygonize(raster, 1)) AS polygon_and_value
+```
+
+Spark SQL example for extracting Polygons and values from raster:
+
+```scala
+val pointDf = sedona.read...
+
+var df = sedona.read.format("binaryFile").load("/some/path/*.tiff")
+df = df.selectExpr("RS_FromGeoTiff(content) as raster")
+
+df.selectExpr(
+  "explode(RS_Polygonize(raster, 1)) as exploded"
+).selectExpr(
+  "exploded.geom as geom",
+  "exploded.value as value",
+).show(3)
+```
+
+Output:
+
+```
++--------------------+-----+
+|                geom|value|
++--------------------+-----+
+|POLYGON ((-130958...|  0.0|
+|POLYGON ((-130957...|  1.0|
+|POLYGON ((-130956...|  2.0|
++--------------------+-----+
+```
+
 ## Geometry Functions
 
 ### RS_Envelope
