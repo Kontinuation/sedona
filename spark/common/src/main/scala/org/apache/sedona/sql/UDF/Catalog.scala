@@ -371,8 +371,7 @@ object Catalog extends AbstractCatalog with Logging {
     function[ST_GeomToGeography]()) ++ geoStatsFunctions()
 
   val aggregateExpressions: Seq[Aggregator[Geometry, _, _]] =
-    Seq(new ST_Union_Aggr, new ST_Envelope_Aggr, new ST_Intersection_Aggr, new ST_Analyze_Aggr)
-
+    Seq(new ST_Envelope_Aggr, new ST_Intersection_Aggr, new ST_Union_Aggr, new ST_Analyze_Aggr, new ST_Collect_Agg)
   private def geoStatsFunctions(): Seq[FunctionDescription] = {
     // Try loading geostats functions. Return a seq of geo-stats functions. If any error occurs,
     // return an empty seq to skip registering these functions.
