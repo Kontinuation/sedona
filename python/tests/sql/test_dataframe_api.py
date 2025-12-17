@@ -129,7 +129,7 @@ test_configurations = [
         ("x", "y", "z", "m", "srid"),
         "x_y_z_m_srid",
         "",
-        "POINT Z (1 2 3)",
+        "POINT ZM (1 2 3 100.9)",
     ),
     (
         stc.ST_PointFromGeoHash,
