@@ -291,7 +291,6 @@ Since: `v1.5.0`
 	The function doesn't support rasters that have any one of the following properties:
 	```
 	ScaleX < 0
-	ScaleY > 0
 	SkewX != 0
 	SkewY != 0
 	```
