@@ -18,6 +18,7 @@
  */
 package org.apache.sedona.common.raster;
 
+import static org.apache.sedona.common.utils.RasterUtils.flipVerticallyPixelSpace;
 import static org.junit.Assert.*;
 
 import java.io.IOException;
@@ -97,6 +98,8 @@ public class RasterBandAccessorsTest extends RasterTestBase {
         };
     GridCoverage2D raster =
         RasterConstructors.makeNonEmptyRaster(1, "", 5, 5, 1, -1, 1, -1, 0, 0, 0, pixelsValues);
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(raster);
+
     Geometry extent =
         Constructors.geomFromWKT(
             "POLYGON ((5.822754 -6.620957, 6.965332 -6.620957, 6.965332 -5.834616, 5.822754 -5.834616, 5.822754 -6.620957))",
@@ -109,6 +112,14 @@ public class RasterBandAccessorsTest extends RasterTestBase {
         Arrays.toString(RasterBandAccessors.getZonalStatsAll(raster, extent));
     String expectedZonalStatsAll = "[0.0, null, null, null, null, null, null, null, null]";
     assertEquals(expectedZonalStatsAll, actualZonalStatsAll);
+
+    // Testing bottom-up raster case
+    actualZonalStats = RasterBandAccessors.getZonalStats(raster_bottom_up, extent, "mode");
+    assertNull(actualZonalStats);
+
+    actualZonalStatsAll =
+        Arrays.toString(RasterBandAccessors.getZonalStatsAll(raster_bottom_up, extent));
+    assertEquals(expectedZonalStatsAll, actualZonalStatsAll);
   }
 
   @Test
@@ -120,9 +131,14 @@ public class RasterBandAccessorsTest extends RasterTestBase {
 
     GridCoverage2D raster =
         RasterConstructors.makeEmptyRaster(1, 256, 256, 989419.3, 221365.675, 1, -1, 0, 0, 2263);
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(raster);
 
     Double actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "mean", true);
     Double expected = 0.0;
+    assertEquals(expected, actual, FP_TOLERANCE);
+
+    // Test bottom-up raster case
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, 1, "mean", true);
     assertEquals(expected, actual, FP_TOLERANCE);
   }
 
@@ -136,7 +152,8 @@ public class RasterBandAccessorsTest extends RasterTestBase {
             "test-outdb-raster",
             new Path(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif"),
             conf);
-    GridCoverage2D[] rasters = {inDbRaster, outDbRaster};
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(inDbRaster);
+    GridCoverage2D[] rasters = {inDbRaster, outDbRaster, raster_bottom_up};
 
     for (GridCoverage2D raster : rasters) {
       String polygon =
@@ -202,6 +219,8 @@ public class RasterBandAccessorsTest extends RasterTestBase {
   public void testZonalStatsWithMultiPolygonAndAllNoDataValues()
       throws IOException, ParseException, FactoryException {
     GridCoverage2D raster = rasterFromGeoTiff(resourceFolder + "allNoData.tiff");
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(raster);
+
     String polygon =
         "SRID=2263;MULTIPOLYGON (((994691.8668410989 222732.55147949007, 994838.9964562772 222657.33114599282, 994835.8129632992 222651.32007158513, 994866.5497303953 222635.3891649635, 994894.9626119346 222620.6621292782, 994897.9281735104 222627.20212832885, 994912.1027229384 222619.95519748307, 994956.740641462 222597.13404523468, 994906.6541878665 222501.29768674026, 994887.6889911637 222465.0093761085, 994837.7340744453 222492.35408672754, 994853.625535307 222529.50849369404, 994840.917607888 222537.65418126856, 994854.5478470477 222563.6338512456, 994741.1935887854 222632.66443061878, 994738.9934715481 222626.82248078822, 994702.4691429745 222651.24039529508, 994697.0023239915 222639.56843077522, 994678.9672543779 222648.3079601465, 994685.5799214249 222666.9009330018, 994665.0506513546 222677.4596114837, 994659.5075353233 222666.0714385335, 994632.9559455585 222677.04472308207, 994638.4121639903 222687.65317858435, 994591.4049194932 222709.53064703743, 994586.6935214218 222697.38903859386, 994616.2676593014 222684.09473134452, 994605.3813627969 222665.16367271703, 994622.8224811119 222657.34304865566, 994607.9605241728 222623.97575110715, 994564.0366535546 222648.86690007558, 994557.0215804322 222635.22727109503, 994598.6762462581 222611.8864745539, 994575.6274241732 222565.97242495706, 994491.2032010661 222611.58729253453, 994505.0971421576 222638.26311996125, 994514.7620293793 222656.81908144747, 994546.3321385295 222717.43209184796, 994583.15469286 222788.13068275736, 994691.8668410989 222732.55147949007)), ((994694.3583764347 222594.7954121792, 994682.9462650565 222576.25757348718, 994714.7318199909 222557.2271746981, 994731.0831743629 222587.97634928412, 994751.7483152337 222576.00672128247, 994733.293978232 222547.9483216761, 994757.1527337709 222535.40880340294, 994776.7344568828 222568.78807561978, 994798.9932181359 222556.2664852004, 994773.956981773 222512.28235275837, 994787.2044639152 222504.6640554264, 994803.0287520508 222535.95262718352, 994833.2445882489 222519.60684072823, 994816.8991777989 222489.39134959964, 994882.542139174 222455.1610012155, 994860.12053293 222412.2592701621, 994588.1726443635 222559.1938735171, 994614.5758814359 222614.37291736386, 994649.5364776199 222593.17272477841, 994663.1308743045 222615.95305783482, 994694.3583764347 222594.7954121792)))";
     Geometry geom = Constructors.geomFromEWKT(polygon);
@@ -216,12 +235,26 @@ public class RasterBandAccessorsTest extends RasterTestBase {
 
     actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "mean", false, true);
     assertNull(actual);
+
+    // Test bottom-up raster case
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, 1, "count", false, false);
+    expected = 20470.0;
+    assertEquals(expected, actual, 0d);
+
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, 1, "sum", false, false);
+    expected = 0;
+    assertEquals(expected, actual, 0d);
+
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, 1, "mean", false, true);
+    assertNull(actual);
   }
 
   @Test
   public void testZonalStatsWithNoData() throws IOException, FactoryException, ParseException {
     GridCoverage2D raster =
         rasterFromGeoTiff(resourceFolder + "raster/raster_with_no_data/test5.tiff");
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(raster);
+
     String polygon =
         "POLYGON((-167.750000 87.750000, -155.250000 87.750000, -155.250000 40.250000, -180.250000 40.250000, -167.750000 87.750000))";
     // Testing implicit CRS transformation
@@ -254,11 +287,42 @@ public class RasterBandAccessorsTest extends RasterTestBase {
     actual = RasterBandAccessors.getZonalStats(raster, geom, 1, "sd", false, true);
     expected = 74.81287592054916;
     assertEquals(expected, actual, FP_TOLERANCE);
+
+    // Test bottom-up raster case
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, 1, "sum", false, true);
+    expected = 3229013.0;
+    assertEquals(expected, actual, 0d);
+
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, 1, "mean", false, true);
+    expected = 226.61330619692416;
+    assertEquals(expected, actual, FP_TOLERANCE);
+
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, 1, "count");
+    expected = 14249.0;
+    assertEquals(expected, actual, 0.1d);
+
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, "variance");
+    expected = 5596.966403503485;
+    assertEquals(expected, actual, FP_TOLERANCE);
+
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, "max");
+    expected = 255.0;
+    assertEquals(expected, actual, 1E-1);
+
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, 1, "min", false, true);
+    expected = 1.0;
+    assertEquals(expected, actual, 1E-1);
+
+    actual = RasterBandAccessors.getZonalStats(raster_bottom_up, geom, 1, "sd", false, true);
+    expected = 74.81287592054916;
+    assertEquals(expected, actual, FP_TOLERANCE);
   }
 
   @Test
   public void testRasterization1() throws FactoryException, ParseException, IOException {
     GridCoverage2D raster = rasterFromGeoTiff(resourceFolder + "raster/test7.tiff");
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(raster);
+
     String wkt =
         "POLYGON ((-0.897979307443705 52.22640443968169, -0.897982946766236 52.22638696176784, -0.89799206869722 52.22637025568977, -0.898006322680796 52.22635496345145, -0.89802516094114 52.22634167272326, -0.898047859533683 52.2263308942584, -0.898073546166002 52.22632304226535, -0.898101233719275 52.22631841849023, -0.898129858182076 52.22631720062118, -0.89815831953887 52.22631943546002, -0.898185524042003 52.2263250371237, -0.898210426242843 52.22633379034471, -0.898232069167008 52.22634535874342, -0.898249621089847 52.22635929775475, -0.89826240749905 52.22637507171224, -0.898269937016031 52.22639207443311, -0.898271920279954 52.226409652513254, -0.898268281068583 52.226427130437145, -0.898259159228442 52.226443836537406, -0.89824490530156 52.226459128806695, -0.898226067055136 52.22647241956989, -0.898203368431614 52.226483198068486, -0.898177681728134 52.22649105008885, -0.898149994074354 52.226495673880706, -0.898121369497 52.22649689175339, -0.898092908029046 52.22649465690451, -0.898065703435071 52.22648905521864, -0.898040801177534 52.226480301966674, -0.898019158239452 52.226468733532954, -0.898001606347591 52.2264547944879, -0.897988820009547 52.22643902050307, -0.897981290593075 52.22642201776546, -0.897979307443705 52.22640443968169))";
     Geometry geom = Constructors.geomFromWKT(wkt, 4326);
@@ -270,12 +334,22 @@ public class RasterBandAccessorsTest extends RasterTestBase {
 
     double[] expected = new double[] {14.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
     assertArrayEquals(expected, actual, FP_TOLERANCE);
+
+    // Test bottom-up raster case
+    actual =
+        Arrays.stream(RasterBandAccessors.getZonalStatsAll(raster_bottom_up, geom, 1, false, false))
+            .mapToDouble(Double::doubleValue)
+            .toArray();
+
+    expected = new double[] {14.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+    assertArrayEquals(expected, actual, FP_TOLERANCE);
   }
 
   @Test
   public void testRasterization2() throws FactoryException, ParseException, IOException {
     GridCoverage2D raster =
         rasterFromGeoTiff(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif");
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(raster);
 
     Geometry geom =
         Constructors.geomFromWKT(
@@ -289,11 +363,20 @@ public class RasterBandAccessorsTest extends RasterTestBase {
 
     double[] expected = new double[] {7.0, 1785.0, 255.0, 255.0, 255.0, 0.0, 0.0, 255.0, 255.0};
     assertArrayEquals(expected, actual, FP_TOLERANCE);
+
+    // Test bottom-up raster case
+    actual =
+        Arrays.stream(RasterBandAccessors.getZonalStatsAll(raster_bottom_up, geom, 1, false, true))
+            .mapToDouble(Double::doubleValue)
+            .toArray();
+
+    assertArrayEquals(expected, actual, FP_TOLERANCE);
   }
 
   @Test
   public void testRasterization3() throws FactoryException, ParseException, IOException {
     GridCoverage2D raster = rasterFromGeoTiff(resourceFolder + "raster/test8.tiff");
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(raster);
 
     Geometry geom =
         Constructors.geomFromWKT(
@@ -305,6 +388,13 @@ public class RasterBandAccessorsTest extends RasterTestBase {
             .toArray();
 
     double[] expected = new double[] {2.0, 10.0, 5.0, 5.0, 5.0, 0.0, 0.0, 5.0, 5.0};
+    assertArrayEquals(expected, actual, FP_TOLERANCE);
+
+    actual =
+        Arrays.stream(RasterBandAccessors.getZonalStatsAll(raster_bottom_up, geom, 1, true, true))
+            .mapToDouble(Double::doubleValue)
+            .toArray();
+
     assertArrayEquals(expected, actual, FP_TOLERANCE);
   }
 
@@ -318,7 +408,8 @@ public class RasterBandAccessorsTest extends RasterTestBase {
             "test-outdb-raster",
             new Path(resourceFolder + "raster_geotiff_color/FAA_UTM18N_NAD83.tif"),
             conf);
-    GridCoverage2D[] rasters = {inDbRaster, outDbRaster};
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(inDbRaster);
+    GridCoverage2D[] rasters = {inDbRaster, outDbRaster, raster_bottom_up};
 
     for (GridCoverage2D raster : rasters) {
       String polygon =
@@ -375,6 +466,8 @@ public class RasterBandAccessorsTest extends RasterTestBase {
   public void testZonalStatsAllWithNoData() throws IOException, FactoryException, ParseException {
     GridCoverage2D raster =
         rasterFromGeoTiff(resourceFolder + "raster/raster_with_no_data/test5.tiff");
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(raster);
+
     String polygon =
         "POLYGON((-167.750000 87.750000, -155.250000 87.750000, -155.250000 40.250000, -180.250000 40.250000, -167.750000 87.750000))";
     Geometry geom = Constructors.geomFromWKT(polygon, RasterAccessors.srid(raster));
@@ -397,18 +490,30 @@ public class RasterBandAccessorsTest extends RasterTestBase {
         };
 
     assertArrayEquals(expected, actual, FP_TOLERANCE);
+
+    // Testing bottom-up raster case
+    actual =
+        Arrays.stream(RasterBandAccessors.getZonalStatsAll(raster_bottom_up, geom, 1, false, true))
+            .mapToDouble(Double::doubleValue)
+            .toArray();
+    assertArrayEquals(expected, actual, FP_TOLERANCE);
   }
 
   @Test
   public void testZonalStatsAllWithEmptyRaster() throws FactoryException, ParseException {
     GridCoverage2D raster = RasterConstructors.makeEmptyRaster(1, 6, 6, 1, -1, 1, -1, 0, 0, 4326);
+
     double[] bandValue =
         new double[] {
           0, 0, 0, 0, 0, 0, 0, 1, 0, 3, 9, 0, 0, 5, 6, 0, 8, 0, 0, 4, 11, 11, 12, 0, 0, 13, 0, 15,
           16, 0, 0, 0, 0, 0, 0, 0
         };
+
     raster = MapAlgebra.addBandFromArray(raster, bandValue, 1);
     raster = RasterBandEditors.setBandNoDataValue(raster, 1, 0d);
+
+    GridCoverage2D raster_bottom_up = flipVerticallyPixelSpace(raster);
+
     // Testing implicit CRS transformation
     Geometry geom = Constructors.geomFromWKT("POLYGON((2 -2, 2 -6, 6 -6, 6 -2, 2 -2))", 0);
 
@@ -417,6 +522,13 @@ public class RasterBandAccessorsTest extends RasterTestBase {
             .mapToDouble(Double::doubleValue)
             .toArray();
     double[] expected = new double[] {13.0, 114.0, 8.7692, 9.0, 11.0, 4.7285, 22.3589, 1.0, 16.0};
+    assertArrayEquals(expected, actual, FP_TOLERANCE);
+
+    // Testing bottom-up raster case
+    actual =
+        Arrays.stream(RasterBandAccessors.getZonalStatsAll(raster_bottom_up, geom, 1, false, true))
+            .mapToDouble(Double::doubleValue)
+            .toArray();
     assertArrayEquals(expected, actual, FP_TOLERANCE);
   }
 
