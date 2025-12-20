@@ -286,13 +286,28 @@ class TestGdalConfig:
         )
 
         class MockCredential:
+            global_counter = 0
+
             def __init__(self):
-                self.access_key = "test_default_profile_access_key"  # nosec: B015
-                self.secret_key = "test_default_profile_secret_key"  # nosec: B015
-                self.token = "test_default_profile_token"  # nosec: B015
+                MockCredential.global_counter += 1
+                self.version = MockCredential.global_counter
+                self.internal_counter = 0
 
             def get_frozen_credentials(self):
-                return self
+                # Always return a new stateless object with unique values
+                v = self.version
+
+                class Frozen:
+                    access_key = (
+                        f"test_default_profile_access_key_{v}_{self.internal_counter}"
+                    )
+                    secret_key = (
+                        f"test_default_profile_secret_key_{v}_{self.internal_counter}"
+                    )
+                    token = f"test_default_profile_token_{v}_{self.internal_counter}"
+
+                self.internal_counter += 1
+                return Frozen()
 
         class MockBoto3SessionModule:
             class SessionClass:
@@ -309,27 +324,47 @@ class TestGdalConfig:
             gdal_conf._sts_client_default_profile = None
             gdal_conf.boto3_session = MockBoto3SessionModule()
 
-            config = gdal_conf.get_gdal_conf_for_s3_bucket(
+            config1 = gdal_conf.get_gdal_conf_for_s3_bucket(
                 "test-default-profile-bucket"
             )
-            assert config["AWS_NO_SIGN_REQUEST"] == "NO"
-            assert config["AWS_ACCESS_KEY_ID"] == "test_default_profile_access_key"
-            assert config["AWS_SECRET_ACCESS_KEY"] == "test_default_profile_secret_key"
-            assert config["AWS_SESSION_TOKEN"] == "test_default_profile_token"
 
-            session = gdal_conf.get_rasterio_aws_session(
+            assert config1["AWS_NO_SIGN_REQUEST"] == "NO"
+            assert config1["AWS_ACCESS_KEY_ID"].startswith(
+                "test_default_profile_access_key_"
+            )
+            assert config1["AWS_SECRET_ACCESS_KEY"].startswith(
+                "test_default_profile_secret_key_"
+            )
+            assert config1["AWS_SESSION_TOKEN"].startswith(
+                "test_default_profile_token_"
+            )
+
+            session1 = gdal_conf.get_rasterio_aws_session(
                 "s3://test-default-profile-bucket/test/path"
             )
-            assert (
-                session.credentials["aws_access_key_id"]
-                == "test_default_profile_access_key"
+            assert session1.credentials["aws_access_key_id"].startswith(
+                "test_default_profile_access_key_"
             )
-            assert (
-                session.credentials["aws_secret_access_key"]
-                == "test_default_profile_secret_key"
+            assert session1.credentials["aws_secret_access_key"].startswith(
+                "test_default_profile_secret_key_"
             )
+            assert session1.credentials["aws_session_token"].startswith(
+                "test_default_profile_token_"
+            )
+
+            # Call again to get new credentials
+            config2 = gdal_conf.get_gdal_conf_for_s3_bucket(
+                "test-default-profile-bucket"
+            )
+            session2 = gdal_conf.get_rasterio_aws_session(
+                "s3://test-default-profile-bucket/test/path"
+            )
+
+            # Ensure the credentials are different
+            assert config1["AWS_ACCESS_KEY_ID"] != config2["AWS_ACCESS_KEY_ID"]
             assert (
-                session.credentials["aws_session_token"] == "test_default_profile_token"
+                session1.credentials["aws_access_key_id"]
+                != session2.credentials["aws_access_key_id"]
             )
         finally:
             gdal_conf.boto3_session = old_boto3_session

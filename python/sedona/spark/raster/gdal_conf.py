@@ -20,6 +20,7 @@ import os
 import re
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Tuple
+from copy import deepcopy
 
 try:
     import boto3  # type: ignore
@@ -55,9 +56,11 @@ def get_gdal_conf_for_s3_bucket(bucket_name: str) -> Dict[str, str]:
     if _base_gdal_conf is None or _per_bucket_gdal_conf is None:
         return {}
     if bucket_name in _per_bucket_gdal_conf:
-        gdal_conf = _per_bucket_gdal_conf[bucket_name]
+        # Deepcopy to avoid modifying the cached conf
+        gdal_conf = deepcopy(_per_bucket_gdal_conf[bucket_name])
     else:
-        gdal_conf = _base_gdal_conf
+        # Deepcopy to avoid modifying the cached conf
+        gdal_conf = deepcopy(_base_gdal_conf)
     if "__stint_role_cfg__" in gdal_conf:
         role_cfg = gdal_conf["__stint_role_cfg__"].copy()
         cred = _get_session_credentials_for_stint_role(role_cfg)
