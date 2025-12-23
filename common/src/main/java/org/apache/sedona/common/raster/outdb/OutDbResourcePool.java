@@ -26,7 +26,10 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import javax.imageio.stream.ImageInputStream;
+import javax.media.jai.JAI;
+import javax.media.jai.TileCache;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.conf.StorageUnit;
 import org.apache.hadoop.fs.Path;
 import org.apache.sedona.common.raster.inputstream.DiskCachedImageInputStream;
 import org.apache.sedona.common.raster.inputstream.HadoopImageInputStreamFactory;
@@ -293,6 +296,19 @@ public class OutDbResourcePool {
               newDiskSpaceCapacity);
           freeResourcesDiskSpacePercent = newDiskPercent;
           freeResourcesDiskSpaceCapacity = newDiskSpaceCapacity;
+        }
+      }
+
+      // Reconfiguring the tile cache
+      long newTileCacheSize =
+          (long)
+              conf.getStorageSize(
+                  ThreadLocalOutDbResourcePool.TILE_CACHE_SIZE_KEY, "0b", StorageUnit.BYTES);
+      if (newTileCacheSize > 0) {
+        TileCache tileCache = JAI.getDefaultInstance().getTileCache();
+        if (newTileCacheSize != tileCache.getMemoryCapacity()) {
+          logger.info("Reconfiguring JAI tile cache size: {} bytes", newTileCacheSize);
+          tileCache.setMemoryCapacity(newTileCacheSize);
         }
       }
 

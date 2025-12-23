@@ -42,6 +42,12 @@ public class ThreadLocalOutDbResourcePool {
   public static final int DEFAULT_FREE_RESOURCES_POOL_SIZE = 100;
 
   /**
+   * Configuration key for configuring JAI's in-memory tile cache size for out-db rasters. The value
+   * is in storage size format, such as 500mb, etc.
+   */
+  public static final String TILE_CACHE_SIZE_KEY = "wherobots.raster.outdb.tile-cache.size";
+
+  /**
    * Automatically rescale pixel values to the range of the data type. This is useful when the
    * GeoTiff has scale and offset values in the metadata. Default is true.
    */
