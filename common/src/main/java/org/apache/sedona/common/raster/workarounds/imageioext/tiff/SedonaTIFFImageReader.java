@@ -1927,6 +1927,12 @@ public class SedonaTIFFImageReader extends TIFFImageReader {
       processImageComplete();
     }
 
+    // Wherobots patch: actually decompressor does not have to be a member. The most recent code
+    // in the upstream has defined decompressor to be a local variable and dispose it after usage.
+    // Reference:
+    // https://github.com/geosolutions-it/imageio-ext/blob/2.0.1/plugin/tiff/src/main/java/it/geosolutions/imageioimpl/plugins/tiff/TIFFImageReader.java#L1850
+    decompressor.dispose();
+    decompressor = null;
     return theImage;
   }
 
