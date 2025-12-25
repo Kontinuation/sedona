@@ -21,7 +21,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wherobots-sedona"
-version = "1.10.5"
+version = "1.10.6"
 description = "Wherobots Compute is a cluster computing system for processing large-scale spatial data"
 readme = "README.md"
 authors = [ { name = "Wherobots", email = "support@wherobots.com" } ]
