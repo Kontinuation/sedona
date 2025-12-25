@@ -94,8 +94,7 @@ public class Rasterization {
       RasterizationParams params,
       ReferencedEnvelope geomExtent,
       double value,
-      boolean allTouched)
-      throws FactoryException {
+      boolean allTouched) {
 
     // For instances where sub geometry is completely outside raster
     if (geomExtent == null) {
@@ -117,7 +116,7 @@ public class Rasterization {
         rasterizeLineString(geom, params, value, geomExtent);
         break;
       default:
-        rasterizePolygon(geom, params, geomExtent, value, allTouched);
+        rasterizePolygon(raster, metadata, geom, params, geomExtent, value, allTouched);
         break;
     }
   }
@@ -128,8 +127,7 @@ public class Rasterization {
       Geometry geom,
       RasterizationParams params,
       double value,
-      boolean allTouched)
-      throws FactoryException {
+      boolean allTouched) {
 
     for (int i = 0; i < geom.getNumGeometries(); i++) {
       Geometry subGeom = geom.getGeometryN(i);
@@ -562,7 +560,9 @@ public class Rasterization {
     }
   }
 
-  public static void rasterizePolygon(
+  private static void rasterizePolygon(
+      GridCoverage2D raster,
+      double[] metadata,
       Geometry geom,
       RasterizationParams params,
       ReferencedEnvelope geomExtent,
@@ -577,25 +577,28 @@ public class Rasterization {
     Geometry clippedGeom =
         Functions.intersection(JTS.toGeometry((BoundingBox) geomExtent), Functions.buffer(geom, 0));
 
-    if (Objects.equals(clippedGeom.getGeometryType(), "MultiPolygon")) {
+    if (clippedGeom instanceof MultiPolygon) {
       for (int i = 0; i < clippedGeom.getNumGeometries(); i++) {
         Geometry subGeom = clippedGeom.getGeometryN(i);
-        rasterizePolygon(subGeom, params, geomExtent, value, allTouched);
+        rasterizePolygon(raster, metadata, subGeom, params, geomExtent, value, allTouched);
       }
-      return;
+    } else if (clippedGeom instanceof Polygon) {
+      Polygon polygon = (Polygon) clippedGeom;
+
+      // Compute scanline X-intercepts
+      Map<Double, TreeSet<Double>> scanlineIntersections =
+          computeScanlineIntersections(polygon, params, value, geomExtent, allTouched);
+
+      // Process intersections to get startXs and endXs for each scanline
+      Map<Integer, List<int[]>> scanlineFillRanges = computeFillRanges(scanlineIntersections);
+
+      // Burn values between startX and endX pairs
+      fillPolygon(scanlineFillRanges, params, value);
+    } else {
+      // Clipped geometry could be anything, such as a GeometryCollection, although such cases are
+      // rare. Delegate to rasterizeGeometry to handle all these cases.
+      rasterizeGeometry(raster, metadata, clippedGeom, params, geomExtent, value, allTouched);
     }
-
-    Polygon polygon = (Polygon) clippedGeom;
-
-    // Compute scanline X-intercepts
-    Map<Double, TreeSet<Double>> scanlineIntersections =
-        computeScanlineIntersections(polygon, params, value, geomExtent, allTouched);
-
-    // Process intersections to get startXs and endXs for each scanline
-    Map<Integer, List<int[]>> scanlineFillRanges = computeFillRanges(scanlineIntersections);
-
-    // Burn values between startX and endX pairs
-    fillPolygon(scanlineFillRanges, params, value);
   }
 
   /** Computes scanline intersections by iterating over polygon edges. */

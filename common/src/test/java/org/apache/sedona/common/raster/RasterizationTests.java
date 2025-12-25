@@ -20,7 +20,10 @@ package org.apache.sedona.common.raster;
 
 import static org.apache.sedona.common.raster.RasterAccessors.metadata;
 
+import java.util.List;
+import org.apache.sedona.common.FunctionsGeoTools;
 import org.geotools.api.referencing.FactoryException;
+import org.geotools.api.referencing.operation.TransformException;
 import org.geotools.coverage.grid.GridCoverage2D;
 import org.geotools.geometry.jts.ReferencedEnvelope;
 import org.junit.Assert;
@@ -292,6 +295,26 @@ public class RasterizationTests extends RasterTestBase {
     wktPoint = "POINT (5.25 2.25)";
     validateRasterizeGeomExtent(
         wktPoint, new double[] {5.0, 6.0, 2.0, 3.0}, testRaster, metadata, false);
+  }
+
+  @Test
+  public void testRasterizePolygonPartiallyTouchesRaster()
+      throws ParseException, FactoryException, TransformException {
+    // The metadata of an Alpha Earth image
+    GridCoverage2D testRaster =
+        RasterConstructors.makeEmptyRaster(1, 1024, 1024, 500000, 4976640, 10, 10, 0, 0, 32610);
+
+    // Grid aligned polygon completely contained within raster extent
+    String wktPolygon =
+        "POLYGON ((-123.000206 44.960125, -123.000208 44.960031, -122.999961 44.960028, -122.99996 44.960105, -123 44.960105, -123 44.960123, -123.000206 44.960125))";
+    Geometry geom = wktReader.read(wktPolygon);
+    geom = FunctionsGeoTools.transform(geom, "EPSG:4326", "EPSG:32610");
+
+    // The intersection of the polygon and the raster extent will be a GeometryCollection containing
+    // Polygons and LineStrings. We should handle this case gracefully rather than throwing an
+    // error.
+    List<Object> result = Rasterization.rasterize(geom, testRaster, "B", 10, true, true);
+    Assert.assertEquals(2, result.size());
   }
 
   private void validateRasterizeGeomExtent(
