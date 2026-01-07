@@ -22,7 +22,7 @@
     <parent>
         <groupId>com.wherobots</groupId>
         <artifactId>sedona-parent</artifactId>
-        <version>1.10.6</version>
+        <version>1.10.7</version>
         <relativePath>../pom.xml</relativePath>
     </parent>
     <artifactId>sedona-common</artifactId>
