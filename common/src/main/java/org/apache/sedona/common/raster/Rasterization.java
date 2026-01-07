@@ -668,18 +668,15 @@ public class Rasterization {
           // calculating slope
           for (double y = yStart; y >= yEnd; y--) {
             double xIntercept = p1X; // Vertical line, xIntercept is constant
-            if (xIntercept < 0 || xIntercept > params.writableRaster.getWidth()) {
-              continue; // Skip xIntercepts outside geomExtent
-            }
             scanlineIntersections.computeIfAbsent(y, k -> new TreeSet<>()).add(xIntercept);
           }
         } else {
           double slope = (worldP2.y - worldP1.y) / (worldP2.x - worldP1.x);
+          double xMin = (geomExtent.getMinX() - params.upperLeftX) / params.scaleX;
+          double xMax = (geomExtent.getMaxX() - params.upperLeftX) / params.scaleX;
 
           for (double y = yStart; y >= yEnd; y--) {
             double xIntercept = p1X + ((p1Y - y) / slope);
-            double xMin = (geomExtent.getMinX() - params.upperLeftX) / params.scaleX;
-            double xMax = (geomExtent.getMaxX() - params.upperLeftX) / params.scaleX;
             if ((xIntercept < xMin) || (xIntercept >= xMax)) {
               continue; // Skip xIntercepts outside geomExtent
             }
