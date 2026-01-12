@@ -211,4 +211,169 @@ class ReplaceSingleRowJoinsWithScalarSubqueriesSuite extends TestBaseScala with 
       testCrossJoin("SELECT geom AS geom2 FROM df1 WHERE geom IS NULL LIMIT 1", keepDf2 = true)
     }
   }
+
+  describe("Order-dependent Aggregation Join") {
+    // These tests verify that the optimization is NOT applied when the scalar plan
+    // contains order-dependent aggregations (collect_set, collect_list, first, last).
+    // Such aggregations can produce different results in distributed execution depending
+    // on row ordering, which can cause incorrect results when converted to scalar subqueries.
+
+    it("should NOT optimize join with collect_set aggregation") {
+      val query = "SELECT collect_set(id) AS ids FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_collect_set")
+
+      val actualResult = sparkSession.sql(
+        "SELECT df1.* FROM df1, df2_collect_set WHERE array_contains(ids, df1.id)")
+
+      // The optimization should NOT be applied, so Join should remain in the plan
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).nonEmpty,
+        "Join with collect_set should not be optimized to scalar subquery")
+    }
+
+    it("should NOT optimize join with collect_list aggregation") {
+      val query = "SELECT collect_list(id) AS ids FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_collect_list")
+
+      val actualResult = sparkSession.sql(
+        "SELECT df1.* FROM df1, df2_collect_list WHERE array_contains(ids, df1.id)")
+
+      // The optimization should NOT be applied, so Join should remain in the plan
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).nonEmpty,
+        "Join with collect_list should not be optimized to scalar subquery")
+    }
+
+    it("should NOT optimize join with first aggregation") {
+      val query = "SELECT first(geom) AS geom2 FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_first")
+
+      val actualResult =
+        sparkSession.sql("SELECT df1.* FROM df1, df2_first WHERE ST_Contains(geom2, geom)")
+
+      // The optimization should NOT be applied, so Join should remain in the plan
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).nonEmpty,
+        "Join with first should not be optimized to scalar subquery")
+    }
+
+    it("should NOT optimize join with last aggregation") {
+      val query = "SELECT last(geom) AS geom2 FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_last")
+
+      val actualResult =
+        sparkSession.sql("SELECT df1.* FROM df1, df2_last WHERE ST_Contains(geom2, geom)")
+
+      // The optimization should NOT be applied, so Join should remain in the plan
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).nonEmpty,
+        "Join with last should not be optimized to scalar subquery")
+    }
+
+    it("should NOT optimize join with any_value aggregation") {
+      val query = "SELECT any_value(geom) AS geom2 FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_any_value")
+
+      val actualResult =
+        sparkSession.sql("SELECT df1.* FROM df1, df2_any_value WHERE ST_Contains(geom2, geom)")
+
+      // The optimization should NOT be applied, so Join should remain in the plan
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).nonEmpty,
+        "Join with any_value should not be optimized to scalar subquery")
+    }
+
+    it("should NOT optimize join with max_by aggregation") {
+      val query = "SELECT max_by(geom, id) AS geom2 FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_max_by")
+
+      val actualResult =
+        sparkSession.sql("SELECT df1.* FROM df1, df2_max_by WHERE ST_Contains(geom2, geom)")
+
+      // The optimization should NOT be applied, so Join should remain in the plan
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).nonEmpty,
+        "Join with max_by should not be optimized to scalar subquery")
+    }
+
+    it("should NOT optimize join with min_by aggregation") {
+      val query = "SELECT min_by(geom, id) AS geom2 FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_min_by")
+
+      val actualResult =
+        sparkSession.sql("SELECT df1.* FROM df1, df2_min_by WHERE ST_Contains(geom2, geom)")
+
+      // The optimization should NOT be applied, so Join should remain in the plan
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).nonEmpty,
+        "Join with min_by should not be optimized to scalar subquery")
+    }
+
+    it("should still optimize join with order-irrelevant aggregations like MAX") {
+      // MAX is order-irrelevant, so the optimization should still be applied
+      val query = "SELECT MAX(geom) AS geom2 FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_max")
+
+      val actualResult =
+        sparkSession.sql("SELECT df1.* FROM df1, df2_max WHERE ST_Contains(geom2, geom)")
+
+      // The optimization SHOULD be applied, so Join should be removed
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).isEmpty,
+        "Join with MAX should be optimized to scalar subquery")
+    }
+
+    it("should still optimize join with COUNT aggregation") {
+      // COUNT is order-irrelevant, so the optimization should still be applied
+      val query = "SELECT COUNT(*) AS cnt FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_count")
+
+      val actualResult =
+        sparkSession.sql("SELECT df1.* FROM df1, df2_count WHERE df1.id < cnt")
+
+      // The optimization SHOULD be applied, so Join should be removed
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).isEmpty,
+        "Join with COUNT should be optimized to scalar subquery")
+    }
+
+    it("should still optimize join with SUM aggregation") {
+      // SUM is order-irrelevant, so the optimization should still be applied
+      val query = "SELECT SUM(id) AS total FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_sum")
+
+      val actualResult =
+        sparkSession.sql("SELECT df1.* FROM df1, df2_sum WHERE df1.id < total")
+
+      // The optimization SHOULD be applied, so Join should be removed
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).isEmpty,
+        "Join with SUM should be optimized to scalar subquery")
+    }
+
+    it("should still optimize join with AVG aggregation") {
+      // AVG is order-irrelevant, so the optimization should still be applied
+      val query = "SELECT AVG(id) AS avg_id FROM df1"
+      val df2 = sparkSession.sql(query)
+      df2.createOrReplaceTempView("df2_avg")
+
+      val actualResult =
+        sparkSession.sql("SELECT df1.* FROM df1, df2_avg WHERE df1.id < avg_id")
+
+      // The optimization SHOULD be applied, so Join should be removed
+      assert(
+        actualResult.queryExecution.optimizedPlan.find(_.isInstanceOf[Join]).isEmpty,
+        "Join with AVG should be optimized to scalar subquery")
+    }
+  }
 }

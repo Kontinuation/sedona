@@ -19,6 +19,7 @@
 package org.apache.spark.sql.sedona_sql.optimization
 
 import org.apache.spark.sql.catalyst.expressions.{Alias, Expression, NamedExpression, ScalarSubquery}
+import org.apache.spark.sql.catalyst.expressions.aggregate.{AggregateExpression, AnyValue, CollectList, CollectSet, First, Last, MaxBy, MinBy}
 import org.apache.spark.sql.catalyst.plans.InnerLike
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -27,9 +28,43 @@ import org.apache.spark.sql.sedona_sql.optimization.RewriteUtils.matchOrderToOri
 // TODO: Support outer and anti joins
 object ReplaceSingleRowJoinsWithScalarSubqueries extends Rule[LogicalPlan] {
 
+  /**
+   * Checks if the plan contains order-dependent or non-deterministic aggregations. These include:
+   *   - CollectSet, CollectList: Order of elements in resulting array can vary
+   *   - First, Last: Return values that depend on row ordering
+   *   - AnyValue: Explicitly non-deterministic, returns arbitrary value
+   *   - MaxBy, MinBy: Non-deterministic when there are ties in the ordering column
+   *
+   * Converting joins with such aggregations to scalar subqueries can cause incorrect results
+   * because the subquery may be evaluated independently on different tasks, potentially seeing
+   * different row orderings or returning different arbitrary values.
+   */
+  private def containsOrderDependentAggregation(plan: LogicalPlan): Boolean = {
+    plan.exists {
+      case agg: Aggregate =>
+        agg.aggregateExpressions.exists { expr =>
+          expr.collect {
+            case AggregateExpression(_: CollectSet, _, _, _, _) => true
+            case AggregateExpression(_: CollectList, _, _, _, _) => true
+            case AggregateExpression(_: First, _, _, _, _) => true
+            case AggregateExpression(_: Last, _, _, _, _) => true
+            case AggregateExpression(_: AnyValue, _, _, _, _) => true
+            case AggregateExpression(_: MaxBy, _, _, _, _) => true
+            case AggregateExpression(_: MinBy, _, _, _, _) => true
+          }.nonEmpty
+        }
+      case _ => false
+    }
+  }
+
   private def isScalarPlan(plan: LogicalPlan): Boolean = {
-    // This will miss the case where there is a OneRowRelation that is not output by the plan
-    plan.output.length == 1 && plan.maxRows.contains(1)
+    // This will miss the case where there is a OneRowRelation that is not output by the plan.
+    // Note: Short-circuit evaluation ensures containsOrderDependentAggregation (which traverses
+    // the plan tree) is only called when the first two O(1) checks pass. Each plan is checked
+    // at most once per join during transformDown, so caching is not necessary.
+    plan.output.length == 1 &&
+    plan.maxRows.contains(1) &&
+    !containsOrderDependentAggregation(plan)
   }
 
   private def replaceJoin(
