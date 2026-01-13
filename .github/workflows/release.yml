@@ -18,82 +18,76 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      name:
-        description: 'Release name (use v{version} if left blank)'
-        required: false
-      overwrite:
-        description: 'Overwrite existing release'
-        type: boolean
-        required: true
-        default: false
-      prerelease:
-        description: 'Set as a pre-release'
-        required: true
-        type: boolean
-        default: false
-      make_latest:
-        description: 'Set as the latest release'
-        required: true
-        type: boolean
-        default: true
+  push:
+    branches: [master]
 
 env:
   MAVEN_OPTS: -Dmaven.wagon.httpconnectionManager.ttlSeconds=60
 
 jobs:
-  prepare:
+  # Semantic release determines version and creates tag
+  semantic-release:
     runs-on: depot-ubuntu-24.04
+    concurrency:
+      group: ${{ github.workflow }}-release
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    outputs:
+      released: ${{ steps.release.outputs.released }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set up JDK
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: git reset --hard ${{ github.sha }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'zulu'
-      - name: Cache Maven packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2-wherobots-compute
-      - name: Resolve version number
-        id: resolve-version
-        run: |
-          VERSION=$(mvn help:evaluate -Dexpression=project.version -q -DforceStdout)
-          echo "Project version number: $VERSION"
-          if [ -z "$VERSION" ]; then
-            echo "::error title=Resolve version number failed::Failed to obtain version number of this maven project"
-          fi
-          if [[ "$VERSION" == *"-SNAPSHOT" ]]; then
-            echo "::error title=SNAPSHOT version detected::The version $VERSION is a snapshot version and should not be released"
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
-    outputs:
-      version: ${{ steps.resolve-version.outputs.version }}
-      tag: ${{ steps.resolve-version.outputs.tag }}
+          java-version: '17'
 
+      - name: Install semantic-release
+        run: npm ci
+
+      - name: Release
+        id: release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx semantic-release
+
+  # Build wheels (only if release was created)
   build-wheel:
-    needs:
-      - prepare
+    needs: semantic-release
+    if: needs.semantic-release.outputs.released == 'true'
     uses: wherobots/wherobots-compute/.github/workflows/python-wheel.yml@master
 
+  # Build docs (only if release was created)
   build-docs:
-    needs:
-      - prepare
+    needs: semantic-release
+    if: needs.semantic-release.outputs.released == 'true'
     uses: wherobots/wherobots-compute/.github/workflows/docs.yml@master
 
+  # Build and deploy JARs (only if release was created)
   build-jars:
     runs-on: depot-ubuntu-24.04
-    needs:
-      - prepare
+    needs: semantic-release
+    if: needs.semantic-release.outputs.released == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.semantic-release.outputs.tag }}
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
@@ -105,29 +99,6 @@ jobs:
           path: ~/.m2
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2-wherobots-compute
-      - name: Find maven packages
-        id: find-packages
-        if: ${{ github.event.inputs.overwrite != 'false' }}
-        run: |
-          GROUP_ID=$(mvn help:evaluate -Dexpression=project.groupId -q -DforceStdout)
-          echo "Finding all artifact IDs"
-          find . -name pom.xml -execdir sh -c 'echo "$(mvn help:evaluate -Dexpression=project.artifactId -Dscala=2.13 -Dspark=3.3 -q -DforceStdout)"' \; > artifact-list.txt
-          find . -name pom.xml -execdir sh -c 'echo "$(mvn help:evaluate -Dexpression=project.artifactId -Dscala=2.13 -Dspark=3.4 -q -DforceStdout)"' \; >> artifact-list.txt
-          find . -name pom.xml -execdir sh -c 'echo "$(mvn help:evaluate -Dexpression=project.artifactId -Dscala=2.13 -Dspark=3.5 -q -DforceStdout)"' \; >> artifact-list.txt
-          find . -name pom.xml -execdir sh -c 'echo "$(mvn help:evaluate -Dexpression=project.artifactId -Dscala=2.13 -Dspark=4.0 -q -DforceStdout)"' \; >> artifact-list.txt
-          sort artifact-list.txt | uniq | sed "s/^/${GROUP_ID}./" > package-list.txt
-          echo "Packages to be deleted:"
-          cat package-list.txt
-          PACKAGES=$(tr '\n' ',' < package-list.txt | sed 's/,$//')
-          echo "packages=$PACKAGES" >> "$GITHUB_OUTPUT"
-      - name: Delete existing maven packages
-        if: ${{ github.event.inputs.overwrite != 'false' }}
-        uses: wherobots/delete-package-versions@v1.0.0
-        with:
-          package_type: maven
-          packages: ${{ steps.find-packages.outputs.packages }}
-          versions: ${{ needs.prepare.outputs.version }}
-          github_token: ${{ secrets.GH_PKG_WRITE_TOKEN }}
       - name: Build and publish to Maven repository
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PKG_WRITE_TOKEN }}
@@ -144,26 +115,20 @@ jobs:
           name: jars
           path: ./artifacts/jars/*
 
-  release:
+  # Upload artifacts to GitHub release
+  upload-release-assets:
     runs-on: depot-ubuntu-24.04
     permissions:
       contents: write
-      packages: write
     needs:
-      - prepare
+      - semantic-release
       - build-jars
       - build-wheel
       - build-docs
+    if: needs.semantic-release.outputs.released == 'true'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Delete existing release if exists
-        uses: dev-drprasad/delete-tag-and-release@v1.1
-        if: ${{ github.event.inputs.overwrite != 'false' }}
-        with:
-          tag_name: ${{ needs.prepare.outputs.tag }}
-          delete_release: true
-          github_token: ${{ secrets.GITHUB_TOKEN }}
       - name: Prepare artifacts directory
         run: mkdir -p artifacts
       - name: Download jars
@@ -182,24 +147,11 @@ jobs:
         with:
           name: docs
           path: artifacts/docs
-
-      - name: Create tag
-        env:
-          VERSION: ${{ needs.prepare.outputs.version }}
-          TAG: ${{ needs.prepare.outputs.tag }}
-        run: |
-          git tag $TAG
-          git push origin $TAG
-      - name: Create release
+      - name: Upload release assets
         uses: softprops/action-gh-release@v2
         with:
-          name: ${{ github.event.inputs.name != '' && github.event.inputs.name || needs.prepare.outputs.tag }}
-          tag_name: ${{ needs.prepare.outputs.tag }}
-          draft: false
-          prerelease: ${{ github.event.inputs.prerelease }}
-          make_latest: ${{ github.event.inputs.make_latest }}
+          tag_name: ${{ needs.semantic-release.outputs.tag }}
           fail_on_unmatched_files: true
-          generate_release_notes: true
           files: |
             artifacts/jars/*
             artifacts/wheels/cibw-wheels-depot-macos-15-*/*
