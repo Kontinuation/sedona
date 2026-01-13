@@ -369,7 +369,7 @@ object Catalog extends AbstractCatalog with Logging {
     function[ST_GetReverseGeocodingLayers](),
     // geom <-> geog conversion functions
     function[ST_GeogToGeometry](),
-    function[ST_GeomToGeography]()) ++ geoStatsFunctions()
+    function[ST_GeomToGeography]()) ++ dbxIncompatibleFunctions()
 
   val aggregateExpressions: Seq[Aggregator[Geometry, _, _]] =
     Seq(
@@ -378,21 +378,27 @@ object Catalog extends AbstractCatalog with Logging {
       new ST_Union_Aggr,
       new ST_Analyze_Aggr,
       new ST_Collect_Agg)
-  private def geoStatsFunctions(): Seq[FunctionDescription] = {
+
+  private def dbxIncompatibleFunctions(): Seq[FunctionDescription] = {
     // Try loading geostats functions. Return a seq of geo-stats functions. If any error occurs,
     // return an empty seq to skip registering these functions.
     // This is for fixing a compatibility issue with DBR 17.3 LTS. See https://github.com/apache/sedona/issues/2472
     try {
       Seq(
+        // geostats
         function[ST_DBSCAN](),
         function[ST_LocalOutlierFactor](),
         function[ST_GLocal](),
         function[ST_BinaryDistanceBandColumn](),
-        function[ST_WeightedDistanceBandColumn]())
+        function[ST_WeightedDistanceBandColumn](),
+        // geocoding
+        function[ST_Geocode](),
+        function[ST_GetReverseGeocodingLayers](),
+        function[ST_ReverseGeocode]())
     } catch {
       case e: Throwable =>
         log.warn(
-          "GEO stats functions are not available due to Spark/DBR compatibility issues.",
+          "stats and geocoding functions are not available due to Spark/DBR compatibility issues.",
           e)
         Seq.empty
     }
