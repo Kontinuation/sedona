@@ -4,7 +4,8 @@
     "@semantic-release/commit-analyzer",
     "@semantic-release/release-notes-generator",
     ["@semantic-release/exec", {
-      "prepareCmd": "bash scripts/set-version.sh ${nextRelease.version}"
+      "prepareCmd": "bash scripts/set-version.sh ${nextRelease.version}",
+      "successCmd": "echo 'released=true' >> $GITHUB_OUTPUT && echo 'version=${nextRelease.version}' >> $GITHUB_OUTPUT && echo 'tag=v${nextRelease.version}' >> $GITHUB_OUTPUT"
     }],
     ["@semantic-release/git", {
       "assets": ["pom.xml", "**/pom.xml", "python/pyproject.toml", "python/sedona/version.py"],
