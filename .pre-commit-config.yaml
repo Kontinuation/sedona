@@ -291,7 +291,8 @@ repos:
             ^docs-overrides|
             ^spark/common/src/test/resources|
             ^tools/maven/scalafmt|
-            osmpbf/build
+            osmpbf/build|
+            package-lock\.json
           )
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.0
