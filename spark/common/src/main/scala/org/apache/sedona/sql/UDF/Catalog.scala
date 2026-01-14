@@ -363,10 +363,6 @@ object Catalog extends AbstractCatalog with Logging {
     function[RS_StackTileExplode](false, Double.NaN),
     // Expression for raster AI
     function[RS_SEGMENT_TO_GEOMS](),
-    // Expression for Geocoding
-    function[ST_Geocode](),
-    function[ST_ReverseGeocode](),
-    function[ST_GetReverseGeocodingLayers](),
     // geom <-> geog conversion functions
     function[ST_GeogToGeometry](),
     function[ST_GeomToGeography]()) ++ dbxIncompatibleFunctions()
@@ -380,8 +376,6 @@ object Catalog extends AbstractCatalog with Logging {
       new ST_Collect_Agg)
 
   private def dbxIncompatibleFunctions(): Seq[FunctionDescription] = {
-    // Try loading geostats functions. Return a seq of geo-stats functions. If any error occurs,
-    // return an empty seq to skip registering these functions.
     // This is for fixing a compatibility issue with DBR 17.3 LTS. See https://github.com/apache/sedona/issues/2472
     try {
       Seq(
