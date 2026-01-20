@@ -40,7 +40,7 @@ jobs:
       version: ${{ steps.release.outputs.version }}
       tag: ${{ steps.release.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -52,7 +52,7 @@ jobs:
           node-version: 'lts/*'
 
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '17'
@@ -85,11 +85,11 @@ jobs:
     if: needs.semantic-release.outputs.released == 'true'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ needs.semantic-release.outputs.tag }}
       - name: Set up JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'zulu'
@@ -110,7 +110,7 @@ jobs:
           # Build and deploy for Spark 4.0
           mvn --batch-mode clean deploy -DskipTests -Dscala=2.13 -Dspark=4.0
           cp spark-shaded/target/sedona-*.jar artifacts/jars/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: jars
           path: ./artifacts/jars/*
@@ -128,22 +128,22 @@ jobs:
     if: needs.semantic-release.outputs.released == 'true'
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Prepare artifacts directory
         run: mkdir -p artifacts
       - name: Download jars
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: jars
           path: artifacts/jars
       - name: Download wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: artifacts/wheels
           pattern: cibw-*
           merge-multiple: false
       - name: Download docs
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: docs
           path: artifacts/docs
