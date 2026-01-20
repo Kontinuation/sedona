@@ -21,7 +21,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.wherobots</groupId>
     <artifactId>sedona-parent</artifactId>
-    <version>1.12.2</version>
+    <version>1.12.3</version>
     <packaging>pom</packaging>
     <name>sedona-parent</name>
     <url>http://sedona.apache.org/</url>
