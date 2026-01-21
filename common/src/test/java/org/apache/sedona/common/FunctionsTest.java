@@ -24,6 +24,8 @@ import static org.junit.Assert.*;
 
 import com.google.common.geometry.S2CellId;
 import com.google.common.math.DoubleMath;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 import org.apache.sedona.common.sphere.Haversine;
@@ -64,6 +66,15 @@ public class FunctionsTest extends TestBase {
           return 0;
         }
       };
+
+  private static String readResourceString(String resourcePath) throws IOException {
+    try (InputStream inputStream = FunctionsTest.class.getResourceAsStream(resourcePath)) {
+      if (inputStream == null) {
+        throw new IllegalArgumentException("Resource not found: " + resourcePath);
+      }
+      return new String(inputStream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim();
+    }
+  }
 
   private final WKTReader wktReader = new WKTReader();
 
@@ -532,6 +543,18 @@ public class FunctionsTest extends TestBase {
     Geometry actualResult = Functions.split(geometryCollection, lineString);
 
     assertNull(actualResult);
+  }
+
+  @Test
+  public void splitPolygonInto2Polygons() throws ParseException, IOException {
+    String polygonWkt = readResourceString("/split_polygon.wkt");
+    String knifeWkt =
+        "LINESTRING (-0.0818787163524535 51.650609639354805, -0.0803874022176052 51.650702833160665)";
+
+    Geometry polygon = Constructors.geomFromWKT(polygonWkt, 4326);
+    Geometry knife = Constructors.geomFromWKT(knifeWkt, 4326);
+    Geometry resultPolygon = Functions.split(polygon, knife);
+    assertEquals(2, resultPolygon.getNumGeometries());
   }
 
   @Test
