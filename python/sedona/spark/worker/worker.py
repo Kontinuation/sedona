@@ -19,8 +19,8 @@ import importlib
 import os
 import sys
 import time
+from types import SimpleNamespace
 
-import sedonadb
 from pyspark import TaskContext, shuffle, SparkFiles
 from pyspark.errors import PySparkRuntimeError
 from pyspark.java_gateway import local_connect_and_auth
@@ -36,8 +36,12 @@ from pyspark.serializers import (
     SpecialLengths,
 )
 
+from sedona.spark.worker.direct_batch import DirectBatchSerializer, apply_direct_batch
 from sedona.spark.worker.serde import SedonaDBSerializer
 from sedona.spark.worker.udf_info import UDFInfo
+
+
+SQL_SCALAR_SEDONA_ARROW_BATCH_UDF = 6202
 
 
 def apply_iterator(db, iterator, udf_info: UDFInfo, cast_to_wkb: bool = False):
@@ -207,6 +211,23 @@ def register_sedona_db_udf(infile, pickle_ser) -> UDFInfo:
     return udf
 
 
+def register_direct_batch_udf(infile, pickle_ser):
+    num_udfs = read_int(infile)
+
+    udfs = []
+    for _ in range(num_udfs):
+        num_arg = read_int(infile)
+        arg_offsets = [read_int(infile) for _ in range(num_arg)]
+        function = None
+        return_type = None
+        for _ in range(read_int(infile)):
+            function, return_type = read_command(pickle_ser, infile)
+
+        udfs.append((arg_offsets, function, return_type))
+
+    return udfs
+
+
 def report_times(outfile, boot, init, finish):
     write_int(SpecialLengths.TIMING_DATA, outfile)
     write_long(int(1000 * boot), outfile)
@@ -234,7 +255,6 @@ def write_statistics(infile, outfile, boot_time, init_time) -> None:
 
 def main(infile, outfile):
     boot_time = time.time()
-    sedona_db = sedonadb.connect()
     #
     utf8_deserializer = UTF8Deserializer()
     pickle_ser = CPickleSerializer()
@@ -256,21 +276,12 @@ def main(infile, outfile):
     eval_type = read_int(infile)
 
     runner_conf = get_runner_conf(utf8_deserializer, infile)
-
-    udf = register_sedona_db_udf(infile, pickle_ser)
-
-    sedona_db.register_udf(udf.function)
-    init_time = time.time()
+    if eval_type == SQL_SCALAR_SEDONA_ARROW_BATCH_UDF:
+        udfs = register_direct_batch_udf(infile, pickle_ser)
+    else:
+        udf = register_sedona_db_udf(infile, pickle_ser)
 
     cast_to_wkb = read_bool(infile)
-
-    serde = SedonaDBSerializer(
-        timezone=runner_conf.get("spark.sql.session.timeZone", "UTC"),
-        safecheck=False,
-        db=sedona_db,
-        udf_info=udf,
-        cast_to_wkb=cast_to_wkb,
-    )
 
     number_of_geometries = read_int(infile)
     geom_offsets = {}
@@ -280,14 +291,50 @@ def main(infile, outfile):
 
         geom_offsets[geom_index] = geom_srid
 
-    udf.geom_offsets = geom_offsets
+    if eval_type == SQL_SCALAR_SEDONA_ARROW_BATCH_UDF:
+        init_time = time.time()
+        serde = DirectBatchSerializer(
+            timezone=runner_conf.get("spark.sql.session.timeZone", "UTC"),
+            safecheck=False,
+        )
+        iterator = serde.load_stream(infile)
 
-    iterator = serde.load_stream(infile)
-    out_iterator = apply_iterator(
-        db=sedona_db, iterator=iterator, udf_info=udf, cast_to_wkb=cast_to_wkb
-    )
+        def wrapped_function(*args):
+            results = tuple(
+                function(*[args[offset] for offset in arg_offsets])
+                for arg_offsets, function, _ in udfs
+            )
+            return results[0] if len(results) == 1 else results
 
-    serde.dump_stream(out_iterator, outfile)
+        out_iterator = apply_direct_batch(
+            iterator,
+            SimpleNamespace(
+                arg_offsets=None,
+                function=wrapped_function,
+                return_type=udfs[0][2],
+                geom_offsets=geom_offsets,
+            ),
+        )
+        serde.dump_stream(out_iterator, outfile)
+    else:
+        import sedonadb
+
+        sedona_db = sedonadb.connect()
+        sedona_db.register_udf(udf.function)
+        init_time = time.time()
+        serde = SedonaDBSerializer(
+            timezone=runner_conf.get("spark.sql.session.timeZone", "UTC"),
+            safecheck=False,
+            db=sedona_db,
+            udf_info=udf,
+            cast_to_wkb=cast_to_wkb,
+        )
+        udf.geom_offsets = geom_offsets
+        iterator = serde.load_stream(infile)
+        out_iterator = apply_iterator(
+            db=sedona_db, iterator=iterator, udf_info=udf, cast_to_wkb=cast_to_wkb
+        )
+        serde.dump_stream(out_iterator, outfile)
 
     write_statistics(infile, outfile, boot_time=boot_time, init_time=init_time)
 

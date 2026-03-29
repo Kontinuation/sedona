@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 import os
+import sys
 from tempfile import mkdtemp
 from typing import Iterable, Union
 
@@ -74,6 +75,10 @@ class TestBase:
                     "sedona.python.worker.udf.daemon.module",
                     "sedona.spark.worker.daemon",
                 )
+                .config("spark.pyspark.python", sys.executable)
+                .config("spark.pyspark.driver.python", sys.executable)
+                .config("spark.executorEnv.PYSPARK_PYTHON", sys.executable)
+                .config("spark.executorEnv.PYTHONPATH", os.pathsep.join(sys.path))
                 .config(
                     "sedona.python.worker.daemon.enabled", "true"
                 )  # Pandas on PySpark doesn't work with ANSI mode, which is enabled by default

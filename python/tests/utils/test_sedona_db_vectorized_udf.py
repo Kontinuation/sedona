@@ -16,10 +16,11 @@
 # under the License.
 
 import numpy as np
+import pandas as pd
 import pyspark
 import pytest
 
-from sedona.spark.sql.functions import sedona_db_vectorized_udf
+from sedona.spark.sql.functions import sedona_arrow_batch_udf, sedona_db_vectorized_udf
 from sedona.spark.utils.geometry_serde import to_sedona, from_sedona
 from tests.test_base import TestBase
 import pyarrow as pa
@@ -143,5 +144,76 @@ class TestSedonaDBArrowFunction(TestBase):
         crs_list = (
             result_df.selectExpr("ST_SRID(geom)").rdd.flatMap(lambda x: x).collect()
         )
+
+        assert crs_list == [3857, 3857, 3857]
+
+    @pytest.mark.vectorized
+    @pytest.mark.skipif(
+        pyspark.__version__ >= "4.0.0" or pyspark.__version__ < "3.5.0",
+        reason="Skip for pyspark > 4.0",
+    )
+    def test_direct_batch_geometry_to_double(self):
+        @sedona_arrow_batch_udf(return_type=DoubleType(), input_types=[ByteType()])
+        def geometry_to_non_geometry_udf(geom):
+            geom_wkb = pa.array(geom.tolist(), type=pa.binary())
+            geometry_array = np.asarray(geom_wkb, dtype=object)
+            geom = from_sedona(geometry_array)
+            result = shapely.get_x(shapely.centroid(geom))
+            return pd.Series(result)
+
+        df = self.spark.createDataFrame(
+            [(1, "POINT (1 1)"), (2, "POINT (2 2)"), (3, "POINT (3 3)")],
+            ["id", "wkt"],
+        ).withColumn("wkt", expr("ST_GeomFromWKT(wkt)"))
+
+        values = df.select(
+            geometry_to_non_geometry_udf(df.wkt).alias("x_coord")
+        ).collect()
+
+        assert [row["x_coord"] for row in values] == [1.0, 2.0, 3.0]
+
+    @pytest.mark.vectorized
+    @pytest.mark.skipif(
+        pyspark.__version__ >= "4.0.0" or pyspark.__version__ < "3.5.0",
+        reason="Skip for pyspark > 4.0",
+    )
+    def test_direct_batch_geometry_to_geometry(self):
+        @sedona_arrow_batch_udf(return_type=GeometryType(), input_types=[ByteType()])
+        def return_centroid(geom):
+            geom_wkb = pa.array(geom.tolist(), type=pa.binary())
+            geometry_array = np.asarray(geom_wkb, dtype=object)
+            geometries = from_sedona(geometry_array)
+            centroids = shapely.centroid(geometries)
+            return pd.Series(to_sedona(centroids))
+
+        df = self.spark.createDataFrame(
+            [(1, "POINT (1 1)"), (2, "POINT (2 2)"), (3, "POINT (3 3)")],
+            ["id", "wkt"],
+        ).withColumn("wkt", expr("ST_GeomFromWKT(wkt)"))
+
+        values = df.select(ST_X(return_centroid(df.wkt)).alias("x_coord")).collect()
+
+        assert [row["x_coord"] for row in values] == [1.0, 2.0, 3.0]
+
+    @pytest.mark.vectorized
+    @pytest.mark.skipif(
+        pyspark.__version__ >= "4.0.0" or pyspark.__version__ < "3.5.0",
+        reason="Skip for pyspark > 4.0",
+    )
+    def test_direct_batch_geometry_crs_preservation(self):
+        @sedona_arrow_batch_udf(return_type=GeometryType(), input_types=[ByteType()])
+        def return_same_geometry(geom):
+            geom_wkb = pa.array(geom.tolist(), type=pa.binary())
+            geometry_array = np.asarray(geom_wkb, dtype=object)
+            geometries = from_sedona(geometry_array)
+            return pd.Series(to_sedona(geometries))
+
+        df = self.spark.createDataFrame(
+            [(1, "POINT (1 1)"), (2, "POINT (2 2)"), (3, "POINT (3 3)")],
+            ["id", "wkt"],
+        ).withColumn("wkt", expr("ST_SetSRID(ST_GeomFromWKT(wkt), 3857)"))
+
+        result_df = df.select(return_same_geometry(df.wkt).alias("geom"))
+        crs_list = result_df.selectExpr("ST_SRID(geom)").rdd.flatMap(lambda x: x).collect()
 
         assert crs_list == [3857, 3857, 3857]

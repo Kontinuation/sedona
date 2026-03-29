@@ -37,6 +37,7 @@ from pyspark.sql.types import (
 from sedona.spark.utils.geometry_serde import sedona_db_speedup_enabled
 
 SEDONA_SCALAR_EVAL_TYPE = 5200
+SEDONA_ARROW_BATCH_EVAL_TYPE = 6202
 SEDONA_PANDAS_ARROW_NAME = "SedonaPandasArrowUDF"
 
 
@@ -218,6 +219,23 @@ def sedona_db_vectorized_udf(
 
         udf = UserDefinedFunction(
             lambda: shapely_udf, return_type, "SedonaPandasArrowUDF", evalType=eval_type
+        )
+
+        return udf
+
+    return apply_fn
+
+
+def sedona_arrow_batch_udf(
+    return_type: DataType,
+    input_types: list[DataType],
+):
+    def apply_fn(fn):
+        udf = UserDefinedFunction(
+            fn,
+            return_type,
+            SEDONA_PANDAS_ARROW_NAME,
+            evalType=SEDONA_ARROW_BATCH_EVAL_TYPE,
         )
 
         return udf

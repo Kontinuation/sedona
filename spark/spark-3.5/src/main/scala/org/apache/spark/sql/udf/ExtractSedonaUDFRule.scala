@@ -32,7 +32,7 @@ import scala.collection.mutable
 class ExtractSedonaUDFRule extends Rule[LogicalPlan] with Logging {
 
   private def hasScalarPythonUDF(e: Expression): Boolean = {
-    e.exists(PythonUDF.isScalarPythonUDF)
+    e.exists(isScalarPythonUDF)
   }
 
   @scala.annotation.tailrec
